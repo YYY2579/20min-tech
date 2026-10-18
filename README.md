@@ -1,8 +1,10 @@
 # 20分钟速学
 
-25 份中文技术手册，**每份控制在 20 分钟读完**，但只讲能上手用的部分：核心心智模型、关键命令、以及别人踩过的坑。
+198 份中文技术手册，**每份控制在 20 分钟读完**，但只讲能上手用的部分：核心心智模型、关键命令、以及别人踩过的坑。
 
 纯静态 HTML，无框架、无构建步骤、无追踪脚本。**离线也能打开。**
+
+在线访问：**https://yyy2579.github.io/20min-tech/**
 
 ---
 
@@ -10,23 +12,23 @@
 
 | # | 分类 | 份数 | 覆盖内容 |
 |---|---|---|---|
-| 01 | 工程基础 | 4 | Git、Linux、HTTP/HTTPS、抓包分析 |
-| 02 | 编程语言 | 1 | Python |
-| 03 | 数据与存储 | 4 | MySQL、PostgreSQL、Redis、消息队列 |
-| 04 | 架构与设计 | 4 | 架构评审、系统设计案例、分布式、微服务与 API |
-| 05 | 运维与云原生 | 5 | Docker、Kubernetes、可观测性、Nginx、CI/CD 与混沌工程 |
-| 06 | 安全 | 1 | Web 安全 |
-| 07 | 底层原理 | 2 | 计算机网络、操作系统与 IO 模型 |
-| 08 | AI 工程 | 3 | 大模型应用开发、向量数据库、AI 服务部署与运维 |
-| 09 | 综合实战 | 1 | 从零搭建可部署系统（41 步动手手册） |
+| 01 | 工程基础 | 22 | Git、Linux、HTTP、抓包、接口测试、调试、代码评审… |
+| 02 | 底层原理 | 21 | CPU/内存/中断、操作系统与 IO 模型、编译链接、锁-free… |
+| 03 | 编程语言 | 21 | C/Rust/Go/Java/Python/JS/Kotlin/Swift/PHP、WASM、元编程… |
+| 04 | 数据与存储 | 24 | MySQL/Redis/Kafka/ES/Mongo/TiDB、分库分表、数据仓库… |
+| 05 | 架构与设计 | 22 | 系统设计案例、高并发、DDD、缓存架构、多活容灾… |
+| 06 | 运维与云原生 | 24 | Docker/K8s/Prometheus/Terraform、CI/CD、日志、备份容灾… |
+| 07 | 安全 | 20 | XSS/CSRF/注入、认证授权、密码学、等保合规、应急响应… |
+| 08 | AI 工程 | 22 | 提示词工程、RAG、Agent、微调、LLMOps、多模态… |
+| 09 | 综合实战 | 22 | 短链/秒杀/IM/Feed/电商、支付/搜索/推送平台设计… |
 
 ---
 
 ## 怎么用
 
-**在线看**：直接访问站点首页，用搜索框或分类浏览。
+**在线看**：访问站点首页，搜索或按分类浏览。
 
-**离线看**：`git clone` 后双击 `index.html`。所有文档都是自包含的单文件 HTML，样式和脚本全部内联，不依赖 CDN，断网也能正常显示。
+**离线看**：`git clone` 后双击 `index.html`。每份文档都是自包含单文件 HTML，样式脚本全内联，断网也能正常显示。
 
 **手机上**：单文件自适应移动端，也可以把某个 HTML 直接发给自己。
 
@@ -37,11 +39,27 @@
 统一体例，方便跳读：
 
 - **计时器** —— 20 分钟倒计时，逼你别读太细
-- **6~8 个知识模块** —— 每个模块一个心智模型
-- **常见坑** —— 8~10 条，都是真实踩过的
-- **自测题** —— 6 道选择题，点了立刻判对错，附解析
+- **6~15 个知识模块** —— 每个模块一个心智模型
+- **常见坑** —— 真实踩过的
+- **自测题** —— 选择题，点了立刻判对错，附解析
 - **速查卡** —— 命令/配置一键复制
-- **术语表** —— 15~20 条，看不懂随时回查
+- **术语表** —— 看不懂随时回查
+
+---
+
+## 学习笔记与已读（重点功能）
+
+站点右下角有一个**全局悬浮按钮 ✎**，所有页面通用：
+
+- **标记已读**：文档页信息行有「标记已读」按钮，点击即记录；主页每篇文档会显示 **✓ 已读** 徽章，首页统计栏实时显示 **已读 x/198** 总进度。
+- **按模块记笔记**：每个模块标题旁有 ✎ 按钮，点击直接给该模块写笔记；每篇还有独立的「⭐ 本篇总结」。
+- **Markdown 支持**：标题、粗体/斜体、行内代码、代码块、表格（支持对齐）、有序/无序列表、**待办复选框** `- [ ]`、引用、分割线、链接。编辑/预览一键切换，输入即自动保存。
+- **全部笔记**：抽屉里可浏览所有笔记，按时间倒序，显示所在文档与章节，支持搜索、点击跳转对应章节、单条删除。
+- **数据存哪**：默认存在**本机浏览器 localStorage**（`20min.read.v1` / `20min.notes.v1`），换设备看不见。
+- **多设备同步（可选）**：设置页填入 GitHub Token（建议用细粒度 Token、仅勾选 Gist 权限，可随时吊销），即可同步到一个**私有 Gist**。合并规则是按记录更新时间取胜者，多设备改不会互相覆盖。也支持导出/导入 JSON 备份。
+- **快捷键**：`Ctrl/⌘+Enter` 开关笔记面板，`Ctrl/⌘+S` 保存，`Esc` 关闭。
+
+> 安全说明：Token 只保存在你自己浏览器的 localStorage，除 api.github.com 外不发送到任何地方；笔记内容渲染前全部转义，`javascript:` 类链接会被拦截。
 
 ---
 
@@ -59,7 +77,8 @@
 - 纯静态 HTML + 内联 CSS/JS，**零依赖**
 - GitHub Pages 分支部署，不使用 GitHub Actions（省额度，也省配置）
 - 路径全 ASCII，避免中文 URL 的百分号编码问题
-- 每份文档约 50~70 KB
+- 每份文档约 40~70 KB
+- 笔记系统为单文件运行时模块 `notes-core.js`（ES5、无依赖），198 篇文档只注入一行 `<script>`，UI 全部运行时生成——改功能只动一个文件
 
 ---
 
@@ -67,20 +86,44 @@
 
 ```
 .
-├── index.html                    首页（搜索 + 分类导航）
+├── index.html                    首页（搜索 + 分类导航 + 已读进度）
 ├── 404.html
 ├── .nojekyll                     跳过 Jekyll 处理
-├── 01-fundamentals/              git / linux-cli / http-https / packet-capture
-├── 02-languages/                 python
-├── 03-data/                      mysql / postgresql / redis / message-queue
-├── 04-architecture/              architecture-review / system-design-cases
-│                                 distributed-systems / microservices-api
-├── 05-devops/                    docker / kubernetes / observability
-│                                 nginx / cicd-chaos
-├── 06-security/                  web-security
-├── 07-lowlevel/                  networking / os-io-model
-├── 08-ai/                        llm-app-dev / vector-database / ai-service-ops
-└── 09-practice/                  build-deployable-system
+├── notes-core.js                 笔记/已读核心模块（唯一被 198 篇共享的文件）
+├── build-index.py                首页生成器（改文档后重跑）
+├── inject-notes.py               把 notes-core.js 注入所有页面（幂等）
+├── qa-check.py                   全站质检脚本
+├── test-notes-core.js            Markdown 渲染器 / 合并逻辑单测（Node）
+├── test-e2e-notes.js              端到端冒烟测试（Playwright）
+├── CATALOG.md                    198 篇完整目录与状态
+├── 01-fundamentals/              工程基础 22 篇
+├── 02-lowlevel/                  底层原理 21 篇
+├── 03-languages/                 编程语言 21 篇
+├── 04-data/                      数据与存储 24 篇
+├── 05-architecture/              架构与设计 22 篇
+├── 06-devops/                    运维与云原生 24 篇
+├── 07-security/                  安全 20 篇
+├── 08-ai/                        AI 工程 22 篇
+└── 09-practice/                  综合实战 22 篇
+```
+
+---
+
+## 维护工作流
+
+```bash
+# 1. 改完任何文档后，重新生成首页（自动提取标题/简介/标签）
+python build-index.py
+
+# 2. 把笔记模块注入新页面（幂等，已有注入的自动跳过；新文档需要跑）
+python inject-notes.py
+
+# 3. 全站质检
+python qa-check.py .
+
+# 4. 推送上线（任选其一）
+git push                                    # 常规方式
+python api-push.py <user>/<repo> <token> .   # 或走 GitHub API 增量推送
 ```
 
 ---
