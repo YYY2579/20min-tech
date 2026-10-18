@@ -165,5 +165,54 @@ t('esc', function () {
   assert.strictEqual(core.esc('<a href="x">&\''), '&lt;a href=&quot;x&quot;&gt;&amp;&#39;');
 });
 
+console.log('== 迁移与数据修复 ==');
+
+/* notes-core 在 Node 下用内存降级存储；经 _store 播种数据 */
+var NA = core.notes;
+var S = core._store;
+function seedNotes(obj) { S.save(core.keys.notes, obj); }
+
+t('旧版单条格式迁移为多条（内容不丢）', function () {
+  seedNotes({
+    'doc.html#m1': { text: '遗留笔记', updatedAt: 1700000000000, doc: 'doc.html', sec: '模块一', secId: 's1' }
+  });
+  var changed = NA.migrate();
+  assert.ok(changed, '应有变更');
+  var after = NA.all();
+  assert.ok(!after['doc.html#m1'], '旧 key 应被清掉');
+  var keys = Object.keys(after).filter(function (k) { return k.indexOf('doc.html#m1#n') === 0; });
+  assert.strictEqual(keys.length, 1, '应恰好迁移出一条');
+  assert.strictEqual(after[keys[0]].text, '遗留笔记', '内容不能丢');
+  assert.strictEqual(after[keys[0]].key, keys[0], '记录内 key 必须等于存储键');
+  assert.ok(after[keys[0]].createdAt, '应补 createdAt');
+});
+
+t('迁移幂等：再跑一次不重复不丢', function () {
+  var before = JSON.stringify(NA.all());
+  NA.migrate();
+  assert.strictEqual(JSON.stringify(NA.all()), before, '第二次迁移应为无操作');
+});
+
+t('修复 key 字段缺失/错位的记录', function () {
+  seedNotes({
+    'doc.html#m2#nfix1': { text: '缺 key 字段', updatedAt: 1, doc: 'doc.html', sec: '模块二', secId: 's2' },
+    'doc.html#m2#nfix2': { key: 'doc.html#m2#nWRONG', text: 'key 错位', updatedAt: 2, doc: 'doc.html', sec: '模块二', secId: 's2' }
+  });
+  NA.migrate();
+  var after = NA.all();
+  assert.strictEqual(after['doc.html#m2#nfix1'].key, 'doc.html#m2#nfix1');
+  assert.strictEqual(after['doc.html#m2#nfix2'].key, 'doc.html#m2#nfix2');
+  var list = NA.forSection('doc.html#m2');
+  assert.strictEqual(list.length, 2);
+  assert.ok(NA.get(list[0].key), '列表项的 key 必须能取回记录');
+});
+
+t('清掉非笔记垃圾数据', function () {
+  seedNotes({ 'junk.key': '我不是对象', 'junk2.key': { noText: true } });
+  NA.migrate();
+  var after = NA.all();
+  assert.ok(!after['junk.key'] && !after['junk2.key'], '垃圾应被清除');
+});
+
 console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

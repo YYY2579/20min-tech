@@ -332,17 +332,65 @@
     }
   };
 
-  /* ================= 7. 笔记状态 ================= */
+  /* ================= 7. 笔记状态（一个章节可有多条笔记） ================= */
+
+  function noteId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function snippet(text) {
+    return String(text || '').replace(/[#*`>|\[\]\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 90);
+  }
 
   var notesApi = {
     all: function () { return load(K.notes, {}); },
     get: function (key) { return load(K.notes, {})[key] || null; },
-    set: function (key, rec) {
+    count: function () { return Object.keys(load(K.notes, {})).length; },
+    sectionPrefix: function (id, idx) { return id + '#m' + idx; },
+    summaryPrefix: function (id) { return id + '#__summary__'; },
+    /* 某章节的全部笔记（按创建时间正序，编辑不会打乱顺序） */
+    forSection: function (prefix) {
       var m = load(K.notes, {});
+      var out = [];
+      for (var k in m) {
+        if (!Object.prototype.hasOwnProperty.call(m, k)) continue;
+        if (k.indexOf(prefix + '#n') === 0) out.push(m[k]);
+      }
+      out.sort(function (a, b) {
+        return ((a.createdAt || a.updatedAt || 0) - (b.createdAt || b.updatedAt || 0)) ||
+               ((a.key < b.key) ? -1 : 1);
+      });
+      return out;
+    },
+    countSection: function (prefix) {
+      var m = load(K.notes, {}), n = 0, k;
+      for (k in m) if (Object.prototype.hasOwnProperty.call(m, k) && k.indexOf(prefix + '#n') === 0) n++;
+      return n;
+    },
+    /* 新建一条笔记（章节内多条并存，各带唯一 id） */
+    add: function (sec, text) {
+      var m = load(K.notes, {});
+      var key = sec.key + '#n' + noteId();
+      var now = Date.now();
+      var rec = {
+        key: key, text: text, updatedAt: now, createdAt: now,
+        doc: page.id, docTitle: page.title,
+        sec: sec.title, secId: sec.secId
+      };
       m[key] = rec;
       save(K.notes, m);
       bus.emit('notes', key);
       return rec;
+    },
+    /* 原地更新已有笔记（不新增条目） */
+    update: function (key, text) {
+      var m = load(K.notes, {});
+      if (!m[key]) return null;
+      m[key].text = text;
+      m[key].updatedAt = Date.now();
+      save(K.notes, m);
+      bus.emit('notes', key);
+      return m[key];
     },
     remove: function (key) {
       var m = load(K.notes, {});
@@ -350,9 +398,33 @@
       save(K.notes, m);
       bus.emit('notes', key);
     },
-    summaryKey: function (id) { return id + '#__summary__'; },
-    sectionKey: function (id, idx) { return id + '#m' + idx; },
-    count: function () { return Object.keys(load(K.notes, {})).length; }
+    /* 启动修复：旧版"一章一条"格式迁移为多条格式；
+       并强制不变量 rec.key === 存储键（老数据/手写数据可能缺 key 字段，
+       缺了会导致点列表项时 ui.editing=undefined、编辑器打不开） */
+    migrate: function () {
+      var m = load(K.notes, {});
+      var changed = false, k;
+      for (k in m) {
+        if (!Object.prototype.hasOwnProperty.call(m, k)) continue;
+        var v = m[k];
+        if (!v || typeof v !== 'object' || typeof v.text !== 'string') {
+          delete m[k]; changed = true; continue;   // 清掉非笔记垃圾，计数才准
+        }
+        var fk = k;
+        if (k.indexOf('#n') < 0) {
+          // 旧格式：补 #n 后缀，内容原样保留
+          fk = k + '#n' + noteId();
+          if (m[fk]) { delete m[k]; changed = true; continue; }
+          v.createdAt = v.createdAt || v.updatedAt || Date.now();
+          m[fk] = v;
+          delete m[k];
+          changed = true;
+        }
+        if (v.key !== fk) { v.key = fk; changed = true; }
+      }
+      if (changed) { save(K.notes, m); bus.emit('notes', 'migrate'); }
+      return changed;
+    }
   };
 
   /* ================= 8. GitHub Gist 同步 ================= */
@@ -378,6 +450,7 @@
           var notes = mergeRecords(notesApi.all(), data.notes || {});
           save(K.read, read);
           save(K.notes, notes);
+          notesApi.migrate();   // 兼容旧版单条格式
           c.lastPull = Date.now();
           gh.saveCfg(c);
           bus.emit('sync', 'pull');
@@ -460,7 +533,7 @@
       var sec = sh.closest('section');
       return {
         idx: idx,
-        key: notesApi.sectionKey(id, idx),
+        key: notesApi.sectionPrefix(id, idx),
         title: (h2 ? h2.textContent.trim() : ('模块 ' + (idx + 1))),
         secId: (sec && sec.id) ? sec.id : ('s' + idx),
         mins: (sh.querySelector('.mins') ? sh.querySelector('.mins').textContent.trim() : '')
@@ -471,7 +544,7 @@
   /* ================= 10. 面板 UI ================= */
 
   var page = { id: '', title: '', isDoc: false, isHome: false, sections: [] };
-  var ui = { open: false, tab: 'doc', cur: null, preview: false, search: '', text: '' };
+  var ui = { open: false, tab: 'doc', cur: null, preview: false, search: '', text: '', editing: null, creating: false };
   var dom = {};
 
   var CSS = [
@@ -636,7 +709,7 @@
       if (e.key === 'Escape' && ui.open) closePanel();
       if ((e.metaKey || e.ctrlKey) && e.key === 's' && ui.open) {
         e.preventDefault();
-        saveCurrentNote(true);
+        commitNote(ui.editing, ui.text, ui.cur, true);
       }
     });
   }
@@ -669,6 +742,8 @@
 
   function closePanel() {
     flushAutosave();
+    ui.editing = null;
+    ui.creating = false;
     ui.open = false;
     dom.panel.classList.remove('on');
     dom.mask.classList.remove('on');
@@ -676,7 +751,7 @@
   }
 
   function switchTab(tab) {
-    if (ui.tab === 'doc' && tab !== 'doc') flushAutosave();
+    if (ui.tab === 'doc' && tab !== 'doc') { flushAutosave(); ui.editing = null; ui.creating = false; }
     ui.tab = tab;
     $$('#n20-tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
     if (tab === 'doc') renderDocTab();
@@ -688,7 +763,9 @@
 
   function renderDocTab() {
     dom.title.textContent = page.title || '学习笔记';
-    dom.sub.textContent = page.isDoc ? '按模块记录笔记，支持 Markdown' : '在任意文档页可以按模块记笔记';
+    dom.sub.textContent = page.isDoc
+      ? ('按模块记笔记，每节可写多条 · 全篇 ' + notesApi.count() + ' 条')
+      : '在任意文档页可以按模块记笔记';
     var b = dom.body;
     b.innerHTML = '';
 
@@ -698,48 +775,134 @@
       return;
     }
 
-    // 区块选择 chips
+    // 区块选择 chips（带每条数）
     var chips = el('div', 'n20-chips');
-    var all = [{ key: notesApi.summaryKey(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true }]
+    dom.chips = chips;
+    var all = [{ key: notesApi.summaryPrefix(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true }]
       .concat(page.sections);
     all.forEach(function (s) { chips.appendChild(makeChip(s)); });
     b.appendChild(chips);
 
-    // 工具栏
+    if (!ui.cur) ui.cur = all[0];
+    if (ui.editing || ui.creating) renderEditor(b);
+    else renderNoteList(b);
+  }
+
+  /* 自动保存后只刷 chips 条数（不动编辑器，保住光标） */
+  function refreshChips() {
+    if (!dom.chips || !page.isDoc || !document.contains(dom.chips)) return;
+    var all = [{ key: notesApi.summaryPrefix(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true }]
+      .concat(page.sections);
+    dom.chips.innerHTML = '';
+    all.forEach(function (s) { dom.chips.appendChild(makeChip(s)); });
+  }
+
+  /* 章节视图：该章节的笔记列表 + 「＋ 写新笔记」 */
+  function renderNoteList(b) {
     var bar = el('div', 'n20-toolbar');
+    var btnNew = el('button', 'n20-btn pri new', '＋ 写新笔记');
+    btnNew.onclick = function () {
+      flushAutosave();
+      ui.editing = null;
+      ui.creating = true;   // 新建模式：打开空白编辑器，不落盘不算条目
+      ui.text = '';
+      renderDocTab();
+    };
+    bar.appendChild(btnNew);
+    var tip = el('span', 'n20-hint', '「' + ui.cur.title + '」可写多条笔记，保存后计入「全部」');
+    tip.style.flex = '1';
+    bar.appendChild(tip);
+    b.appendChild(bar);
+
+    var list = notesApi.forSection(ui.cur.key);
+    if (!list.length) {
+      b.appendChild(el('div', 'n20-empty',
+        '<div class="big">📝</div>这一节还没有笔记<br>点上方「＋ 写新笔记」开始记录'));
+      return;
+    }
+    list.forEach(function (rec) {
+      var item = el('div', 'n20-item');
+      item.innerHTML =
+        '<button class="del" title="删除这条笔记">✕</button>' +
+        '<span class="time">' + esc(fmtTime(rec.updatedAt)) + '</span>' +
+        '<div class="txt">' + esc(snippet(rec.text)) + '</div>';
+      item.querySelector('.del').onclick = function (e) {
+        e.stopPropagation();
+        if (confirm('删除这条笔记？')) {
+          notesApi.remove(rec.key);
+          if (ui.editing === rec.key) { ui.editing = null; ui.creating = false; ui.text = ''; }
+          paintCounts();
+          schedulePush();
+          renderDocTab();
+        }
+      };
+      item.onclick = function () {
+        flushAutosave();
+        ui.editing = rec.key;
+        ui.text = rec.text;
+        renderDocTab();
+      };
+      b.appendChild(item);
+    });
+    setStatus('「' + ui.cur.title + '」共 ' + list.length + ' 条笔记');
+  }
+
+  /* 编辑器视图：新建（ui.editing=null）或编辑某一条 */
+  function renderEditor(b) {
+    var rec = ui.editing ? notesApi.get(ui.editing) : null;
+    var bar = el('div', 'n20-toolbar');
+    var btnBack = el('button', 'n20-btn', '← 列表');
+    btnBack.onclick = function () {
+      var ta = $('.n20-ta');
+      if (ta) ui.text = ta.value;
+      flushAutosave();
+      ui.editing = null;
+      ui.creating = false;
+      renderDocTab();
+    };
     var btnPv = el('button', 'n20-btn', ui.preview ? '✏️ 编辑' : '👁 预览');
     btnPv.onclick = function () {
       // 先从 DOM 捕获最新文本（编辑态有文本框；预览态没有，不能当成空）
       var ta = $('.n20-ta');
       if (ta) ui.text = ta.value;
-      flushAutosave();                 // 落盘任何待存内容（按原 key，不串写）
+      flushAutosave();
       ui.preview = !ui.preview;
-      saveCurrentNote(false, ui.text); // 显式带文本，绝不由 DOM 推断
       renderDocTab();
     };
-    var btnSave = el('button', 'n20-btn pri', '保存');
-    btnSave.onclick = function () { saveCurrentNote(true); };
-    var tip = el('span', 'n20-hint', '⌘/Ctrl+S 保存 · 支持 **粗体** *斜体* `代码` 表格 与 - [ ] 待办');
+    var btnNew2 = el('button', 'n20-btn new', '＋ 新建');
+    btnNew2.title = '在本章节再写一条新笔记';
+    btnNew2.onclick = function () {
+      var ta = $('.n20-ta');
+      if (ta) ui.text = ta.value;
+      flushAutosave();
+      ui.editing = null;
+      ui.creating = true;   // 连着写第二条、第三条…不用先回列表
+      ui.text = '';
+      renderDocTab();
+    };
+    var btnSave = el('button', 'n20-btn pri', '💾 保存');
+    btnSave.onclick = function () {
+      var ta = $('.n20-ta');
+      if (ta) ui.text = ta.value;
+      commitNote(ui.editing, ui.text, ui.cur, true);
+    };
+    var tip = el('span', 'n20-hint',
+      (rec ? '编辑于 ' + fmtClock(rec.updatedAt) : '新笔记') + ' · ⌘/Ctrl+S 保存 · 支持 **粗体** *斜体* `代码` 表格 - [ ] 待办');
     tip.style.flex = '1';
-    bar.appendChild(btnPv); bar.appendChild(btnSave); bar.appendChild(tip);
+    bar.appendChild(btnBack); bar.appendChild(btnNew2); bar.appendChild(btnPv); bar.appendChild(btnSave); bar.appendChild(tip);
     b.appendChild(bar);
 
-    // 编辑区 / 预览区
-    if (!ui.cur) ui.cur = all[0];
-    var rec = notesApi.get(ui.cur.key);
-    var text = rec ? rec.text : '';
-    ui.text = text;
     if (ui.preview) {
       var pv = el('div', 'n20-pv');
-      pv.innerHTML = text.trim() ? md(text) : '<span class="n20-hint">还没有内容，切到编辑写点什么吧。</span>';
+      pv.innerHTML = ui.text.trim() ? md(ui.text) : '<span class="n20-hint">还没有内容。</span>';
       b.appendChild(pv);
     } else {
       var ta = el('textarea', 'n20-ta');
-      ta.placeholder = '在这里记录 ' + ui.cur.title + ' 的要点、疑问、命令…\n\n支持 Markdown：\n# 小标题\n- [ ] 待办事项\n| 命令 | 作用 |\n| --- | --- |';
-      ta.value = text;
+      ta.placeholder = '在这里记录「' + ui.cur.title + '」的要点、疑问、命令…\n\n支持 Markdown：\n# 小标题\n- [ ] 待办事项\n| 命令 | 作用 |\n| --- | --- |';
+      ta.value = ui.text;
       ta.oninput = function () {
         ui.text = ta.value;
-        scheduleAutosave(ta.value, ui.cur.key, ui.cur);
+        scheduleAutosave(ta.value, ui.editing, ui.cur);
       };
       b.appendChild(ta);
       setTimeout(function () { ta.focus(); }, 60);
@@ -748,16 +911,18 @@
   }
 
   function makeChip(s) {
-    var has = !!notesApi.get(s.key);
-    var c = el('button', 'n20-chip' + (ui.cur && ui.cur.key === s.key ? ' on' : ''), esc(s.title));
-    if (has) c.appendChild(el('i', 'dot'));
-    c.title = s.title;
+    var n = notesApi.countSection(s.key);
+    var c = el('button', 'n20-chip' + (ui.cur && ui.cur.key === s.key ? ' on' : ''),
+      esc(s.title) + (n ? ' ·' + n : ''));
+    c.title = s.title + (n ? '（' + n + ' 条笔记）' : '');
     c.onclick = function () {
       // 切区块前：捕获当前文本并立即落盘到原 key，防止延迟保存串写到新区块
       var ta = $('.n20-ta');
       if (ta) ui.text = ta.value;
       flushAutosave();
       ui.cur = s;
+      ui.editing = null;   // 回到该章节的笔记列表
+      ui.creating = false;
       renderDocTab();
     };
     return c;
@@ -777,37 +942,44 @@
     clearTimeout(pendingSave.timer);
     var p = pendingSave;
     pendingSave = null;
-    saveCurrentNote(false, p.text, p.key, p.sec);
+    commitNote(p.key, p.text, p.sec, false);
   }
 
-  function saveCurrentNote(manual, textOverride, keyOverride, secOverride) {
-    if (!page.isDoc) return;
-    var sec = secOverride || ui.cur;
-    if (!sec) return;
-    // 文本唯一来源：显式传入 > ui.text（由输入/加载/切换前捕获维护）。
-    // 绝不再查询 DOM——预览态没有文本框，查不到会被误判为"清空"而删笔记。
-    var text;
-    if (textOverride != null) text = textOverride;
-    else if (typeof ui.text === 'string') text = ui.text;
-    else return;
-    var key = keyOverride || sec.key;
-    if (!text.trim()) {
-      if (notesApi.get(key)) notesApi.remove(key);
-      setStatus('已清空该区块笔记');
+  /* 提交一条笔记：key 为空 → 新建（章节内多条并存）；否则原地更新 */
+  function commitNote(key, text, sec, manual) {
+    if (!page.isDoc) return null;
+    sec = sec || ui.cur;
+    if (!sec) return null;
+    if (text == null) text = ui.text;
+    if (!String(text).trim()) {
+      // 空内容：新笔记放弃创建；已有笔记删除
+      if (key && notesApi.get(key)) {
+        notesApi.remove(key);
+        setStatus(manual ? '已删除空笔记' : '');
+      } else if (manual) {
+        setStatus('空内容未保存');
+      }
+      if (ui.editing && (!key || !notesApi.get(key))) { ui.editing = null; ui.creating = false; }
+      paintCounts();
+      refreshChips();
+      return null;
+    }
+    var k = key;
+    if (!k) {
+      k = notesApi.add(sec, text).key;
+      if (!ui.editing) ui.editing = k;   // 新笔记落盘后接管编辑权，继续改就是更新这一条
+      ui.creating = false;               // 已从"新建"转为"编辑已有条目"
     } else {
-      notesApi.set(key, {
-        text: text,
-        updatedAt: Date.now(),
-        doc: page.id,
-        docTitle: page.title,
-        sec: sec.title,
-        secId: sec.secId
-      });
-      setStatus('已保存 ' + fmtClock());
+      notesApi.update(k, text);
     }
     paintCounts();
+    refreshChips();
     schedulePush();
-    if (manual && ui.preview) renderDocTab();
+    if (manual) {
+      setStatus('已保存 ' + fmtClock());
+      if (ui.preview) renderDocTab();
+    }
+    return k;
   }
 
   /* ---------- 全部 tab ---------- */
@@ -891,20 +1063,17 @@
   function jumpToNote(rec) {
     var url = page.isHome ? rec.doc : ('../' + rec.doc);
     if (page.isDoc && rec.doc === page.id) {
-      // 同文档：直接定位并打开对应区块（按 secId 匹配，key 格式不影响定位）
+      // 同文档：定位章节并直接打开这一条笔记的编辑器
       var summary = rec.sec.indexOf('总结') >= 0;
       var sec = page.sections.filter(function (s) { return s.secId === rec.secId; })[0];
-      var cur;
-      if (summary) {
-        cur = { key: notesApi.summaryKey(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true };
-      } else if (sec) {
-        cur = sec;
-      } else {
-        // 兼容历史 key：sN 统一映射为 #mN，避免同章节出现两条
-        var idx = /^s(\d+)$/.test(rec.secId || '') ? parseInt(RegExp.$1, 10) : null;
-        cur = { key: notesApi.sectionKey(page.id, idx != null ? idx : rec.secId), title: rec.sec, secId: rec.secId };
-      }
+      var cur = summary
+        ? { key: notesApi.summaryPrefix(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true }
+        : (sec || null);
+      if (!cur) { location.href = url + (rec.secId ? '#' + rec.secId : ''); return; }
       ui.cur = cur;
+      ui.editing = rec.key || null;
+      ui.creating = false;
+      ui.text = rec.text || '';
       openPanel('doc');
       if (rec.secId) {
         var t = document.getElementById(rec.secId);
@@ -1212,6 +1381,8 @@
     if (sec) {
       setTimeout(function () {
         ui.cur = sec;
+        ui.editing = null;   // 打开该章节的笔记列表
+        ui.creating = false;
         openPanel('doc');
         var t = document.getElementById(h);
         if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1239,6 +1410,7 @@
 
   function boot() {
     injectCSS();
+    notesApi.migrate();          // 旧版"一章一条"数据迁移为多条格式
     page.id = docId();
     page.title = docTitle();
     page.isDoc = $$('.shead').length > 0;
@@ -1283,6 +1455,7 @@
     read: readApi,
     notes: notesApi,
     gh: gh,
-    keys: K
+    keys: K,
+    _store: { load: load, save: save, mem: function () { return memFallback; } }  // 供单测播种数据
   };
 });
