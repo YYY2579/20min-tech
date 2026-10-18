@@ -116,6 +116,40 @@ server.listen(8899, '127.0.0.1', async function () {
       pvHtml.indexOf('<input type="checkbox" disabled="">') >= 0, pvHtml.slice(0, 120));
     check('预览渲染表格', pvHtml.indexOf('<table>') >= 0 && pvHtml.indexOf('<td>排行榜</td>') >= 0);
 
+    /* ---------- 3b. 回归：预览/编辑来回切换、预览态保存，都绝不能丢笔记 ---------- */
+    console.log('== 预览/编辑切换回归（用户报的数据丢失 bug） ==');
+    // 注意：每次 renderDocTab 会重建工具栏，必须重新查询按钮
+    var pvBtn2 = await page.$$('#n20-body .n20-toolbar .n20-btn');
+    await pvBtn2[0].click(); // 预览 → 编辑
+    await page.waitForTimeout(300);
+    notesStore = await page.evaluate(function () { return JSON.parse(localStorage.getItem('20min.notes.v1') || '{}'); });
+    check('切回编辑后笔记仍在', !!notesStore[key] && notesStore[key].text.indexOf('HyperLogLog') >= 0);
+    var taVal = await page.inputValue('.n20-ta');
+    check('编辑器内容完整恢复', taVal.indexOf('HyperLogLog') >= 0 && taVal.indexOf('排行榜') >= 0, taVal.slice(0, 40));
+
+    pvBtn2 = await page.$$('#n20-body .n20-toolbar .n20-btn');
+    await pvBtn2[0].click(); // 编辑 → 预览
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Control+s'); // 预览态下按保存
+    await page.waitForTimeout(400);
+    notesStore = await page.evaluate(function () { return JSON.parse(localStorage.getItem('20min.notes.v1') || '{}'); });
+    check('预览态 Ctrl+S 不丢笔记', !!notesStore[key] && notesStore[key].text.indexOf('HyperLogLog') >= 0);
+
+    // 直接关面板再打开，验证持久化
+    await page.click('#n20-x');
+    await page.waitForTimeout(200);
+    await page.goto(base + '/04-data/redis.html');
+    await page.waitForTimeout(500);
+    await page.click('#n20-fab');
+    await page.waitForTimeout(300);
+    chips = await page.$$('#n20-body .n20-chip');
+    for (var m = 0; m < chips.length; m++) {
+      if ((await chips[m].textContent()).indexOf('四种高级结构') >= 0) { await chips[m].click(); break; }
+    }
+    await page.waitForTimeout(200);
+    taVal = await page.inputValue('.n20-ta');
+    check('刷新页面后笔记持久完整', taVal.indexOf('HyperLogLog') >= 0 && taVal.indexOf('排行榜') >= 0, taVal.slice(0, 40));
+
     /* ---------- 4. 全部 tab ---------- */
     console.log('== 全部笔记 ==');
     await page.click('#n20-tabs button[data-tab="all"]');

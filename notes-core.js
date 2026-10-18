@@ -471,7 +471,7 @@
   /* ================= 10. 面板 UI ================= */
 
   var page = { id: '', title: '', isDoc: false, isHome: false, sections: [] };
-  var ui = { open: false, tab: 'doc', cur: null, preview: false, search: '' };
+  var ui = { open: false, tab: 'doc', cur: null, preview: false, search: '', text: '' };
   var dom = {};
 
   var CSS = [
@@ -706,8 +706,11 @@
     var bar = el('div', 'n20-toolbar');
     var btnPv = el('button', 'n20-btn', ui.preview ? '✏️ 编辑' : '👁 预览');
     btnPv.onclick = function () {
+      // 先从 DOM 捕获最新文本（编辑态有文本框；预览态没有，不能当成空）
+      var ta = $('.n20-ta');
+      if (ta) ui.text = ta.value;
       ui.preview = !ui.preview;
-      saveCurrentNote(false);
+      saveCurrentNote(false, ui.text);
       renderDocTab();
     };
     var btnSave = el('button', 'n20-btn pri', '保存');
@@ -721,6 +724,7 @@
     if (!ui.cur) ui.cur = all[0];
     var rec = notesApi.get(ui.cur.key);
     var text = rec ? rec.text : '';
+    ui.text = text;
     if (ui.preview) {
       var pv = el('div', 'n20-pv');
       pv.innerHTML = text.trim() ? md(text) : '<span class="n20-hint">还没有内容，切到编辑写点什么吧。</span>';
@@ -729,7 +733,7 @@
       var ta = el('textarea', 'n20-ta');
       ta.placeholder = '在这里记录 ' + ui.cur.title + ' 的要点、疑问、命令…\n\n支持 Markdown：\n# 小标题\n- [ ] 待办事项\n| 命令 | 作用 |\n| --- | --- |';
       ta.value = text;
-      ta.oninput = function () { scheduleAutosave(ta.value); };
+      ta.oninput = function () { ui.text = ta.value; scheduleAutosave(ta.value); };
       b.appendChild(ta);
       setTimeout(function () { ta.focus(); }, 60);
     }
@@ -749,10 +753,12 @@
 
   function saveCurrentNote(manual, textOverride) {
     if (!page.isDoc || !ui.cur) return;
-    var text = textOverride != null ? textOverride : (function () {
-      var ta = $('.n20-ta');
-      return ta ? ta.value : '';
-    })();
+    // 文本唯一来源：显式传入 > ui.text（由输入/加载时维护）。
+    // 绝不再查询 DOM——预览态没有文本框，查不到会被误判为"清空"而删笔记。
+    var text;
+    if (textOverride != null) text = textOverride;
+    else if (typeof ui.text === 'string') text = ui.text;
+    else return;
     var key = ui.cur.key;
     if (!text.trim()) {
       if (notesApi.get(key)) notesApi.remove(key);
