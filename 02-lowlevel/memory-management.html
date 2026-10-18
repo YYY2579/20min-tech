@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透内存管理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透内存管理</h1>
+    <p class="sub">"内存泄漏"和"内存溢出"是两回事，"RSS 高"和"内存不够"也是两回事。这篇从虚拟内存讲到 cgroup OOM，目标是让你看到 <b>free / pmap / vmstat</b> 的输出时，能说出到底发生了什么。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 模块</span>
+      <span class="chip"><b>RSS 与 VSZ</b> 的区别</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开着 free -m 和 pmap -x $$，边读边对照自己机器</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>准备观测环境</h2></div>
+  <p class="lead">内存问题的排查极其依赖工具。先把它们装上，再看几个基线数字。</p>
+  <pre><span class="c"># 1. 基础工具（procps-ng / sysstat / valgrind 三件套）</span>
+which free vmstat pmap ps top
+which valgrind heaptrack
+<span class="c"># Debian/Ubuntu: apt install procps sysstat valgrind</span>
+<span class="c"># RHEL/CentOS : yum install procps-ng sysstat valgrind</span>
+
+<span class="c"># 2. 看系统内存基线</span>
+free -m
+free -h --wide
+
+<span class="c"># 3. 看内核的 overcommit 策略</span>
+cat /proc/sys/vm/overcommit_memory      <span class="c"># 0=启发式 1=总是允许 2=严格</span>
+cat /proc/sys/vm/overcommit_ratio       <span class="c"># 仅模式 2 生效，默认 50</span>
+
+<span class="c"># 4. 看透明大页（影响 fork 和内存碎片）</span>
+cat /sys/kernel/mm/transparent_hugepage/enabled
+
+<span class="c"># 5. 看 cgroup 版本和当前限制</span>
+stat -fc %T /sys/fs/cgroup/             <span class="c"># cgroup2fs = v2, tmpfs = v1</span>
+cat /sys/fs/cgroup/memory.max 2&gt;/dev/null
+cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2&gt;/dev/null   <span class="c"># v1</span>
+
+<span class="c"># 6. 换页统计（有没有在用 swap）</span>
+cat /proc/vmstat | grep -E "pgpgin|pgpgout|pswpin|pswpout"</pre>
+  <div class="callout warn">
+    <b>看内存数据前必须知道的两件事：</b><br>
+    ① <b><span class="k">free</span> 的 "free" 列几乎总是很小</b>，这是正常的。Linux 会主动把空闲内存拿去做页缓存（page cache），有需要时立刻回收。判断内存够不够看 <span class="k">available</span> 列，不是 <span class="k">free</span> 列。<br>
+    ② <b>容器里的 <span class="k">free</span> 显示的是宿主机内存</b>，不是你的配额。要看 <span class="k">/sys/fs/cgroup/memory.max</span> 和 <span class="k">memory.current</span>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>虚拟内存解决了什么</h2></div>
+  <p class="lead">虚拟内存不是"把硬盘当内存用"这种科普说法。它真正的价值是<b>让每个进程拥有一份独立、连续、可以任意撒谎的地址空间</b>，而物理内存的分配完全由内核在背后调度。</p>
+
+  <h3>四个核心能力</h3>
+  <table>
+    <tr><th style="width:130px">能力</th><th style="width:230px">机制</th><th>带来的好处</th></tr>
+    <tr><td><b>隔离</b></td><td>每个进程一份页表，虚拟地址到物理地址的映射互不相干</td><td>进程 A 无法读写进程 B 的内存（除非显式共享）。越界访问只会崩自己，不会崩别人</td></tr>
+    <tr><td><b>超配</b><br>overcommit</td><td>分配虚拟地址时不立刻给物理页，等到真正访问才触发缺页并分配</td><td>进程可以 malloc 10 GB 但只用 100 MB。<b>这也是 OOM 的根源</b></td></tr>
+    <tr><td><b>简化链接与加载</b></td><td>每个进程都以为自己从固定地址开始（如 x86-64 的 <span class="k">0x400000</span>）</td><td>可执行文件不用关心自己被加载到哪里；动态库可以共享同一份物理页</td></tr>
+    <tr><td><b>共享与写时复制</b></td><td>多个进程映射同一物理页，写入时才复制（COW）</td><td>fork 几乎零成本；动态库、只读数据只占一份物理内存</td></tr>
+  </table>
+
+  <h3>地址空间长什么样</h3>
+  <pre><span class="c"># x86-64 Linux 进程的典型布局（低地址 → 高地址）</span>
+0x0000000000400000   代码段 .text（只读、可执行）
+                     数据段 .data / .bss（可读写）
+                     ↓
+                     堆 heap  ← brk() 向上增长
+                     ↓
+                     （未映射的空洞，巨大）
+                     ↓
+                     内存映射区 mmap ← 向下增长（动态库、大块 malloc、文件映射）
+                     ↓
+0x00007ffffffff000   栈 stack ← 向下增长
+                     ↓
+0xffffffffffffffff   内核空间（用户态不可访问）
+
+<span class="c"># 关键数字</span>
+用户空间可用范围：<span class="g">0x000000000000 ~ 0x00007fffffffffff</span> = 128 TB
+（4 级页表，48 位虚拟地址）
+
+<span class="c"># 所以一个进程的 VSZ 可以轻松到几十 GB，而 RSS 只有几十 MB</span>
+<span class="c"># VSZ 大不代表占内存，只代表"地址空间用掉了"</span></pre>
+
+  <h3>overcommit 的三种模式</h3>
+  <table>
+    <tr><th style="width:150px">overcommit_memory</th><th style="width:210px">行为</th><th>适用</th></tr>
+    <tr><td class="f">0（默认）</td><td>启发式。内核按经验判断这次分配是否"明显过分"，过分就拒绝</td><td>大多数场景。允许合理超配，但挡住明显离谱的请求</td></tr>
+    <tr><td class="f">1</td><td><b>总是允许</b>。malloc 几乎不会失败，直到真的没内存时 OOM Killer 出手</td><td>Redis 官方推荐（避免 fork 时因 COW 预估失败）；科学计算</td></tr>
+    <tr><td class="f">2</td><td><b>严格</b>。承诺的虚拟内存总量不能超过 swap + 物理内存 × ratio</td><td>需要确定性行为的场景。但会导致 mmap 大量失败</td></tr>
+  </table>
+  <pre><span class="c"># 模式 2 的可用额度计算</span>
+CommitLimit = swap 总量 + 物理内存 × overcommit_ratio / 100
+<span class="c"># 默认 ratio = 50，16 GB 内存 + 0 swap → CommitLimit = 8 GB</span>
+<span class="c"># 所有进程的已承诺虚拟内存之和不能超过这个值</span>
+
+<span class="c"># 查看当前承诺量</span>
+grep -E "CommitLimit|Committed_AS" /proc/meminfo
+
+<span class="c"># 常见现象：模式 2 下 Java 启动失败</span>
+<span class="c"># "Native memory allocation (mmap) failed to map ..."</span>
+<span class="c"># 因为 JVM 预留的虚拟地址（堆 + metaspace + 保留区）超过了 CommitLimit</span></pre>
+  <div class="callout danger">
+    <b>超配是 OOM 的根源，也是它的价值所在。</b><br>
+    因为 malloc 成功不等于物理内存到手。一个进程可以顺利 malloc 8 GB，然后在逐页写入的过程中被 OOM Killer 杀掉。<b>这不是 bug，是设计</b> —— 否则每个进程都得按最坏情况预留内存，机器利用率会低得可怕。<br>
+    <b>工程含义：</b>不要用 "malloc 有没有返回 NULL" 来判断内存够不够。要看 RSS 和 cgroup 的 <span class="k">memory.current</span>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>页表与地址翻译</h2></div>
+
+  <h3>为什么是四级</h3>
+  <pre><span class="c"># 48 位虚拟地址 + 4 KB 页（12 位偏移）</span>
+页内偏移 offset = 12 位
+需要翻译的位   = 48 - 12 = 36 位
+
+<span class="c"># 如果只用一级页表：2^36 个页表项 × 8 字节 = 2 TB</span>
+<span class="c"># 每个进程都要 2 TB 页表 → 完全不可行</span>
+
+<span class="c"># 分成四级，每级 9 位（512 项，正好一个 4 KB 页装 512 个 8 字节表项）</span>
+PGD  (Page Global Directory)   9 位  →  512 项
+PUD  (Page Upper Directory)    9 位  →  512 项
+PMD  (Page Middle Directory)   9 位  →  512 项
+PTE  (Page Table Entry)        9 位  →  512 项
+offset                        12 位
+                              ─────
+                              48 位
+
+<span class="c"># 关键：按需分配。进程只用了几个 GB 的地址空间，</span>
+<span class="c"># 只需要为实际用到的区域建表，大部分层级是空的</span>
+<span class="c"># 一个典型进程的页表实际只占几 MB</span>
+
+<span class="c"># 5 级页表（Ice Lake 起支持）扩展到 57 位 = 128 PB</span>
+<span class="c"># 但会多一次内存访问，默认关闭</span></pre>
+
+  <h3>一次地址翻译的代价</h3>
+  <p>四级页表意味着<b>一次逻辑上的内存访问要读 4 次页表 + 1 次数据 = 5 次内存访问</b>。如果每次都这样，性能会崩掉。救场的是 TLB。</p>
+  <table>
+    <tr><th style="width:170px">结构</th><th style="width:150px">容量</th><th>说明</th></tr>
+    <tr><td><b>L1 dTLB</b></td><td>64 项，4 路</td><td>命中延迟 1 周期，几乎免费</td></tr>
+    <tr><td><b>L2 STLB</b></td><td>1536~2048 项</td><td>命中延迟 7~10 周期</td></tr>
+    <tr><td><b>页表遍历</b></td><td>—</td><td>4 次内存访问，<b>可能 20~100 周期</b>，还可能本身 cache miss</td></tr>
+  </table>
+  <pre><span class="c"># 4 KB 页、TLB 2048 项，能覆盖多大范围？</span>
+2048 × 4 KB = <span class="r">8 MB</span>
+
+<span class="c"># 也就是说：工作集超过 8 MB，TLB 就开始 miss</span>
+<span class="c"># 而现代服务的堆动辄几个 GB —— 所以大内存应用几乎必然 TLB 抖动</span>
+
+<span class="c"># 解法：大页（huge page）</span>
+2 MB 大页：2048 × 2 MB = <span class="g">4 GB</span> 覆盖范围（提升 512 倍）
+1 GB 大页：2048 × 1 GB = 2 TB
+
+<span class="c"># 代价：内部碎片。用 2 MB 页存 100 字节的数据，浪费 2 MB</span>
+<span class="c"># 所以大页只适合大块、连续、长期存在的内存（JVM 堆、数据库缓冲池）</span></pre>
+
+  <h3>缺页中断的两种类型</h3>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:230px">触发条件</th><th>代价</th></tr>
+    <tr><td><b>Minor fault</b><br>次缺页</td><td>页已经在物理内存里，只是当前进程的页表里没有映射。典型场景：<b>COW 写时复制</b>、进程刚 fork、页被换出后换回但还在缓存</td><td>约 1~2 μs，纯内存操作</td></tr>
+    <tr><td><b>Major fault</b><br>主缺页</td><td>页不在内存里，必须<b>从磁盘/swap 读进来</b></td><td>几十 μs 到几 ms，取决于存储介质</td></tr>
+  </table>
+  <pre><span class="c"># 怎么看缺页次数</span>
+ps -o min_flt,maj_flt -p 1234
+<span class="c"># min_flt = 次缺页累计，maj_flt = 主缺页累计</span>
+
+<span class="c"># 实时观察</span>
+pidstat -r -p 1234 1
+<span class="c">#   minflt/s  majflt/s     VSZ     RSS   %MEM  Command</span>
+<span class="c">#    1200.00      0.00  8123456  456789   5.6  java</span>
+
+<span class="c"># 系统级</span>
+vmstat 1
+<span class="c"># si/so 列 = 每秒从 swap 换入/换出的 KB 数</span>
+<span class="c"># si/so 持续非 0 → 内存压力大，正在用 swap，性能会断崖式下跌</span>
+
+<span class="c"># 详细统计</span>
+cat /proc/vmstat | grep -E "^pgfault|^pgmajfault"
+<span class="c"># pgfault     = 总缺页数（含 minor）</span>
+<span class="c"># pgmajfault  = 主缺页数</span></pre>
+  <div class="callout warn">
+    <b>次缺页不是免费的。</b>一次 minor fault 要进内核、分配页、填页表、返回，约 1~2 μs。如果一个程序每秒产生 10 万次 minor fault，就是 0.2 秒/秒 —— 20% 的 CPU 花在缺页上。<br>
+    <b>典型来源：</b>① 频繁 <span class="k">malloc/free</span> 大块内存（每次都 mmap/munmap）；② JVM 堆的首次触碰（<span class="k">-XX:+AlwaysPreTouch</span> 可以在启动时预触碰，把成本前置）；③ fork 之后大量写（COW）。
+  </div>
+
+  <h3>页表项里有什么</h3>
+  <pre><span class="c"># 一个 64 位 PTE 的典型位布局（x86-64）</span>
+bit 0     Present   <span class="c"># 页是否在内存中。为 0 时其余位由内核自由使用</span>
+bit 1     R/W       <span class="c"># 0=只读 1=可写</span>
+bit 2     User      <span class="c"># 1=用户态可访问 0=仅内核</span>
+bit 3     PWT       <span class="c"># 写穿透（几乎不用）</span>
+bit 4     PCD       <span class="c"># 禁用缓存（映射设备内存时用）</span>
+bit 5     Accessed  <span class="c"># 被访问过。内核靠它做页面置换（LRU 近似）</span>
+bit 6     Dirty     <span class="c"># 被写过。决定换出时要不要写回磁盘</span>
+bit 7     PAT / PS  <span class="c"># 大页标志（PS=1 时这一级就是最终映射）</span>
+bit 8     Global    <span class="c"># 全局页，切换进程时不刷 TLB（内核页用）</span>
+bit 9-11  软件保留  <span class="c"># Linux 用来存 swap 类型、COW 标记等</span>
+bit 12-51 物理页帧号 PFN
+bit 63    NX        <span class="c"># 不可执行。W^X 保护的基础</span>
+
+<span class="c"># 注意 Accessed 和 Dirty 是硬件自动置位的</span>
+<span class="c"># 内核的 LRU 链表和脏页回写，全靠这两位驱动</span></pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>堆与栈</h2></div>
+
+  <h3>栈帧布局</h3>
+  <pre><span class="c"># x86-64 上一个函数调用栈的典型布局（高地址在上）</span>
+        ┌─────────────────────┐
+        │  调用者的栈帧        │
+        ├─────────────────────┤
+        │  参数 7, 8, ...      │  <span class="c"># 超过 6 个的参数走栈</span>
+        ├─────────────────────┤
+        │  返回地址 return addr│  ← call 指令压入
+        ├─────────────────────┤
+        │  保存的 rbp          │  ← push rbp
+        ├─────────────────────┤ ← rbp
+        │  局部变量            │
+        │  ...                │
+        ├─────────────────────┤
+        │  溢出检测 canary     │  <span class="c"># -fstack-protector 生成</span>
+        ├─────────────────────┤ ← rsp
+        │  （红色区域，128B）   │
+        └─────────────────────┘
+
+<span class="c"># 每个线程的栈大小</span>
+ulimit -s                    <span class="c"># 8192 KB = 8 MB（默认）</span>
+pthread_attr_setstacksize()  <span class="c"># 创建线程时自定义</span>
+
+<span class="c"># 栈溢出（stack overflow）的两种表现</span>
+1. 递归太深 → 撞到 guard page → SIGSEGV
+2. 大数组放栈上 → int buf[1000000] 就是 4 MB，直接爆栈
+   <span class="c"># 编译器不报错，运行时才崩，而且崩的位置很难查</span></pre>
+
+  <h3>堆分配器的三条路线</h3>
+  <table>
+    <tr><th style="width:130px">分配器</th><th style="width:230px">设计</th><th>特点</th></tr>
+    <tr><td><b>ptmalloc</b><br>glibc 默认</td><td>主 arena + 每线程 arena（64 位下最多 8 × 核数）。每个 arena 用 bins 管理空闲块</td><td>通用性好，但<b>多线程下锁竞争和碎片较严重</b>。大块走 mmap</td></tr>
+    <tr><td><b>jemalloc</b><br>FreeBSD/Facebook</td><td>按 size class 分级，每线程 tcache，后台线程按 decay 回收脏页</td><td>碎片控制好，多线程扩展性好。Redis 官方推荐</td></tr>
+    <tr><td><b>tcmalloc</b><br>Google</td><td>每线程 cache + 中央空闲链表 + page heap</td><td>小对象分配极快，大对象走页级分配</td></tr>
+  </table>
+  <pre><span class="c"># 换分配器：LD_PRELOAD 即可，不用改代码</span>
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 ./app
+
+<span class="c"># 验证是否生效</span>
+lsof -p &lt;pid&gt; | grep -i jemalloc
+<span class="c"># 或者看 /proc/&lt;pid&gt;/maps</span>
+
+<span class="c"># glibc 的两个关键阈值（可以用 mallopt 调）</span>
+M_MMAP_THRESHOLD   默认 128 KB   <span class="c"># 超过就改用 mmap，free 时直接 munmap 还给系统</span>
+M_TRIM_THRESHOLD   默认 128 KB   <span class="c"># 堆顶空闲超过这个值就 brk 收缩</span>
+
+<span class="c"># 注意：M_MMAP_THRESHOLD 是动态的</span>
+<span class="c"># 每次 free 一个 mmap 块，阈值会上调，最高到 32 MB</span>
+<span class="c"># 目的是减少 mmap/munmap 的系统调用次数</span>
+<span class="c"># 副作用：程序跑久了之后，大块内存不再归还给系统</span></pre>
+
+  <h3>brk vs mmap</h3>
+  <table>
+    <tr><th style="width:110px">方式</th><th style="width:200px">机制</th><th>适用与代价</th></tr>
+    <tr><td><b>brk</b></td><td>移动堆顶指针，扩展/收缩连续的一段</td><td>小块、频繁分配。<b>问题：只能从顶部收缩</b>，中间的空闲块无法归还，容易形成"堆顶卡住"</td></tr>
+    <tr><td><b>mmap</b></td><td>建立一段独立的匿名映射，free 时 munmap 直接归还</td><td>大块（&gt; 128 KB）、长期存活。<b>代价：每次 mmap/munmap 都要改页表、触发 TLB 失效</b></td></tr>
+  </table>
+  <pre><span class="c"># 这就是"内存只涨不降"的第一个原因</span>
+程序 malloc 了 1000 个 1 MB 的块（走 mmap）
+free 掉其中 999 个 → 这些块 munmap 了，RSS 立刻下降
+但如果它们是 100 KB 的块（走 brk）
+free 后只是回到空闲链表，<b>堆顶没降，RSS 不会下降</b>
+
+<span class="c"># 缓解手段</span>
+malloc_trim(0);                    <span class="c"># glibc 提供，主动收缩堆</span>
+mallopt(M_TRIM_THRESHOLD, 64*1024); <span class="c"># 降低收缩阈值</span>
+mallopt(M_MMAP_THRESHOLD, 64*1024); <span class="c"># 让更多分配走 mmap，便于归还</span>
+
+<span class="c"># 但注意：malloc_trim 会遍历所有 arena，本身有开销</span>
+<span class="c"># 不要在高频路径调用</span></pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>内存泄漏与内存溢出</h2></div>
+  <p class="lead">这两个词经常被混用，但它们的成因、表现、排查手段完全不同。</p>
+
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:230px">内存泄漏 Leak</th><th>内存溢出 Overflow / OOM</th></tr>
+    <tr><td><b>定义</b></td><td>分配了内存但<b>永远不再释放</b>，且失去了引用</td><td>申请的<b>超过可用上限</b>，或者写入<b>越过缓冲区边界</b></td></tr>
+    <tr><td><b>表现</b></td><td>内存<b>缓慢、持续</b>上涨，几天到几周后 OOM</td><td><b>突然</b>失败：malloc 返回 NULL、进程被 kill、或崩溃</td></tr>
+    <tr><td><b>时间尺度</b></td><td>慢，通常要观察趋势才能发现</td><td>快，往往是某个瞬间的峰值</td></tr>
+    <tr><td><b>典型原因</b></td><td>忘记 free/delete、异常路径漏释放、循环引用、缓存无上限、监听器未注销</td><td>一次性加载大文件、批量查询没分页、缓冲区越界、递归爆栈</td></tr>
+    <tr><td><b>排查工具</b></td><td>valgrind、heaptrack、pprof、堆 dump</td><td>pmap、cgroup memory.events、dmesg</td></tr>
+  </table>
+  <div class="callout">
+    <b>注意第三个含义：</b>"缓冲区溢出"（buffer overflow）是另一回事 —— 写越界，属于安全漏洞（CWE-787）。它和内存不够无关，但中文里也常被叫"内存溢出"。<b>看到这个词要先问清楚指哪个</b>。
+  </div>
+
+  <h3>泄漏的五种常见成因</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>异常路径漏释放。</b>C++ 里 <span class="k">new</span> 之后抛异常，后面的 <span class="k">delete</span> 没执行。<b>解法：用 RAII / 智能指针</b>，让析构自动发生。</div></div>
+    <div class="step"><div class="txt"><b>循环引用。</b>A 持有 B，B 持有 A，引用计数永远不归零。Java/Python 的 GC 能处理，但 <span class="k">shared_ptr</span> 不能。<b>解法：一端用 <span class="k">weak_ptr</span></b>。</div></div>
+    <div class="step"><div class="txt"><b>缓存没有上限。</b>用 map 做本地缓存，只 put 不 evict。<b>解法：用带容量限制的 LRU（Caffeine、Guava Cache、<span class="k">container/list</span> 手写）</b>。</div></div>
+    <div class="step"><div class="txt"><b>监听器/回调没注销。</b>注册了事件监听但对象销毁时没移除，容器一直持有引用。<b>解法：成对的生命周期管理，或用弱引用</b>。</div></div>
+    <div class="step"><div class="txt"><b>线程局部变量。</b><span class="k">ThreadLocal</span> 在线程池里不会自动清理，线程复用导致旧值一直挂着。<b>解法：用完必须 <span class="k">remove()</span></b>。</div></div>
+  </div>
+
+  <h3>怎么定位</h3>
+  <pre><span class="c"># ===== C/C++：valgrind（慢但准，约 20~50 倍开销）=====</span>
+valgrind --leak-check=full --show-leak-kinds=all \
+         --track-origins=yes ./app
+
+<span class="c"># 输出里重点看三段</span>
+definitely lost:  <span class="c"># 确定泄漏，没有指针指向它 —— 一定要修</span>
+indirectly lost:  <span class="c"># 因为别的块泄漏而跟着泄漏</span>
+possibly lost:    <span class="c"># 可能有指针指向块中间，需要人工判断</span>
+still reachable:  <span class="c"># 程序结束时还有指针，通常不算泄漏（比如全局单例）</span>
+
+<span class="c"># ===== heaptrack：采样式，开销小得多，适合长跑 =====</span>
+heaptrack ./app
+heaptrack_gui heaptrack.app.*.zst
+
+<span class="c"># ===== 生产环境：pmap 看趋势 =====</span>
+pmap -x &lt;pid&gt; | tail -1        <span class="c"># 看 RSS 总量</span>
+<span class="c"># 每隔 10 分钟采一次，画成曲线。持续上涨且不回落 = 泄漏</span>
+
+<span class="c"># ===== Java =====</span>
+jmap -histo:live &lt;pid&gt; | head -20      <span class="c"># 各类对象数量与占用</span>
+jmap -dump:live,format=b,file=heap.hprof &lt;pid&gt;
+<span class="c"># 然后用 Eclipse MAT 或 VisualVM 分析支配树</span>
+
+<span class="c"># ===== Go =====</span>
+curl http://localhost:6060/debug/pprof/heap?debug=1
+go tool pprof -http=:8080 http://localhost:6060/debug/pprof/heap</pre>
+  <div class="callout danger">
+    <b>判断"是不是泄漏"的正确方法：看趋势，不看绝对值。</b><br>
+    ① <b>锯齿形</b>（涨上去又掉下来）：正常，是 GC 或请求峰值，不是泄漏。<br>
+    ② <b>阶梯形</b>（涨上去不降，过一段时间再涨一截）：<b>典型泄漏</b>，每次触发某条路径就漏一点。<br>
+    ③ <b>线性上涨</b>：可能是缓存无上限，也可能是连接/文件描述符泄漏。<br>
+    ④ <b>稳定在一个高位</b>：可能只是分配器不归还（模块 6 讲的碎片问题），不是泄漏。<br>
+    <b>观察窗口至少覆盖一个完整的业务周期</b>（比如 24 小时），否则很容易误判。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>GC 原理</h2></div>
+  <p class="lead">GC 解决的是"怎么在不靠人手动 free 的前提下，找出哪些内存没人用了"。所有算法都在<b>吞吐、延迟、内存开销</b>三者之间做取舍。</p>
+
+  <h3>三种基础算法</h3>
+  <table>
+    <tr><th style="width:130px">算法</th><th style="width:230px">做法</th><th>问题</th></tr>
+    <tr><td><b>引用计数</b></td><td>每个对象记一个被引用次数，归零就回收</td><td><b>无法处理循环引用</b>；每次赋值都要改计数，开销分散在业务代码里</td></tr>
+    <tr><td><b>标记-清除</b><br>mark-sweep</td><td>从根（栈、全局变量、寄存器）出发遍历可达对象，标记；未标记的回收</td><td><b>产生外部碎片</b>；标记阶段要暂停业务（STW）</td></tr>
+    <tr><td><b>标记-整理 / 复制</b></td><td>标记后把存活对象<b>挪到一起</b>，消除碎片</td><td>要移动对象，<b>所有引用都得改</b>；需要额外空间</td></tr>
+  </table>
+
+  <h3>分代假设</h3>
+  <p>GC 领域最重要的经验规律：<b>绝大多数对象都是朝生夕死的</b>（弱分代假说）。所以：</p>
+  <table>
+    <tr><th style="width:130px">区域</th><th style="width:180px">存放</th><th>回收策略</th></tr>
+    <tr><td><b>新生代 Young</b></td><td>刚创建的对象</td><td>频繁、快速回收（Minor GC）。用复制算法，因为存活对象少，复制成本低</td></tr>
+    <tr><td><b>老年代 Old</b></td><td>熬过多次 GC 的对象</td><td>不频繁、较慢（Major / Full GC）。用标记-清除或标记-整理</td></tr>
+  </table>
+  <p>这个假设的价值在于：<b>只扫描新生代就能回收 90% 的垃圾</b>，成本远低于每次都扫全堆。</p>
+
+  <h3>三色标记法</h3>
+  <pre><span class="c"># 把对象分成三种颜色</span>
+<span class="g">白色</span>：还没被访问到。GC 结束时仍是白色 = 垃圾，回收
+<span class="y">灰色</span>：自己访问到了，但它引用的对象还没扫完。待处理队列
+<span class="b">黑色</span>：自己和所有引用都扫完了。确定存活
+
+<span class="c"># 流程</span>
+1. 所有对象初始为白色，根对象置灰
+2. 从灰色队列取一个对象，把它引用的白色对象置灰，自己变黑
+3. 重复直到灰色队列为空
+4. 剩下的白色对象就是垃圾
+
+<span class="c"># 问题：并发标记时，业务线程还在改引用</span>
+<span class="c"># 如果黑色对象新引用了白色对象，而这个白色对象</span>
+<span class="c"># 已经不会再被扫描到 —— 就会被错误回收（对象消失）</span>
+
+<span class="c"># 两种破坏条件（必须同时满足才会出错）</span>
+1. 黑色对象指向了白色对象（插入了一条新边）
+2. 从灰色对象到该白色对象的所有路径都被删除了
+
+<span class="c"># 所以只要破坏其中任意一个，就安全了</span></pre>
+
+  <h3>写屏障：两种流派</h3>
+  <table>
+    <tr><th style="width:170px">方式</th><th style="width:180px">破坏哪个条件</th><th>代表</th></tr>
+    <tr><td><b>增量更新</b><br>incremental update</td><td>破坏条件 1：黑色对象新增引用时，<b>把它重新变灰</b>，之后重新扫描</td><td>CMS 的初始实现</td></tr>
+    <tr><td><b>SATB</b><br>Snapshot-At-The-Beginning</td><td>破坏条件 2：<b>删除引用时</b>，把被删除的旧值记录下来，按"GC 开始时的快照"来标记</td><td>G1、ZGC 的部分阶段</td></tr>
+    <tr><td><b>混合写屏障</b></td><td>插入和删除都记录，兼顾两者</td><td><b>Go</b>（1.8 起的 hybrid write barrier）</td></tr>
+  </table>
+
+  <h3>Java G1 与 Go 的差异</h3>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:230px">Java G1</th><th>Go（1.5+）</th></tr>
+    <tr><td><b>堆布局</b></td><td>切成最多 2048 个 Region（1~32 MB），逻辑上分 Eden/Survivor/Old/Humongous</td><td>没有分代（Go 1.20 前），整堆统一管理</td></tr>
+    <tr><td><b>回收单位</b></td><td>Region。按"回收价值"排序，优先收垃圾最多的 Region（Garbage First）</td><td>整堆并发标记 + 清扫</td></tr>
+    <tr><td><b>暂停目标</b></td><td><span class="k">-XX:MaxGCPauseMillis</span>，默认 200 ms。G1 会按目标动态调整</td><td>STW 通常在 <b>亚毫秒级</b>（几百微秒），且不受堆大小显著影响</td></tr>
+    <tr><td><b>触发条件</b></td><td>Eden 满（Young GC）、老年代占用超阈值（并发标记）、分配失败（Full GC）</td><td><span class="k">GOGC</span>（默认 100）= 堆增长到上次存活量的 2 倍时触发</td></tr>
+    <tr><td><b>写屏障</b></td><td>SATB（标记阶段）+ 卡表（跨代引用）</td><td>混合写屏障（插入 + 删除）</td></tr>
+    <tr><td><b>内存上限</b></td><td><span class="k">-Xmx</span> / <span class="k">-XX:MaxRAMPercentage</span></td><td><span class="k">GOMEMLIMIT</span>（1.19+），软限制，配合 GOGC 使用</td></tr>
+  </table>
+  <pre><span class="c"># Go 的 GC 调优：两个旋钮</span>
+GOGC=100          <span class="c"># 默认。堆涨到上次存活量的 2 倍时触发 GC</span>
+                  <span class="c"># 调大 → GC 更少、CPU 更省、内存更高</span>
+                  <span class="c"># 调小 → 内存更省、GC 更频繁</span>
+GOGC=off          <span class="c"># 关闭 GC（只在极短生命周期程序里用）</span>
+
+GOMEMLIMIT=3GiB   <span class="c"># 1.19+。软限制，接近时会更激进地 GC</span>
+                  <span class="c"># 关键：它是软限制，不保证不超。真正的硬限制还是 cgroup</span>
+
+<span class="c"># 两者配合的正确姿势</span>
+GOMEMLIMIT = cgroup 内存上限 × 0.9
+GOGC       = 保持默认或适度调大
+
+<span class="c"># 查看 GC 行为</span>
+GODEBUG=gctrace=1 ./app
+<span class="c"># 每行输出：gc 次数 @ 时间 s，堆大小 → 目标，STW 时长等</span></pre>
+  <div class="callout warn">
+    <b>GC 的三个常见误解：</b><br>
+    ① <b>"有 GC 就不会内存泄漏"</b>。错。GC 只回收<b>不可达</b>的对象。缓存无上限、集合只增不减、ThreadLocal 不清理，都会导致"逻辑泄漏" —— 对象一直可达，GC 无能为力。<br>
+    ② <b>"GC 语言不需要关心内存"</b>。错。对象分配速率、对象大小、存活时间，直接决定 GC 频率和暂停时长。分配越少，GC 越轻松。<br>
+    ③ <b>"STW 越短越好"</b>。不完全对。压低 STW 通常要用更多并发标记，占用更多 CPU 和内存带宽，总吞吐会下降。<b>这是取舍，不是免费的</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>内存碎片</h2></div>
+  <p class="lead">"服务跑了三天，内存只涨不降" —— 大部分情况不是泄漏，是碎片。</p>
+
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:230px">含义</th><th>例子</th></tr>
+    <tr><td><b>内部碎片</b><br>internal</td><td>分配出去的内存<b>比实际需要的大</b>，多出来的部分浪费在块内部</td><td>申请 100 字节，分配器按 112 字节的 size class 给。多出的 12 字节谁也拿不到</td></tr>
+    <tr><td><b>外部碎片</b><br>external</td><td>空闲内存总量够，但<b>分散成小块，凑不出连续的大块</b></td><td>堆里有 100 个 1 MB 的空闲块，但申请 10 MB 连续内存失败</td></tr>
+  </table>
+
+  <h3>为什么 RSS 只涨不降</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>分配器按 size class 取整。</b>jemalloc/tcmalloc 把请求映射到最近的 size class（如 96、112、128）。请求 100 字节实际占 112，长期积累就是 10%+ 的浪费。</div></div>
+    <div class="step"><div class="txt"><b>free 只是还给分配器，不是还给内核。</b>释放的内存进入空闲链表，等待下次复用。只有满足特定条件（brk 收缩、munmap、分配器的 decay 机制）才真正归还。</div></div>
+    <div class="step"><div class="txt"><b>brk 只能从顶部收缩。</b>如果堆顶恰好有个长期存活的小对象，下面再大的空闲块也归还不了。这就是"堆顶卡住"。</div></div>
+    <div class="step"><div class="txt"><b>线程缓存不共享。</b>线程 A 释放的内存进了 A 的 tcache，线程 B 要用时拿不到，只能向系统申请新的。<b>线程数越多，碎片越严重</b>。</div></div>
+    <div class="step"><div class="txt"><b>分配模式随时间变化。</b>启动时大量小对象，运行期变成大对象，原来的小块拼不出大块，只能不断向系统要新页。</div></div>
+  </div>
+
+  <h3>怎么缓解</h3>
+  <table>
+    <tr><th style="width:170px">手段</th><th style="width:200px">适用</th><th>代价</th></tr>
+    <tr><td><b>换分配器</b></td><td>jemalloc / tcmalloc 替代 ptmalloc</td><td>需要 LD_PRELOAD 或重新编译；不同分配器的峰值内存可能不同</td></tr>
+    <tr><td><b>对象池 / 内存池</b></td><td>高频创建销毁的同类型对象</td><td>要自己管理生命周期，池太大会浪费</td></tr>
+    <tr><td><b>固定大小分配</b></td><td>能预估大小的场景（如固定长度缓冲区）</td><td>灵活性下降</td></tr>
+    <tr><td><b>jemalloc 的 decay</b></td><td>长时间运行的服务</td><td><span class="k">dirty_decay_ms</span> 调小会更积极归还，但增加系统调用</td></tr>
+    <tr><td><b>定期重启</b></td><td>实在没办法时的兜底</td><td>有损，且掩盖了真问题</td></tr>
+  </table>
+  <pre><span class="c"># jemalloc 的关键参数（环境变量）</span>
+MALLOC_CONF="dirty_decay_ms:1000,muzzy_decay_ms:0,background_thread:true"
+
+<span class="c"># dirty_decay_ms：脏页多久后归还给系统，默认 10000（10 秒）</span>
+<span class="c"># muzzy_decay_ms：madvise(MADV_FREE) 的页多久后真正释放，默认 0</span>
+<span class="c"># background_thread：用后台线程做回收，不阻塞业务线程</span>
+
+<span class="c"># 验证碎片程度</span>
+<span class="c"># 对 glibc：比较 RSS 和 malloc_usable_size 之和</span>
+<span class="c"># 对 jemalloc：看 stats.allocated vs stats.resident</span>
+MALLOC_CONF="stats_print:true" ./app
+
+<span class="c"># 判断是不是碎片而非泄漏的关键实验</span>
+<span class="c"># 让服务空跑一段时间（不接流量），观察 RSS 是否下降</span>
+<span class="c"># 下降 → 是缓存/可回收，不是泄漏</span>
+<span class="c"># 不降 → 可能是碎片（分配器不归还），也可能是真泄漏</span>
+<span class="c"># 再触发一次完整 GC（jcmd GC.run / runtime.GC()）</span>
+<span class="c"># 仍不降 → 大概率是分配器层面的碎片</span></pre>
+  <div class="callout ok">
+    <b>一个实用的判断流程：</b>① 先确认是"持续上涨"还是"涨到某个水位就平稳"；② 触发 Full GC，看是否回落 —— 回落说明是 GC 没来得及收，不回落说明是可达对象（泄漏）或分配器不归还（碎片）；③ 用 <span class="k">pmap -x</span> 看是哪一段在涨（heap / anon mmap / 动态库）；④ 对 anon 段持续增长且 GC 无效的，基本就是碎片或原生内存泄漏（DirectByteBuffer、JNI、Netty 的堆外内存）。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>OOM 与 cgroup</h2></div>
+
+  <h3>内核 OOM Killer 怎么选人</h3>
+  <pre><span class="c"># 核心是 badness 打分，分数越高越可能被杀</span>
+badness ≈ 进程的 RSS + swap 使用量 + 页表占用
+
+<span class="c"># 但这不是简单比大小，实际计算（简化）</span>
+oom_score 归一化到 0~1000
+考虑因素：
+  1. 物理内存占用（RSS）—— 主要权重
+  2. swap 占用
+  3. 页表大小
+  4. oom_score_adj 调整值（-1000 ~ 1000）
+  5. 是否 CAP_SYS_ADMIN 等特权（会减分）
+
+<span class="c"># oom_score_adj 是人工干预的旋钮</span>
+-1000  →  <span class="g">永不被杀</span>（比如 sshd、systemd）
+    0  →  默认
+ 1000  →  <span class="r">优先被杀</span>
+
+<span class="c"># 查看和设置</span>
+cat /proc/&lt;pid&gt;/oom_score
+cat /proc/&lt;pid&gt;/oom_score_adj
+echo -500 &gt; /proc/&lt;pid&gt;/oom_score_adj</pre>
+  <div class="callout warn">
+    <b>OOM Killer 的"直觉"经常是错的：</b>它<b>倾向于杀占用内存最多的进程</b>，而不是"最该负责的那个"。所以一个 8 GB 的数据库和一个 100 MB 的泄漏服务同时存在时，数据库会被先杀。<br>
+    <b>对策：</b>给关键进程设 <span class="k">oom_score_adj = -1000</span>（需要权限），或者用 systemd 的 <span class="k">OOMScoreAdjust=</span>。但注意 —— 这只是转移了受害者，没解决内存不够的问题。
+  </div>
+
+  <h3>cgroup 的内存限制</h3>
+  <table>
+    <tr><th style="width:210px">文件（cgroup v2）</th><th>含义</th></tr>
+    <tr><td class="f">memory.max</td><td><b>硬限制</b>。超过就触发 cgroup 内 OOM，杀进程</td></tr>
+    <tr><td class="f">memory.high</td><td><b>软限制</b>。超过会被限流（throttle），强制回收，但不杀进程</td></tr>
+    <tr><td class="f">memory.current</td><td>当前用量（含页缓存）</td></tr>
+    <tr><td class="f">memory.stat</td><td>明细：anon、file、slab、kernel_stack 等</td></tr>
+    <tr><td class="f">memory.events</td><td><b>oom / oom_kill 计数</b>。判断"是不是被 OOM 杀了"的关键证据</td></tr>
+    <tr><td class="f">memory.pressure</td><td>PSI 指标，反映内存压力导致的停顿时间</td></tr>
+  </table>
+  <pre><span class="c"># 判断容器是否发生过 OOM</span>
+cat /sys/fs/cgroup/memory.events
+<span class="c"># low 0</span>
+<span class="c"># high 0</span>
+<span class="c"># max 12</span>
+<span class="c"># oom 3          ← 触发了 3 次 OOM</span>
+<span class="c"># oom_kill 3     ← 杀了 3 个进程</span>
+
+<span class="c"># 进程被杀的证据</span>
+dmesg -T | grep -i "killed process"
+<span class="c"># [Wed Oct 15 10:23:41 2026] Out of memory: Killed process 12345 (java)</span>
+<span class="c">#   total-vm:8123456kB, anon-rss:3987654kB, file-rss:0kB</span>
+
+<span class="c"># 容器退出码 137 = 128 + 9 (SIGKILL) —— OOM 的典型信号</span>
+docker inspect --format='{{.State.OOMKilled}}' &lt;container&gt;
+<span class="c"># true 就实锤了</span>
+
+<span class="c"># 注意：memory.current 包含页缓存</span>
+<span class="c"># 一个只读文件的容器，页缓存可能占满配额，看起来"内存满了"</span>
+<span class="c"># 实际上页缓存是可回收的，内核会先回收再 OOM</span>
+cat /sys/fs/cgroup/memory.stat | grep -E "^anon|^file"</pre>
+
+  <h3>为什么容器里的 JVM 要用 MaxRAMPercentage</h3>
+  <pre><span class="c"># ===== 错误做法：写死 -Xmx =====</span>
+java -Xmx4g -jar app.jar
+<span class="c"># 问题 1：容器限制改成 2 GB，-Xmx 还是 4 GB → 启动就 OOMKilled</span>
+<span class="c"># 问题 2：容器限制改成 8 GB，-Xmx 还是 4 GB → 一半内存浪费</span>
+
+<span class="c"># ===== 更错的做法：-Xmx 等于容器上限 =====</span>
+java -Xmx4g ...  # 容器 memory.max = 4g
+<span class="c"># 堆之外还有很多内存开销：</span>
+<span class="c">#   Metaspace         几百 MB（取决于类数量）</span>
+<span class="c">#   Code Cache        默认 240 MB</span>
+<span class="c">#   线程栈            1 MB × 线程数</span>
+<span class="c">#   Direct ByteBuffer 堆外内存（Netty 大量使用）</span>
+<span class="c">#   GC 自身的元数据    （G1 的卡表、记忆集）</span>
+<span class="c">#   JVM 自身代码和数据</span>
+<span class="c"># 结果：堆还没满，容器已经 OOM 了</span>
+
+<span class="c"># ===== 正确做法：按比例 =====</span>
+java -XX:MaxRAMPercentage=75.0 \
+     -XX:InitialRAMPercentage=75.0 \
+     -XX:+UseContainerSupport \
+     -jar app.jar
+
+<span class="c"># UseContainerSupport 从 JDK 10 / 8u191 起默认开启</span>
+<span class="c"># 它会读 cgroup 的限制，把 "物理内存" 替换成 "容器可用内存"</span>
+<span class="c"># 然后 MaxRAMPercentage 按这个基数算堆大小</span>
+
+<span class="c"># 容器 4 GB，75% → 堆约 3 GB，留 1 GB 给堆外</span>
+
+<span class="c"># 验证实际生效的堆大小</span>
+java -XX:+PrintFlagsFinal -version | grep -i maxheap
+jcmd &lt;pid&gt; VM.flags | tr ' ' '\n' | grep -i heap</pre>
+  <table>
+    <tr><th style="width:190px">参数</th><th style="width:130px">默认值</th><th>说明</th></tr>
+    <tr><td class="f">MaxRAMPercentage</td><td>25.0</td><td>最大堆占容器内存的百分比。<b>默认只有 25%，对服务型应用通常偏低</b></td></tr>
+    <tr><td class="f">InitialRAMPercentage</td><td>1.5625</td><td>初始堆占比。设成和 Max 一样可以避免运行期扩容带来的抖动</td></tr>
+    <tr><td class="f">UseContainerSupport</td><td>true</td><td>JDK 10+ / 8u191+ 默认开启</td></tr>
+    <tr><td class="f">MaxDirectMemorySize</td><td>= 最大堆</td><td>堆外直接内存上限。<b>Netty 应用要显式设置</b>，否则可能吃掉和堆一样多的内存</td></tr>
+    <tr><td class="f">MetaspaceSize</td><td>约 21 MB 起</td><td>无上限（受 MaxMetaspaceSize 限制），动态类加载多的应用要关注</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>一个真实的高频事故：</b>容器限 2 GB，JVM 用 <span class="k">-Xmx2g</span>，压测时被 OOMKilled，但 <span class="k">jmap</span> 看堆只用了 1.2 GB。<br>
+    原因：<b>剩下的 800 MB 是堆外</b> —— Metaspace 200 MB + Code Cache 240 MB + 200 个线程栈 200 MB + Direct Buffer 150 MB。堆没满，但容器总量超了。<br>
+    <b>正确配置：</b><span class="k">-XX:MaxRAMPercentage=70</span>（给堆外留 30%），并且显式设 <span class="k">-XX:MaxDirectMemorySize</span>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>观测：RSS、VSZ 与 available</h2></div>
+
+  <h3>free 的每一列到底是什么意思</h3>
+  <pre><span class="c"># 典型输出</span>
+$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:           15884        6210        1234         312        8439        9102
+Swap:           2047          12        2035
+
+<span class="c"># 逐列解释</span>
+total       = 物理内存总量
+used        = total - free - buff/cache   <span class="c"># 已分配且不可回收</span>
+free        = <span class="r">完全没被用到的内存，通常很小，这是正常的</span>
+shared      = tmpfs / 共享内存占用（会算进 used）
+buff/cache  = 页缓存 + 块设备缓存。<span class="g">可回收</span>
+available   = <span class="b">估算的"还能给新程序用多少"，这才是关键</span>
+
+<span class="c"># available 的估算方式（简化）</span>
+available ≈ free + 大部分可回收的页缓存 - 内核保留水位
+
+<span class="c"># 为什么 free 很小是正常的</span>
+<span class="c"># Linux 的策略是"空闲内存就是浪费"，主动拿去做页缓存加速文件读写</span>
+<span class="c"># 有进程需要内存时，页缓存会被立刻回收</span>
+<span class="c"># 所以：<b>看 available，不看 free</b></span>
+
+<span class="c"># 什么时候要警惕</span>
+available &lt; total × 10%   → 内存紧张，随时可能 OOM
+si/so 持续非 0            → 已经在用 swap，性能断崖</span></pre>
+
+  <h3>RSS 与 VSZ</h3>
+  <table>
+    <tr><th style="width:110px">指标</th><th style="width:150px">全称</th><th>含义</th></tr>
+    <tr><td><b>VSZ</b></td><td>Virtual Set Size</td><td>进程<b>虚拟地址空间</b>的大小。包含已映射但从未访问的页、共享库、预留区域。<b>几乎总是远大于实际占用</b></td></tr>
+    <tr><td><b>RSS</b></td><td>Resident Set Size</td><td>进程<b>实际占用物理内存</b>的页数。包含共享页（同一个共享库在 10 个进程里各算一次）</td></tr>
+    <tr><td><b>PSS</b></td><td>Proportional Set Size</td><td>共享页按<b>共享进程数均摊</b>。10 个进程共享 10 MB，每个算 1 MB。<b>把所有进程的 PSS 加起来 ≈ 真实内存占用</b></td></tr>
+    <tr><td><b>USS</b></td><td>Unique Set Size</td><td>进程<b>独占</b>的物理内存。杀掉这个进程能释放多少 —— 判断泄漏最有用的指标</td></tr>
+  </table>
+  <pre><span class="c"># 一个进程的四个数字</span>
+$ grep -E "VmSize|VmRSS|RssAnon|RssFile|RssShmem" /proc/1234/status
+VmSize:   8123456 kB    <span class="c"># VSZ，约 8 GB</span>
+VmRSS:     456789 kB    <span class="c"># RSS，约 456 MB</span>
+RssAnon:   234567 kB    <span class="c"># 匿名页（堆、栈）—— 泄漏通常体现在这里</span>
+RssFile:   222222 kB    <span class="c"># 文件映射页（代码、mmap 的文件）</span>
+RssShmem:       0 kB    <span class="c"># 共享内存</span>
+
+<span class="c"># 更精确的 PSS / USS</span>
+cat /proc/1234/smaps_rollup
+<span class="c"># Rss:     456789 kB</span>
+<span class="c"># Pss:     312456 kB   ← 共享部分已均摊</span>
+<span class="c"># Pss_Anon: 234567 kB</span>
+<span class="c"># Private_Clean / Private_Dirty: 独占部分</span>
+<span class="c"># Referenced: 最近被访问过的页</span>
+
+<span class="c"># pmap 看分段</span>
+pmap -x 1234 | tail -1
+<span class="c"># 或者按大小排序看哪一段最大</span>
+pmap -x 1234 | sort -k3 -n -r | head -10</pre>
+
+  <h3>为什么 RSS 会被共享</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>动态库</div><div class="cd">libc、libssl 这些库在多个进程间共享同一份物理页。10 个进程用 libc，物理内存只有一份，但每个进程的 RSS 都算了进去。<b>所以所有进程 RSS 之和会大于物理内存</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>fork 的 COW</div><div class="cd">fork 之后父子进程共享全部内存页，只在写入时才复制。Redis 的 bgsave、Nginx 的 worker 都靠这个省内存</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>共享内存 / tmpfs</div><div class="cd">shmget、mmap(MAP_SHARED)、tmpfs 文件，多个进程映射同一块页。注意 tmpfs 还占内存配额</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>KSM</div><div class="cd">Kernel Samepage Merging，内核主动扫描并合并内容相同的页。虚拟机场景常用，但会增加 CPU 开销</div></div>
+  </div>
+  <pre><span class="c"># 一个反直觉的验证：所有进程 RSS 之和 &gt; 物理内存</span>
+$ ps -eo rss= | awk '{s+=$1} END {print s/1024/1024 " GB"}'
+12.4 GB
+$ free -g | awk '/Mem:/{print $2 " GB total"}'
+16 GB
+<span class="c"># 这不是内存泄漏，是共享页被重复计算</span>
+
+<span class="c"># 用 PSS 才是准的</span>
+$ sudo smem -t -k
+<span class="c"># 或者遍历 /proc/*/smaps_rollup 累加 Pss</span></pre>
+  <div class="callout ok">
+    <b>排查内存问题的正确顺序：</b><br>
+    ① <b>看趋势</b>：RSS 是锯齿、阶梯还是线性？决定是正常、泄漏还是碎片。<br>
+    ② <b>看构成</b>：<span class="k">RssAnon</span> 涨 = 堆/栈（业务代码）；<span class="k">RssFile</span> 涨 = 文件映射（可能是 mmap 了大文件）；<span class="k">RssShmem</span> 涨 = 共享内存。<br>
+    ③ <b>看 PSS</b>：确认到底占了多少真实内存，别被共享页误导。<br>
+    ④ <b>看 cgroup</b>：<span class="k">memory.current</span> 和 <span class="k">memory.events</span>，确认是不是被容器限制卡住。<br>
+    ⑤ <b>最后才看代码</b>：用 valgrind / pprof / 堆 dump 定位到具体分配点。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">看 free 列的数值判断内存够不够</div><div class="pd">Linux 会主动用空闲内存做页缓存，free 列几乎总是很小。判断标准是 <span class="k">available</span> 列，它才是"还能给新程序用多少"的估算值。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把 VSZ 当成实际内存占用</div><div class="pd">VSZ 是虚拟地址空间，包含大量从未访问的预留区域，动辄几十 GB。JVM 启动后 VSZ 可能有 8 GB 而 RSS 只有 500 MB。看 RSS 或 PSS，不看 VSZ。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把"所有进程 RSS 之和超过物理内存"当成异常</div><div class="pd">共享库、COW、共享内存都被重复计算了。要准确评估用 PSS（按共享进程数均摊），或者直接看 cgroup 的 memory.current。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">把内存泄漏和内存溢出混为一谈</div><div class="pd">泄漏是"该释放没释放"，表现为缓慢上涨；溢出是"超过上限"，表现为突然失败。前者要查分配点，后者要查峰值和限制配置，排查路径完全不同。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">认为"有 GC 就不会泄漏"</div><div class="pd">GC 只回收不可达对象。缓存无上限、集合只增不减、ThreadLocal 不 remove、监听器不注销，都会导致对象一直可达 —— 逻辑泄漏，GC 无能为力。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">容器里 JVM 用固定 -Xmx</div><div class="pd">容器限制一变就 OOM 或浪费。更危险的是 -Xmx 等于容器上限 —— 堆之外的 Metaspace、Code Cache、线程栈、Direct Buffer 会直接撑爆。用 <span class="k">-XX:MaxRAMPercentage=70</span> 并显式设 MaxDirectMemorySize。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">用 swap 来"解决"内存不足</div><div class="pd">swap 的延迟是内存的几千倍（微秒级 vs 纳秒级）。si/so 持续非 0 时，服务延迟会断崖式恶化。swap 只该作为防止 OOM 的缓冲，不该当作扩容手段。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">看到 RSS 不降就认定是泄漏</div><div class="pd">分配器（ptmalloc）free 后只是还给空闲链表，不一定还给内核。brk 只能从堆顶收缩，堆顶卡住就永远降不下来。触发一次 Full GC 后仍不降，且 <span class="k">RssAnon</span> 平稳，多半是碎片。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">在容器里用 free / nproc 判断资源</div><div class="pd">容器看到的是宿主机资源。内存限制看 <span class="k">/sys/fs/cgroup/memory.max</span>，当前用量看 <span class="k">memory.current</span>，OOM 证据看 <span class="k">memory.events</span> 的 oom_kill 计数。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">线程栈开太大导致线程创建失败</div><div class="pd">默认 8 MB 栈 × 1000 线程 = 8 GB 虚拟空间。虽然物理内存不一定用到，但会撞上 <span class="k">max_map_count</span> 或地址空间上限。线程多时把栈调到 256 KB~1 MB。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 某进程 VSZ 显示 8 GB，RSS 显示 500 MB。说明？</div>
+      <button class="opt">内存泄漏了 8 GB</button>
+      <button class="opt">系统内存不足</button>
+      <button class="opt">虚拟地址空间预留了 8 GB，实际只访问了 500 MB 物理页</button>
+      <div class="ans">正确答案：<b>只访问了 500 MB</b>。虚拟内存允许"承诺"远大于实际使用，缺页时才分配物理页。JVM 启动时就会预留大块虚拟地址。判断实际占用要看 RSS 或 PSS，不是 VSZ。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 容器限制 4 GB，JVM 应该怎么配堆？</div>
+      <button class="opt">-Xmx4g，把容器内存全给堆</button>
+      <button class="opt">-XX:MaxRAMPercentage=70 左右，给堆外留 30%</button>
+      <button class="opt">-Xmx512m，越小越安全</button>
+      <div class="ans">正确答案：<b>MaxRAMPercentage 70 左右</b>。堆之外还有 Metaspace、Code Cache（默认 240 MB）、线程栈、Direct ByteBuffer、GC 元数据。<span class="k">-Xmx</span> 等于容器上限必然 OOMKilled；<span class="k">-Xmx512m</span> 又浪费资源。还要显式设 <span class="k">MaxDirectMemorySize</span>。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. <span class="k">free</span> 输出里 free 列只有 1 GB，available 列有 9 GB，说明？</div>
+      <button class="opt">大部分内存被页缓存占用，可随时回收，内存充足</button>
+      <button class="opt">内存严重不足，马上要 OOM</button>
+      <button class="opt">有 8 GB 内存泄漏</button>
+      <div class="ans">正确答案：<b>页缓存可回收</b>。Linux 主动用空闲内存做文件缓存，free 列小是设计使然。available 才是"还能给新程序用多少"的估算，9 GB 说明内存充足。只有 available 低于 total 的 10% 才需要警惕。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 服务 RSS 三天内阶梯式上涨（涨一段平一段再涨），触发 Full GC 后不回落。最可能是？</div>
+      <button class="opt">正常的内存波动</button>
+      <button class="opt">分配器碎片，应该换 jemalloc</button>
+      <button class="opt">内存泄漏：有对象一直可达，GC 收不掉</button>
+      <div class="ans">正确答案：<b>内存泄漏</b>。阶梯式上涨说明每次触发某条业务路径就漏一点；Full GC 后不回落说明这些对象是<b>可达的</b>，GC 无能为力。碎片通常表现为"涨到某个水位后平稳"，不会持续阶梯上涨。下一步用堆 dump 或 pprof 找分配点。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 三色标记法中，如果不加写屏障，并发标记可能出错的原因是？</div>
+      <button class="opt">灰色对象太多导致内存不够</button>
+      <button class="opt">黑色对象新引用了白色对象，而该白色对象已无法从灰色对象到达，会被误回收</button>
+      <button class="opt">白色对象被重复标记</button>
+      <div class="ans">正确答案：<b>对象消失问题</b>。需要同时满足两个条件：黑色对象插入指向白色对象的新边，且所有从灰色到该白色的路径都被删除。写屏障只要破坏其中任意一个就安全 —— 增量更新破坏前者（把黑色变回灰色），SATB 破坏后者（记录被删除的旧引用）。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 容器退出码 137，最可能的原因是？</div>
+      <button class="opt">被 SIGKILL 杀死，通常是 cgroup 内存超限触发 OOM Killer</button>
+      <button class="opt">程序自己调用了 exit(137)</button>
+      <button class="opt">磁盘写满</button>
+      <div class="ans">正确答案：<b>被 SIGKILL 杀</b>。137 = 128 + 9，即收到信号 9。最常见的是 cgroup 内存超限。用 <span class="k">cat /sys/fs/cgroup/memory.events</span> 看 <span class="k">oom_kill</span> 计数，用 <span class="k">dmesg | grep -i "killed process"</span> 看内核日志确认。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+
+  <h3>四个内存指标的区别</h3>
+  <table>
+    <tr><th style="width:100px">指标</th><th style="width:170px">含义</th><th>用来看什么</th></tr>
+    <tr><td><b>VSZ</b></td><td>虚拟地址空间大小</td><td>地址空间是否耗尽、mmap 是否过多。<b>不代表实际占用</b></td></tr>
+    <tr><td><b>RSS</b></td><td>常驻物理内存（含共享）</td><td>趋势判断：锯齿/阶梯/线性</td></tr>
+    <tr><td><b>PSS</b></td><td>共享页按进程数均摊</td><td>准确评估真实占用，各进程 PSS 之和 ≈ 物理内存</td></tr>
+    <tr><td><b>USS</b></td><td>进程独占的物理内存</td><td>杀进程能释放多少，泄漏排查的首选</td></tr>
+  </table>
+
+  <h3>观测命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>free -h --wide</code><span class="desc">看 available，不看 free</span><button class="copy">复制</button></div>
+    <div class="crow"><code>vmstat 1</code><span class="desc">si/so 看 swap，bi/bo 看块设备 IO</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pmap -x &lt;pid&gt; | tail -1</code><span class="desc">进程内存总量与分段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/&lt;pid&gt;/smaps_rollup</code><span class="desc">Rss / Pss / Private_Dirty 一次看全</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -E "VmSize|VmRSS|RssAnon" /proc/&lt;pid&gt;/status</code><span class="desc">VSZ/RSS/匿名页构成</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -o pid,rss,vsz,min_flt,maj_flt -p &lt;pid&gt;</code><span class="desc">RSS/VSZ + 缺页次数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -r -p &lt;pid&gt; 1</code><span class="desc">持续采样缺页率与内存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/fs/cgroup/memory.current</code><span class="desc">cgroup 当前用量（含页缓存）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/fs/cgroup/memory.events</code><span class="desc">oom / oom_kill 计数，判断是否被 OOM</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dmesg -T | grep -i "killed process"</code><span class="desc">内核 OOM 日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>valgrind --leak-check=full ./app</code><span class="desc">C/C++ 泄漏检测（慢但准）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>heaptrack ./app</code><span class="desc">采样式堆分析，开销小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jmap -histo:live &lt;pid&gt; | head -20</code><span class="desc">Java 对象直方图</span><button class="copy">复制</button></div>
+    <div class="crow"><code>go tool pprof -http=:8080 &lt;heap-url&gt;</code><span class="desc">Go 堆分析</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键参数</h3>
+  <pre><span class="c"># 内核</span>
+vm.overcommit_memory        <span class="c"># 0=启发式 1=总是允许 2=严格</span>
+vm.overcommit_ratio         <span class="c"># 模式 2 下的物理内存比例，默认 50</span>
+vm.swappiness               <span class="c"># 0-100，越大越倾向换出匿名页。数据库通常设 1~10</span>
+vm.min_free_kbytes          <span class="c"># 内核保留水位，太小容易触发直接回收</span>
+
+<span class="c"># glibc malloc</span>
+M_MMAP_THRESHOLD            <span class="c"># 默认 128 KB，超过走 mmap</span>
+M_TRIM_THRESHOLD            <span class="c"># 默认 128 KB，堆顶空闲超过就收缩</span>
+
+<span class="c"># jemalloc</span>
+dirty_decay_ms              <span class="c"># 默认 10000，脏页多久归还</span>
+muzzy_decay_ms              <span class="c"># 默认 0</span>
+background_thread           <span class="c"># true 用后台线程回收</span>
+
+<span class="c"># JVM</span>
+-XX:MaxRAMPercentage=70     <span class="c"># 按容器内存算堆上限</span>
+-XX:InitialRAMPercentage=70 <span class="c"># 初始堆，避免运行期扩容</span>
+-XX:MaxDirectMemorySize     <span class="c"># 堆外直接内存上限，Netty 必设</span>
+-XX:+AlwaysPreTouch         <span class="c"># 启动时预触碰堆页，把缺页成本前置</span>
+-XX:MaxMetaspaceSize        <span class="c"># 限制 Metaspace，防止动态类加载撑爆</span>
+
+<span class="c"># Go</span>
+GOGC=100                    <span class="c"># 堆涨到存活量 2 倍时触发 GC</span>
+GOMEMLIMIT=3GiB             <span class="c"># 软内存上限（1.19+）</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>虚拟内存</b></td><td>每个进程独享的地址空间抽象，由页表映射到物理内存</td></tr>
+    <tr><td><b>overcommit</b></td><td>允许分配的虚拟内存超过物理内存总量，靠缺页时再兑现</td></tr>
+    <tr><td><b>页表 page table</b></td><td>虚拟页到物理页帧的映射表，x86-64 默认四级</td></tr>
+    <tr><td><b>PTE</b></td><td>页表项，包含物理页帧号和各种标志位（Present/Dirty/Accessed/NX）</td></tr>
+    <tr><td><b>TLB</b></td><td>地址翻译缓存，miss 时要走多级页表，代价等同一次 cache miss</td></tr>
+    <tr><td><b>大页 huge page</b></td><td>2 MB 或 1 GB 的页，大幅提升 TLB 覆盖范围，代价是内部碎片</td></tr>
+    <tr><td><b>缺页中断 page fault</b></td><td>访问的页没有有效映射时触发。minor 在内存里，major 要读磁盘</td></tr>
+    <tr><td><b>COW</b></td><td>写时复制，fork 后共享页，写入时才真正复制</td></tr>
+    <tr><td><b>brk</b></td><td>通过移动堆顶指针扩展堆，只能从顶部收缩</td></tr>
+    <tr><td><b>mmap</b></td><td>建立独立的内存映射，free 时可 munmap 完整归还</td></tr>
+    <tr><td><b>RSS</b></td><td>常驻物理内存，含与其他进程共享的页</td></tr>
+    <tr><td><b>PSS</b></td><td>共享页按进程数均摊后的内存占用，最接近真实值</td></tr>
+    <tr><td><b>USS</b></td><td>进程独占的物理内存，杀进程能释放的量</td></tr>
+    <tr><td><b>内部碎片</b></td><td>分配出去的块比请求的大，多出的部分浪费在块内</td></tr>
+    <tr><td><b>外部碎片</b></td><td>空闲总量够但分散，凑不出连续大块</td></tr>
+    <tr><td><b>三色标记</b></td><td>GC 用白/灰/黑表示扫描进度，并发标记的正确性基础</td></tr>
+    <tr><td><b>写屏障 write barrier</b></td><td>赋值时插入的钩子，记录引用变化，保证并发标记不漏对象</td></tr>
+    <tr><td><b>SATB</b></td><td>按 GC 开始时的快照标记，删除引用时记录旧值</td></tr>
+    <tr><td><b>STW</b></td><td>Stop The World，GC 暂停所有业务线程的阶段</td></tr>
+    <tr><td><b>OOM Killer</b></td><td>内存耗尽时内核按 badness 打分杀进程的机制</td></tr>
+    <tr><td><b>cgroup</b></td><td>内核的资源隔离机制，memory.max 是容器的内存硬限制</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个每秒 malloc 1 MB 且不 free 的程序，用 <span class="k">pmap -x</span> 观察 <span class="k">RssAnon</span> 的阶梯上涨，再用 valgrind 定位；② 用 <span class="k">-Xmx</span> 等于容器上限跑一个 Java 服务，压测到 OOMKilled，然后改成 <span class="k">MaxRAMPercentage</span> 复测；③ 用 <span class="k">LD_PRELOAD</span> 把同一个程序切到 jemalloc，对比 RSS 曲线；④ 用 <span class="k">smem</span> 或遍历 <span class="k">smaps_rollup</span> 算出全机 PSS 之和，和 <span class="k">free</span> 的 used 对比；⑤ 打开 <span class="k">GODEBUG=gctrace=1</span> 跑一个 Go 服务，观察 GOGC 调整对 GC 频率和 RSS 的影响。<br><br>
+    <b>之后值得单独学：</b>NUMA 感知的内存分配（numactl / mbind）、透明大页与 <span class="k">khugepaged</span> 的行为、ZGC / Shenandoah 的染色指针、Go 的 <span class="k">GOMEMLIMIT</span> 与 scavenger 协作机制、以及 eBPF 对内存分配的动态追踪。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透内存管理 · 先分清是泄漏、碎片还是限制，再动手改</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（堆栈）、模块 7（OOM 与 cgroup）最值得回看。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边用 pmap -x 看自己的进程。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开着 free -m 和 pmap -x $$，边读边对照自己机器';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

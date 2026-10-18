@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学会代码审查</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 工程基础</span>
+    <h1>二十分钟学会代码审查</h1>
+    <p class="sub">代码审查是团队里<b>性价比最高的知识传递机制</b>，也是最容易变成互相挑刺的地方。这篇讲的是：看什么、不看什么、话怎么说、大 PR 怎么拆。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>7</b> 类检查项</span>
+      <span class="chip"><b>3</b> 级评论标签</span>
+      <span class="chip"><b>10</b> 个常见坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议打开你团队最近一个 PR，用文末清单过一遍</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先定标准：什么算"可以合并"</h2></div>
+  <p class="lead">审查之所以经常吵架，往往不是因为技术分歧，而是因为<b>双方对"合格"的定义不一样</b>。先把标准写下来，后面所有的讨论都有依据。</p>
+  <table>
+    <tr><th style="width:150px">标准</th><th>含义</th></tr>
+    <tr><td><b>确实变好了</b></td><td>合入后代码库的整体健康状况不下降。不是"完美"，是"比之前好"</td></tr>
+    <tr><td><b>解决真问题</b></td><td>改动对应一个真实需求或缺陷，不是为了改而改</td></tr>
+    <tr><td><b>可维护</b></td><td>三个月后别人能读懂、能改、能测</td></tr>
+    <tr><td><b>可回滚</b></td><td>出问题时能独立回退，不牵连其他改动</td></tr>
+  </table>
+  <div class="callout">
+    <b>关键取舍：</b>审查的目标是"持续改善"，不是"达到完美"。如果一条评论只是"我会用另一种写法"，而两种写法都对 —— 那就不是必须改的项。把"必须改"和"建议"分开，是审查能长期维持的前提。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>双重目标：找缺陷，也传递知识</h2></div>
+  <p class="lead">只盯着缺陷的审查，会退化成"抓错游戏"。作者开始防御，评论开始变短，最后大家只敢提交最小的改动，谁都不愿碰核心代码。</p>
+
+  <h3>两个目标各自的价值</h3>
+  <table>
+    <tr><th style="width:130px">目标</th><th style="width:250px">具体产出</th><th>缺失后的后果</th></tr>
+    <tr><td><b>找缺陷</b></td><td>边界、并发、错误处理、安全隐患被提前发现</td><td>bug 流到线上，修复成本是审查时的 10~100 倍</td></tr>
+    <tr><td><b>传递知识</b></td><td>作者学到项目约定；审查者了解新代码；团队形成共识</td><td>知识集中在少数人身上，核心模块变成"只有他能改"</td></tr>
+  </table>
+  <p>缺陷的价值可以量化：一个在审查阶段发现的空指针，修复成本是几分钟；同样的问题到了线上，是排查 + 热修 + 复盘 + 用户补偿。而知识传递的价值是隐性的 —— 它决定了半年后还有没有人敢动这块代码。</p>
+
+  <h3>知识传递发生在哪</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>约定</div><div class="cd">"这个项目里所有外部调用都要设超时" —— 一句话让作者以后都不会再犯</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>历史</div><div class="cd">"这里之所以要加锁，是因为去年出过一次并发扣款事故" —— 代码里读不到的背景</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>取舍</div><div class="cd">"我们试过方案 A，但它在数据量超过 100 万时会退化，所以用了 B"</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>盲区</div><div class="cd">审查者问"这里为什么这么写"，作者被迫解释，往往自己就发现了问题</div></div>
+  </div>
+
+  <h3>让知识传递真实发生的三个条件</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>评论要解释"为什么"</b>，而不只是"改成这样"。只给结论的评论，作者只会照抄，下次照样犯。</div></div>
+    <div class="step"><div class="txt"><b>允许作者反问</b>。审查是讨论，不是判决。作者问"为什么"的时候，可能真的是你记错了约定。</div></div>
+    <div class="step"><div class="txt"><b>把重复出现的问题沉淀成文档或 lint 规则</b>。同一个问题被指出三次，说明该交给工具了，而不是继续靠人记。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>最常见的失衡：审查变成单向输出。</b>资深工程师写 20 条评论，初级工程师全部照改，一句不问。看起来效率很高，实际上作者没有建立判断力 —— 三个月后同样的 20 条还会再出现一次。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>该看什么：按优先级排序</h2></div>
+  <p class="lead">审查时间有限，必须按"出错代价"排序。下面七类，从上到下优先级递减。前四类不改就不能合，后三类可以商量。</p>
+
+  <table>
+    <tr><th style="width:40px">#</th><th style="width:130px">检查项</th><th style="width:230px">典型问题</th><th>代价</th></tr>
+    <tr><td>1</td><td><b>正确性</b></td><td>逻辑写反、条件漏判、算法用错、单位不一致</td><td>功能直接不可用</td></tr>
+    <tr><td>2</td><td><b>边界条件</b></td><td>空集合、0、负数、超长字符串、时区、闰年</td><td>低频但必然发生的线上故障</td></tr>
+    <tr><td>3</td><td><b>错误处理</b></td><td>吞异常、只打日志不处理、失败后状态不一致</td><td>故障时静默失败，排查极难</td></tr>
+    <tr><td>4</td><td><b>并发安全</b></td><td>共享可变状态、非原子读改写、锁粒度、死锁</td><td>偶发、难复现、影响面大</td></tr>
+    <tr><td>5</td><td><b>安全风险</b></td><td>注入、越权、密钥硬编码、日志泄露敏感信息</td><td>可能是一次事故级事件</td></tr>
+    <tr><td>6</td><td><b>可读性</b></td><td>命名、函数过长、嵌套过深、魔法数字</td><td>影响长期维护成本</td></tr>
+    <tr><td>7</td><td><b>测试覆盖</b></td><td>新分支没测、只测 happy path</td><td>后续改动没有安全网</td></tr>
+  </table>
+
+  <h3>第一类：正确性</h3>
+  <p>先不看细节，先回答一个问题：<b>这段代码做的事，和 PR 描述说的是同一件事吗？</b>很多严重问题不是写错了，是写偏了。</p>
+  <pre><span class="c"># 常见形态：条件写反、边界用错、单位混用</span>
+<span class="b">if</span> user.balance &gt; amount:          <span class="r"># ✗ 余额刚好等于金额时应该允许支付</span>
+<span class="b">if</span> user.balance &gt;= amount:         <span class="g"># ✓</span>
+
+timeout = 30                       <span class="r"># ✗ 注释说要 30 秒，但下游 SDK 单位是毫秒</span>
+timeout_ms = 30 * 1000             <span class="g"># ✓ 变量名带上单位</span>
+
+total = price * quantity           <span class="r"># ✗ 金额用 float，0.1+0.2 != 0.3</span>
+total = Decimal(price) * quantity  <span class="g"># ✓</span></pre>
+
+  <h3>第二类：边界条件</h3>
+  <table>
+    <tr><th style="width:150px">边界</th><th>要问的问题</th></tr>
+    <tr><td>空 / null</td><td>空列表、空字符串、null 对象，每个都会走哪条路径？</td></tr>
+    <tr><td>零与负数</td><td>数量为 0 时会不会除以零？金额为负会不会退钱给用户？</td></tr>
+    <tr><td>极大值</td><td>一次查 10 万条会不会 OOM？分页参数传 100000 呢？</td></tr>
+    <tr><td>时间</td><td>跨天、跨月、闰年、夏令时、时区不一致</td></tr>
+    <tr><td>编码与长度</td><td>emoji（4 字节）、超长字符串、前后空格</td></tr>
+    <tr><td>重复与顺序</td><td>同一请求发两次会怎样？消息乱序到达会怎样？</td></tr>
+  </table>
+
+  <h3>第三类：错误处理</h3>
+  <pre><span class="c"># ✗ 吞掉异常，故障时完全静默</span>
+<span class="b">try</span>:
+    charge(order)
+<span class="b">except</span> Exception:
+    <span class="b">pass</span>
+
+<span class="c"># ✗ 只打日志，但上层以为成功了</span>
+<span class="b">try</span>:
+    charge(order)
+<span class="b">except</span> Exception <span class="b">as</span> e:
+    logger.error(<span class="y">"charge failed"</span>, exc_info=e)
+    <span class="b">return</span> True
+
+<span class="c"># ✓ 明确失败语义，让调用方必须处理</span>
+<span class="b">try</span>:
+    charge(order)
+<span class="b">except</span> PaymentError <span class="b">as</span> e:
+    logger.error(<span class="y">"charge failed"</span>, extra={<span class="y">"order_id"</span>: order.id}, exc_info=e)
+    <span class="b">raise</span> OrderPaymentFailed(order.id) <span class="b">from</span> e</pre>
+  <p>要重点看的三件事：<b>失败后状态是否一致</b>（扣了库存但没生成订单？）、<b>重试是否安全</b>（幂等键有没有）、<b>错误信息是否够定位</b>（有没有带上关键 ID）。</p>
+
+  <h3>第四类：并发安全</h3>
+  <ul>
+    <li><b>读-改-写不是原子操作</b>：<span class="k">if (stock &gt; 0) stock--</span> 在并发下会超卖。要用数据库条件更新、原子操作或锁。</li>
+    <li><b>共享可变状态</b>：单例里的成员变量、静态缓存、全局 map。多线程下必须用并发容器或加锁。</li>
+    <li><b>锁的范围</b>：锁太小保护不住，锁太大吞掉吞吐。特别要看<b>锁内有没有网络调用</b>。</li>
+    <li><b>锁顺序</b>：两处代码以不同顺序获取两把锁，就是死锁。</li>
+    <li><b>双重检查的可见性</b>：懒加载单例忘了 <span class="k">volatile</span>，可能拿到半初始化对象。</li>
+  </ul>
+
+  <h3>第五类：安全风险</h3>
+  <table>
+    <tr><th style="width:170px">风险</th><th>在 diff 里长什么样</th></tr>
+    <tr><td><b>SQL 注入</b></td><td>字符串拼接 SQL：<span class="k">"SELECT * FROM t WHERE id=" + id</span></td></tr>
+    <tr><td><b>命令注入</b></td><td><span class="k">Runtime.exec("sh -c " + userInput)</span>、<span class="k">os.system(...)</span></td></tr>
+    <tr><td><b>越权</b></td><td>只校验了登录，没校验"这个资源是不是你的"</td></tr>
+    <tr><td><b>密钥硬编码</b></td><td>AK/SK、数据库密码直接写在代码或配置文件里</td></tr>
+    <tr><td><b>敏感信息落日志</b></td><td>打印完整请求体，里面含身份证、token、银行卡</td></tr>
+    <tr><td><b>不安全的反序列化</b></td><td>对不可信输入做 pickle / Java 原生反序列化</td></tr>
+    <tr><td><b>路径穿越</b></td><td>用户传入的文件名直接拼到路径上，没做规范化校验</td></tr>
+  </table>
+
+  <h3>第六、七类：可读性与测试</h3>
+  <p>可读性只看三件事：<b>命名是否说了它是什么</b>、<b>函数是否只做一件事</b>、<b>嵌套是否超过三层</b>。测试只看两件事：<b>新增的分支有没有测</b>、<b>断言是不是真的在验证行为</b>。</p>
+  <div class="callout ok">
+    <b>时间不够时的取舍：</b>先扫一遍 diff 的文件列表和函数签名（3 分钟），再重点看涉及金额、权限、状态流转、并发的那几十行。80% 的严重问题集中在 20% 的代码里，剩下的格式问题交给工具。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>不该纠结什么：交给工具</h2></div>
+  <p class="lead">任何"能被机器判定"的问题，都不该占用人的注意力。人肉检查格式，既慢又不一致，还容易变成权力展示。</p>
+
+  <table>
+    <tr><th style="width:180px">不该在评论里说</th><th>应该由谁管</th></tr>
+    <tr><td>缩进、换行、引号、分号</td><td>格式化工具（gofmt / Prettier / ruff format / google-java-format）</td></tr>
+    <tr><td>命名风格（camelCase / snake_case）</td><td>linter 规则 + 项目约定文档</td></tr>
+    <tr><td>未使用的变量、import</td><td>linter</td></tr>
+    <tr><td>圈复杂度、函数长度</td><td>linter 阈值 + CI 门禁</td></tr>
+    <tr><td>明显的类型错误</td><td>类型检查器（mypy / tsc / pyright）</td></tr>
+    <tr><td>已知的漏洞写法</td><td>静态扫描（Semgrep / CodeQL / gitleaks）</td></tr>
+    <tr><td>"我觉得这样更好看"</td><td>不该出现。没有客观依据的偏好，不该阻塞别人</td></tr>
+  </table>
+
+  <h3>为什么这条边界这么重要</h3>
+  <p>因为<b>人的注意力是审查中最稀缺的资源</b>。一条 PR 有 30 条评论，其中 25 条是格式问题，作者会形成"这些评论都不用认真看"的习惯 —— 剩下 5 条真正重要的，也会被一起忽略。</p>
+  <div class="callout warn">
+    <b>"个人偏好"是最难识别的。</b>它常常伪装成技术意见："我习惯用 for 循环而不是 stream""我觉得这个类应该叫 XxxManager"。判断标准很简单：<b>你能说出一条会导致实际问题的理由吗？</b>说不出，就是偏好。
+  </div>
+
+  <h3>约定怎么落地</h3>
+  <table>
+    <tr><th style="width:170px">层级</th><th>手段</th><th>强制性</th></tr>
+    <tr><td>格式</td><td>提交前自动格式化（pre-commit hook）+ CI 校验</td><td><b>强制</b>，不通过不能合</td></tr>
+    <tr><td>风格</td><td>linter 配置文件入库，全团队共用一份</td><td><b>强制</b></td></tr>
+    <tr><td>架构约定</td><td>文档 + 示例代码 + 审查时指出</td><td>建议，允许有理由的例外</td></tr>
+    <tr><td>领域知识</td><td>只能靠审查和口头传递</td><td>讨论</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一条实用规则：</b>同一个问题如果被人在审查里指出超过三次，就该写进 linter 规则或文档。<b>反复用人脑检查机器能查的东西，是团队效率的净损失。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>评论的写法：让人愿意改</h2></div>
+  <p class="lead">同样一个问题，写法不同，接受度差好几倍。核心不是"委婉"，而是<b>信息完整 + 明确优先级</b>。</p>
+
+  <h3>提问式 vs 命令式</h3>
+  <table>
+    <tr><th style="width:230px">写法</th><th>效果</th></tr>
+    <tr><td>"这里应该用 try-with-resources"</td><td>命令式。如果作者有理由，会觉得被压制</td></tr>
+    <tr><td>"这个流在异常时会不会没关闭？"</td><td>提问式。给出思考方向，作者自己得出结论</td></tr>
+    <tr><td>"必须改成 X"</td><td>只适用于有硬性依据（安全、规范、已知 bug）</td></tr>
+  </table>
+  <p>提问式的隐含前提是：<b>你可能不知道全部背景</b>。作者可能确实有理由（比如这个流由框架关闭）。命令式一旦判断错，就很难下台。</p>
+
+  <h3>用标签分级</h3>
+  <table>
+    <tr><th style="width:90px">标签</th><th style="width:110px">含义</th><th>作者该怎么做</th></tr>
+    <tr><td class="f">must</td><td>必须改，否则不合</td><td>改，或给出充分理由反驳</td></tr>
+    <tr><td class="f">should</td><td>强烈建议</td><td>改，或有理由地说明不改</td></tr>
+    <tr><td class="f">nit</td><td>吹毛求疵，可忽略</td><td>有空就改，不改也能合</td></tr>
+    <tr><td class="f">question</td><td>我不理解，请解释</td><td>回答，可能顺带发现 bug</td></tr>
+    <tr><td class="f">praise</td><td>这里写得好</td><td>不用做任何事</td></tr>
+  </table>
+  <pre><span class="c"># 没有标签：作者不知道哪条必须改</span>
+这里要加超时
+命名不太好
+这个循环可以优化
+
+<span class="c"># 有标签：优先级一目了然</span>
+<span class="r">must</span>: 这个 HTTP 调用没设超时，下游卡住会把线程池占满（参考上次 P1 事故）
+<span class="y">should</span>: 建议把 orderList 改成 pendingOrders，这里装的是待处理订单
+<span class="b">nit</span>: 这行可以合并到上面，纯属个人偏好，不改也行
+<span class="b">question</span>: 这里为什么用 for 而不是批量接口？是有意避免大请求吗</pre>
+
+  <h3>给建议，而不是只指出问题</h3>
+  <pre><span class="c"># ✗ 只说问题</span>
+这个查询在数据量大时会很慢。
+
+<span class="c"># ✓ 指出问题 + 给出方向 + 说明代价</span>
+这个查询在 order 表超过 100 万行时会全表扫描（where 里 create_time 没索引）。
+建议加 (user_id, create_time) 的联合索引，或者把时间范围收窄到 7 天内。
+前者要改表结构，后者会改变产品语义，你判断哪个更合适。
+
+<span class="c"># ✓✓ 更好的做法：直接给 patch</span>
+```suggestion
+WHERE user_id = ? AND create_time &gt;= ?
+```</pre>
+  <div class="callout">
+    <b>"给建议"不等于"替对方写代码"。</b>对于小而明确的问题，直接提 suggestion 最快；对于设计层面的问题，给方向 + 让作者决定更合适。审查者的角色是<b>提供信息和判断依据</b>，不是替作者做决定。
+  </div>
+
+  <h3>三个让评论变糟的习惯</h3>
+  <ul>
+    <li><b>反问带情绪</b>："你有没有想过并发？" —— 这不是提问，是质疑能力。改成"这里两个线程同时进来会怎样"。</li>
+    <li><b>一次贴 30 条</b>：作者会直接放弃逐条讨论。分批提，先提 must，改完再看下一轮。</li>
+    <li><b>只贴链接</b>："参考 Clean Code 第 3 章" —— 对方不一定有这本书，也不一定有时间读。把结论写出来。</li>
+  </ul>
+  <div class="callout ok">
+    <b>一个简单有效的模板：</b>「<b>现象</b> + <b>为什么是问题</b> + <b>建议怎么做</b> + <b>优先级标签</b>」。四句话，作者不用猜你的意图，也不用追问。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>大 PR 怎么审：分层，而不是逐行</h2></div>
+  <p class="lead">一个 2000 行的 PR，逐行读到最后必然注意力涣散。<b>正确的做法是先看骨架，再看肌肉，最后看皮肤。</b></p>
+
+  <h3>第一层：接口契约（5 分钟）</h3>
+  <p>只看对外暴露的东西：函数签名、API 路径与参数、数据结构、数据库表结构、消息格式。<b>这一层决定了这个改动会不会影响别人。</b></p>
+  <table>
+    <tr><th style="width:180px">看什么</th><th>要问的问题</th></tr>
+    <tr><td>函数签名</td><td>参数是不是太多？返回值能不能表达失败？命名是否准确？</td></tr>
+    <tr><td>API 变更</td><td>是不是破坏性变更？老客户端还能用吗？要不要版本化？</td></tr>
+    <tr><td>数据结构</td><td>字段可空吗？默认值是什么？加了必填字段会不会让老数据挂掉？</td></tr>
+    <tr><td>数据库</td><td>加索引会不会锁表？迁移脚本可回滚吗？大表加字段的默认值怎么处理？</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>接口层的错误最贵。</b>内部实现写错了，改一个函数就行；接口发布出去再改，要兼容老客户端、要写迁移、要通知上下游。<b>所以审查时间应该优先花在签名和数据结构上。</b>
+  </div>
+
+  <h3>第二层：核心逻辑（15 分钟）</h3>
+  <p>跳过样板代码（getter、DTO 转换、配置加载），直接找<b>有分支、有状态、有循环、有外部调用</b>的函数。这些是 bug 的栖息地。</p>
+  <ul>
+    <li>主流程能不能用三句话说清？说不清说明抽象有问题。</li>
+    <li>每个 <span class="k">if</span> 的 else 分支去哪了？是有意省略还是漏了？</li>
+    <li>状态流转有没有非法路径（比如从"已取消"直接到"已发货"）？</li>
+    <li>外部调用有没有超时、重试、降级？</li>
+  </ul>
+
+  <h3>第三层：细节（5 分钟）</h3>
+  <p>命名、注释、日志、错误信息、测试。这一层可以快速扫，发现问题标 <span class="k">nit</span> 或 <span class="k">should</span>，不值得阻塞合并。</p>
+
+  <h3>为什么超过 400 行就该拆</h3>
+  <table>
+    <tr><th style="width:130px">PR 大小</th><th style="width:150px">审查质量</th><th>典型后果</th></tr>
+    <tr><td>&lt; 100 行</td><td>能逐行细看</td><td>缺陷发现率最高，评论具体</td></tr>
+    <tr><td>100 ~ 400 行</td><td>能看完，但会跳过部分</td><td>可接受，适合单个功能点</td></tr>
+    <tr><td>400 ~ 1000 行</td><td>只能扫读</td><td>评论变成"看起来没问题"，LGTM 变成形式</td></tr>
+    <tr><td>&gt; 1000 行</td><td>基本没人真读</td><td>等于没有审查，事故后才发现</td></tr>
+  </table>
+  <p>拆的原则不是"按文件拆"，而是<b>按可独立理解和回滚的单元拆</b>：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先拆重构与功能</b>。重命名、移动文件、格式化单独一个 PR，功能改动另一个。混在一起，diff 全是移动，看不出真实改动。</div></div>
+    <div class="step"><div class="txt"><b>按层拆</b>。数据层（表结构 + DAO）、逻辑层、接口层，各自可独立合并和回滚。</div></div>
+    <div class="step"><div class="txt"><b>用 feature flag 隔离</b>。代码可以先合进去但默认关闭，这样每个 PR 都小而完整，上线时机另行控制。</div></div>
+    <div class="step"><div class="txt"><b>机械改动单独提</b>。批量改 import、升级依赖版本、自动格式化 —— 这些 diff 巨大但风险低，应该单独一个 PR 并快速通过。</div></div>
+  </div>
+  <div class="callout">
+    <b>拆 PR 的隐性收益：</b>小 PR 合得快，作者不用等一天；合得快，就能更早发现设计问题；发现问题早，返工成本就低。<b>这是一个正反馈，大 PR 则是负反馈。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>被审查时怎么做</h2></div>
+  <p class="lead">这一节比上一节更重要，因为它决定了团队敢不敢提意见。一个防御性强的作者，会让整个团队的审查质量下降。</p>
+
+  <h3>把"人和代码"分开</h3>
+  <table>
+    <tr><th style="width:230px">收到的话</th><th>防御性解读（错）</th><th>中性解读（对）</th></tr>
+    <tr><td>"这里可能有并发问题"</td><td>他觉得我不懂并发</td><td>他指出一个我没想到的场景</td></tr>
+    <tr><td>"这个命名不清楚"</td><td>他在挑刺</td><td>我的命名对别人确实不直观</td></tr>
+    <tr><td>"建议拆成两个函数"</td><td>他否定我的设计</td><td>这是一个可讨论的重构建议</td></tr>
+  </table>
+  <p>一个实用的心理技巧：<b>把评论当成"未来的你在读这段代码时的困惑"</b>。审查者只是提前替未来的维护者问了一句。</p>
+
+  <h3>不同意的正确姿势</h3>
+  <pre><span class="c"># ✗ 无效回应</span>
+<span class="r">"我觉得这样没问题。"</span>                  <span class="c"># 没有信息量</span>
+<span class="r">"一直这么写的。"</span>                      <span class="c"># 诉诸传统</span>
+<span class="r">"你说得对，我改。"</span>                    <span class="c"># 表面顺从，实际没理解，下次还犯</span>
+
+<span class="c"># ✓ 有效回应：给出依据，或者承认不确定</span>
+<span class="g">"这里加锁会阻塞 200ms，因为锁内有一次 DB 查询。
+ 我改成乐观锁（version 字段），冲突时重试 3 次，可以吗？"</span>
+
+<span class="g">"我不确定这里会不会有并发。这个入口目前只有定时任务调用，单实例部署。
+ 如果以后要多实例，确实需要加锁，要不要现在就先加上？"</span></pre>
+  <p>有效回应有三个特征：<b>给出事实依据</b>、<b>承认不确定的部分</b>、<b>提出替代方案</b>。三者有其一，讨论就能推进。</p>
+
+  <h3>回复的时效与礼貌</h3>
+  <ul>
+    <li><b>当天回复</b>。超过一天的 PR，作者已经在做别的任务，上下文切换成本很高。</li>
+    <li><b>逐条回复，包括不改的</b>。不回复会让审查者不知道你是没看到还是不同意。</li>
+    <li><b>改了之后留个"已改"</b>。让人知道这轮讨论结束了，不用再翻一遍 diff。</li>
+    <li><b>感谢具体的那一条</b>，而不是笼统的"谢谢 review"。具体感谢说明你真的读了。</li>
+  </ul>
+  <div class="callout danger">
+    <b>最伤团队的一种行为：把审查意见当成"审批障碍"。</b>绕过审查直接合、找人"快速 LGTM"、在群里抱怨"又被卡了" —— 这些做法的代价会在半年后以"没人敢改核心模块"的形式还回来。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>可复用的审查清单</h2></div>
+  <p class="lead">清单的价值不是"每次都全过一遍"，而是<b>在你看不出问题时，提供一个兜底</b>。熟练之后大部分项会变成下意识动作。</p>
+
+  <h3>通用项（任何语言都适用）</h3>
+  <table>
+    <tr><th style="width:130px">类别</th><th>检查点</th></tr>
+    <tr><td><b>正确性</b></td><td>逻辑与 PR 描述一致；条件边界正确；单位统一；金额用定点数</td></tr>
+    <tr><td><b>空值</b></td><td>可能为 null 的返回值都处理了；空集合不会导致除零或越界</td></tr>
+    <tr><td><b>错误处理</b></td><td>没有空的 catch；异常带上关键上下文；失败后状态一致</td></tr>
+    <tr><td><b>资源</b></td><td>连接、文件、流、锁都在 finally / try-with-resources 里释放</td></tr>
+    <tr><td><b>外部调用</b></td><td>有超时；有重试且幂等；有降级或熔断</td></tr>
+    <tr><td><b>并发</b></td><td>共享可变状态有保护；锁内无网络调用；锁顺序一致</td></tr>
+    <tr><td><b>安全</b></td><td>无字符串拼接 SQL / 命令；有资源归属校验；无硬编码密钥；日志脱敏</td></tr>
+    <tr><td><b>数据</b></td><td>迁移可回滚；大表加索引评估过锁表；新字段有默认值</td></tr>
+    <tr><td><b>兼容</b></td><td>接口变更向后兼容；老数据能读；灰度期间新旧版本能共存</td></tr>
+    <tr><td><b>可观测</b></td><td>关键路径有日志和指标；错误日志能定位到具体请求</td></tr>
+    <tr><td><b>测试</b></td><td>新增分支有对应用例；断言具体；没有 sleep 等待</td></tr>
+  </table>
+
+  <h3>语言特定项</h3>
+  <table>
+    <tr><th style="width:100px">语言</th><th>重点检查</th></tr>
+    <tr><td><b>Java</b></td><td>equals/hashCode 成对重写；集合初始化容量；Optional 不滥用；Stream 里不要有副作用；线程池不要用 Executors 默认工厂（无界队列）</td></tr>
+    <tr><td><b>Go</b></td><td>error 必须检查；goroutine 有退出路径（context）；defer 在循环里；slice 共享底层数组导致的意外修改；map 并发读写</td></tr>
+    <tr><td><b>Python</b></td><td>可变默认参数（<span class="k">def f(x=[])</span>）；裸 except；循环里字符串拼接；忘记 close 的文件</td></tr>
+    <tr><td><b>JS / TS</b></td><td>== 与 ===；浮点金额；未处理的 Promise rejection；闭包捕获循环变量；any 泛滥</td></tr>
+    <tr><td><b>SQL</b></td><td>WHERE 条件是否命中索引；有没有 SELECT *；隐式类型转换导致索引失效；N+1 查询</td></tr>
+  </table>
+
+  <h3>按 PR 类型的侧重</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>新功能</div><div class="cd">重点看接口设计、边界、错误语义。<b>先问"这个功能不做什么"</b>，边界往往比功能本身更容易出问题</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>Bug 修复</div><div class="cd">重点看<b>根因是否被修掉</b>，而不是症状。有没有对应的回归测试？会不会引入新问题？</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>重构</div><div class="cd">重点看<b>行为是否完全不变</b>。有没有测试保护？diff 里有没有混入功能改动？</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>依赖升级</div><div class="cd">看 changelog 里的 breaking change；锁文件是否一致；有没有引入新的传递依赖</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>配置 / 脚本</div><div class="cd">看默认值是否安全；密钥是否外置；脚本有没有 <span class="k">set -e</span>；路径是否带引号</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>数据库迁移</div><div class="cd">可回滚吗？大表操作会不会锁表？执行时长评估过吗？回滚脚本测过吗？</div></div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>自动化能替代什么</h2></div>
+  <p class="lead">把机器能做的交给机器，人才有余力做机器做不到的：判断设计是否合理、边界是否遗漏、这段代码三个月后还能不能改。</p>
+
+  <table>
+    <tr><th style="width:150px">工具类型</th><th style="width:230px">能替代的审查项</th><th>代表工具</th></tr>
+    <tr><td><b>格式化</b></td><td>缩进、换行、引号、行宽 —— <b>100% 可替代</b></td><td class="f">gofmt、Prettier、ruff format、google-java-format</td></tr>
+    <tr><td><b>Lint</b></td><td>未使用变量、可疑写法、复杂度阈值、常见 bug 模式</td><td class="f">golangci-lint、ESLint、Ruff、Checkstyle、clang-tidy</td></tr>
+    <tr><td><b>类型检查</b></td><td>类型不匹配、可能为 null、参数个数错误</td><td class="f">mypy、pyright、tsc、Flow</td></tr>
+    <tr><td><b>安全扫描</b></td><td>注入、硬编码密钥、已知漏洞依赖、危险 API</td><td class="f">Semgrep、CodeQL、gitleaks、Trivy、npm audit</td></tr>
+    <tr><td><b>测试门禁</b></td><td>改动是否让测试失败、覆盖率是否下降</td><td class="f">CI + diff-cover + jacoco</td></tr>
+    <tr><td><b>依赖检查</b></td><td>许可证、版本冲突、过期依赖</td><td class="f">Dependabot、Renovate</td></tr>
+  </table>
+
+  <h3>机器替代不了的</h3>
+  <table>
+    <tr><th style="width:180px">只有人能判断的</th><th>为什么</th></tr>
+    <tr><td><b>需求是否正确</b></td><td>代码可以完美实现一个错误的需求，所有工具都会说"通过"</td></tr>
+    <tr><td><b>边界是否遗漏</b></td><td>工具只能检查你写了的分支，无法告诉你"少了一个场景"</td></tr>
+    <tr><td><b>抽象是否合理</b></td><td>分层、职责、耦合，取决于未来的演化方向</td></tr>
+    <tr><td><b>可运维性</b></td><td>这个改动上线后怎么排查？回滚要多久？</td></tr>
+    <tr><td><b>团队约定</b></td><td>不成文的领域知识，只存在于人的脑子里</td></tr>
+  </table>
+
+  <h3>把规则前置到提交前</h3>
+  <pre><span class="c"># pre-commit 配置示例（.pre-commit-config.yaml）</span>
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+<span class="c"># 本地跑一次全量检查，比等 CI 快得多</span>
+pre-commit run --all-files
+
+<span class="c"># Go：CI 里跑严格模式</span>
+golangci-lint run --timeout=5m
+
+<span class="c"># 安全扫描（Semgrep 本地跑）</span>
+semgrep --config=auto --error .</pre>
+  <div class="callout ok">
+    <b>自动化的真正价值不是"省时间"，是"消除争论"。</b>格式有分歧时，不用讨论谁对，跑一下格式化工具即可。<b>把主观问题变成客观问题，团队就少了一半的摩擦。</b>
+  </div>
+  <div class="callout warn">
+    <b>别让 CI 变成噪音源。</b>如果 lint 报了 500 个历史遗留问题，新 PR 一提交就满屏红色，所有人都会学会忽略它。正确做法：<b>先修历史问题或加白名单，再开启门禁</b>，保证红色永远意味着"这次改动有问题"。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个代码审查中的典型错误</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把格式问题混进技术讨论</div><div class="pd">30 条评论里 25 条是缩进和命名，真正重要的 5 条被淹没。格式交给工具，别占人的注意力。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">评论不带优先级</div><div class="pd">作者不知道哪条必须改、哪条可以不理，只能全部照改或全部忽略。用 must / should / nit 分级。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只说"这里有问题"，不给方向</div><div class="pd">作者要猜你的意图，来回好几轮。给出"现象 + 为什么 + 建议"，一轮就能收敛。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">LGTM 式橡皮图章</div><div class="pd">1000 行的 PR 五分钟就 approve，等于没有审查。要么认真看，要么明确说"我只看了接口层"。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">一次提几十条评论</div><div class="pd">作者会直接放弃逐条讨论，或者机械地全改一遍。分批提，先解决 must。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">用审查展示权力</div><div class="pd">"这个我一眼就看出来了""你应该知道这个规范"。结果是团队不敢提 PR，也不敢在 PR 里写不成熟的方案。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">作者防御性强，把意见当人身攻击</div><div class="pd">讨论会迅速降温，审查者下次就只挑无关痛痒的说。把人和代码分开，是作者的责任。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">重构和功能混在一个 PR</div><div class="pd">diff 里全是文件移动，看不出真实改动，reviewer 只能跳过。重构单独提，功能单独提。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">只审代码，不审数据迁移和回滚</div><div class="pd">代码没问题，但迁移脚本锁表 20 分钟、且不可回滚。这类改动要单独评估执行时长和回滚方案。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">同一个问题指出五次还不写进规则</div><div class="pd">说明该交给 linter 或文档了。反复用人脑检查机器能查的东西，是团队的净损失。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 审查一个 1500 行的 PR，最合理的做法是？</div>
+      <button class="opt">从头到尾逐行读完，一个字符都不放过</button>
+      <button class="opt">直接 LGTM，相信作者</button>
+      <button class="opt">先看接口契约，再看核心逻辑，最后扫细节；同时建议作者拆分</button>
+      <div class="ans">正确答案：<b>分层看 + 建议拆分</b>。1500 行逐行读必然注意力涣散，实际效果等于没读。接口层的错误代价最高，应该优先看。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 下面哪条评论<b>不该</b>出现在代码审查里？</div>
+      <button class="opt">must: 这个 HTTP 调用没设超时，下游卡住会占满线程池</button>
+      <button class="opt">"这个变量名我不喜欢，改成我习惯的写法"</button>
+      <button class="opt">question: 这里为什么用 for 循环而不是批量接口？</button>
+      <div class="ans">正确答案：<b>纯个人偏好</b>。说不出会导致什么实际问题的意见，不该阻塞别人。命名问题应该由 linter 规则或团队约定来管。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 作者不同意某条审查意见，最好的回应方式是？</div>
+      <button class="opt">给出事实依据（比如"锁内有 DB 查询会阻塞 200ms"），并提出替代方案</button>
+      <button class="opt">直接说"我觉得这样没问题"</button>
+      <button class="opt">嘴上答应，实际不改</button>
+      <div class="ans">正确答案：<b>给依据 + 提替代方案</b>。审查是讨论，不是判决。有理由的不同意完全合理，但必须让对方能判断你的理由是否成立。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 一个 PR 里同时做了"重命名文件"和"修改业务逻辑"，问题是什么？</div>
+      <button class="opt">没有技术问题，只是看起来乱</button>
+      <button class="opt">diff 被大量移动掩盖，审查者看不出真实改动，也无法独立回滚</button>
+      <button class="opt">会导致编译失败</button>
+      <div class="ans">正确答案：<b>改动被掩盖</b>。Git 会把重命名显示成大量删除 + 新增，真实逻辑改动藏在里面。机械改动和功能改动应该分开提。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 哪一项是自动化工具<b>无法</b>替代人工审查的？</div>
+      <button class="opt">缩进和换行格式</button>
+      <button class="opt">未使用的变量</button>
+      <button class="opt">判断这个改动是否遗漏了一个业务边界场景</button>
+      <div class="ans">正确答案：<b>遗漏的边界场景</b>。工具只能检查你写了的分支，无法告诉你"少写了一个 if"。这需要理解业务和需求。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 团队里同一条规范被审查指出过五次，最该做的是？</div>
+      <button class="opt">写进 linter 规则或文档，让它自动生效</button>
+      <button class="opt">继续在每次审查里提醒</button>
+      <button class="opt">算了，不重要的就不提了</button>
+      <div class="ans">正确答案：<b>沉淀成规则</b>。反复用人脑检查机器能查的东西是净损失。写进 linter 或文档后，新人和老人都不会再犯。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>审查命令速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>gh pr view 123 --web</code><span class="desc">在浏览器打开 PR</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gh pr diff 123</code><span class="desc">在终端看完整 diff</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gh pr checkout 123</code><span class="desc">把 PR 拉到本地跑一遍</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git diff main...HEAD --stat</code><span class="desc">看本分支改了哪些文件、各多少行</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git diff main...HEAD -w</code><span class="desc">忽略空白差异，专看真实改动</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git log --oneline main..HEAD</code><span class="desc">看这个 PR 有几个提交</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git blame -L 100,140 file</code><span class="desc">看某段代码的修改历史</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pre-commit run --all-files</code><span class="desc">本地跑一遍格式和 lint</span><button class="copy">复制</button></div>
+    <div class="crow"><code>golangci-lint run</code><span class="desc">Go 综合静态检查</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ruff check --fix .</code><span class="desc">Python lint + 自动修复</span><button class="copy">复制</button></div>
+    <div class="crow"><code>npx eslint . --max-warnings=0</code><span class="desc">JS 检查，警告也算失败</span><button class="copy">复制</button></div>
+    <div class="crow"><code>semgrep --config=auto --error .</code><span class="desc">安全规则扫描</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gitleaks detect --source .</code><span class="desc">扫描硬编码密钥</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mvn dependency:tree</code><span class="desc">看依赖树，排查版本冲突</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>评论模板</h3>
+  <pre><span class="c"># 通用格式：标签 + 现象 + 为什么 + 建议</span>
+<span class="r">must</span>: 这里没有设置超时。
+下游是第三方接口，P99 可能到 5 秒，线程池只有 50 个线程，会被打满。
+建议用 client.withTimeout(Duration.ofSeconds(2))，超时后走降级返回缓存值。
+
+<span class="y">should</span>: 这个函数有 6 层嵌套。
+读起来要来回跳，容易漏掉 else 分支。
+可以把前三层抽成 validateOrder()，剩下的走主流程。
+
+<span class="b">nit</span>: 这里可以合并成一行，纯个人偏好，不改也行。
+
+<span class="b">question</span>: 为什么这里要重试 3 次？
+如果下游是幂等的，重试没问题；如果不是，会不会重复扣款？
+
+<span class="g">praise</span>: 这个幂等键的设计很干净，把 order_id 和 request_id 拼起来，
+比单纯用 request_id 更能覆盖"同一订单重复提交"的场景。</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>PR / CL</b></td><td>Pull Request / Changelist，一次待合入的代码改动</td></tr>
+    <tr><td><b>LGTM</b></td><td>Looks Good To Me，审查通过的口头标记</td></tr>
+    <tr><td><b>nit</b></td><td>Nitpick，吹毛求疵的小意见，不改也能合</td></tr>
+    <tr><td><b>must / should</b></td><td>必须改 / 强烈建议改，用来区分评论优先级</td></tr>
+    <tr><td><b>diff</b></td><td>两个版本之间的差异，审查的主要输入</td></tr>
+    <tr><td><b>suggestion</b></td><td>GitHub 上可直接采纳的代码修改建议</td></tr>
+    <tr><td><b>橡皮图章</b></td><td>不看内容直接 approve，等于没有审查</td></tr>
+    <tr><td><b>接口契约</b></td><td>对外暴露的函数签名、API、数据结构，改动代价最高</td></tr>
+    <tr><td><b>破坏性变更</b></td><td>让老客户端 / 老数据无法继续工作的改动</td></tr>
+    <tr><td><b>feature flag</b></td><td>功能开关，代码先合入但默认关闭，控制上线时机</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作执行多次，结果与执行一次相同</td></tr>
+    <tr><td><b>乐观锁</b></td><td>用版本号检测冲突，冲突时重试，而不是提前加锁</td></tr>
+    <tr><td><b>N+1 查询</b></td><td>查列表后又逐条查详情，一次请求发出 N+1 条 SQL</td></tr>
+    <tr><td><b>锁表</b></td><td>DDL 或大范围更新阻塞整张表的读写</td></tr>
+    <tr><td><b>静态分析</b></td><td>不运行代码，直接分析源码找问题（lint / 类型检查 / 安全扫描）</td></tr>
+    <tr><td><b>门禁</b></td><td>CI 里的强制检查，不通过则无法合并</td></tr>
+    <tr><td><b>diff coverage</b></td><td>只看本次改动新增/修改行的测试覆盖情况</td></tr>
+    <tr><td><b>reviewer / author</b></td><td>审查者 / 作者，两者的责任不同：一个提供判断依据，一个做决定</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 挑你团队最近三个 PR，用模块 7 的清单过一遍，看看能找出几条当时没发现的问题；② 把下一个 PR 拆成"重构"和"功能"两个，体会审查速度的差别；③ 给团队定一份 must / should / nit 的标签约定，并在一周内只用这套标签评论；④ 把一条反复出现的审查意见写成 linter 规则。<br><br>
+    <b>之后值得单独学：</b>Google 的 Engineering Practices 文档（关于小 CL 和审查速度的论述很实用）、Conventional Comments 的标签体系、以及基于 Semgrep 的自定义规则编写 —— 把团队的领域约定变成可执行的检查。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学会代码审查 · 一条好评论的标准：作者看完知道该做什么，且不觉得自己被否定</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（该看什么）和模块 5（大 PR 怎么审）值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边打开一个真实 PR 对照。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议打开你团队最近一个 PR，用文末清单过一遍';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

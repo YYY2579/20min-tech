@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透向量数据库与语义检索</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 19 期 · 高密度版</span>
+    <h1>二十分钟学透向量数据库与语义检索</h1>
+    <p class="sub">这一期讲的是 RAG 的<b>地基</b>：怎么把语义变成向量、怎么在千万条里毫秒级找到最像的几条，以及<b>什么时候用 pgvector 就够了、什么时候必须上专用向量库</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 种索引类型</span>
+      <span class="chip"><b>5</b> 种选型对比</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 pgvector 或 Qdrant 跟着敲：docker run -d -p 6333:6333 qdrant/qdrant</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的向量库</h2></div>
+  <p class="lead">两条路线，选一条即可。想省事就用 pgvector（在你的 PostgreSQL 里加一个扩展）；想体验专业向量库就用 Qdrant。两者本期的操作都会给对照。</p>
+  <pre><span class="c"># 路线 A：pgvector —— 用现成的 PostgreSQL，一条命令起</span>
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=secret pgvector/pgvector:pg16
+
+<span class="c"># 连进去后启用扩展</span>
+CREATE EXTENSION IF NOT EXISTS vector;
+
+<span class="c"># 路线 B：Qdrant —— 专用向量库，自带 Web UI（http://localhost:6333/dashboard）</span>
+docker run -d -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant:/qdrant/storage qdrant/qdrant
+
+<span class="c"># Python 客户端</span>
+pip install "qdrant-client[fastembed]"   <span class="c"># 自带一个可本地跑的嵌入模型，方便练习</span>
+pip install psycopg[binary] pgvector</pre>
+  <div class="callout warn">
+    <b>阅读提示：</b>这一期假设你懂 SQL、懂基本的数据结构和索引概念。<b>不讲神经网络的训练细节</b>，只讲工程：向量怎么存、索引怎么建、参数怎么调、什么时候选哪个库。第 18 期已经讲过 RAG 的整体流程，这一期聚焦它的"检索层"。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>从关键词检索到语义检索</h2></div>
+  <p class="lead">先看清楚<b>传统关键词检索（如 Elasticsearch 的 BM25）为什么会漏</b>，才能理解语义检索补上了什么。</p>
+  <h4>关键词检索的局限</h4>
+  <table>
+    <tr><th style="width:170px">问题</th><th>例子</th></tr>
+    <tr><td><b>同义词</b></td><td>用户搜"笔记本"，文档里写的是"笔记本电脑"，BM25 因为词不匹配而漏召回</td></tr>
+    <tr><td><b>表述差异</b></td><td>问"怎么重启服务"，文档标题是"服务进程的重新拉起方法"，字面几乎不重叠</td></tr>
+    <tr><td><b>多语言</b></td><td>中文问、英文答，词表完全不交叉</td></tr>
+    <tr><td><b>口语与术语</b></td><td>用户说"卡住了"，文档写"响应超时 / 阻塞"，靠词形匹配不到</td></tr>
+  </table>
+  <h4>语义检索的原理差异</h4>
+  <table>
+    <tr><th style="width:170px">维度</th><th>关键词检索（BM25）</th><th>语义检索（向量）</th></tr>
+    <tr><td><b>匹配依据</b></td><td>词是否出现、出现频率、逆文档频率</td><td>语义向量之间的空间距离</td></tr>
+    <tr><td><b>强项</b></td><td>精确匹配：订单号、错误码、人名、专有名词</td><td>模糊表达、同义改写、跨语言</td></tr>
+    <tr><td><b>弱项</b></td><td>换个说法就找不到</td><td>精确串（如"ERR_5021"）可能被语义"平滑"掉，反而不准</td></tr>
+    <tr><td><b>可解释性</b></td><td>高，能指出命中哪个词</td><td>低，只能给出相似度分数</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>结论：两者不是替代关系，而是互补。</b>真实系统几乎都做<b>混合检索（Hybrid Search）</b>：<b>向量检索负责"语义召回"，关键词检索负责"精确召回"，然后把两路结果融合</b>（常用 RRF，Reciprocal Rank Fusion，倒数排名融合，即按两路的排名倒数相加重新排序）。<br>
+    <b>实践建议：</b>先做向量检索跑通，再补关键词检索。<b>别一上来就砍掉关键词</b>——很多"搜不到订单号"的线上问题，都是因为只用向量。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>向量嵌入 Embedding</h2></div>
+  <p class="lead"><b>嵌入（Embedding）</b>就是把一段文本送进嵌入模型，得到一个固定长度的浮点数数组，例如 <span class="k">[0.013, -0.244, 0.087, ...]</span>，共 1536 个数。这个数组就是文本在"语义空间"里的坐标。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>分词</b>：文本先被切成 token。</div></div>
+    <div class="step"><div class="txt"><b>编码</b>：token 经过模型编码成上下文相关的表示。</div></div>
+    <div class="step"><div class="txt"><b>池化</b>：把整段话的表示"压缩"成<b>一个</b>固定长度的向量（通常取平均或取特殊 token 的输出）。</div></div>
+    <div class="step"><div class="txt"><b>归一化</b>：很多模型会顺手把向量长度缩到 1，方便后续用点积算相似度。</div></div>
+  </div>
+  <h4>嵌入模型的选型维度</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>怎么权衡</th></tr>
+    <tr><td><b>维度</b></td><td>常见 384 / 768 / 1024 / 1536 / 3072。<b>维度越高表达力越强，但存储和计算成本成正比</b>。很多模型支持"降维输出"（如 1536 → 512），牺牲一点精度换 3 倍存储节省</td></tr>
+    <tr><td><b>语言</b></td><td>纯英文模型在中文上会明显退化。<b>中文场景必须选多语言模型或中文专优模型</b></td></tr>
+    <tr><td><b>领域</b></td><td>通用模型在医疗/法律/代码等垂直领域可能不够准。有些厂商提供领域嵌入模型</td></tr>
+    <tr><td><b>成本</b></td><td>API 按 token 计费（通常比生成模型便宜得多）；自建则要算 GPU 成本</td></tr>
+    <tr><td><b>是否可本地部署</b></td><td>数据敏感、离线场景必须本地跑（如 bge、m3e 这类开源模型）。<b>本地部署意味着没有网络延迟、数据不出域</b></td></tr>
+    <tr><td><b>最大输入长度</b></td><td>多数嵌入模型只能吃 512 个 token 左右，<b>超长会被截断</b>。这直接约束了你的切分大小</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最容易混淆的一点：嵌入模型和生成模型是两回事。</b><br>
+    ① <b>嵌入模型</b>：输入文本 → 输出<b>向量</b>。只做"表示"，不能生成文字，也几乎不能推理。典型用途是检索、聚类、去重。<br>
+    ② <b>生成模型</b>（就是第 18 期讲的大模型）：输入文本 → 输出<b>文本</b>。<br>
+    <b>它们可以来自同一个厂商，但接口、模型名、计费、能力完全不同。</b>别指望嵌入模型回答你的问题，也别用生成模型去算向量。
+  </div>
+  <pre><span class="c"># 用 API 生成嵌入（伪代码，接口大同小异）</span>
+resp = client.embeddings.create(
+    model="text-embedding-3-small",
+    input=["如何重启服务", "服务进程重新拉起的方法"],   <span class="c"># 可批量，省钱又省时间</span>
+)
+v1, v2 = resp.data[0].embedding, resp.data[1].embedding
+<span class="c"># 这两句话字面几乎不重叠，但向量会非常接近 —— 这就是语义检索能召回到的原因</span>
+
+<span class="c"># 关键工程原则：入库和查询必须用同一个嵌入模型</span>
+<span class="c"># 换了模型 = 向量空间变了 = 旧索引全部作废，必须全量重建</span></pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>相似度度量</h2></div>
+  <p class="lead">向量库要回答的问题是"哪几个向量离查询向量最近"。怎么定义"近"，有三种常见度量，选错会直接影响效果。</p>
+  <table>
+    <tr><th style="width:130px">度量</th><th>含义</th><th>适用</th></tr>
+    <tr><td><b>余弦相似度</b></td><td>看两个向量的<b>夹角</b>，范围 -1~1，越接近 1 越相似。<b>忽略向量长度</b></td><td><b>文本检索默认选择。</b>因为文本相似度关心"方向"而非"长短"</td></tr>
+    <tr><td><b>点积</b></td><td>两个向量对应元素相乘再求和。<b>同时受方向和长度影响</b></td><td>归一化后等价于余弦。<b>推荐系统</b>常用，因为向量长度本身可能编码了"热度/置信度"</td></tr>
+    <tr><td><b>欧氏距离</b></td><td>空间中两点的直线距离，越小越相似</td><td>坐标本身有物理意义的场景（如图片特征、地理位置向量）</td></tr>
+  </table>
+  <pre><span class="c"># 归一化后，余弦与点积等价（这是向量库能用点积加速的根本原因）</span>
+cos(A, B) = (A · B) / (|A| * |B|)
+
+<span class="c"># 若 |A| = |B| = 1，则分母为 1，于是：</span>
+cos(A, B) = A · B        <span class="c"># 余弦 = 点积</span>
+
+<span class="c"># 欧氏距离与余弦的关系（向量归一化后）</span>
+||A - B||² = ||A||² + ||B||² - 2·A·B = 2 - 2·cos(A,B)
+<span class="c"># 所以归一化后，欧氏距离和余弦也是单调对应的，排序结果一致</span></pre>
+  <div class="callout">
+    <b>为什么内积（点积）适合推荐场景？</b>因为推荐里我们往往希望"既相似又热门"的排前面。如果向量长度编码了"流行度"（训练时用交互次数加权），那么点积会<b>同时奖励方向一致（相似）和长度大（热门）</b>。而余弦把长度归一化掉了，就只看相似度。这就是同一个技术在不同场景的取舍。
+  </div>
+  <div class="callout warn">
+    <b>实操建议：</b>① 文本检索，<b>选余弦，或者把向量归一化后用点积</b>；② 选定一种度量后，<b>建索引时也要声明同一种度量</b>，两者不一致会导致结果完全错乱；③ 不同嵌入模型的输出尺度不同，<b>不要混用不同模型产生的向量</b>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>ANN 近似最近邻索引</h2></div>
+  <p class="lead"><b>暴力搜索（Brute-force / Flat）</b>就是拿查询向量和库里每一个向量算一遍距离，再排序。它<b>结果 100% 准确</b>，但复杂度是 O(N)。100 万条、1536 维的向量，一次查询要算 15 亿次浮点乘法 —— 单次可能几百毫秒，高并发直接崩。<br><b>ANN（Approximate Nearest Neighbor，近似最近邻）</b>的思路是：<b>牺牲一点点召回率，换取几个数量级的加速</b>。</p>
+  <h4>四类索引的原理与适用</h4>
+  <table>
+    <tr><th style="width:120px">索引</th><th>原理</th><th>适用</th></tr>
+    <tr><td><b>HNSW</b><br>图索引</td><td>构建一个多层的"近邻图"，查询时像走高速一样从稀疏上层快速靠近，再在下层精细搜索</td><td><b>首选。</b>召回率和延迟都好，适合内存充足的场景。缺点是内存占用大、构建慢</td></tr>
+    <tr><td><b>IVF</b><br>倒排</td><td>先用聚类把向量分成 N 个"桶"（簇），查询时只搜最近的几个桶</td><td>数据量大、内存紧张。通过 <span class="k">nprobe</span> 控制搜几个桶，权衡速度与召回</td></tr>
+    <tr><td><b>PQ</b><br>乘积量化</td><td>把高维向量切成小段，每段用一个小码本压缩成几个字节，<b>大幅省内存</b></td><td>超大规模、内存吃紧。精度损失较大，常和 IVF 组合成 IVF-PQ</td></tr>
+    <tr><td><b>LSH</b><br>局部敏感哈希</td><td>用一组哈希函数，让相似的向量更可能落到同一个桶</td><td>原理简单、支持流式更新，但召回率一般，现在较少作为首选</td></tr>
+  </table>
+  <h4>关键参数含义</h4>
+  <table>
+    <tr><th style="width:170px">参数</th><th>含义与调优方向</th></tr>
+    <tr><td class="f">HNSW: M</td><td>每个节点在图中保留的邻居数。<b>越大召回越高、内存越多、构建越慢</b>。常用 16~48，默认 16</td></tr>
+    <tr><td class="f">HNSW: efConstruction</td><td>建图时的搜索广度。<b>越大图质量越好、构建越慢</b>。常用 100~500</td></tr>
+    <tr><td class="f">HNSW: efSearch</td><td><b>查询时</b>的搜索广度。<b>越大召回越高、延迟越高</b>。这是最常调的旋钮，典型 64~256</td></tr>
+    <tr><td class="f">IVF: nlist</td><td>聚类成多少个桶。经验值约为 <span class="k">sqrt(N)</span>，即 100 万条约用 1000</td></tr>
+    <tr><td class="f">IVF: nprobe</td><td>查询时搜几个桶。<b>越大召回越高越慢</b>。典型取 nlist 的 1%~10%</td></tr>
+    <tr><td class="f">PQ: m / nbits</td><td>切几段、每段用几位编码。<b>段数越多精度越高、压缩率越低</b></td></tr>
+  </table>
+  <div class="callout warn">
+    <b>调参的本质是一次权衡：召回率 ↔ 延迟 ↔ 内存，三者不可能同时最优。</b>工程做法：<b>先用一组默认参数跑通，再用真实查询集测"召回率@K"</b>（即 ANN 返回的前 K 条里，有多少是暴力搜索真正的前 K 条）。召回率低于 90% 就调大 <span class="k">efSearch</span> 或 <span class="k">nprobe</span>，直到满足业务要求。<b>不要凭感觉调参。</b>
+  </div>
+  <div class="callout ok">
+    <b>一个反直觉但重要的点：</b>向量库返回的相似度分数，<b>只在同一批数据、同一模型、同一度量下可比</b>。它<b>不是概率</b>，不能说"相似度 0.8 就是 80% 相关"。设阈值时要基于你自己的数据分布去测，别照搬别人文章里的 0.7。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>选型对比：六个常见选项</h2></div>
+  <p class="lead">这是最常被问、也最容易过度设计的一节。<b>绝大多数项目的正确起点是 pgvector</b>，而不是先上一个独立的向量数据库。</p>
+  <table>
+    <tr><th style="width:120px">方案</th><th>定位</th><th>规模与特点</th><th>代价</th></tr>
+    <tr><td><b>pgvector</b></td><td>PostgreSQL 扩展</td><td>千万级以内很舒服。<b>能用 SQL 和元数据一起过滤，事务一致</b></td><td>超大规模（亿级+）性能不如专用库；调优要懂 PG</td></tr>
+    <tr><td><b>Milvus</b></td><td>专用向量数据库</td><td>亿级到百亿级，分布式、可水平扩展，索引种类最全</td><td><b>部署运维最重</b>（依赖 etcd、对象存储、消息队列），小项目属于杀鸡用牛刀</td></tr>
+    <tr><td><b>Qdrant</b></td><td>专用向量数据库</td><td>Rust 实现，单机性能好，<b>过滤（payload filter）能力很强</b>，部署简单</td><td>超大规模需要集群版；生态比 Milvus 略小</td></tr>
+    <tr><td><b>Weaviate</b></td><td>专用向量数据库</td><td>内置混合检索、模块化（可挂嵌入/生成模型），<b>开箱即用的 RAG 能力</b></td><td>抽象层多，调优不如裸库直观；资源占用偏高</td></tr>
+    <tr><td><b>Redis</b></td><td>缓存 + 向量（Redis Stack）</td><td><b>如果你已经在用 Redis，加个模块就能做向量检索</b>，延迟极低</td><td>内存成本高；持久化和大规模检索不如专用库</td></tr>
+    <tr><td><b>Elasticsearch</b></td><td>搜索平台</td><td><b>BM25 关键词检索 + 向量检索原生一体</b>，混合检索最顺手</td><td>资源消耗大；向量检索性能不如专用库；运维成本高</td></tr>
+  </table>
+  <h4>选型建议（按场景）</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>数据 &lt; 1000 万，已有 PG</div><div class="cd"><b>直接用 pgvector。</b>省一个中间件、省一套运维，还能和业务表 join、用事务。90% 的项目停在这里就够了。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>要混合检索，已有 ES</div><div class="cd">用 <b>Elasticsearch</b>。关键词和向量在一个系统里，不用维护两套。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>千万~亿级，要独立扩展</div><div class="cd">选 <b>Qdrant</b>（轻）或 <b>Milvus</b>（重但能上规模）。优先 Qdrant，除非确实要百亿级。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>要开箱即用的 RAG</div><div class="cd">试 <b>Weaviate</b>，它把嵌入、检索、生成串好了，快速验证想法很方便。</div></div>
+  </div>
+  <div class="callout danger">
+    <b>最常见的过度设计：</b>数据才几万条，就上 Milvus 集群 + etcd + MinIO，结果运维复杂度远超收益。<b>先问自己三个问题：</b>① 数据量到底多少（几万？几百万？几亿？）；② 是否需要和现有数据库做事务性操作；③ 团队有没有人能运维分布式系统。<b>三个问题的答案往往指向 pgvector。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>RAG 落地细节：切分、过滤、重排</h2></div>
+  <p class="lead">向量库只是"存和找"。真正决定 RAG 效果好坏的，是<b>怎么切、怎么过滤、怎么重排</b>。这一节是实战含量最高的部分。</p>
+  <h4>文档切分策略</h4>
+  <table>
+    <tr><th style="width:150px">策略</th><th>做法</th><th>取舍</th></tr>
+    <tr><td><b>固定长度</b></td><td>按 token 数切（如 512），带重叠</td><td>实现最简单。<b>可能切断句子和语义单元</b>，需要重叠来缓解</td></tr>
+    <tr><td><b>按结构</b></td><td>按标题、段落、代码块、表格切</td><td><b>推荐。</b>尊重文档原有结构，语义完整度高</td></tr>
+    <tr><td><b>按语义</b></td><td>用嵌入模型判断相邻句子是否"同话题"，在话题切换处切</td><td>效果好但<b>计算成本高</b>，适合高价值文档</td></tr>
+    <tr><td><b>父子切分</b></td><td>小块用于检索，命中后返回它所属的大块给模型</td><td><b>检索准 + 上下文全</b>，是当前较优实践</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>切分是最容易翻车的一步，记住两条：</b><br>
+    ① <b>切太碎</b> → 单个 chunk 语义不完整（比如把一句话切成两半），检索出来看不懂，模型也无从回答；<br>
+    ② <b>切太大</b> → 一个 chunk 混了好几个话题，向量变成"平均语义"，谁都不像，检索反而不准，还挤占上下文。<br>
+    <b>经验值：中文 300~800 字（约 300~800 token），重叠 10%~20%。</b>但这个数必须<b>用你的数据实测</b>，不同文档类型差别很大。
+  </div>
+  <h4>元数据过滤（Metadata Filtering）</h4>
+  <p>元数据就是跟着每个 chunk 一起存的"标签"：来源文档、章节、创建时间、部门、权限等级、语言。<b>它的作用是在向量检索之前先把范围缩小。</b></p>
+  <pre><span class="c"># 没有元数据过滤：查询"今年的报销标准"</span>
+<span class="c"># 向量检索可能召回 2020 年的旧政策 —— 语义很像，但答案已经作废</span>
+
+<span class="c"># 有元数据过滤：先限定 year = 2026 AND dept = 'finance'</span>
+<span class="c"># 再在符合条件的数据里做向量检索，结果就对了</span>
+
+<span class="c"># 关键点：权限也必须靠元数据过滤来实现</span>
+<span class="c"># 否则员工 A 可能检索到员工 B 的隐私文档 —— 这是安全事故，不是效果问题</span></pre>
+  <h4>召回数量与重排（Rerank）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先粗召回</b>：向量检索取 Top-K（K 通常 20~100），目标是<b>尽量不漏</b>，宁多勿缺。</div></div>
+    <div class="step"><div class="txt"><b>再重排</b>：用重排模型（cross-encoder，把"问题 + 候选"一起送进模型精算相关性）对这 K 条重新打分。</div></div>
+    <div class="step"><div class="txt"><b>后精选</b>：取重排后的 Top-N（N 通常 3~8），拼进提示词。<b>N 越小越省 token、噪声越少</b>。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>为什么"召回多 + 重排精"比"直接召回想取的条数"好？</b>因为向量检索是"粗筛"，靠的是语义距离，容易把真正相关的排在第 15 位。重排模型更慢但更准，能在更大的候选池里挑出真正的前几名。<b>这是提升 RAG 准确率性价比最高的一步。</b>
+  </div>
+  <h4>上下文拼装的顺序与长度控制</h4>
+  <ul>
+    <li><b>顺序</b>：把最相关的放<b>最前面和最后面</b>。因为长上下文里模型对<b>开头和结尾</b>更敏感，中间容易被忽略。</li>
+    <li><b>长度</b>：总输入控制在模型窗口的<b>一半以内</b>，给输出和后续对话留余量。<b>输入越长越贵、越慢、越容易分心。</b></li>
+    <li><b>去重</b>：同一文档的重叠 chunk 会重复出现，要按来源去重，避免同一段话说三遍。</li>
+    <li><b>标注来源</b>：给每个片段编号，要求模型回答时引用编号，便于追溯和展示。</li>
+  </ul>
+  <h4>多路召回</h4>
+  <p>同一个问题，从<b>多个角度</b>同时召回，再融合结果，能显著提升覆盖率：</p>
+  <table>
+    <tr><th style="width:170px">路子</th><th>说明</th></tr>
+    <tr><td><b>向量召回</b></td><td>语义相似，覆盖同义改写</td></tr>
+    <tr><td><b>关键词召回</b></td><td>BM25，覆盖精确串（订单号、错误码、专有名词）</td></tr>
+    <tr><td><b>多查询改写</b></td><td>让大模型把原问题改写成 3~5 个不同说法，分别召回再合并（Multi-Query）</td></tr>
+    <tr><td><b>假设性答案</b></td><td>先让模型"猜"一个答案，再用这个答案去检索（HyDE）。答案的语义往往比问题更接近文档</td></tr>
+  </table>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>性能、成本与运维</h2></div>
+  <p class="lead">向量库上线后，真正让人头疼的是这三件事：<b>构建要多久、内存要多少、数据怎么更新</b>。</p>
+  <h4>内存占用估算</h4>
+  <pre><span class="c"># 纯向量数据的理论内存（不算索引和元数据开销）</span>
+内存 = 向量条数 × 维度 × 每维字节数
+
+<span class="c"># 例：1000 万条 × 1536 维 × 4 字节(float32) = 61.4 GB</span>
+<span class="c"># 这还没算 HNSW 索引本身（图结构通常再增加 30%~100%）</span>
+<span class="c"># 加上索引后，1000 万条 HNSW 实测量级在 80~120 GB</span>
+
+<span class="c"># 省钱手段：</span>
+<span class="c"># 1) 降维：1536 → 512，存储直接省 2/3，精度损失通常可接受</span>
+<span class="c"># 2) 量化：float32 → int8，省 4 倍；或用 PQ 压缩，省 10~30 倍</span>
+<span class="c"># 3) 冷热分离：不常查的历史数据放磁盘索引（如 DiskANN）</span></pre>
+  <h4>索引构建时间</h4>
+  <p>HNSW 是<b>增量可插入</b>的，但<b>批量导入时构建索引比逐条插入快得多</b>。所以初始导入应该：<b>先关索引（或不建索引）灌数据，全部导完再统一建索引</b>。逐条插入 + 实时建图，速度可能慢一个数量级。</p>
+  <h4>增量更新与删除</h4>
+  <table>
+    <tr><th style="width:150px">操作</th><th>注意事项</th></tr>
+    <tr><td><b>新增</b></td><td>直接插入即可，HNSW 支持在线插入，但频繁插入会让图结构退化，建议定期重建</td></tr>
+    <tr><td><b>更新</b></td><td>向量变了通常要<b>先删后插</b>。很多库不支持"原地改向量"</td></tr>
+    <tr><td><b>删除</b></td><td>部分实现是"标记删除"（软删），空间不会立即回收，需要定期压实（compaction）</td></tr>
+    <tr><td><b>换嵌入模型</b></td><td><b>必须全量重建。</b>新模型的向量空间和旧的不兼容，混在一起检索结果完全错乱</td></tr>
+  </table>
+  <h4>备份与高可用</h4>
+  <ul>
+    <li><b>pgvector</b>：跟着 PostgreSQL 的备份方案走（物理备份 / 逻辑备份），最省心。</li>
+    <li><b>专用向量库</b>：用自带的快照功能，<b>快照体积可能很大</b>（向量 + 索引），要单独规划存储和恢复时间。</li>
+    <li><b>高可用</b>：单机 Qdrant/Milvus 挂了服务就断了。生产要评估是否需要副本。<b>pgvector 直接复用 PG 的主从</b>，是它的一大优势。</li>
+  </ul>
+  <h4>监控指标</h4>
+  <table>
+    <tr><th style="width:150px">指标</th><th>为什么重要</th></tr>
+    <tr><td><b>召回率 @K</b></td><td>用离线查询集定期测，<b>这是检索质量的核心指标</b>，比延迟更重要</td></tr>
+    <tr><td><b>查询延迟 P50 / P95 / P99</b></td><td>P99 才反映真实体验，平均值会掩盖长尾</td></tr>
+    <tr><td><b>QPS / 并发</b></td><td>判断是否需要扩容或调整索引参数</td></tr>
+    <tr><td><b>内存使用率</b></td><td>向量库通常是内存密集型，接近上限就要扩容或量化</td></tr>
+    <tr><td><b>索引构建进度</b></td><td>重建索引期间资源会飙升，要避开业务高峰</td></tr>
+    <tr><td><b>过滤命中率</b></td><td>如果元数据过滤后候选集过小，会显著影响召回，需要预警</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>一个常被忽略的运维风险：索引构建的内存峰值。</b>重建 HNSW 索引时，<b>内存占用会短暂接近翻倍</b>（旧索引 + 新索引同时存在）。在内存已经用到 70% 的实例上直接重建，很可能触发 OOM。<b>做法：预留足够内存、在低峰期重建、或者用新实例建好再切流量。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个工程坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">切分太碎，语义断裂</div><div class="pd">把一句话切成两半，检索出来的 chunk 自己都看不懂，模型无从回答。合理粒度中文 300~800 字，并加 10%~20% 重叠。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">切分太大，检索不准</div><div class="pd">一个 chunk 混了多个话题，向量变成"平均语义"，谁都不像。用按结构切分或父子切分解决。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只用向量检索，不用关键词</div><div class="pd">搜订单号、错误码、专有名词时，向量可能把精确串"平滑"掉，导致搜不到。要用混合检索。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">没有元数据过滤，召回无关内容</div><div class="pd">召回了过期政策、别的部门文档、无权限内容。元数据过滤既是效果问题，也是安全问题。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">换了嵌入模型但没重建索引</div><div class="pd">新旧向量不在同一语义空间，混在一起检索结果完全错乱。换模型必须全量重建。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">忽略索引构建的内存峰值</div><div class="pd">重建索引时内存可能接近翻倍，在已用 70% 内存的实例上重建会 OOM。低峰期重建或换实例。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把向量库当主数据库用</div><div class="pd">向量库不擅长复杂事务、关联查询、强一致。它只负责"存向量 + 找近邻"，业务数据还是放关系库。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">相似度阈值照搬别人的数字</div><div class="pd">相似度不是概率，不同模型、不同数据分布下尺度完全不同。0.7 在别人的数据里是"相关"，在你的数据里可能毫无意义。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">只用单一索引参数，从不测召回率</div><div class="pd">HNSW 的 efSearch、IVF 的 nprobe 直接决定召回质量。不测召回率就调参，等于闭着眼睛开车。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">盲目上专用向量数据库</div><div class="pd">数据才几万条就上 Milvus 集群，运维复杂度远超收益。绝大多数项目 pgvector 就够了。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 用户搜"笔记本"，文档里写的是"笔记本电脑"，关键词检索漏召回。这体现了什么问题？</div>
+      <button class="opt">索引没有建好</button>
+      <button class="opt">关键词检索无法处理同义词和表述差异，需要语义检索补充</button>
+      <button class="opt">分词器版本太旧</button>
+      <div class="ans">正确答案：<b>关键词检索的固有局限</b>。BM25 靠词形匹配，同义词、改写表达都召不回。语义检索能补上，但精确串（订单号）还得靠关键词，所以要混合检索。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于嵌入模型和生成模型，哪个说法是对的？</div>
+      <button class="opt">它们是同一个模型的不同调用方式</button>
+      <button class="opt">嵌入模型也能回答问题，只是慢一点</button>
+      <button class="opt">嵌入模型输出向量，只做表示不能生成；生成模型输出文本，两者接口和能力完全不同</button>
+      <div class="ans">正确答案：<b>两者是两回事</b>。嵌入模型输入文本输出向量，用于检索/聚类/去重；生成模型输入文本输出文本。可以来自同一厂商，但绝不可混用。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 文本检索场景最常用的相似度度量是？</div>
+      <button class="opt">余弦相似度（向量归一化后等价于点积）</button>
+      <button class="opt">欧氏距离</button>
+      <button class="opt">曼哈顿距离</button>
+      <div class="ans">正确答案：<b>余弦相似度</b>。它只看方向、忽略长度，符合"文本相似度与长度无关"的直觉。归一化后余弦等价于点积，所以向量库常用点积加速。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. HNSW 索引里，查询时控制"召回率 ↔ 延迟"权衡的关键参数是？</div>
+      <button class="opt">M</button>
+      <button class="opt">efConstruction</button>
+      <button class="opt">efSearch</button>
+      <div class="ans">正确答案：<b>efSearch</b>。它是查询时的搜索广度，调大召回高但慢，调小快但可能漏。<b>M</b> 影响图结构和内存，<b>efConstruction</b> 影响构建质量与构建时间。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 一个已有 PostgreSQL、数据量约 500 万条的团队要做向量检索，最合理的起点是？</div>
+      <button class="opt">直接上 Milvus 集群</button>
+      <button class="opt">先用 pgvector，省一个中间件和一套运维</button>
+      <button class="opt">先用 Redis 存向量</button>
+      <div class="ans">正确答案：<b>pgvector</b>。千万级以内很舒服，还能和业务表 join、用事务、复用 PG 主从备份。上专用库只在规模或过滤需求真正超出时才划算。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 提升 RAG 准确率，性价比最高的一步通常是？</div>
+      <button class="opt">先多召回（Top-K 取大），再用重排模型精选 Top-N</button>
+      <button class="opt">把切分粒度调到最小</button>
+      <button class="opt">把相似度阈值调到 0.95</button>
+      <div class="ans">正确答案：<b>多召回 + 重排</b>。向量检索是粗筛，真相关的内容可能排在十几位；重排模型更慢但更准，能在更大的候选池里挑出真正的前几名。切太碎反而破坏语义。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>操作对照、参数表与术语表</h2></div>
+  <h3>pgvector 与 Qdrant 常用操作对照</h3>
+  <table>
+    <tr><th style="width:170px">操作</th><th>pgvector（SQL）</th><th>Qdrant（Python）</th></tr>
+    <tr><td><b>建表 / 建集合</b></td><td class="f">CREATE TABLE items (id bigserial PRIMARY KEY, vec vector(1536), meta jsonb);</td><td class="f">client.create_collection("items", vectors_config=VectorParams(size=1536, distance=Distance.COSINE))</td></tr>
+    <tr><td><b>建索引</b></td><td class="f">CREATE INDEX ON items USING hnsw (vec vector_cosine_ops);</td><td class="f">建集合时指定 hnsw_config=HnswConfigDiff(m=16, ef_construct=200)</td></tr>
+    <tr><td><b>插入</b></td><td class="f">INSERT INTO items (vec, meta) VALUES (%s, %s);</td><td class="f">client.upsert("items", points=[PointStruct(id=1, vector=v, payload={"src":"a.md"})])</td></tr>
+    <tr><td><b>相似度查询</b></td><td class="f">SELECT id FROM items ORDER BY vec &lt;=&gt; %s LIMIT 5;  (&lt;=&gt; 是余弦距离)</td><td class="f">client.search("items", query_vector=v, limit=5)</td></tr>
+    <tr><td><b>元数据过滤</b></td><td class="f">... WHERE meta-&gt;&gt;'dept' = 'finance' ORDER BY vec &lt;=&gt; %s LIMIT 5;</td><td class="f">client.search("items", query_vector=v, query_filter=Filter(must=[FieldCondition(key="dept", match=MatchValue(value="finance"))]), limit=5)</td></tr>
+    <tr><td><b>调查询广度</b></td><td class="f">SET hnsw.ef_search = 100;  (会话级)</td><td class="f">client.search(..., search_params=SearchParams(hnsw_ef=100))</td></tr>
+    <tr><td><b>删除</b></td><td class="f">DELETE FROM items WHERE id = %s;</td><td class="f">client.delete("items", points_selector=[1, 2, 3])</td></tr>
+    <tr><td><b>距离运算符</b></td><td class="f">&lt;=&gt; 余弦距离 · &lt;-&gt; 欧氏 · &lt;#&gt; 负内积</td><td class="f">Distance.COSINE / EUCLID / DOT</td></tr>
+  </table>
+
+  <h3>分块策略参数建议表</h3>
+  <table>
+    <tr><th style="width:170px">文档类型</th><th>建议块大小</th><th>重叠</th><th>切分方式</th></tr>
+    <tr><td><b>技术文档 / 手册</b></td><td>400~800 字</td><td>10%~15%</td><td>按标题层级切，保留章节结构</td></tr>
+    <tr><td><b>FAQ / 问答对</b></td><td>一问一答为一块</td><td>0</td><td>按问答边界切，天然语义完整</td></tr>
+    <tr><td><b>长篇文章 / 报告</b></td><td>500~1000 字</td><td>15%~20%</td><td>按段落切，段落太长再按句切</td></tr>
+    <tr><td><b>代码仓库</b></td><td>按函数/类</td><td>0</td><td>按语法单元切，附文件路径和行号元数据</td></tr>
+    <tr><td><b>法律 / 合同</b></td><td>按条款</td><td>10%</td><td>按条款编号切，条款间引用关系存元数据</td></tr>
+    <tr><td><b>表格 / 结构化数据</b></td><td>按行或小表</td><td>0</td><td>保留表头，每块都带上列名</td></tr>
+  </table>
+
+  <h3>选型速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>pgvector</code><span class="desc">已有 PG、数据 &lt; 千万级：首选</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Qdrant</code><span class="desc">千万~亿级、要强过滤、部署轻：推荐</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Milvus</code><span class="desc">亿级以上、要水平扩展：重但能上规模</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Weaviate</code><span class="desc">要开箱即用的混合检索 + RAG：方便</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Elasticsearch</code><span class="desc">已有 ES、要 BM25 + 向量一体：顺手</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Redis Stack</code><span class="desc">已有 Redis、要极低延迟小规模向量：够用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>HNSW</code><span class="desc">内存充足、要低延迟高召回：默认选它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>IVF-PQ</code><span class="desc">超大规模、内存吃紧：压缩换空间</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>语义检索</b></td><td>按语义相似度而非字面匹配来检索，靠向量距离实现</td></tr>
+    <tr><td><b>Embedding 嵌入</b></td><td>把文本映射成固定长度的向量，语义相近则向量距离近</td></tr>
+    <tr><td><b>向量维度</b></td><td>向量的长度，常见 384~3072，越高表达力越强、成本越高</td></tr>
+    <tr><td><b>余弦相似度</b></td><td>看两向量夹角，只关心方向不关心长度，文本检索默认度量</td></tr>
+    <tr><td><b>点积</b></td><td>同时受方向和长度影响，归一化后等价于余弦，推荐场景常用</td></tr>
+    <tr><td><b>欧氏距离</b></td><td>空间直线距离，越小越相似，适合坐标有物理意义的场景</td></tr>
+    <tr><td><b>归一化</b></td><td>把向量长度缩到 1，使余弦与点积等价，便于加速</td></tr>
+    <tr><td><b>ANN</b></td><td>近似最近邻，牺牲少量召回率换取大幅加速</td></tr>
+    <tr><td><b>HNSW</b></td><td>多层近邻图索引，召回高延迟低，内存占用大</td></tr>
+    <tr><td><b>IVF</b></td><td>倒排文件索引，先聚类分桶，查询时只搜最近的几个桶</td></tr>
+    <tr><td><b>PQ</b></td><td>乘积量化，把向量压缩成极少量字节，大幅省内存</td></tr>
+    <tr><td><b>LSH</b></td><td>局部敏感哈希，让相似向量更可能落到同一个桶</td></tr>
+    <tr><td><b>efSearch</b></td><td>HNSW 查询广度，调大召回高但慢，是最常调的旋钮</td></tr>
+    <tr><td><b>nprobe</b></td><td>IVF 查询时搜几个桶，越大召回越高越慢</td></tr>
+    <tr><td><b>召回率 @K</b></td><td>ANN 返回的前 K 条里，有多少是暴力搜索真正的前 K 条</td></tr>
+    <tr><td><b>Chunking 切分</b></td><td>把长文档切成小块，供向量化与检索</td></tr>
+    <tr><td><b>元数据过滤</b></td><td>按标签（时间/部门/权限）先缩小范围再做向量检索</td></tr>
+    <tr><td><b>Rerank 重排</b></td><td>用更准的模型对召回结果重新排序，提升相关性</td></tr>
+    <tr><td><b>混合检索</b></td><td>向量 + 关键词两路召回并融合，兼顾语义与精确匹配</td></tr>
+    <tr><td><b>RRF</b></td><td>倒数排名融合，按各路排名倒数相加来合并多路召回结果</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 pgvector 建一张向量表，插入 100 条数据，跑一次余弦检索；② 给数据加元数据字段，做一次"带过滤的检索"，体会差别；③ 用同一个查询集，分别测 HNSW 在 <span class="k">efSearch=32/128</span> 下的召回率与延迟；④ 把同一批文档用"按固定长度"和"按结构"两种方式切分，对比检索结果。<br><br>
+    <b>之后值得单独学：</b>重排模型（cross-encoder）的部署与调优、多路召回与 RRF 融合的工程实现、DiskANN 等磁盘索引、量化与降维的精度评估、以及向量库的容量规划与压测。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透向量数据库与语义检索 · 上线前务必检查：切分粒度、元数据过滤、召回率、索引内存峰值、嵌入模型是否统一</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（ANN 索引）和模块 6（RAG 落地细节）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 psql 或 Qdrant 里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 pgvector 或 Qdrant 跟着敲：docker run -d -p 6333:6333 qdrant/qdrant';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

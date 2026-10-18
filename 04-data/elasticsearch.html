@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Elasticsearch</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 11 期 · 高密度版</span>
+    <h1>二十分钟学透 Elasticsearch</h1>
+    <p class="sub">ES 的门槛不在 API，在<b>分片规划、写入路径和堆内存</b>。这篇讲倒排索引为什么快、分片开多少合适、动态映射怎么把集群炸掉，以及磁盘水位满了之后集群到底在干什么。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 段 bool 查询子句</span>
+      <span class="chip"><b>3</b> 级磁盘水位</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 ES 跟着敲：docker run -p 9200:9200 -e discovery.type=single-node elasticsearch:8.13.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 单节点 ES（8.x，注意 8.x 默认开启安全认证）</span>
+docker run -d --name es -p 9200:9200 -e discovery.type=single-node \
+  -e xpack.security.enabled=false elasticsearch:8.13.0
+
+<span class="c"># 8.x 默认 https + 用户名 elastic，密码在容器启动日志里，可以用上面的环境变量关掉方便练习</span>
+curl http://localhost:9200
+curl http://localhost:9200/_cluster/health
+
+<span class="c"># 7.x 练习（无安全特性，更接近国内存量生产环境）</span>
+docker run -d --name es7 -p 9201:9200 -e discovery.type=single-node elasticsearch:7.17.18</pre>
+  <div class="callout warn">
+    <b>版本说明：</b>本文以 <b>7.x / 8.x</b> 为准。关键差异：8.x <b>默认启用 HTTPS 和认证</b>、彻底移除 mapping type（所有索引只有一种隐式类型）、默认单分片索引 + 自动副本；7.10+ 引入 runtime fields，7.11+ 有新的快照/恢复实现。国内大量生产环境还停在 7.x，新集群建议直接 8.x。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>倒排索引：ES 为什么搜得快</h2></div>
+  <p class="lead">MySQL 的"like '%词%'" 是全表扫描。ES 反过来存：<b>不问"这行有什么词"，而问"这个词在哪些行里"</b>。这个反向的映射就是倒排索引。</p>
+  <table>
+    <tr><th style="width:150px">概念</th><th>说明</th></tr>
+    <tr><td><b>分词 Analysis</b></td><td>写入时按分词器（analyzer）把文本切成词条（term）。standard 分词器：小写化 + 按标点空格切词</td></tr>
+    <tr><td><b>词条字典</b></td><td>所有 term 的有序集合。查询时先在字典里二分定位，不是全表扫</td></tr>
+    <tr><td><b>倒排表 Posting List</b></td><td>每个 term 对应包含它的文档 ID 列表 + 位置信息（做短语查询）。一个 term 命中 1000 万篇文档，就是一个 1000 万的 ID 列表</td></tr>
+    <tr><td><b>相关性评分</b></td><td>BM25 算法（5.0+ 取代 TF-IDF）：词频越高分越高，字段越短分越高，稀有词权重更高</td></tr>
+    <tr><td><b>Doc Values</b></td><td>正排的列式存储，聚合和排序靠它。<b>text 字段没有 doc values</b>，不能直接聚合</td></tr>
+    <tr><td><b>_source</b></td><td>文档原文，返回结果时用。可以 disable 省磁盘，但 update 和 reindex 会受影响</td></tr>
+  </table>
+  <pre><span class="c"># 看一条文档是怎么被切词的（最有价值的学习命令）</span>
+GET /my-index/_analyze
+{
+  "field": "title",
+  "text": "Elasticsearch 分布式搜索引擎"
+}
+<span class="c"># 返回 tokens：elasticsearch、分布式、搜索引擎</span>
+
+<span class="c"># 写入 3 篇文档后，title 字段的倒排结构大致是：</span>
+<span class="c"># 分布式   -&gt; [doc1]</span>
+<span class="c"># elasticsearch -&gt; [doc1, doc2, doc3]</span>
+<span class="c"># 搜索引擎 -&gt; [doc1]</span>
+
+<span class="c"># 搜 "分布式"：字典定位 term -&gt; 拿 posting list [doc1] -&gt; BM25 打分 -&gt; 返回</span>
+GET /my-index/_search
+{
+  "query": { "match": { "title": "分布式" } }
+}</pre>
+  <div class="callout ok">
+    <b>一句话理解 ES 与数据库的分工：</b>ES 的搜索快在"词 → 文档"的反查；聚合排序快在 doc values 列式存储。<b>两者都不需要读 _source 原文</b>，这就是 ES 能在百亿级文档上做亚秒聚合的原因。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>分片与副本：开局决定终局</h2></div>
+  <p class="lead">分片数在建索引时定下，<b>后期几乎改不了</b>（7.x+ 的 split API 有严格上限：目标分片数必须是源分片的倍数）。开小了无法扩容，开大了集群被元数据压垮。</p>
+  <table>
+    <tr><th style="width:150px">参数</th><th>说明</th></tr>
+    <tr><td><b>主分片 Primary</b></td><td>数据的真实切分。写入按路由（默认 doc _id 哈希）落到某个主分片。7.x 默认 1 个，8.x 默认 1 个</td></tr>
+    <tr><td><b>副本 Replica</b></td><td>主分片的完整拷贝。<b>可随时增减</b>。两个作用：高可用（主挂了副本顶上）+ 读吞吐（读可以分发到副本）</td></tr>
+    <tr><td><b>分片大小</b></td><td>业界经验值：<b>单个分片 10GB ~ 50GB</b>。日志类常按 30~50GB 规划，搜索类偏小</td></tr>
+    <tr><td><b>分片公式</b></td><td>主分片数 ≈ 总数据量 ÷ 目标分片大小。1TB 日志 ÷ 40GB ≈ 25 个主分片</td></tr>
+    <tr><td><b>节点数关系</b></td><td>至少保证主分片数 ≥ 数据节点数，才能均匀铺开；副本数决定每节点平均持有 shard 数 =（主+副）×分片数/节点数</td></tr>
+  </table>
+  <h4>过度分片（over-sharding）是隐形杀手</h4>
+  <ul>
+    <li>每个分片都有固定开销：分片级别的元数据、segment 文件句柄、线程池任务。<b>一个分片再小也占几十 MB 级堆内存</b>（term dictionary、fielddata 元数据等）</li>
+    <li>1000 个分片的集群，每个搜索请求要扇出到 1000 个分片，每个分片返回自己的 top N 再归并 —— <b>查询延迟和堆压力随分片数线性上升</b></li>
+    <li>经验红线：<b>单节点分片数控制在 20 个/GB 堆内存以内</b>（即 30GB 堆的节点，分片数不超过 600 个），否则 GC 和查询都会变形</li>
+  </ul>
+  <pre><span class="c"># 建索引时就规划好（7.x/8.x 都可以）</span>
+PUT /logs-2026.10
+{
+  "settings": {
+    "number_of_shards": 25,
+    "number_of_replicas": 1
+  },
+  "mappings": { "properties": { "msg": { "type": "text" } } }
+}
+
+<span class="c"># 查看集群分片分布</span>
+GET /_cat/shards/logs-2026.10?v
+GET /_cat/nodes?v&amp;h=name,heap.percent,ram.percent,cpu,load_1m,disk.used_percent
+
+<span class="c"># 诊断分片是否过大/过小的聚合查询</span>
+GET /_cat/indices?v&amp;h=index,docs.count,store.size,pri.store.size&amp;s=store.size:desc</pre>
+  <div class="callout warn">
+    <b>"先开 100 个分片备用"是最常见的错误。</b>数据没多少，分片开销先吃满堆内存，集群还没上量就天天 GC。正确姿势：按当前数据量 ÷ 40GB 算，留出 2~3 倍增长空间即可，真不够了用 split/rollover 滚动新索引（日志场景按天/周滚动本来就是标准做法）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>写入路径：refresh、flush 与 segment merge</h2></div>
+  <p class="lead">ES 的"近实时（NRT）"就诞生在这条路径上：写入 1 秒后可搜，不是因为数据落了盘，而是因为内存里新建了 segment。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>文档进入内存缓冲</b>：写入请求到达主分片，先追加到 <b>translog</b>（事务日志，保证掉电不丢），再写入内存 buffer</div></div>
+    <div class="step"><div class="txt"><b>refresh（默认 1 秒）</b>：buffer 中的文档生成一个新的 <b>segment</b> 并打开文件句柄供搜索。<b>不 fsync，不写 translog 之外的新磁盘数据</b> —— 这就是"1 秒后可搜"的全部秘密</div></div>
+    <div class="step"><div class="txt"><b>translog fsync</b>：按 <span class="k">index.translog.durability</span> 策略。request 模式每个请求都 fsync（最安全默认），async 模式每 5 秒批量 fsync（吞吐优先，最多丢 5 秒）</div></div>
+    <div class="step"><div class="txt"><b>flush</b>：触发条件为 translog 过大（默认 512MB）或 30 分钟。<b>真正把 segment fsync 落盘、清空 translog、更新 commit point</b></div></div>
+    <div class="step"><div class="txt"><b>segment merge</b>：后台把多个小 segment 合并成大 segment。<b>被删除/更新的文档在此刻才真正物理消失</b>，merge 本身消耗 CPU 和磁盘 IO</div></div>
+  </div>
+  <pre><span class="c"># 写性能三板斧</span>
+<span class="c"># 1. 批量写：bulk 每批 5~15MB 或 1000~5000 文档，拒绝单条循环</span>
+POST /_bulk
+{ "index": { "_index": "logs", "_id": "1" } }
+{ "msg": "hello", "level": "INFO" }
+{ "index": { "_index": "logs", "_id": "2" } }
+{ "msg": "world", "level": "WARN" }
+
+<span class="c"># 2. 调大 refresh 间隔：批量导入时关掉近实时</span>
+PUT /logs/_settings
+{ "index": { "refresh_interval": "30s" } }
+<span class="c"># 导完记得改回 1s，或用 _refresh 接口立即生效</span>
+POST /logs/_refresh
+
+<span class="c"># 3. 导入完成后 force merge：把小段合成大段，提升查询速度</span>
+POST /logs/_forcemerge?max_num_segments=1
+<span class="c"># 注意：只对不再写入的索引做，online 索引 force merge 会产生大段</span>
+
+<span class="c"># translog 模式切换（写吞吐优先时）</span>
+PUT /logs/_settings
+{ "index": { "translog": { "durability": "async" } } }</pre>
+  <table>
+    <tr><th style="width:150px">操作</th><th style="width:200px">发生了什么</th><th>影响</th></tr>
+    <tr><td><b>refresh</b></td><td>buffer → 新 segment（内存 + 打开句柄）</td><td>不 fsync，掉电丢这段。段数量暴涨会让查询变慢</td></tr>
+    <tr><td><b>flush</b></td><td>segment fsync + 清 translog</td><td>真正的持久化点。触发时短暂写 IO 尖刺</td></tr>
+    <tr><td><b>merge</b></td><td>多段合并、物理删除已删文档</td><td>持续后台 IO；段太多查询慢，段太大删文档回收慢</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>"写入后立刻搜不到"类问题，90% 是 refresh_interval 被改大了没改回来。</b>排查顺序：① <span class="k">GET /索引/_settings</span> 看 refresh_interval；② <span class="k">_cat/segments</span> 看段数量是否异常（几千个段 = merge 跟不上）；③ <span class="k">_cat/thread_pool/write?v</span> 看写线程池是否打满有拒绝。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>映射与动态映射陷阱</h2></div>
+  <p class="lead">mapping 定义字段怎么切词、怎么存。<b>动态映射是新手最好的朋友，也是集群崩溃的头号原因。</b></p>
+  <h4>两种字符串类型，选错全盘皆输</h4>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:250px">行为</th><th>用途</th></tr>
+    <tr><td><b>text</b></td><td>写入时分词，倒排索引按词条命中。没有 doc values，<b>不能聚合/排序</b></td><td>全文搜索：正文、标题、日志内容</td></tr>
+    <tr><td><b>keyword</b></td><td>不分词，整值精确匹配。有 doc values，<b>聚合/排序/精确过滤都靠它</b></td><td>ID、状态码、标签、枚举、邮箱</td></tr>
+  </table>
+  <pre><span class="c"># 标准姿势：一个字段同时要搜索和聚合，用 multi-field</span>
+PUT /logs
+{
+  "mappings": {
+    "properties": {
+      "msg":     { "type": "text", "analyzer": "standard" },
+      "status":  { "type": "keyword" },
+      "level":   { "type": "keyword" },
+      "@timestamp": { "type": "date" },
+      "content": {
+        "type": "text",
+        "fields": {
+          "raw": { "type": "keyword" }     <span class="c"># content 搜索用 content，聚合用 content.raw</span>
+        }
+      }
+    }
+  }
+}</pre>
+  <h4>动态映射（dynamic mapping）</h4>
+  <ul>
+    <li>默认 <span class="k">"dynamic": true</span>：文档里出现新字段，ES 自动猜类型（字符串→text+keyword 多字段，数字→long/double，日期串→date）</li>
+    <li><b>陷阱一：mapping 爆炸。</b>日志里带 hostname、trace_id、随机 key 的 JSON，每个新 key 都变成一个映射字段。几十万上百万字段的映射，集群状态（cluster state）膨胀，所有节点同步变慢，<b>堆内存被元数据吃光</b></li>
+    <li><b>陷阱二：类型推断冲突。</b>自动推断把字段定成 long，上游某天发了个字符串，写入直接报错</li>
+    <li><b>陷阱三：text 字段被用来聚合。</b>日志按 msg 聚合 → fielddata 疯狂加载 → 堆爆 OOM（7.x 后 fielddata 默认关，报错而不是炸，但查询照样失败）</li>
+  </ul>
+  <pre><span class="c"># 生产级防御：显式 mapping + dynamic templates</span>
+PUT /logs
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "strings_as_keyword": {          <span class="c"># 所有字符串默认 keyword</span>
+          "match_mapping_type": "string",
+          "mapping": { "type": "keyword" }
+        }
+      }
+    ]
+  },
+  "settings": {
+    "index.mapping.total_fields.limit": 1000,     <span class="c"># 字段数硬上限，防爆炸（默认 1000）</span>
+    "index.mapping.depth.limit": 20               <span class="c"># 嵌套深度上限</span>
+  }
+}
+
+<span class="c"># 严格模式：新字段直接拒绝写入（推荐给日志管道）</span>
+PUT /logs/_mapping
+{ "dynamic": "strict" }
+
+<span class="c"># 查看字段数量和类型</span>
+GET /logs/_mapping
+GET /_cat/fielddata?v                          <span class="c"># 看哪些字段在用 fielddata（内存大户）</span></pre>
+  <div class="callout warn">
+    <b>映射几乎不可变：</b>已存在的字段不能改类型（text 改 keyword 要 reindex）；只能加新字段、改分析器要重建索引。<b>所以映射必须在第一批数据写入前定好</b>，日志管道上线第一天就要配 dynamic templates。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>查询 DSL：bool 组合与相关性</h2></div>
+  <p class="lead">ES 查询分两个上下文：<b>query context 算相关性分数，filter context 只判是否匹配</b>。搞混这两个概念，写不出高性能查询。</p>
+  <table>
+    <tr><th style="width:150px">上下文</th><th>行为</th></tr>
+    <tr><td><b>Query 上下文</b></td><td>计算 BM25 得分，按分数排序。<b>结果默认不缓存</b>（分数依赖每个查询）</td></tr>
+    <tr><td><b>Filter 上下文</b></td><td>只有"是/否"，不算分。<b>结果可被节点缓存（bitset）</b>，且能利用 filter cache。能放 filter 的绝不放 query</td></tr>
+  </table>
+  <pre><span class="c"># bool query 四大子句</span>
+<span class="c"># must    -&gt; 必须匹配，算分（query context）</span>
+<span class="c"># filter  -&gt; 必须匹配，不算分（filter context，可缓存）</span>
+<span class="c"># should  -&gt; 应该匹配，配合 minimum_should_match</span>
+<span class="c"># must_not -&gt; 必须不匹配，filter context</span>
+
+GET /logs/_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "match": { "msg": "timeout error" } }          <span class="c"># 分词后 OR 匹配，算分</span>
+      ],
+      "filter": [
+        { "term":  { "level": "ERROR" } },               <span class="c"># 精确匹配，缓存</span>
+        { "range": { "@timestamp": { "gte": "now-1h" } } }
+      ],
+      "must_not": [
+        { "term": { "service": "deprecated-api" } }
+      ],
+      "should": [
+        { "match": { "msg": "database" } }               <span class="c"># 命中加分，不命中不扣</span>
+      ],
+      "minimum_should_match": 0
+    }
+  }
+}</pre>
+  <h4>高频查询类型对照</h4>
+  <table>
+    <tr><th style="width:180px">查询</th><th>作用域</th><th>要点</th></tr>
+    <tr><td class="f">term</td><td>keyword / 数字 / 日期</td><td><b>精确匹配不分词</b>。对 text 字段用它等于查原始 term，通常查不到</td></tr>
+    <tr><td class="f">terms</td><td>keyword</td><td>多值 IN，等价 SQL IN</td></tr>
+    <tr><td class="f">match</td><td>text</td><td>先分析查询串再匹配，默认 OR，可用 operator: "and"</td></tr>
+    <tr><td class="f">match_phrase</td><td>text</td><td>短语匹配，词序和相邻性都要对</td></tr>
+    <tr><td class="f">multi_match</td><td>多字段</td><td>跨字段搜同一串，best_fields / most_fields / cross_fields</td></tr>
+    <tr><td class="f">range</td><td>数字 / 日期</td><td>gte/gt/lte/lt，时间范围查询必用</td></tr>
+    <tr><td class="f">exists</td><td>任意</td><td>字段存在性，处理稀疏字段</td></tr>
+  </table>
+  <h4>相关性与分页</h4>
+  <pre><span class="c"># 看一条文档为什么排第一 —— 排错最实用的命令</span>
+GET /logs/_search
+{
+  "explain": true,
+  "query": { "match": { "msg": "timeout" } }
+}
+
+<span class="c"># 函数分：给新文档加权（recency）、给特定来源加权</span>
+GET /logs/_search
+{
+  "query": {
+    "function_score": {
+      "query": { "match": { "msg": "timeout" } },
+      "functions": [
+        { "exp": { "@timestamp": { "origin": "now", "scale": "1h", "decay": 0.5 } } }
+      ]
+    }
+  }
+}
+
+<span class="c"># 深分页：from+size 超过 max_result_window（默认 10000）直接报错</span>
+<span class="c"># 正确做法 1：search_after 游标翻页（利用上一页最后一条的排序值）</span>
+GET /logs/_search
+{
+  "size": 100,
+  "sort": [ { "@timestamp": "desc" }, { "_doc": "asc" } ],
+  "search_after": ["2026-10-17T10:00:00", 12345]
+}
+
+<span class="c"># 正确做法 2：PIT（point in time，7.10+）固定视图再翻页，保证一致性</span>
+POST /logs/_pit?keep_alive=1m
+<span class="c"># 返回 pit_id，后续查询带 "pit": {"id": "xxx", "keep_alive": "1m"}</span></pre>
+  <div class="callout ok">
+    <b>查询性能口诀：</b>过滤条件全放 <b>filter</b>（缓存 + 不算分），只有"按文本相关度排序"的才放 <b>must/match</b>；排序字段用 <b>keyword/date/数字</b>（有 doc values），永远别对 text 排序；翻页过 1 万条换 <b>search_after</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>聚合性能</h2></div>
+  <p class="lead">ES 的聚合（aggregation）跑在 doc values 上，比 SQL 的 GROUP BY 快一个量级，<b>但用错方式的代价是直接 OOM</b>。</p>
+  <h4>聚合族谱</h4>
+  <table>
+    <tr><th style="width:160px">类型</th><th style="width:230px">作用</th><th>关键参数</th></tr>
+    <tr><td><b>Metric 聚合</b></td><td>单值统计：avg/sum/min/max/cardinality/stats</td><td>cardinality 默认精度 100，误差约 3%~5%</td></tr>
+    <tr><td><b>Bucket 聚合</b></td><td>分组：terms/date_histogram/range/histogram</td><td>terms 的 size、shard_size</td></tr>
+    <tr><td><b>Pipeline 聚合</b></td><td>对其他聚合的结果再加工：derivative/cumulative_sum/moving_avg</td><td>只对 metric 聚合结果生效</td></tr>
+  </table>
+  <pre><span class="c"># 经典三层聚合：按服务分桶 → 桶内按状态码分桶 → 桶内算 P95</span>
+GET /logs/_search
+{
+  "size": 0,                                  <span class="c"># 只要聚合不要文档</span>
+  "aggs": {
+    "by_service": {
+      "terms": { "field": "service", "size": 10, "shard_size": 50 },
+      "aggs": {
+        "by_status": {
+          "terms": { "field": "status" },
+          "aggs": {
+            "latency_p95": { "percentiles": { "field": "latency_ms", "percents": [50, 95, 99] } }
+          }
+        }
+      }
+    }
+  }
+}
+
+<span class="c"># cardinality 去重 UV：快但近似</span>
+GET /logs/_search
+{
+  "size": 0,
+  "aggs": { "uv": { "cardinality": { "field": "user_id", "precision_threshold": 1000 } } }
+}
+<span class="c"># precision_threshold 100 → 误差 ~3%；1000 → 内存换精度；精确去重要全量扫或预计算</span>
+
+<span class="c"># 时间直方图：日志曲线图的标准聚合</span>
+GET /logs/_search
+{
+  "size": 0,
+  "aggs": {
+    "over_time": {
+      "date_histogram": { "field": "@timestamp", "calendar_interval": "1h" },
+      "aggs": { "error_rate": { "filter": { "term": { "level": "ERROR" } } } }
+    }
+  }
+}</pre>
+  <h4>聚合的性能红线</h4>
+  <ul>
+    <li><b>terms 聚合必须有 doc values。</b>text 字段聚合会报错（fielddata 默认关闭），这是设计保护不是 bug</li>
+    <li><b>terms size 别贪大。</b>size=1000 的 terms 聚合 = 每个分片都排 1000 个桶再归并。深翻页用 <b>composite 聚合</b>（支持 after 游标）而不是加大 size</li>
+    <li><b>全局序数（global ordinals）：</b>keyword 字段首次聚合时构建"值→序号"的内存映射，高基数字段（百万级不同值）这块内存很大。可用 <span class="k">eager_global_ordinals</span> 在刷新时预构建，避开查询时的卡顿</li>
+    <li><b>date_histogram 用 calendar_interval</b>（1h/1d）而不是 fixed_interval 跨时区场景，语义更符合预期</li>
+  </ul>
+  <div class="callout warn">
+    <b>聚合 OOM 的标准配方：</b>对百万级高基数字段做 terms size=10000 聚合 + 并发几十个查询。分片各自在堆内排大 Map，直接触发 circuit breaker。<b>预防：</b>聚合字段基数控制在十万级以内，size 控制在三位数，超长尾用 composite 分页，或者把明细预聚合成独立统计索引。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>集群运维：重启、水位、堆内存与快照</h2></div>
+  <h4>滚动重启（升级/换配置必做）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>关分片分配</b>：<span class="k">PUT /_cluster/settings {"persistent":{"cluster.routing.allocation.enable":"none"}}</span>，防止重启期间集群把副本疯狂重分配</div></div>
+    <div class="step"><div class="txt"><b>可能先同步刷新</b>：<span class="k">POST /_flush/synced</span>，减少恢复时间（可选）</div></div>
+    <div class="step"><div class="txt"><b>停一个节点</b>，改配置/升级，重启，等它重新加入并恢复完（<span class="k">GET /_cat/recovery</span> 看进度）</div></div>
+    <div class="step"><div class="txt"><b>逐节点重复</b>，直到全部完成，期间集群 health 是 yellow（副本缺失）属正常</div></div>
+    <div class="step"><div class="txt"><b>恢复分配</b>：把 enable 改回 <span class="k">all</span>（或 primaries），等 health 变 green</div></div>
+  </div>
+  <h4>磁盘水位：集群只读的触发链</h4>
+  <table>
+    <tr><th style="width:150px">水位</th><th style="width:220px">默认阈值</th><th>行为</th></tr>
+    <tr><td><b>low</b></td><td>磁盘使用率 85%</td><td><b>不再给该节点分配新分片</b></td></tr>
+    <tr><td><b>high</b></td><td>磁盘使用率 90%</td><td>开始把该节点的分片<b>迁走去别的节点</b></td></tr>
+    <tr><td><b>flood-stage</b></td><td>磁盘使用率 95%</td><td>该节点上索引被置为<b>只读块</b>（index.blocks.read_only_allow_delete），写入全部报 403，直到手动解锁</td></tr>
+  </table>
+  <pre><span class="c"># 看水位和块状态</span>
+GET /_cluster/allocation/explain
+GET /_cat/allocation?v&amp;h=node,disk.used,disk.avail,disk.total,shards
+
+<span class="c"># flood-stage 后的解锁姿势（先扩容/清理，再手动解除只读）</span>
+PUT /logstash-*/_settings
+{ "index.blocks.read_only_allow_delete": null }
+
+<span class="c"># 提前规划：按容量配 watermark，按索引设 ILM rollover 自动滚新索引</span>
+PUT /_cluster/settings
+{
+  "transient": {
+    "cluster.routing.allocation.disk.watermark.low": "85%",
+    "cluster.routing.allocation.disk.watermark.high": "90%",
+    "cluster.routing.allocation.disk.watermark.flood_stage": "95%"
+  }
+}</pre>
+  <h4>JVM 堆与文件系统缓存的配合</h4>
+  <ul>
+    <li><b>堆内存不超过物理内存的 50%</b>（且 Xms = Xmx，禁动态调整），剩下的一半给<b>文件系统缓存（page cache）</b> —— segment 文件、doc values 的冷读全靠它</li>
+    <li><b>绝对不要超过 31GB。</b>超过这个线，JVM 关闭压缩普通对象指针（compressed oops），同样的堆能装的对象数骤降，等于白给一倍内存。常见做法：堆 26~30GB 封顶，或 16GB 分节点铺开</li>
+    <li>堆里的大户：fielddata（已默认关闭）、term dictionary、segment 元数据、查询缓存、聚合堆。<b>分片越多元数据越大</b> —— 堆问题最后常常回到分片规划</li>
+    <li>GC：默认 G1。关注 <span class="k">GET /_nodes/stats/jvm</span> 里 old GC 频率和耗时，old GC 每次超过 1 秒就要警惕</li>
+  </ul>
+  <h4>快照与恢复</h4>
+  <pre><span class="c"># 1. 注册仓库（共享文件系统 / S3 / HDFS / Azure）</span>
+PUT /_snapshot/my_backup
+{
+  "type": "fs",
+  "settings": { "location": "/mount/backups/es" }
+}
+
+<span class="c"># 2. 创建快照（增量，只传新 segment）</span>
+PUT /_snapshot/my_backup/snapshot_20261017?wait_for_completion=true
+{
+  "indices": "logs-*",
+  "ignore_unavailable": true
+}
+
+<span class="c"># 3. 查看与恢复</span>
+GET /_snapshot/my_backup/_all
+POST /_snapshot/my_backup/snapshot_20261017/_restore
+{
+  "indices": "logs-2026.10",
+  "rename_pattern": "logs-(.+)",
+  "rename_replacement": "restored-logs-$1"
+}
+
+<span class="c"># 4. 自动化：SLM 策略定期快照 + ILM 管理索引生命周期</span>
+PUT /_slm/policy/nightly
+{
+  "schedule": "0 30 2 * * ?",
+  "name": "&lt;nightly-{now/d}&gt;",
+  "repository": "my_backup",
+  "retention": { "expire_after": "30d" }
+}
+
+<span class="c"># ILM：hot（可写可查）→ warm（只读+ shrink 合并）→ cold（可搜索快照）→ delete</span>
+PUT /_ilm/policy/logs_policy
+{
+  "phases": {
+    "hot":    { "actions": { "rollover": { "max_size": "50gb", "max_age": "1d" } } },
+    "warm":   { "min_age": "3d",  "actions": { "shrink": { "number_of_shards": 1 } } },
+    "delete": { "min_age": "30d", "actions": { "delete": {} } }
+  }
+}</pre>
+  <div class="callout danger">
+    <b>运维三定律：</b>① 磁盘 95% 之前就要有告警，等集群只读写已经晚了；② 堆内存没超过 31GB 且 Xms=Xmx，否则 GC 抖动会以"查询偶发几秒"的形式出现；③ 快照恢复到新集群是灾难恢复的唯一手段，<b>没测过恢复的快照等于没有快照</b>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">日志索引不配 mapping，动态映射字段爆炸</div><div class="pd">带随机 key 的 JSON 被自动映射成几十万字段，cluster state 膨胀、堆内存被元数据吃光。上线第一天就要配 dynamic templates 和 total_fields.limit。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">对 text 字段做聚合或排序</div><div class="pd">text 没有 doc values，聚合直接报 fielddata 禁用错误，排序失败。聚合排序必须用 keyword，用 multi-field 的 .raw 子字段。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">term 查询打在 text 字段上</div><div class="pd">term 不做分析，查的是原始 term。text 字段存的是切词后的结果，term: "Timeout Error" 永远查不到 "timeout error" 的文档。搜文本用 match。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">分片开得过大或过度分片</div><div class="pd">1TB 数据开 5 个分片 = 单分片 200GB 恢复慢；反过来为"将来"开 100 个小分片，元数据先压垮堆内存。按 10~50GB/分片规划，宁少勿多。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">bulk 逐条循环写</div><div class="pd">每条一个 HTTP 请求，网络和序列化开销主导，吞吐差一个量级。bulk 每批 5~15MB / 1000~5000 文档，多线程并行发。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">导入时没调大 refresh_interval</div><div class="pd">1 秒 refresh + 高频写入 = segment 数量暴涨，查询变慢、merge 压力山大。批量导入调 30s，导完改回，或 force merge。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">from + size 深翻页</div><div class="pd">超过 max_result_window（默认 10000）直接报错，就算不报，深翻页每个分片都要排前 N 万条。用 search_after 或 PIT。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">JVM 堆超过 31GB 或超过物理内存 50%</div><div class="pd">超过 31GB 丢压缩指针，堆效率骤降；超过 50% 物理内存，page cache 被挤占，冷查询全磁盘 IO。堆设 26GB 封顶或 16GB 多节点。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">磁盘写满到 flood-stage 才发现</div><div class="pd">95% 水位触发索引只读块，业务写入全 403。85%/90% 就要配告警，日常用 ILM 滚索引 + 快照 + 清理。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">滚动重启前没关分片分配</div><div class="pd">节点一停集群立刻开始副本重分配，恢复流量和重启流量叠加，集群可能雪崩。先 allocation.enable=none，逐节点重启完再恢复。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. ES 查询中，什么条件下应该用 filter 子句而不是 must？</div>
+      <button class="opt">需要按相关度分数排序结果时</button>
+      <button class="opt">条件只做"是否匹配"判断、不需要算分时，可缓存且更快</button>
+      <button class="opt">查询 text 字段时必须用 filter</button>
+      <div class="ans">正确答案：<b>不需要算分就用 filter</b>。filter context 不计算 BM25 分数，结果以 bitset 形式被节点缓存，后续相同过滤直接命中缓存。这是 ES 查询优化第一原则：状态码、时间范围这类条件全放 filter。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一个 text 字段存了 "Timeout Error"，用 term 查询 "timeout error" 搜不到，原因是？</div>
+      <button class="opt">因为 term 查询只支持 keyword 字段</button>
+      <button class="opt">因为索引里该字段没有倒排索引</button>
+      <button class="opt">因为 term 不做分词，匹配的是原始 term，而 text 字段存的是切词后的小写词条</button>
+      <div class="ans">正确答案：<b>term 不分析查询串</b>。text 字段写入时被 standard 分词器切成 timeout、error 两个词条，倒排表里没有 "timeout error" 这个整体 term。搜文本内容要用 match（它会先分析查询串）。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于分片规划，哪个说法是对的？</div>
+      <button class="opt">单分片建议 10~50GB，分片数 = 总数据量 ÷ 目标大小，后期几乎不可调整</button>
+      <button class="opt">分片越多越好，并行度越高</button>
+      <button class="opt">副本数决定数据容量，加副本可以扩容</button>
+      <div class="ans">正确答案：<b>按 10~50GB 规划且后期几乎不可改</b>。过度分片每个分片都吃堆内存和元数据，查询扇出开销线性上升。副本只是主分片的完整拷贝，加副本提升的是读吞吐和高可用，不增加数据容量。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 写入文档 1 秒后就能被搜到，主要靠哪个机制？</div>
+      <button class="opt">translog 每秒 fsync 落盘</button>
+      <button class="opt">refresh 每秒把内存 buffer 生成新 segment 并打开供搜索</button>
+      <button class="opt">flush 每秒把 segment 写进磁盘</button>
+      <div class="ans">正确答案：<b>refresh 生成可搜索的 segment</b>。它不 fsync 数据，只是让新文档在内存文件系统里可被检索；flush 才是把 segment fsync 落盘并清 translog 的持久化动作。这也是"数据可能丢最近几秒"的原因。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. JVM 堆内存的推荐配置是？</div>
+      <button class="opt">越大越好，64GB 以上最佳</button>
+      <button class="opt">占物理内存 80%，充分利用机器</button>
+      <button class="opt">不超过物理内存 50%，且不超过约 31GB，Xms = Xmx</button>
+      <div class="ans">正确答案：<b>≤50% 物理内存且 ≤31GB 左右，Xms=Xmx</b>。31GB 是 JVM 压缩对象指针的边界，超过它堆效率骤降；超过物理内存一半会挤占 page cache，冷查询全走磁盘。剩下的内存留给文件缓存是 ES 的设计核心。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 磁盘使用率达到 95% 触发 flood-stage 水位后，会发生什么？</div>
+      <button class="opt">该节点上的索引被置为只读块，写入报错，需清理/扩容后手动解锁</button>
+      <button class="opt">集群自动删除最旧的索引释放空间</button>
+      <button class="opt">集群自动重启该节点清空缓存</button>
+      <div class="ans">正确答案：<b>索引进入只读状态</b>（index.blocks.read_only_allow_delete），这是 ES 的自保机制：宁可拒绝写入也不能写满磁盘导致节点崩溃。85% 时停止分配新分片、90% 开始迁走分片，三级水位层层递进。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>GET /_cluster/health</code><span class="desc">集群健康：green/yellow/red 一眼定位</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_cat/indices?v&amp;s=store.size:desc</code><span class="desc">看索引大小和文档数，找大索引</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_cat/shards/index?v</code><span class="desc">分片分布和状态，排查未分配分片</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_cat/segments/index?v</code><span class="desc">segment 数量，多了说明 merge 跟不上</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_cluster/allocation/explain</code><span class="desc">解释某个分片为什么没分配（超好用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /index/_analyze</code><span class="desc">看文本怎么被切词，排查搜不到的第一命令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /index/_mapping</code><span class="desc">看字段类型，确认 text/keyword 没选错</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_nodes/stats/jvm,os</code><span class="desc">堆内存、GC、磁盘水位巡检</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_nodes/hot_threads</code><span class="desc">看哪个线程在烧 CPU</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_tasks?actions=*reindex</code><span class="desc">看 reindex 后台任务进度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>PUT /_cluster/settings</code><span class="desc">滚动重启时关/开分片分配</span><button class="copy">复制</button></div>
+    <div class="crow"><code>PUT /_snapshot/repo/name</code><span class="desc">创建快照，灾难恢复的基础</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置项</h3>
+  <pre><span class="c"># jvm.options / elasticsearch.yml 里最该盯的</span>
+-Xms30g -Xmx30g                   <span class="c"># Xms=Xmx，不超过 31GB 红线</span>
+
+<span class="c"># 索引级 settings</span>
+number_of_shards: 25              <span class="c"># 建索引时定，按数据量/40GB 估</span>
+number_of_replicas: 1             <span class="c"># 可随时调，高可用 + 读吞吐</span>
+refresh_interval: 1s              <span class="c"># 近实时来源；批量导入时临时调 30s</span>
+translog.durability: request      <span class="c"># 每请求 fsync；写优先可改 async（最多丢 5s）</span>
+index.mapping.total_fields.limit: 1000   <span class="c"># 字段数上限，防 mapping 爆炸</span>
+max_result_window: 10000          <span class="c"># from+size 深翻页上限</span>
+
+<span class="c"># 集群级（磁盘水位）</span>
+cluster.routing.allocation.disk.watermark.low: 85%
+cluster.routing.allocation.disk.watermark.high: 90%
+cluster.routing.allocation.disk.watermark.flood_stage: 95%
+
+<span class="c"># 日常巡检组合拳</span>
+GET /_cluster/health
+GET /_cat/allocation?v&amp;h=node,disk.used_percent,shards
+GET /_cat/nodes?v&amp;h=name,heap.percent,cpu,load_1m
+GET /_cat/indices?v&amp;h=index,health,status,docs.count,store.size</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>倒排索引</b></td><td>词条 → 文档 ID 列表的反向映射，全文搜索的核心结构</td></tr>
+    <tr><td><b>分词 Analysis</b></td><td>写入/查询时用 analyzer 把文本切成 term 的过程</td></tr>
+    <tr><td><b>Term 词条</b></td><td>分词后的最小索引单元，倒排字典的键</td></tr>
+    <tr><td><b>BM25</b></td><td>5.0+ 的相关度打分算法，综合词频、字段长度、词稀有度</td></tr>
+    <tr><td><b>Doc Values</b></td><td>字段的列式正排存储，聚合排序的基础；text 字段没有</td></tr>
+    <tr><td><b>分片 Shard</b></td><td>索引的数据切片，主分片数建索引时定，后期几乎不可改</td></tr>
+    <tr><td><b>副本 Replica</b></td><td>主分片拷贝，提供高可用和读吞吐，可动态增减</td></tr>
+    <tr><td><b>Segment 段</b></td><td>倒排索引的最小物理单元，不可变，merge 时合并</td></tr>
+    <tr><td><b>Refresh 刷新</b></td><td>buffer 生成新 segment 并打开供搜索（默认 1s），不 fsync</td></tr>
+    <tr><td><b>Flush 落盘</b></td><td>segment fsync + 清 translog，真正的持久化点</td></tr>
+    <tr><td><b>Translog</b></td><td>事务日志，保证节点宕机不丢已确认写入，flush 时清空</td></tr>
+    <tr><td><b>映射 Mapping</b></td><td>字段类型和分析方式的定义，建索引前定好，几乎不可变</td></tr>
+    <tr><td><b>动态映射</b></td><td>自动推断新字段类型，便利但可能造成字段爆炸</td></tr>
+    <tr><td><b>Keyword</b></td><td>不分词的精确类型，有 doc values，聚合排序精确匹配都用它</td></tr>
+    <tr><td><b>Text</b></td><td>分词的全文搜索类型，没有 doc values，不能聚合排序</td></tr>
+    <tr><td><b>Query Context</b></td><td>算分的查询上下文，结果不缓存</td></tr>
+    <tr><td><b>Filter Context</b></td><td>不算分的过滤上下文，bitset 可缓存，能放 filter 就放</td></tr>
+    <tr><td><b>Global Ordinals</b></td><td>keyword 聚合的"值→序号"内存映射，高基数字段开销大</td></tr>
+    <tr><td><b>Disk Watermark</b></td><td>磁盘水位线：85% 停分配、90% 迁分片、95% 索引只读</td></tr>
+    <tr><td><b>ILM</b></td><td>索引生命周期管理：hot/warm/cold/delete 自动流转</td></tr>
+    <tr><td><b>Searchable Snapshot</b></td><td>7.10+ 快照直接可查，冷数据不必全量占本地磁盘</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 ES，完成这五件事 —— ① 灌 100 万条日志（bulk 批量），用 _cat/indices 看大小；② 用 _analyze 对比 standard 和 keyword 对同一句中文/英文的切词差异；③ 写一个 bool 查询，条件分别放 must 和 filter，对比耗时；④ 对高基数字段做 terms size=1000 聚合，观察 _nodes/stats/jvm 的堆变化；⑤ 走一遍滚动重启流程（关分配→重启→恢复），再注册快照仓库做一次快照和恢复。<br><br>
+    <b>之后值得单独学：</b>ILM+SLM 的完整生命周期方案、跨集群搜索 CCR、检索相关性调优（自定义评分、同义词、中文分词器 IK）、以及 ES 与 Kafka/Logstash 的管道架构。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Elasticsearch · 上线前务必检查：分片规划、mapping、refresh_interval、磁盘水位</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（写入路径）和模块 7（集群运维）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Kibana Dev Tools 里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 ES 跟着敲：docker run -p 9200:9200 -e discovery.type=single-node elasticsearch:8.13.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

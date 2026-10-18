@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透性能架构设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透性能架构设计</h1>
+    <p class="sub">性能是设计出来的，不是压测出来的。这篇的重点：把"快"拆成可度量的数字、按段分配延迟预算、用对测试体系验证，以及那些"前期不设计、后期硬扛"的代价。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>300ms</b> 延迟预算拆解</span>
+      <span class="chip"><b>5</b> 类性能测试</span>
+      <span class="chip"><b>10</b> 个性能坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">边看边问自己：你的核心接口，有写进文档的 P99 目标吗？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>性能需求：把"快"变成数字</h2></div>
+  <p class="lead">"系统要快"不是需求，是愿望。性能需求有三类指标，必须同时给出：<b>延迟、吞吐、并发</b>，而且每个都要带条件（数据量、时段、负载）。</p>
+  <table>
+    <tr><th style="width:110px">指标</th><th style="width:220px">定义</th><th>示例（电商下单 API）</th></tr>
+    <tr><td><b>延迟 Latency</b></td><td>请求从发出到收到响应的耗时，看分位数不看平均</td><td>P50 &lt; 80ms，P99 &lt; 500ms，P999 &lt; 1s</td></tr>
+    <tr><td><b>吞吐 Throughput</b></td><td>单位时间完成的请求数：QPS（查询）/ TPS（事务）</td><td>日常 5000 QPS，大促峰值 60000 QPS</td></tr>
+    <tr><td><b>并发 Concurrency</b></td><td>系统同时处理的在途请求数，决定线程池/连接池下限</td><td>峰值在途 1200（由 Little's Law 推出，见下）</td></tr>
+  </table>
+  <h3>为什么平均值是谎言</h3>
+  <p>两个服务平均延迟都是 100ms，用户体验可能天差地别：</p>
+  <table>
+    <tr><th style="width:120px">服务</th><th style="width:90px">P50</th><th style="width:90px">P99</th><th style="width:90px">P999</th><th>用户感知</th></tr>
+    <tr><td><b>服务 A</b></td><td>98ms</td><td>130ms</td><td>150ms</td><td>稳定，所有人都觉得快</td></tr>
+    <tr><td><b>服务 B</b></td><td>60ms</td><td>420ms</td><td>2400ms</td><td>一半人觉得飞快，1% 的人以为网站挂了</td></tr>
+  </table>
+  <p>投诉来自长尾，监控必须盯 P99 / P999。<b>尾延迟（Tail Latency）</b>往往由单个慢节点、一次 GC、一条慢 SQL 造成，在微服务里还会被 fan-out 放大：一个请求调用 20 个下游，每个下游 P99 都是 100ms，整条链路 P99 接近 2000ms。</p>
+  <h3>Little's Law：并发 = 吞吐 × 延迟</h3>
+  <pre><span class="c"># 并发数 L = 到达率 λ × 单请求耗时 W</span>
+目标：5000 QPS，单请求平均耗时 100ms（0.1s）
+并发 L = 5000 × 0.1 = <span class="g">500</span> 个同时在途请求
+
+推论：线程池 / 连接池 / 队列长度至少按这个数量级配，
+否则请求在池外排队，延迟指标必然失真。</pre>
+  <div class="callout warn">
+    <b>性能目标必须写成"带条件的数字"。</b>"P99 &lt; 200ms"是半成品；"P99 &lt; 200ms（单表 5000 万行、缓存命中率 90%、峰值 1 万 QPS 条件下）"才是可验收的目标。少了条件，压测通过与否全凭一张嘴。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>性能预算：像分钱一样分毫秒</h2></div>
+  <p class="lead">Performance Budget：<b>把端到端总延迟切成预算，分配到每一段，超支要么优化要么重谈需求。</b>预算的本质是团队间的契约——它让"前端怪后端慢、后端怪数据库慢"变成"谁的段超支谁负责"。</p>
+  <h3>一个真实分配示例（详情页，总预算 300ms）</h3>
+  <table>
+    <tr><th style="width:200px">段</th><th style="width:90px">预算</th><th style="width:80px">占比</th><th>约束</th></tr>
+    <tr><td><b>前端渲染（FCP/LCP）</b></td><td>120ms</td><td>40%</td><td>JS bundle &lt; 200KB gzip；首屏不超 3 个阻塞请求</td></tr>
+    <tr><td><b>建连 + 网络往返</b></td><td>40ms</td><td>13%</td><td>同城部署；连接复用率 &gt; 95%</td></tr>
+    <tr><td><b>网关路由 + 鉴权</b></td><td>10ms</td><td>3%</td><td>本地校验 JWT，不远程查会话</td></tr>
+    <tr><td><b>聚合服务（含下游并行）</b></td><td>80ms</td><td>27%</td><td>3 个下游并行调用，取 max 不计 sum</td></tr>
+    <tr><td><b>DB 查询</b></td><td>30ms</td><td>10%</td><td>全部命中索引；单条 SQL &lt; 20ms</td></tr>
+    <tr><td><b>Redis 查询</b></td><td>15ms</td><td>5%</td><td>同机房；pipeline 合并多次访问</td></tr>
+    <tr><td><b>buffer（不可预见）</b></td><td>5ms</td><td>2%</td><td>专款专用，不许提前花</td></tr>
+  </table>
+  <h3>分配三原则</h3>
+  <ul>
+    <li><b>DB 段给最小预算</b>：数据库是最贵的共享资源，毫秒应该花在减少访问次数上，不是允许它慢。</li>
+    <li><b>串行段相加、并行段取 max</b>：三个 50ms 的下游调用串行是 150ms 预算，并行只要 50ms——先并行化再谈分配。</li>
+    <li><b>永远留 5%~10% buffer</b>：没有余量的预算等于没有预算，第一次 GC 抖动就全线超支。</li>
+  </ul>
+  <div class="callout ok">
+    <b>执行方式：压测时按段打点。</b>每个请求在网关、服务入口、下游调用前后各记一个时间戳，上报到追踪系统，出报告时直接对照预算表看谁超支。前端同理：LCP / TTFB 有明确预算，超出时 CI 告警（Lighthouse CI）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>端到端延迟拆解</h2></div>
+  <p class="lead">优化前先拆。下面是一次真实量级的拆解（POST /api/orders，同城 IDC 部署，连接池已预热）：</p>
+  <table>
+    <tr><th style="width:180px">段</th><th style="width:90px">P50</th><th style="width:90px">P99</th><th>说明</th></tr>
+    <tr><td><b>DNS + TCP + TLS 建连</b></td><td>0 / 40ms</td><td>80ms</td><td>TLS 1.3 是 1-RTT；连接池复用时此项为 0</td></tr>
+    <tr><td><b>客户端到网关网络</b></td><td>8ms</td><td>25ms</td><td>同城 1~2ms；跨省 20~30ms；跨运营商更差</td></tr>
+    <tr><td><b>网关路由 + 鉴权</b></td><td>2ms</td><td>8ms</td><td>Nginx + Lua 或 Envoy；远程鉴权会再加 5~15ms</td></tr>
+    <tr><td><b>业务服务处理</b></td><td>25ms</td><td>90ms</td><td>含参数校验、业务规则、编排逻辑</td></tr>
+    <tr><td><b>下游 RPC（并行）</b></td><td>15ms</td><td>45ms</td><td>3 个约 20ms 的调用并行，耗时取 max 不是 sum</td></tr>
+    <tr><td><b>DB 查询（主库）</b></td><td>3ms</td><td>15ms</td><td>命中索引；全表扫描在千万级表上 500ms+</td></tr>
+    <tr><td><b>Redis 查询</b></td><td>0.5ms</td><td>2ms</td><td>同机房；含序列化约 0.2ms</td></tr>
+    <tr><td><b>序列化 / 反序列化</b></td><td>1ms</td><td>4ms</td><td>JSON 解析 1KB 约 5μs；大对象 Protobuf 快 3~5 倍</td></tr>
+    <tr><td><b>日志 / 监控埋点</b></td><td>1ms</td><td>5ms</td><td><b>同步写日志是隐形杀手</b>，必须异步批量</td></tr>
+    <tr><td><b>响应回传网络</b></td><td>5ms</td><td>20ms</td><td>2KB 响应体；开启压缩后 CPU 换带宽</td></tr>
+  </table>
+  <h3>预算分配演算（目标 P99 ≤ 300ms）</h3>
+  <pre><span class="c"># 串行段直接相加，并行段取最大</span>
+建连/网络往返      60ms   <span class="c"># 建连 40 + 网关往返 20</span>
+网关处理           10ms
+业务 + 下游并行   120ms   <span class="c"># 业务 60 + max(库存 40, 价格 30, 促销 45)</span>
+DB                 30ms
+序列化 + 日志      15ms
+响应回传           40ms
+buffer             25ms
+------------------------
+合计              300ms   <span class="g"># 刚好用满，任何一段超支都违约</span></pre>
+  <h3>拆解工具</h3>
+  <ul>
+    <li><b>分布式追踪</b>（Jaeger / SkyWalking / OpenTelemetry）：看每个 span 的耗时与父子关系，一眼定位超支段。</li>
+    <li><b>async-profiler / Arthas</b>：火焰图看 CPU 栈，trace 命令看方法级耗时。</li>
+    <li><b>tcpdump + Wireshark</b>：确认到底是网络慢还是服务慢，排除"以为慢在这、其实慢在那"。</li>
+  </ul>
+  <div class="callout danger">
+    <b>最常见的拆解错误：盯着平均值优化。</b>P99 由长尾构成，平均 50ms 的服务 P99 可能 800ms。所有预算和报告都以分位数对齐，平均值只用来观察趋势，不用来做验收。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>异步化与并行化</h2></div>
+  <p class="lead">并行化让关键路径取 max 而不是 sum；异步化把耗时操作移出请求链路。两者是延迟优化的前两大杠杆，代价是复杂度和一致性。</p>
+  <h3>并行化：代码长这样</h3>
+  <pre><span class="c">// Java：三个下游并行，总耗时从 135ms 降到约 45ms</span>
+CompletableFuture&lt;StockVO&gt; stockF =
+    CompletableFuture.supplyAsync(() -&gt; stockClient.query(ids), ioPool);
+CompletableFuture&lt;PriceVO&gt; priceF =
+    CompletableFuture.supplyAsync(() -&gt; priceClient.query(ids), ioPool);
+CompletableFuture&lt;PromoVO&gt; promoF =
+    CompletableFuture.supplyAsync(() -&gt; promoClient.query(ids), ioPool);
+CompletableFuture.allOf(stockF, priceF, promoF).join();
+<span class="c">// 注意：ioPool 独立线程池。共用一个池会相互拖死（Hystrix 舱壁模式）</span></pre>
+  <pre><span class="c">// Go：errgroup 并发 + 错误传播</span>
+g, ctx := errgroup.WithContext(ctx)
+var stock StockVO
+g.Go(func() error { var err error; stock, err = queryStock(ctx, ids); return err })
+g.Go(func() error { _, err := queryPrice(ctx, ids); return err })
+if err := g.Wait(); err != nil { return err }</pre>
+  <h3>异步化：三种形态与代价</h3>
+  <table>
+    <tr><th style="width:150px">形态</th><th style="width:230px">做法</th><th>代价</th></tr>
+    <tr><td><b>消息队列削峰</b></td><td>写请求入 Kafka，下游按能力消费</td><td>延迟从 50ms 变成秒级；要处理重复消费、顺序、对账</td></tr>
+    <tr><td><b>受理即返回</b></td><td>接口返回"已受理"，后台异步处理，结果轮询/推送</td><td>客户端复杂度上升；需要任务状态查询接口</td></tr>
+    <tr><td><b>事件驱动</b></td><td>状态变更发事件，关注方各自响应</td><td>链路变长排错难；最终一致</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>两条红线：</b>① <b>强一致场景不许异步</b>——扣款、创建订单主记录这类操作异步化等于把一致性 bug 写进架构；② <b>异步必须可观测</b>——队列堆积深度、消费延迟、死信数量三个指标必须进监控，否则"异步"就是"悄悄丢请求"的体面说法。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>预计算与 IO 优化</h2></div>
+  <p class="lead">这一模块的主题是<b>把成本挪出关键路径</b>：能提前算的别实时算，能批量做的别逐条做，能少拷贝的别多拷贝。</p>
+  <h3>预计算与空间换时间</h3>
+  <table>
+    <tr><th style="width:150px">手段</th><th style="width:260px">做法</th><th>量化收益</th></tr>
+    <tr><td><b>缓存</b></td><td>Redis 存热点查询结果，命中率目标 90%+</td><td>DB 3ms → Redis 0.5ms，且挡住绝大部分流量</td></tr>
+    <tr><td><b>预聚合</b></td><td>报表用离线/Flink 窗口预计算，查询直接读结果表</td><td>5 分钟聚合查询 → 20ms 点查</td></tr>
+    <tr><td><b>本地缓存</b></td><td>Caffeine 存配置/热点商品，expireAfterWrite=5m</td><td>0.5ms → 0.05ms；注意多节点不一致窗口</td></tr>
+    <tr><td><b>CDN</b></td><td>静态资源 + 可缓存 GET 接口推到边缘</td><td>跨省 30ms → 10ms；命中率 95%+</td></tr>
+    <tr><td><b>HyperLogLog</b></td><td>UV 统计用 12.5KB 近似结构代替全表 count(distinct)</td><td>3 秒全表扫描 → 1ms 查询，误差 0.81%</td></tr>
+  </table>
+  <h3>IO 优化四板斧</h3>
+  <h4>1. 批处理（收益最大）</h4>
+  <pre><span class="c">// 反例：循环单查，100 个 SKU × 3ms = 300ms</span>
+for (String id : ids) { skuMap.put(id, skuClient.query(id)); }
+
+<span class="c">// 正例：一次批量查询，15ms</span>
+List&lt;SkuVO&gt; list = skuClient.batchQuery(ids);   <span class="c">// 底层一条 IN 查询</span>
+
+<span class="c"># MySQL 批量插入：每批 500~1000 行，比逐条 INSERT 快 10~50 倍</span>
+INSERT INTO t (a, b) VALUES (1, 2), (3, 4), ... ;   <span class="c"># 一次事务一次 fsync</span>
+
+<span class="c"># Redis pipeline：1000 条命令一次网络往返</span>
+<span class="c"># 逐条：1000 × 0.5ms = 500ms；pipeline：约 5ms</span></pre>
+  <h4>2. 零拷贝</h4>
+  <ul>
+    <li><b>sendfile</b>：Nginx 返回静态文件时数据不经过用户态，CPU 占用接近零。API 网关返回大 JSON 时同理可评估。</li>
+    <li><b>Kafka 的 zero-copy</b>：producer 写 page cache，broker 用 sendfile 直接发给 consumer，全程不进用户态——这是 Kafka 高吞吐的核心设计之一。</li>
+    <li><b>mmap</b>：读大文件比 read 少一次拷贝；但小文件 mmap 的建立/拆除开销不划算，且要注意页缓存压力。</li>
+  </ul>
+  <h4>3. 连接复用</h4>
+  <pre><span class="c"># HikariCP 连接池 sizing：SSD 时代近似 公式 = CPU 核数 × 2 + 1</span>
+4 核机器 → maximum-pool-size = 9
+<span class="c"># 池子太小：请求排队等连接，延迟飙升</span>
+<span class="c"># 池子太大：DB 端连接数打满 + 上下文切换，吞吐反而降</span>
+
+<span class="c"># HTTP keep-alive：复用 TCP 连接，省掉 1-RTT 握手（20~40ms）</span>
+<span class="c"># OkHttp / HttpClient 默认 keep-alive，注意 idle 超时别短于 LB 的</span></pre>
+  <h4>4. 协议与压缩</h4>
+  <ul>
+    <li><b>gRPC / Protobuf vs REST / JSON</b>：同等数据体积小 3~5 倍、解析快 3~5 倍，内部服务间通信首选；对外兼容性场景保留 REST。</li>
+    <li><b>压缩是 CPU 换带宽</b>：响应体 &gt; 1KB 开 gzip / zstd；小响应体开了反而更慢（压缩头开销）。</li>
+    <li><b>顺序写优于随机写</b>：LSM 结构（RocksDB / HBase）把随机写转换成顺序写，写吞吐高一个数量级，代价是读放大和 compaction 抖动。</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>容量与扩展性设计</h2></div>
+  <p class="lead">容量规划回答两个问题：<b>目标负载需要多少机器</b>，以及<b>不够时怎么加</b>。两个都答不上来，就是在等事故发生。</p>
+  <h3>容量计算（完整演算）</h3>
+  <pre><span class="c"># 已知：单接口基准测试，4 核机器单节点 2000 QPS（CPU 水位 70%）</span>
+目标峰值 QPS：20000
+基础节点数 = 20000 / 2000 = 10
+加冗余系数 30%（突发 + 个体性能差异）= 13
+加 N+1 容错（坏一台不塌）= <span class="g">14 台</span>
+
+<span class="c"># 另一个视角验证：并发数验证</span>
+Little's Law：L = 20000 QPS × 0.05s（P50 耗时）= 1000 并发
+单节点线程池 200 → 需要 ≥ 5 个节点并行服务，与 14 台结论兼容 ✓</pre>
+  <h3>扩展方式对比</h3>
+  <table>
+    <tr><th style="width:120px">方式</th><th style="width:200px">做法</th><th style="width:180px">优点</th><th>局限</th></tr>
+    <tr><td><b>垂直扩展</b></td><td>升配（4C8G → 16C32G）</td><td>零改造，当天生效</td><td>有物理上限、通常要停机、单价越来越贵</td></tr>
+    <tr><td><b>水平扩展</b></td><td>无状态服务多副本 + LB</td><td>理论无上限</td><td>前提：无状态化改造完成</td></tr>
+    <tr><td><b>读写分离</b></td><td>主写从读</td><td>读吞吐翻倍</td><td>复制延迟带来最终一致；写仍是单点</td></tr>
+    <tr><td><b>分片 Sharding</b></td><td>按 key（用户 ID）哈希分库分表</td><td>突破单机写入上限</td><td>跨片查询/事务复杂；扩容要迁移数据</td></tr>
+    <tr><td><b>弹性伸缩</b></td><td>HPA 按指标自动扩缩</td><td>成本优化</td><td>扩容生效 2~5 分钟，扛不住秒级突发</td></tr>
+  </table>
+  <h3>无状态化三件事（水平扩展的前置条件）</h3>
+  <ol>
+    <li><b>Session 外置</b>：登录态入 Redis，任何请求落到任何节点都能处理。</li>
+    <li><b>本地缓存降级</b>：Caffeine 只存"允许短暂不一致"的数据；一致性要求高的入分布式缓存并接受延迟。</li>
+    <li><b>定时任务改分布式调度</b>：单机 Timer/Quartz 改 XXL-Job 或 Quartz 集群模式，避免 N 个节点同时执行 N 遍。</li>
+  </ol>
+  <h3>峰值与弹性</h3>
+  <p>日常 5000 QPS、大促 60000 QPS，峰谷比 12 倍。<b>按峰值买 12 倍机器全年空转是浪费；全押弹性则扩容来不及。</b>务实组合：</p>
+  <ul>
+    <li>常备容量 = 峰值 × 60%（应对 P95 以下日子）</li>
+    <li>弹性容量 = 峰值 × 40%，提前 1 天预热扩容（镜像拉取 + JVM 预热 + 缓存预热）</li>
+    <li>排队与限流兜底：超过容量的请求进队列或返回"繁忙"，比打挂系统体面</li>
+  </ul>
+  <div class="callout warn">
+    <b>HPA 别只看 CPU。</b>CPU 是滞后指标——流量来了 CPU 才涨，等扩容到位流量高峰已过。领先指标选<b>请求队列长度 / QPS / 消费延迟</b>。另外务必预留扩容生效时间：告警延迟 30s + 调度 10s + 拉镜像 30s + 启动 30s + 预热 60s ≈ 2.5 分钟，这期间只能靠常备容量扛。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>性能测试体系</h2></div>
+  <p class="lead">五类测试回答五个不同问题。只做其中一种，等于只验证了一个维度。</p>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:190px">回答的问题</th><th style="width:220px">方法</th><th>通过标准</th></tr>
+    <tr><td><b>基准 Benchmark</b></td><td>单接口的理论上限在哪</td><td>单接口阶梯加压至极限</td><td>知道拐点 QPS 与拐点时的主要瓶颈</td></tr>
+    <tr><td><b>负载 Load</b></td><td>目标负载下满足 SLO 吗</td><td>目标 QPS 持续 10~30 分钟</td><td>P99 达标、错误率 &lt; 0.1%、无降级触发</td></tr>
+    <tr><td><b>压力 Stress</b></td><td>系统的极限和 degradation 曲线</td><td>1.5x / 2x / 3x 逐级加压</td><td>记录每级的延迟与错误率，画出曲线</td></tr>
+    <tr><td><b>稳定性 Soak</b></td><td>长时间跑会不会泄漏/衰减</td><td>70% 目标负载跑 12~24 小时</td><td>24h 后 P99 劣化 &lt; 10%、内存无持续增长</td></tr>
+    <tr><td><b>破坏性 Chaos</b></td><td>故障下核心链路表现如何</td><td>杀节点 / 断网 / 注入延迟 / 杀 DB 主</td><td>核心链路有降级、无数据错误、恢复时间符合 RTO</td></tr>
+  </table>
+  <h3>测试数据真实性 Checklist</h3>
+  <ul>
+    <li><b>数据量同级</b>：索引在 100 万行和 1 亿行是两个世界。生产 5000 万行的表，压测库至少同量级。</li>
+    <li><b>数据分布一致</b>：热点账号、长尾、空结果比例贴近生产——全是均匀分布的压测数据会高估索引效果。</li>
+    <li><b>缓存打两轮</b>：冷缓存（命中率 0%）测 DB 真实水位；热缓存（命中率 90%）测服务上限。</li>
+    <li><b>下游 mock 按 P99 模拟</b>：mock 全部 0ms 响应的压测，结论只对"没有下游"的系统成立。</li>
+  </ul>
+  <h3>标准流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>基线</b>：记录当前各接口 P50/P99/QPS/错误率，没有基线就没有"变慢了多少"。</div></div>
+    <div class="step"><div class="txt"><b>单接口</b>：逐个接口基准测试，找出理论瓶颈（CPU / DB / 下游）。</div></div>
+    <div class="step"><div class="txt"><b>全链路</b>：按真实流量比例混合场景，验证链路级 SLO 与资源竞争。</div></div>
+    <div class="step"><div class="txt"><b>峰值演练</b>：按历史峰值 1.2 倍加压，验证扩容预案与限流兜底真的能执行。</div></div>
+    <div class="step"><div class="txt"><b>稳定性</b>：长时间跑，抓内存泄漏、连接泄漏、缓存腐烂。</div></div>
+    <div class="step"><div class="txt"><b>回归常态化</b>：每次发版跑一轮负载测试，性能衰减是渐进的，只在发布前测一次等于没测。</div></div>
+  </div>
+  <h3>工具选型</h3>
+  <table>
+    <tr><th style="width:110px">工具</th><th style="width:200px">定位</th><th>适用</th></tr>
+    <tr><td><b>wrk</b></td><td>轻量 HTTP 压测，单机高并发</td><td>快速摸底、CI 里的冒烟压测</td></tr>
+    <tr><td><b>k6</b></td><td>JS 脚本、阈值断言、报告清晰</td><td>负载测试主力，适合进 CI/CD</td></tr>
+    <tr><td><b>JMeter</b></td><td>GUI + 插件生态</td><td>复杂场景、多协议、非技术同学协作</td></tr>
+    <tr><td><b>async-profiler</b></td><td>低开销火焰图</td><td>定位 CPU 热点与方法级耗时</td></tr>
+    <tr><td><b>Jaeger / SkyWalking</b></td><td>分布式追踪</td><td>链路拆解、找超支段、依赖分析</td></tr>
+    <tr><td><b>Prometheus + Grafana</b></td><td>指标采集与看板</td><td>QPS/P99/错误率/资源水位持续观测</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>线上压测三条军规：</b>① 流量打标（压测标透传到全链路），方便识别和清洗压测数据；② 写操作打到影子表/隔离库，绝不能污染生产数据；③ 限流开关和熔断阈值提前调好，压测本身要能被一键止血。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个真实的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">前期不设计，后期硬扛</div><div class="pd">架构阶段不定性能目标和预算，上线后靠加机器续命，加到第 20 台发现瓶颈是单条慢 SQL。延迟预算在方案评审时就要落到表上。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">性能目标缺失或不可度量</div><div class="pd">"系统要快"无法验收也无法告警。合格目标形如：P99 &lt; 200ms @ 1 万 QPS、单表 5000 万行、缓存命中率 90%。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">测试数据量不真实</div><div class="pd">开发环境 1 万行数据测得飞快，生产 5000 万行全表扫描。数据量、分布、缓存命中率三项必须与生产同级，否则压测是自欺欺人。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">只看平均延迟</div><div class="pd">均值 100ms 的服务 P99 可能 800ms，投诉全部来自长尾。监控和验收一律看 P99/P999，平均值只用于观察趋势。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">压测环境缩水</div><div class="pd">生产 32 核压测 8 核、生产 SSD 压测机械盘、生产万兆压测千兆——规格差一倍，结论全作废。至少同代同核数同盘型。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">凭猜优化，不用 Profiler</div><div class="pd">以为瓶颈在 DB，结果 30% 时间耗在 JSON 序列化和日志同步写盘。先用火焰图和追踪定位再动手，猜错的优化经常越优越慢。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">异步化丢掉可靠性</div><div class="pd">消息队列没有 confirm/ack、没有重试、没有对账，高峰期悄悄丢请求。异步链路三件套：可靠投递 + 死信告警 + 准实时对账。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">缓存解决一切</div><div class="pd">缓存命中率从 95% 掉到 80% 时 DB 流量翻 4 倍，性能雪崩；且一致性问题只是被推迟爆发。缓存要有容量上限、命中率监控和降级预案。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">容量规划拍脑袋</div><div class="pd">按日均 QPS 买机器，大促峰值 12 倍流量瞬间打挂。按峰值 × 冗余系数规划，用弹性补差，用限流兜底，三者缺一不可。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">性能测试只做一次</div><div class="pd">发布前压一轮，之后每次发版都悄悄劣化。把负载测试放进 CI/CD 流水线，P99 劣化超过 10% 自动阻断发布。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 评估一个接口的延迟指标，最该看哪个？</div>
+      <button class="opt">平均延迟</button>
+      <button class="opt">最大延迟</button>
+      <button class="opt">P99 分位数</button>
+      <button class="opt">接口文档写的预期值</button>
+      <div class="ans">正确答案：<b>P99 分位数</b>。投诉来自长尾：P50 60ms、P99 420ms 的服务，1% 的用户在承受 400ms+ 的体验。平均值会把长尾完全稀释掉；最大延迟又太容易被单次异常带偏。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 某接口串行调用 3 个下游，每个 50ms，并行化之后总耗时约为？</div>
+      <button class="opt">150ms，总工作量没变</button>
+      <button class="opt">约 50ms，并行段取 max 不计 sum</button>
+      <button class="opt">约 100ms，各除以线程数</button>
+      <div class="ans">正确答案：<b>约 50ms</b>。三个调用互不依赖时并行发起，耗时由最慢的那个决定。这也是延迟预算分配的核心规则：串行段相加、并行段取 max。注意给并行调用独立的线程池，避免相互拖死。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 单机基准 2000 QPS，目标峰值 20000 QPS，冗余系数 30% 再加 N+1 容错，大约需要几台？</div>
+      <button class="opt">10 台</button>
+      <button class="opt">11 台</button>
+      <button class="opt">13 台</button>
+      <button class="opt">14 台</button>
+      <div class="ans">正确答案：<b>14 台</b>。计算：20000 ÷ 2000 = 10 台基础；×1.3 冗余 = 13 台；+1 台容错 = 14 台。容量规划漏掉冗余系数和 N+1 是常见错误，前者应对突发和个体差异，后者保证坏一台不塌。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 目标 5000 QPS、单请求平均耗时 100ms，按 Little's Law 需要多少并发处理能力？</div>
+      <button class="opt">500</button>
+      <button class="opt">5000</button>
+      <button class="opt">50</button>
+      <button class="opt">50000</button>
+      <div class="ans">正确答案：<b>500</b>。Little's Law：L = λ × W = 5000 × 0.1 = 500 个在途请求。线程池、连接池、队列长度都按这个量级配置，配小了请求在池外排队，延迟指标必然失真。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 压测数据库用了 1 万行数据，生产同表有 5000 万行，压测结论可信吗？</div>
+      <button class="opt">可信，数据库有优化器会自适应</button>
+      <button class="opt">可信，只要索引建对了数据量无所谓</button>
+      <button class="opt">不可信，索引在百万行和亿级表上的表现是两个世界</button>
+      <div class="ans">正确答案：<b>不可信</b>。数据量决定执行计划（全表扫描 vs 索引扫描）、决定 buffer pool 命中率、决定 IO 量级。压测数据必须在<b>数据量、分布、缓存命中率</b>三个维度与生产同级，否则是在验证一个不存在的系统。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 关于性能预算（Performance Budget），正确的理解是？</div>
+      <button class="opt">给压测工具设一个 QPS 上限，别把机器打挂</button>
+      <button class="opt">把端到端总延迟切成分段预算，分配到各团队，超支负责</button>
+      <button class="opt">给性能优化工作批的经费预算</button>
+      <div class="ans">正确答案：<b>分段延迟预算</b>。它把"前端怪后端、后端怪 DB"变成"谁的段超支谁负责"，是团队间的契约。压测按段打点，报告直接对照预算表，buffer 专款专用不许提前花。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令与工具</h3>
+  <div class="cmds">
+    <div class="crow"><code>wrk -t8 -c200 -d60s http://api/orders</code><span class="desc">8 线程 200 连接压 60 秒，快速摸底</span><button class="copy">复制</button></div>
+    <div class="crow"><code>k6 run --vus 100 --duration 10m load.js</code><span class="desc">k6 负载测试，脚本里写阈值断言</span><button class="copy">复制</button></div>
+    <div class="crow"><code>asprof -d 30 -f flame.html pid</code><span class="desc">async-profiler 采 30 秒 CPU 火焰图</span><button class="copy">复制</button></div>
+    <div class="crow"><code>arthas trace com.x.OrderService create '#cost&gt;100'</code><span class="desc">Arthas 方法级耗时追踪，只看 &gt;100ms 的调用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN ANALYZE SELECT ...</code><span class="desc">看 SQL 真实执行计划与实际耗时</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jmeter -n -t test.jmx -l result.jtl</code><span class="desc">JMeter 命令行模式跑测试计划</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -s ; netstat -ant | awk '{print $6}' | sort | uniq -c</code><span class="desc">看连接状态分布，排查连接池耗尽</span><button class="copy">复制</button></div>
+    <div class="crow"><code>top -H -p pid ; pidstat -t -p pid 1</code><span class="desc">看进程内线程级 CPU，定位热点线程</span><button class="copy">复制</button></div>
+  </div>
+  <h3>关键数字速记</h3>
+  <pre><span class="c"># 延迟直觉（同机房 / 同城 / 跨省）</span>
+同机房 RTT            0.2 ~ 0.5ms
+同城 RTT              1 ~ 2ms
+跨省 RTT              20 ~ 30ms
+TLS 1.3 握手          1-RTT（连接复用后为 0）
+Redis GET（含序列化） 0.3 ~ 0.8ms
+MySQL 主键点查        1 ~ 3ms
+MySQL 索引范围查      5 ~ 20ms
+MySQL 全表扫描        500ms+（千万级表）
+
+<span class="c"># 容量公式</span>
+并发数    = QPS × 单请求耗时(s)          <span class="c"># Little's Law</span>
+所需节点  = ceil(目标QPS × 冗余系数 / 单机QPS) + 1   <span class="c"># N+1</span>
+扩容生效  ≈ 告警30s + 调度10s + 拉镜像30s + 启动30s + 预热60s ≈ 2.5min</pre>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>延迟 Latency</b></td><td>请求从发出到收到响应的耗时，看分位数不看平均</td></tr>
+    <tr><td><b>吞吐 Throughput</b></td><td>单位时间完成的请求数，QPS / TPS</td></tr>
+    <tr><td><b>并发 Concurrency</b></td><td>同时在途的请求数，由 Little's Law 推出</td></tr>
+    <tr><td><b>分位数 P50/P99/P999</b></td><td>50%/99%/99.9% 请求的耗时上限，长尾观测指标</td></tr>
+    <tr><td><b>尾延迟 Tail Latency</b></td><td>长尾部分的延迟，微服务 fan-out 下会被放大</td></tr>
+    <tr><td><b>Little's Law</b></td><td>并发数 = 吞吐 × 延迟，排队系统的第一定律</td></tr>
+    <tr><td><b>性能预算</b></td><td>Performance Budget：总延迟切段分配的团队契约</td></tr>
+    <tr><td><b>预热 Warmup</b></td><td>JIT 编译、连接池填充、缓存加热，冷启动阶段性能失真</td></tr>
+    <tr><td><b>基准测试 Benchmark</b></td><td>单接口阶梯加压，找理论瓶颈与上限</td></tr>
+    <tr><td><b>负载测试 Load Test</b></td><td>目标负载下验证 SLO 是否达标</td></tr>
+    <tr><td><b>压力测试 Stress Test</b></td><td>超负载加压，画 degradation 曲线找拐点</td></tr>
+    <tr><td><b>稳定性测试 Soak Test</b></td><td>长时间中低负载运行，抓泄漏与性能衰减</td></tr>
+    <tr><td><b>破坏性测试 Chaos</b></td><td>注入故障（杀节点/断网/延迟）验证韧性</td></tr>
+    <tr><td><b>垂直 / 水平扩展</b></td><td>升配 / 加副本；后者前提是无状态化</td></tr>
+    <tr><td><b>无状态 Stateless</b></td><td>任意节点可处理任意请求，是水平扩展的前置条件</td></tr>
+    <tr><td><b>连接池</b></td><td>复用 TCP/DB 连接的池，太大太小都坏事</td></tr>
+    <tr><td><b>零拷贝 Zero-Copy</b></td><td>数据不经过用户态直接网卡/磁盘传输，如 sendfile</td></tr>
+    <tr><td><b>批处理 Batching</b></td><td>合并多次往返/事务为一次，延迟收益最大的优化</td></tr>
+    <tr><td><b>容量规划</b></td><td>按峰值 × 冗余系数 × N+1 推导机器数</td></tr>
+    <tr><td><b>峰谷比</b></td><td>峰值与日常流量之比，弹性策略的输入参数</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>本周就能做的三件事：</b>① 给核心接口写下带条件的性能目标（P99 / QPS / 数据量 / 命中率），贴到监控看板旁；② 用追踪系统拉一次真实链路，画一张自己的延迟拆解表，对照找超支段；③ 在 CI 里加一轮 k6 冒烟压测，P99 比基线劣化 10% 就告警。<br><br>
+    <b>之后值得深入：</b>JVM GC 调优（ZGC/Shenandoah 的低停顿实践）、eBPF 无侵入观测、以及按业务模型的排队论容量规划。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透性能架构设计 · 性能是设计出来的，不是压测出来的</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（延迟拆解）和模块 7（测试体系）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边给核心接口估一条延迟预算。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='边看边问自己：你的核心接口，有写进文档的 P99 目标吗？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

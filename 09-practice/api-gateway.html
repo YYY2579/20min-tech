@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 API 网关设计实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 API 网关设计实战</h1>
+    <p class="sub">网关是流量的总入口，也是横切关注点（认证/限流/熔断/灰度）的收容所。这篇讲机制：路由与插件怎么设计、动态配置怎么热更新、Kong/APISIX/自研怎么选、多活怎么容灾，以及<b>网关单点、配置不同步、插件拖慢</b>三个经典死法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 类核心功能</span>
+      <span class="chip"><b>4</b> 种技术选型</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边画图：一笔外部请求从客户端到服务，穿过了网关的哪几层插件</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>网关定位：流量入口与横切关注点</h2></div>
+  <p class="lead">一句话定义：<b>API 网关是所有外部流量的单一入口，把跨业务的通用能力（认证、限流、熔断、日志、灰度）从每个服务里抽出来集中实现。</b></p>
+  <table>
+    <tr><th style="width:170px">能力</th><th>没有网关时</th><th>有网关时</th></tr>
+    <tr><td>认证鉴权</td><td>每个服务各写一遍，漏一个就是一个洞</td><td>网关统一验签，服务只认网关注入的身份头</td></tr>
+    <tr><td>限流</td><td>各服务限流策略割裂，总量不可控</td><td>入口级总量控制 + 服务级细分配额</td></tr>
+    <tr><td>灰度发布</td><td>每个服务自己实现分流逻辑</td><td>网关按流量百分比/头/用户标签路由</td></tr>
+    <tr><td>监控日志</td><td>日志格式五花八门，无法关联</td><td>统一 access log + trace_id 注入</td></tr>
+    <tr><td>安全防护</td><td>WAF、防重放、黑白名单各搞各的</td><td>入口统一防护，攻击在门外被拦</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>网关不是万能的，别把业务逻辑搬进网关。</b>判断标准：<b>这个逻辑是"每个服务都需要的通用能力"还是"某个服务特有的规则"？</b>前者进网关，后者留在服务里。把业务判断（比如"这个用户能不能买"）塞进网关插件，会让网关变成第二个单体，且插件版本和服务版本互相耦合。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>核心功能清单</h2></div>
+  <table>
+    <tr><th style="width:110px">功能</th><th style="width:230px">机制要点</th><th>典型实现</th></tr>
+    <tr><td><b>路由 Routing</b></td><td>按 host/path/header 匹配上游服务，支持权重与优先级</td><td>Nginx location、Kong route、APISIX route</td></tr>
+    <tr><td><b>认证 AuthN</b></td><td>JWT/OAuth2/API Key 校验，身份注入请求头</td><td>网关统一验签，服务信任 X-User-Id 头</td></tr>
+    <tr><td><b>限流 Rate Limit</b></td><td>按 IP/用户/接口维度，令牌桶/滑动窗口</td><td>Redis 分布式计数、本地令牌桶兜底</td></tr>
+    <tr><td><b>熔断 Circuit Break</b></td><td>上游错误率/延迟超标 → 打开熔断，快速失败</td><td>被动熔断（统计错误）+ 主动降级</td></tr>
+    <tr><td><b>灰度 Canary</b></td><td>按流量比例/用户标签分流到不同版本</td><td>Header 染色 + 权重路由</td></tr>
+    <tr><td><b>协议转换</b></td><td>HTTP ↔ gRPC、Dubbo、WebSocket 转接</td><td>gRPC-Gateway、协议插件</td></tr>
+  </table>
+  <h3>请求经过网关的完整生命周期</h3>
+  <pre><span class="c">┌──────────────────────────────────────────────────────────────┐</span>
+<span class="c">│ 接入层：TLS 终止 → 连接管理 → 基础访问日志                      │</span>
+<span class="c">├──────────────────────────────────────────────────────────────┤</span>
+<span class="c">│ 前置插件链（顺序执行）：                                       │</span>
+<span class="c">│   ① IP 黑白名单 / WAF  ② 防重放(nonce+ts)  ③ 限流            │</span>
+<span class="c">│   ④ 认证验签  ⑤ 灰度标签解析  ⑥ trace_id 注入                │</span>
+<span class="c">├──────────────────────────────────────────────────────────────┤</span>
+<span class="c">│ 路由匹配：host + path + header → 选择 upstream + 权重          │</span>
+<span class="c">├──────────────────────────────────────────────────────────────┤</span>
+<span class="c">│ 转发：负载均衡（round-robin/least-conn/一致性哈希）            │</span>
+<span class="c">├──────────────────────────────────────────────────────────────┤</span>
+<span class="c">│ 后置插件链：响应改写 → 响应日志 → 指标上报                     │</span>
+<span class="c">└──────────────────────────────────────────────────────────────┘</span></pre>
+  <div class="callout">
+    <b>插件顺序是安全设计的一部分：</b>防重放必须在认证<b>之前</b>（避免未验签的请求消耗验签资源），限流在认证<b>之前</b>（防止恶意流量打爆验签服务），trace_id 注入要在最前面（保证全链路日志能串起来）。<b>顺序写错，不是效果差，是防护被绕过。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>技术选型：Nginx+Kong/APISIX/自研</h2></div>
+  <table>
+    <tr><th style="width:150px">方案</th><th>优势</th><th>劣势</th><th>适用</th></tr>
+    <tr><td><b>Nginx + Lua（OpenResty）</b></td><td>性能极致、生态成熟、可控性强</td><td>动态能力靠自己写，无管理面</td><td>流量极大、定制深的大厂</td></tr>
+    <tr><td><b>Kong</b></td><td>插件生态全（100+）、管理 UI、多协议</td><td>PostgreSQL/Cassandra 依赖，重</td><td>需要快速拼装能力的中型团队</td></tr>
+    <tr><td><b>Apache APISIX</b></td><td>etcd 配置中心、性能高、插件热更新、国产活跃</td><td>etcd 运维门槛，生态较 Kong 小</td><td>云原生、要热更新和高性能</td></tr>
+    <tr><td><b>自研网关</b></td><td>完全可控、深度定制</td><td>周期长、坑全自己踩、要专职团队</td><td>有特殊协议/合规要求的大厂</td></tr>
+  </table>
+  <h3>选型决策树</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>团队 &lt; 5 人且求快：</b>选 <b>Kong/APISIX</b>，别自研。自研网关的最小成本是 2 个资深工程师 + 1 年，还不含插件生态</div></div>
+    <div class="step"><div class="txt"><b>流量峰值 &gt; 50 万 QPS 或延迟要求 &lt; 1ms：</b>选 <b>OpenResty 自建或 APISIX</b>，Kong 的数据面延迟在这个量级会成为瓶颈</div></div>
+    <div class="step"><div class="txt"><b>已有 K8s 体系：</b>选 <b>APISIX Ingress</b> 或 Kong Ingress Controller，网关即 K8s 资源，GitOps 管理</div></div>
+    <div class="step"><div class="txt"><b>需要 gRPC/Dubbo 多协议：</b>APISIX 支持较好；纯 HTTP/JSON 三者都行</div></div>
+  </div>
+  <div class="callout ok">
+    <b>一个务实建议：先跑标准品，把"自研网关"留作最后选项。</b>大多数团队高估了自己需求的独特性。Kong/APISIX 的插件机制能覆盖 90% 场景，剩下 10% 用插件/外部服务补。自研网关的真正门槛不是性能，是<b>长期维护：安全漏洞响应、配置管理面、多活容灾、可观测性</b>——每一项都是持续投入。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>动态配置与热更新</h2></div>
+  <p class="lead">网关的配置（路由、插件、上游）变更必须<b>不重启、不丢连接、秒级生效</b>。这是网关区别于普通反向代理的核心能力。</p>
+  <h3>三种配置同步机制对比</h3>
+  <table>
+    <tr><th style="width:140px">机制</th><th>生效延迟</th><th>一致性</th><th>适用</th></tr>
+    <tr><td><b>轮询（pull）</b></td><td>秒级（间隔可调）</td><td>最终一致</td><td>Kong DB 模式，简单可靠</td></tr>
+    <tr><td><b>长轮询/推送</b></td><td>亚秒级</td><td>近实时</td><td>配置中心（Nacos/Apollo）</td></tr>
+    <tr><td><b>Watch（etcd）</b></td><td>毫秒级</td><td>强一致（raft）</td><td>APISIX，节点订阅 etcd key</td></tr>
+  </table>
+  <pre><span class="c"># 配置变更的标准链路（APISIX/etcd 模式）</span>
+运维/CI 写入 etcd ──► 所有网关节点 watch 到变更 ──► 本地重建路由表
+                                          │
+                                          ▼
+                            <span class="y">新连接用新配置，存量连接不中断</span>
+
+<span class="c"># 灰度发布配置：先发 1 台节点 → 观察 → 全量</span>
+<span class="c"># 配置校验：CI 侧做 schema 校验，防止错误配置打到生产</span></pre>
+  <h3>热更新的三个工程细节</h3>
+  <ul>
+    <li><b>配置版本化：</b>每次变更生成版本号，出问题秒级回滚（而不是"再改一次改回去"）</li>
+    <li><b>变更审计：</b>谁、什么时候、改哪条路由/插件、前后 diff 是什么，全部落日志</li>
+    <li><b>本地缓存兜底：</b>etcd/配置中心短暂不可用时，网关用本地最后一份有效配置继续服务，<b>不能因为配置中心挂了而拒绝流量</b></li>
+  </ul>
+  <div class="callout danger">
+    <b>配置不同步是网关事故的头号来源：</b>A 节点用的是新路由，B 节点还是旧路由，同一请求两次打到不同上游；或者插件在部分节点生效部分不生效，限流时有时无。<b>对策：配置变更后必须有"全节点生效确认"机制</b>（各节点上报配置版本，控制面确认一致才算变更完成），以及变更后的自动校验（探活 + 抽样请求比对）。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>插件机制</h2></div>
+  <p class="lead">插件是网关能力的扩展单元。设计良好的插件机制 = <b>标准化生命周期 + 明确执行阶段 + 可独立灰度</b>。</p>
+  <h3>插件执行阶段</h3>
+  <table>
+    <tr><th style="width:140px">阶段</th><th>能做什么</th><th>示例插件</th></tr>
+    <tr><td><b>access（前置）</b></td><td>改请求、拒绝请求、注入头</td><td>认证、限流、WAF、防重放、灰度标签</td></tr>
+    <tr><td><b>header_filter / body_filter（后置）</b></td><td>改响应头、改响应体</td><td>响应脱敏、CORS、安全响应头</td></tr>
+    <tr><td><b>log（日志阶段）</b></td><td>上报指标、发日志、异步通知</td><td>access log、指标上报、审计</td></tr>
+  </table>
+  <h3>插件配置示例（Kong 风格声明式配置）</h3>
+  <pre><span class="c"># 给某路由启用限流 + 认证 + 熔断三个插件</span>
+curl -X POST http://kong:8001/routes/order-api/plugins \
+  -d "name=rate-limiting" \
+  -d "config.minute=1000" \            <span class="c"># 每分钟 1000 次</span>
+  -d "config.policy=redis" \           <span class="c"># 集群级计数，不用 local</span>
+  -d "config.limit_by=consumer"        <span class="c"># 按调用方限，不是按 IP</span>
+
+curl -X POST http://kong:8001/routes/order-api/plugins \
+  -d "name=jwt"                       <span class="c"># 验签后注入 X-Consumer-Username</span>
+
+curl -X POST http://kong:8001/routes/order-api/plugins \
+  -d "name=circuit-breaker" \
+  -d "config.failure_threshold=0.5" \ <span class="c"># 错误率 50% 触发熔断</span>
+  -d "config.window_seconds=30" \
+  -d "config.recovery_seconds=10"      <span class="c"># 熔断 10s 后半开试探</span></pre>
+  <h3>插件治理纪律</h3>
+  <ul>
+    <li><b>插件要有 owner 和 SLA：</b>每个插件属于一个团队，故障时找得到人</li>
+    <li><b>插件可独立灰度：</b>按路由/按流量百分比启用新插件，出问题一键摘除</li>
+    <li><b>插件超时预算：</b>单个插件 P99 执行时间纳入网关总延迟预算（如总预算 10ms，插件占 5ms）</li>
+    <li><b>禁止同步重逻辑：</b>插件里不做慢查询、不发同步 HTTP（异步化或旁路化）</li>
+  </ul>
+  <div class="callout warn">
+    <b>插件拖慢网关的典型原因：</b>① 插件里<b>同步调用外部服务</b>（如每次请求查一次权限中心），把网关延迟从 1ms 拖到 50ms；② 插件用<b>全局锁</b>做计数，并发下互斥排队；③ 插件日志<b>同步写盘/发 Kafka</b>，IO 抖动直接卡请求。<b>解法：本地缓存 + 异步化 + 降级开关</b>，插件逻辑默认走"快路径"，异常走旁路不影响主流程。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>性能：连接复用、异步、零拷贝</h2></div>
+  <table>
+    <tr><th style="width:150px">手段</th><th>做法</th><th style="width:190px">收益量级</th></tr>
+    <tr><td><b>连接复用</b></td><td>网关到上游用长连接池（keepalive），避免每请求新建 TCP + TLS</td><td>延迟降 30%~60%，上游端口不耗尽</td></tr>
+    <tr><td><b>HTTP/2 多路复用</b></td><td>客户端侧支持 h2，单连接多请求，减少握手</td><td>移动端弱网收益明显</td></tr>
+    <tr><td><b>异步非阻塞 IO</b></td><td>epoll/kqueue 事件驱动，单机十万级并发连接</td><td>C10K 问题的基础解</td></tr>
+    <tr><td><b>零拷贝/内核旁路</b></td><td>sendfile、DPDK/DPK 类方案（极端场景）</td><td>大 body 转发场景收益大</td></tr>
+    <tr><td><b>CPU 亲和 + 多 worker</b></td><td>worker 绑定 CPU 核，减少上下文切换</td><td>吞吐提升 10%~30%</td></tr>
+  </table>
+  <pre><span class="c"># Nginx  upstream 连接池配置（关键参数）</span>
+upstream order_svc {
+  server 10.0.1.10:8080 max_fails=3 fail_timeout=10s;
+  server 10.0.1.11:8080 max_fails=3 fail_timeout=10s;
+  <span class="b">keepalive</span> 64;                    <span class="c"># 每个 worker 保持 64 条空闲长连接</span>
+  keepalive_timeout 60s;
+  keepalive_requests 1000;          <span class="c"># 单连接最多处理 1000 请求后重建</span>
+}
+location /order/ {
+  <span class="b">proxy_pass</span> http://order_svc;
+  proxy_http_version 1.1;
+  proxy_set_header Connection "";   <span class="c"># 关键：清掉客户端的 Connection 头，否则 keepalive 失效</span>
+  proxy_next_upstream error timeout http_502;
+}</pre>
+  <h3>延迟预算分配（总 P99 &lt; 50ms 的分解）</h3>
+  <table>
+    <tr><th style="width:150px">环节</th><th>预算</th></tr>
+    <tr><td>TLS + 接入层</td><td>5ms</td></tr>
+    <tr><td>前置插件链（认证/限流）</td><td>8ms</td></tr>
+    <tr><td>路由 + 转发（含连接池命中）</td><td>10ms</td></tr>
+    <tr><td>上游服务处理</td><td>25ms（服务自己的预算）</td></tr>
+    <tr><td>响应回程 + 后置插件</td><td>2ms</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>网关性能的第一定律：能不经过网关就不经过。</b>内部服务间调用走 Service Mesh 或直连，网关只承接<b>南北向流量</b>（外部进内部）。把东西向流量也塞进网关，会让网关成为全公司流量的单瓶颈，扩容成本和故障半径都失控。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>与 Service Mesh 的分工</h2></div>
+  <p class="lead">Service Mesh（Istio/Linkerd）火了之后，经常有人问"网关是不是可以取消了"。<b>答案是分工不同，不是替代关系。</b></p>
+  <table>
+    <tr><th style="width:170px">维度</th><th>API 网关</th><th>Service Mesh</th></tr>
+    <tr><td><b>流量方向</b></td><td>南北向（外部 → 内部）</td><td>东西向（服务 ↔ 服务）</td></tr>
+    <tr><td><b>部署位置</b></td><td>集群边缘，独立部署</td><td>每个 Pod 一个 sidecar，随业务部署</td></tr>
+    <tr><td><b>核心能力</b></td><td>认证、限流、灰度、协议转换、WAF</td><td>mTLS、流量治理、重试、可观测</td></tr>
+    <tr><td><b>配置视角</b></td><td>运维/SRE 视角，面向入口</td><td>开发视角，面向服务间调用</td></tr>
+    <tr><td><b>延迟代价</b></td><td>一跳，可控</td><td>每跳两次 sidecar，累积延迟</td></tr>
+  </table>
+  <pre><span class="c"># 典型拓扑：外部流量走网关，内部流量走 Mesh，网关即 Mesh 的 ingress</span>
+手机 App ──► <span class="b">API 网关集群</span> ──(mTLS)──► Istio Ingress Gateway
+                                          │
+                    ┌─────────────────────┼─────────────────────┐
+                    ▼                     ▼                     ▼
+               Service A              Service B              Service C
+              (sidecar)               (sidecar)              (sidecar)
+                    │ 东西向调用全走 sidecar，mTLS + 重试 + 遥测</pre>
+  <div class="callout">
+    <b>分工口诀：网关管"进门"，Mesh 管"串门"。</b>认证、限流、防攻击这些"入口治理"归网关；mTLS、重试、熔断、链路追踪这些"服务间治理"归 Mesh。两者重叠的部分（如熔断）以 Mesh 为主、网关兜底——网关的熔断保护的是"上游整体故障时快速失败"，Mesh 的熔断精细到单个上游实例。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>多活容灾与可观测</h2></div>
+  <h3>多活架构</h3>
+  <table>
+    <tr><th style="width:130px">模式</th><th>做法</th><th>RTO/RPO</th></tr>
+    <tr><td><b>同城双活</b></td><td>两个机房同时承载流量，数据库主从同步</td><td>RTO 分钟级，RPO ≈ 0</td></tr>
+    <tr><td><b>异地多活</b></td><td>多地域流量分片，单元化（按用户 ID 路由到固定地域）</td><td>RTO 秒级（切流），RPO 秒级</td></tr>
+    <tr><td><b>网关多活</b></td><td>DNS/GSLB 流量调度 + 各活网关独立配置 + 配置中心多活</td><td>RTO 秒级（DNS TTL 决定）</td></tr>
+  </table>
+  <pre><span class="c"># 网关层容灾三板斧</span>
+<span class="y">1. 入口层：</span>DNS 多线路 + GSLB 健康检查，机房级故障秒级切流
+<span class="y">2. 网关层：</span>每机房独立网关集群（不跨机房依赖），配置中心多地域部署
+<span class="y">3. 兜底层：</span>静态降级页/CDN 缓存 —— 网关全挂时至少返回静态内容，不能白屏
+
+<span class="c"># 单元化路由示例：按 user_id % 100 分片，固定路由到地域 A 或 B</span>
+route_by_user_hash:
+  - region: east    when: hash(user_id) % 100 &lt; 50
+  - region: west    when: hash(user_id) % 100 &gt;= 50</pre>
+  <h3>可观测性三件套</h3>
+  <table>
+    <tr><th style="width:130px">维度</th><th>指标</th><th>告警示例</th></tr>
+    <tr><td><b>Metrics</b></td><td>QPS、P50/P99 延迟、错误率、上游健康度、连接池使用率</td><td>错误率 &gt; 1% 持续 2 分钟 → P1</td></tr>
+    <tr><td><b>Logging</b></td><td>统一 access log：trace_id、路由、上游、耗时、状态码、插件执行明细</td><td>日志量突降 50% → 采集链路故障</td></tr>
+    <tr><td><b>Tracing</b></td><td>trace_id 注入 + 透传，网关是链路的第一个 span</td><td>P99 劣化 → 按 trace 下钻定位是网关还是上游</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>网关是排障的第一现场，日志必须能回答三个问题：</b>这个请求走了哪条路由、命中了哪些插件、上游是谁、各段耗时多少。<b>没有插件级耗时的 access log，等于把"网关自身慢"和"上游慢"混为一谈</b>，排障时全靠猜。结构化日志（JSON）落地，字段：ts/trace_id/route/upstream/status/durations{access,plugins,upstream,total}。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>核心配置示例与十个坑</h2></div>
+  <h3>APISIX 声明式配置（真实可用）</h3>
+  <pre><span class="c"># 1. 上游：连接池 + 健康检查</span>
+upstreams:
+  - id: order-svc
+    type: roundrobin
+    nodes:
+      <span class="g">"10.0.1.10:8080"</span>: 1
+      <span class="g">"10.0.1.11:8080"</span>: 1
+    scheme: http
+    keepalive_pool:
+      size: 64              <span class="c"># 连接池大小</span>
+      idle_timeout: 60s
+    checks:                 <span class="c"># 主动健康检查</span>
+      active:
+        type: http
+        http_path: /health
+        healthy: {successes: 2}
+        unhealthy: {timeouts: 3}
+
+<span class="c"># 2. 路由：前缀匹配 + 插件链（顺序即执行序）</span>
+routes:
+  - id: order-api
+    uri: /api/order/*
+    upstream_id: order-svc
+    plugins:
+      trace-id: {}                        <span class="c"># 先生成 trace_id</span>
+      ip-restriction:                     <span class="c"># 黑白名单</span>
+        blacklist: [<span class="g">"10.66.0.0/16"</span>]
+      limit-req:                          <span class="c"># 限流：漏桶</span>
+        rate: 2000
+        burst: 500
+        rejected_code: 429
+      jwt-auth:                           <span class="c"># 认证</span>
+        key: order-api-key
+      prometheus: {}                      <span class="c"># 指标暴露</span>
+
+<span class="c"># 3. 灰度路由：按 header 分流 10% 到金丝雀上游</span>
+  - id: order-api-canary
+    uri: /api/order/*
+    upstream_id: order-svc-canary
+    vars: [[<span class="g">"http_x_canary"</span>, <span class="g">"=="</span>, <span class="g">"true"</span>]]
+    plugins:
+      traffic-split:                      <span class="c"># APISIX 流量分割插件</span>
+        rules:
+          - match: [[<span class="g">"arg_version"</span>, <span class="g">"=="</span>, <span class="g">"v2"</span>]]
+            weighted_upstreams:
+              canary: 10                  <span class="c"># 10% 流量</span>
+              stable: 90</pre>
+  <h3>Nginx 侧限流配置（兜底用）</h3>
+  <pre><span class="c"># 按 IP 限流（Nginx 层最后一道闸，防网关集群被打穿）</span>
+limit_req_zone $binary_remote_addr zone=per_ip:10m rate=100r/s;
+limit_conn_zone $binary_remote_addr zone=per_ip_conn:10m;
+
+server {
+  location /api/ {
+    limit_req zone=per_ip burst=200 nodelay;   <span class="c"># 超了直接 429，不排队</span>
+    limit_conn per_ip_conn 50;                 <span class="c"># 单 IP 最多 50 并发</span>
+    limit_req_status 429;
+    proxy_pass http://gateway_upstream;
+  }
+}</pre>
+
+  <h3>十个线上坑</h3>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">网关单点：一个集群挂了全站不可用</div><div class="pd">网关是南北向总入口，天然单点风险。必须多机房部署 + DNS 健康检查切流 + 网关自身无状态（配置外置）。任何"网关集群只有一个"的设计都是在赌运气。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">配置不同步：部分节点旧路由部分新路由</div><div class="pd">同一请求两次落到不同上游，限流时有时无。配置变更要有"全节点版本确认"机制，变更后自动探活校验；本地缓存兜底防止配置中心故障时拒绝服务。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">插件里同步调外部服务，拖垮网关</div><div class="pd">每请求同步查一次权限中心，网关 P99 从 1ms 变 50ms，吞吐暴跌。插件逻辑必须本地缓存 + 异步化，慢路径旁路，默认走快路径。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">限流只按 IP，NAT 下误杀一片用户</div><div class="pd">公司出口共享 IP，一个用户超限全体 429。限流维度要组合：IP + 用户 ID + 接口，优先按认证后的用户/API Key 限，IP 限流只做异常兜底。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">限流用本地计数，多网关节点各自为政</div><div class="pd">每节点限 1000 QPS，10 个节点实际放进 1 万 QPS，上游照样挂。集群级限流必须用 Redis 等集中计数（允许极端情况下本地降级兜底）。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">到上游没开连接复用，端口耗尽</div><div class="pd">每请求新建 TCP，上游 time_wait 打满，新连接被拒。upstream keepalive + proxy_set_header Connection ""（Nginx）或 keepalive_pool（APISIX），这一对参数漏一个，长连接就失效。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">认证头被伪造成 X-User-Id 直穿服务</div><div class="pd">服务信任网关注入的身份头，但没校验"这个头只能来自网关"，内网直接伪造头调用服务越权。服务层要校验调用来源（mTLS/内部令牌），或只在 mesh 内可信。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">灰度按流量百分比，用户跳变体验割裂</div><div class="pd">同一用户两次请求一个进新版一个进旧版，状态错乱。灰度要按用户维度粘性（hash user_id 分流），而不是纯随机比例。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">access log 没有插件耗时，排障靠猜</div><div class="pd">"网关慢还是上游慢"分不清。结构化日志必须含分段耗时：接入/插件链/上游/回程，trace_id 串联全链路。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">东西向流量全过网关，网关成全公司瓶颈</div><div class="pd">内部服务间调用也走网关，QPS 全集中到入口，扩容成本高、故障半径大。网关只管南北向，东西向走 Service Mesh 或服务直连。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 网关插件链"防重放、认证、限流"的正确执行顺序是？</div>
+      <button class="opt">认证 → 防重放 → 限流（先确认身份再谈其他）</button>
+      <button class="opt">防重放 → 限流 → 认证（先把不可信流量挡在验签之前）</button>
+      <button class="opt">限流 → 认证 → 防重放</button>
+      <div class="ans">正确答案：<b>防重放 → 限流 → 认证</b>。逻辑：先用最便宜的检查（nonce/时间戳）挡掉明显非法的重复请求，再限流保护后续资源，最后才做最贵的验签。反过来会让恶意流量消耗验签算力，也能绕过限流打爆认证服务。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 多网关节点集群级限流（总配额 1 万 QPS），正确做法是？</div>
+      <button class="opt">每个节点本地限流 1000 QPS，加起来正好</button>
+      <button class="opt">每个节点本地限流 1 万 QPS，各自为政</button>
+      <button class="opt">用 Redis 等集中存储做全局计数，本地限流只做降级兜底</button>
+      <div class="ans">正确答案：<b>Redis 集中计数</b>。本地计数下流量在各节点分布不均时，实际放行量会远超或远低于总配额（均匀分布是巧合不是常态）。集中计数保证全局准确，Redis 故障时降级为本地限流保命。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 API 网关与 Service Mesh 的关系，正确的是？</div>
+      <button class="opt">网关管南北向（外部进内部），Mesh 管东西向（服务间），互补而非替代</button>
+      <button class="opt">Mesh 出现后网关可以取消了</button>
+      <button class="opt">网关和 Mesh 功能完全相同，选一个就行</button>
+      <div class="ans">正确答案：<b>分工互补</b>。网关负责入口治理（认证、限流、灰度、WAF），Mesh 负责服务间治理（mTLS、重试、细粒度熔断、东西向可观测）。Mesh 的 sidecar 在集群边缘，替代不了网关的入口策略与协议转换能力。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 网关到上游的请求延迟突然劣化，最不可能的原因是？</div>
+      <button class="opt">连接池太小，每请求新建 TCP + TLS</button>
+      <button class="opt">proxy_set_header Connection 头没清，keepalive 失效</button>
+      <button class="opt">网关路由表匹配从 O(1) 变成了 O(n)（路由表本就不是瓶颈）</button>
+      <div class="ans">正确答案：<b>路由表匹配复杂度</b>。路由表通常几百条，前缀/哈希匹配是微秒级，且索引常驻内存。真实瓶颈几乎总是连接复用失效、上游变慢、或插件同步调用——优先查连接池配置和上游健康度。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 服务端收到了 X-User-Id: 10086 的请求头，正确的信任策略是？</div>
+      <button class="opt">直接用，这是网关注入的标准头</button>
+      <button class="opt">完全忽略，让网关另行通知</button>
+      <button class="opt">校验请求来源可信（mTLS/内部令牌）后才使用该头，防止内网伪造</button>
+      <div class="ans">正确答案：<b>校验来源后才信</b>。"网关注入的头"只有在"请求确实来自网关"时才可信。内网任何机器都能伪造这个头直连服务，必须配合 mTLS 或内部服务令牌做来源校验，形成第二道防线。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 网关配置热更新的核心要求是？</div>
+      <button class="opt">不重启、不丢连接、秒级生效，且配置中心故障时本地缓存兜底</button>
+      <button class="opt">修改 nginx.conf 后 reload，断连接也无所谓</button>
+      <button class="opt">配置变更需要重启网关，凌晨发布窗口做</button>
+      <div class="ans">正确答案：<b>热更新 + 本地兜底</b>。重启意味着连接中断和可用性损失，凌晨窗口则意味着故障响应延迟。同时配置中心/etcd 故障时网关必须能用本地最后有效配置继续服务，不能因配置链路故障而拒绝流量。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>网关运维速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>curl kong:8001/status</code><span class="desc">Kong 管理面探活，看集群成员</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl apisix:9090/v1/schema</code><span class="desc">APISIX 插件 schema，校验配置前对照</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nginx -t &amp;&amp; nginx -s reload</code><span class="desc">Nginx 配置检查 + 热 reload（存量连接保持）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -s | grep estab</code><span class="desc">看连接总量，定位端口耗尽</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl /apisix/prometheus/metrics</code><span class="desc">网关指标：按路由/上游的 QPS、延迟、错误率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>trace_id 透传 + grep 日志</code><span class="desc">一笔请求穿网关全程的定位方式</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>API 网关</b></td><td>南北向流量单一入口，横切关注点（认证/限流/路由）的集中实现层</td></tr>
+    <tr><td><b>南北向流量</b></td><td>外部客户端进内部服务的流量</td></tr>
+    <tr><td><b>东西向流量</b></td><td>内部服务之间的调用流量，归 Service Mesh 管</td></tr>
+    <tr><td><b>横切关注点</b></td><td>每个服务都需要的通用能力：认证、日志、限流、监控</td></tr>
+    <tr><td><b>路由 Route</b></td><td>按 host/path/header 把请求映射到上游服务的规则</td></tr>
+    <tr><td><b>上游 Upstream</b></td><td>网关背后的服务实例组，含负载均衡与健康检查</td></tr>
+    <tr><td><b>插件 Plugin</b></td><td>网关的能力扩展单元，分 access/header_filter/log 阶段执行</td></tr>
+    <tr><td><b>热更新</b></td><td>配置变更不重启、不丢连接、秒级生效</td></tr>
+    <tr><td><b>连接池</b></td><td>网关到上游的长连接复用池，避免每请求新建 TCP</td></tr>
+    <tr><td><b>限流 Rate Limit</b></td><td>按维度控制请求速率，令牌桶/漏桶/滑动窗口</td></tr>
+    <tr><td><b>熔断 Circuit Break</b></td><td>上游故障率超标时快速失败，半开试探恢复</td></tr>
+    <tr><td><b>灰度发布</b></td><td>按流量比例/用户标签把部分请求导到新版本</td></tr>
+    <tr><td><b>Service Mesh</b></td><td>服务间通信的基础设施层，sidecar 提供 mTLS/治理/可观测</td></tr>
+    <tr><td><b>Sidecar</b></td><td>随业务 Pod 部署的代理进程，Mesh 的数据面单元</td></tr>
+    <tr><td><b>GSLB</b></td><td>全局负载均衡，按健康检查和策略调度跨机房流量</td></tr>
+    <tr><td><b>单元化</b></td><td>按用户分片固定路由到某地域的多活架构</td></tr>
+    <tr><td><b>access log</b></td><td>网关的结构化访问日志，排障第一现场</td></tr>
+    <tr><td><b>trace_id</b></td><td>全链路追踪ID，网关是链路上第一个注入点</td></tr>
+    <tr><td><b>WAF</b></td><td>Web 应用防火墙，网关层防注入/越权/扫描</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① docker 起 APISIX + etcd + 一个 echo 上游，配一条带限流 + jwt 插件的路由；② 压测对比开/关 keepalive_pool 的延迟差异；③ 改一次路由配置，观察生效延迟，再拔掉 etcd 验证本地缓存兜底；④ 配一条 traffic-split 灰度路由，用不同 header 验证分流；⑤ 打开 prometheus 插件，用 Grafana 画一张按路由的 QPS/延迟/错误率大盘。<br><br>
+    <b>之后值得单独学：</b>Kong 的插件开发（Lua）、APISIX 的 Serverless 插件、网关与零信任（SPIFFE/SPIRE 身份）、以及基于 eBPF 的网关可观测。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 API 网关设计实战 · 上线前务必检查：连接复用、限流维度、配置生效确认</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（动态配置）和模块 8（配置示例与坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边推演一笔请求穿过网关的全程。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边画图：一笔外部请求从客户端到服务，穿过了网关的哪几层插件';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

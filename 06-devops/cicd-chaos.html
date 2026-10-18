@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 CI/CD 与混沌工程</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 25 期 · 高密度版</span>
+    <h1>二十分钟学透 CI/CD 与混沌工程</h1>
+    <p class="sub">流水线跑得起来不算本事，<b>敢在周五下午发布</b>才算。这篇讲怎么把"发布"从一次冒险变成一件无聊的例行公事，以及怎么用混沌工程提前把故障找出来。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种发布策略</span>
+      <span class="chip"><b>5</b> 个混沌实验</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 kind/minikube 集群 + Chaos Mesh，边看边做实验</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <p class="lead">CI/CD 和混沌工程都必须在真实环境里练。看文档学不会，因为你永远不知道"没预料到的那一步"会在哪里失败。</p>
+  <pre><span class="c"># 本地起一个单节点 K8s 集群（kind 最快）</span>
+kind create cluster --name lab
+
+<span class="c"># 装 Chaos Mesh（混沌工程实验平台，用 Helm 最省事）</span>
+helm repo add chaos-mesh https://charts.chaos-mesh.org
+helm install chaos-mesh chaos-mesh/chaos-mesh -n chaos-mesh --create-namespace
+
+<span class="c"># 装一个 demo 应用（用来做发布和故障演练）</span>
+kubectl create deployment demo --image=nginx:alpine --replicas=3
+kubectl expose deployment demo --port=80 --type=NodePort
+
+<span class="c"># 验证</span>
+kubectl get pods -n chaos-mesh         <span class="c"># 看 Chaos Mesh 组件是否 Running</span>
+kubectl get pods                        <span class="c"># 看 demo 的 3 个副本</span>
+kubectl get svc                         <span class="c"># 看 NodePort 端口</span></pre>
+  <div class="callout warn">
+    <b>阅读提示：</b>CI/CD 的核心不是"用哪个工具"，而是"<b>把哪些步骤自动化、在什么条件下放行、失败了怎么办</b>"。混沌工程的核心不是"能杀进程"，而是"<b>用受控的实验去验证你对系统韧性的假设</b>"。抓住这两条主线，工具只是实现细节。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>CI/CD 到底解决什么</h2></div>
+  <p class="lead">先破除一个误解：CI/CD 不是"让部署自动化"这么简单。它真正解决的是<b>软件交付的不确定性和人为错误</b>。手工发布的问题不是慢，而是<b>不可重复</b>——同一个人做两次结果都可能不一样，更别说不同的人。</p>
+  <table>
+    <tr><th style="width:110px">概念</th><th style="width:220px">全称与含义</th><th>解决什么</th></tr>
+    <tr><td><b>CI<br>持续集成</b></td><td>Continuous Integration：代码一提交就自动构建、跑测试</td><td>让"集成"这件事从几周一次变成每次提交都做，问题<b>在几分钟内被发现</b></td></tr>
+    <tr><td><b>CD<br>持续交付</b></td><td>Continuous Delivery：代码通过测试后随时可发布，但发布要人点一下</td><td>保证<b>任何时刻都有一个经过验证、可以上线的版本</b></td></tr>
+    <tr><td><b>CD<br>持续部署</b></td><td>Continuous Deployment：通过测试后自动发布到生产</td><td>连"点一下"都省了，但要求极高的测试覆盖和回滚能力</td></tr>
+  </table>
+  <h4>DORA 四指标：用数据衡量你的交付能力</h4>
+  <p>DORA（DevOps Research and Assessment，Google 收购的研究团队）用四个指标衡量一个团队的软件交付效能。前两个看<b>速度</b>，后两个看<b>稳定性</b>。关键洞察是：<b>速度和稳定性不是对立的</b>——高效能团队两者都好。</p>
+  <table>
+    <tr><th style="width:170px">指标</th><th style="width:200px">定义</th><th>高效能团队参考值</th></tr>
+    <tr><td><b>部署频率</b></td><td>多久部署一次到生产</td><td>按需，一天多次（而非一周一次）</td></tr>
+    <tr><td><b>变更前置时间</b></td><td>从代码提交到上线运行的时间</td><td>小于一天</td></tr>
+    <tr><td><b>变更失败率</b></td><td>发布导致故障需要回滚/修复的比例</td><td>0%~15%</td></tr>
+    <tr><td><b>恢复时长 MTTR</b></td><td>从故障发生到恢复服务的时间</td><td>小于一小时</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>为什么"部署频率高"反而是好事？</b>因为每次发布的<b>变更量小</b>。变更越小，出问题的概率越低，出了问题也越容易定位和回滚。反直觉的结论：<b>发得越勤，单次风险越低，整体越稳定</b>。那些"一个月攒一个大版本"的团队，每次发布都是豪赌。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>流水线设计</h2></div>
+  <p class="lead">一条好的流水线只有一个目标：<b>用最短的时间，给出"这个变更能不能上"的可信答案</b>。所有设计取舍都围绕这个目标。</p>
+  <h4>典型阶段划分</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>Lint &amp; 静态检查</b>：语法、格式、静态分析。<b>几秒到几十秒</b>，最便宜，最先跑，能在这一步拦住的问题绝不往后传。</div></div>
+    <div class="step"><div class="txt"><b>编译 &amp; 单元测试</b>：构建产物 + 跑单测。<b>分钟级</b>。单测必须快，否则没人愿意等。</div></div>
+    <div class="step"><div class="txt"><b>构建制品</b>：打 Docker 镜像 / 编译二进制。<b>只做一次</b>，产出唯一制品，后续所有环境都用它。</div></div>
+    <div class="step"><div class="txt"><b>集成测试 &amp; 契约测试</b>：需要依赖服务，验证模块间协作。<b>较慢</b>，但能发现单测发现不了的问题。</div></div>
+    <div class="step"><div class="txt"><b>部署到测试环境 &amp; 端到端测试</b>：真实环境验证核心流程（冒烟测试）。</div></div>
+    <div class="step"><div class="txt"><b>部署到生产</b>：灰度、金丝雀、或直接全量（视策略而定）。</div></div>
+  </div>
+  <h4>加速流水线的三个手段</h4>
+  <table>
+    <tr><th style="width:150px">手段</th><th>说明</th></tr>
+    <tr><td><b>并行</b></td><td>互不依赖的任务同时跑：单测、lint、构建镜像可以并行。总时长从"相加"变成"取最大"</td></tr>
+    <tr><td><b>缓存</b></td><td>缓存依赖包（node_modules、Maven 仓库）、Docker layer。<b>这一步通常能省掉一半以上时间</b></td></tr>
+    <tr><td><b>失败快速反馈</b></td><td>把最可能失败、最便宜的检查放最前面。lint 挂了就别浪费时间构建镜像</td></tr>
+  </table>
+  <pre><span class="c"># GitHub Actions 流水线示例：并行 + 缓存</span>
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make lint            <span class="c"># 最快，放最前面</span>
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4     <span class="c"># 缓存依赖，省时间</span>
+        with:
+          path: ~/.m2
+          key: m2-${{ hashFiles('**/pom.xml') }}
+      - run: make test
+
+  build:
+    needs: [lint, test]           <span class="c"># 前两步都过了才构建</span>
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t myapp:${{ github.sha }} .
+      - run: docker push registry/myapp:${{ github.sha }}   <span class="c"># 只构建这一次</span></pre>
+  <div class="callout danger">
+    <b>两条铁律：</b><br>
+    ① <b>制品只构建一次。</b>用同一份镜像部署到测试、预发、生产。如果你在预发构建一次、生产又构建一次，那你上线的东西<b>从来没被测试过</b>——两次构建的结果可能有微妙差异（依赖版本、构建时间、随机种子）。<br>
+    ② <b>环境一致性。</b>用同一份镜像 + 同一份配置模板，只通过环境变量区分环境。<b>凡是"预发能跑、生产报错"的问题，90% 出在环境不一致</b>（基础镜像版本、依赖版本、配置项）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>制品与版本管理</h2></div>
+  <p class="lead">制品（artifact，指构建产出的可部署文件，如 Docker 镜像、jar 包、二进制）是交付的核心资产。管好它，回滚才有依据。</p>
+  <h4>镜像 tag 规范：绝对不要用 latest</h4>
+  <table>
+    <tr><th style="width:200px">tag 方式</th><th>评价</th></tr>
+    <tr><td class="f">myapp:latest</td><td><b>禁用。</b>latest 是个移动目标，同一个 tag 每次构建内容都不同。你无法知道生产跑的是哪一版，回滚时也无从下手</td></tr>
+    <tr><td class="f">myapp:v1.2.3</td><td>语义化版本，适合正式发布。<b>但同一个版本号可能被覆盖重建</b>，要配仓库的不可变策略</td></tr>
+    <tr><td class="f">myapp:git-a1b2c3d</td><td><b>推荐。</b>用 git commit SHA 做 tag，天然唯一、可追溯到具体代码，回滚时直接指向代码</td></tr>
+    <tr><td class="f">myapp:v1.2.3-a1b2c3d</td><td>最佳实践：语义版本 + commit SHA 双 tag，既有可读性又可追溯</td></tr>
+  </table>
+  <h4>不可变制品（Immutable Artifact）</h4>
+  <p>不可变意味着：<b>一个 tag 一旦推送，内容就永远不能改</b>。要修改就发新版本。<span class="k">latest</span> 之所以危险，就是因为它违反了不可变性。制品仓库（Harbor、Nexus、Artifactory）应该开启"tag 不可覆盖"策略，从机制上杜绝"偷偷改了同一个 tag"。</p>
+  <h4>语义化版本（SemVer）</h4>
+  <pre><span class="c"># MAJOR.MINOR.PATCH  →  1.4.2</span>
+<span class="b">MAJOR</span>  <span class="c"># 不兼容的 API 变更（破坏性变更），如 1.x → 2.0</span>
+<span class="b">MINOR</span>  <span class="c"># 向后兼容的新功能，如 1.4 → 1.5</span>
+<span class="b">PATCH</span>  <span class="c"># 向后兼容的 bug 修复，如 1.4.2 → 1.4.3</span>
+
+<span class="c"># 预发布版本用连字符：1.5.0-rc.1、1.5.0-beta.2</span>
+<span class="c"># 构建元数据用加号：1.5.0+20261016</span></pre>
+  <div class="callout warn">
+    <b>制品仓库要做的事：</b>① 唯一可信源，所有环境只从这里拉镜像；② 开启不可变 tag，禁止覆盖；③ 配保留策略（如保留最近 100 个版本，其余归档），否则仓库会被历史镜像撑爆；④ 扫描镜像漏洞（Trivy、Clair），高危漏洞的镜像禁止部署。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>测试策略金字塔</h2></div>
+  <p class="lead">测试金字塔的核心思想：<b>越靠底层的测试越便宜、越快、越稳定，应该越多；越靠上层越贵、越慢、越容易不稳定，应该越少。</b>倒过来的"冰淇淋甜筒"（大量 E2E、少量单测）是反模式。</p>
+  <table>
+    <tr><th style="width:120px">层级</th><th style="width:150px">测什么</th><th style="width:130px">成本 / 速度</th><th>占比建议</th></tr>
+    <tr><td><b>单元测试</b></td><td>单个函数/类的逻辑</td><td>最低 / 毫秒级</td><td>最多，约 70%</td></tr>
+    <tr><td><b>集成测试</b></td><td>模块间协作、真实依赖（DB、MQ）</td><td>中 / 秒级</td><td>约 20%</td></tr>
+    <tr><td><b>契约测试</b></td><td>服务间的接口约定是否匹配</td><td>中 / 秒级</td><td>按服务数，关键接口必须有</td></tr>
+    <tr><td><b>端到端 E2E</b></td><td>完整用户流程，跨所有服务</td><td>最高 / 分钟级、易 flaky</td><td>最少，只测核心路径，约 10%</td></tr>
+  </table>
+  <h4>契约测试：微服务时代的关键补充</h4>
+  <p>契约测试（contract testing）解决的是"<b>我改了接口，怎么知道下游会不会挂</b>"。消费者（调用方）定义它期望的接口契约，提供者（被调用方）验证自己是否满足这个契约。这样<b>不需要把所有服务都启动起来做 E2E</b>，就能在 CI 阶段发现接口不兼容。Pact 是最常用的契约测试工具。</p>
+  <h4>冒烟测试在部署流程里的位置</h4>
+  <pre><span class="c"># 冒烟测试（smoke test）= 部署后立刻跑的最小核心路径验证</span>
+<span class="c"># 目的：确认"新版本至少能跑起来"，如果不行立刻回滚</span>
+
+<span class="c"># 部署流程里的位置：</span>
+<span class="g">1.</span> 部署新版本到生产（灰度 1 个实例）
+<span class="g">2.</span> 对这个实例跑冒烟测试（健康检查 + 核心接口）
+<span class="g">3.</span> 通过 → 继续扩大灰度；失败 → <span class="r">立即回滚</span>
+<span class="g">4.</span> 全量后继续观察核心指标
+
+<span class="c"># 冒烟测试要快（几十秒内），只测"服务活着 + 核心功能可用"</span>
+<span class="c"># 它不是 E2E 的替代品，而是部署流程里的一个安全闸门</span>
+curl -f http://new-pod/healthz || exit 1
+curl -f -X POST http://new-pod/api/order -d '{"test":true}' || exit 1</pre>
+  <h4>测试数据管理</h4>
+  <ul>
+    <li><b>测试数据要可复现</b>：用固定种子生成，别依赖"数据库里恰好有那条数据"。</li>
+    <li><b>每个测试自建自清理</b>：测试自己准备数据、测试完清理掉，避免测试间互相污染（测试 A 改了数据导致测试 B 失败）。</li>
+    <li><b>生产数据脱敏后使用</b>：真实数据的分布最接近生产，但必须脱敏（去掉手机号、身份证、密码），且要合规。</li>
+    <li><b>别共用测试环境的状态</b>：多个流水线同时跑却共享一个测试库，是最经典的 flaky 来源。</li>
+  </ul>
+  <div class="callout warn">
+    <b>关于 flaky test（时好时坏、结果不稳定的测试）：</b>flaky 测试是流水线公信力的最大杀手。一旦出现，开发者就开始习惯性地"重跑一次看看"，最终对红灯麻木，真正的失败被忽略。<b>处理原则：发现 flaky 立即隔离（quarantine）并修复，绝不能让它长期留在流水线里。</b>宁可暂时跳过，也不要让整条流水线的可信度崩塌。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>部署策略对比</h2></div>
+  <p class="lead">部署策略的本质是在"<b>风险暴露面</b>"和"<b>资源成本 / 复杂度</b>"之间做权衡。没有最好的策略，只有最合适的。</p>
+  <table>
+    <tr><th style="width:110px">策略</th><th style="width:230px">怎么工作</th><th style="width:150px">适用场景</th><th>代价</th></tr>
+    <tr><td><b>滚动<br>Rolling</b></td><td>逐个替换旧实例，新老版本短暂共存</td><td>K8s 默认策略，绝大多数场景</td><td>期间新旧版本同时在线，要求接口<b>向后兼容</b>；回滚要重新滚动</td></tr>
+    <tr><td><b>蓝绿<br>Blue-Green</b></td><td>部署一套全新的（绿），验证后一键切换流量</td><td>需要<b>秒级回滚</b>的关键服务</td><td><b>资源翻倍</b>（两套环境同时跑）；数据库 schema 必须兼容两版</td></tr>
+    <tr><td><b>金丝雀<br>Canary</b></td><td>先放一小部分流量（如 1%）到新版本，观察指标，逐步扩大</td><td>高流量、需要<b>真实验证</b>的核心服务</td><td>需要精细的流量控制 + 自动指标对比，运维复杂度高</td></tr>
+    <tr><td><b>功能开关<br>Feature Flag</b></td><td>代码已部署，但新功能由开关控制是否对用户可见</td><td>需要<b>把发布和上线解耦</b>、A/B 测试、快速关停</td><td>代码里有大量分支，开关本身要管理，容易积累技术债</td></tr>
+  </table>
+  <h4>K8s 配置片段</h4>
+  <pre><span class="c"># 1. 滚动更新（Deployment 默认）</span>
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1              <span class="c"># 最多多出 1 个 Pod</span>
+      maxUnavailable: 0        <span class="c"># 保证始终有足够可用副本，零中断</span>
+  minReadySeconds: 10          <span class="c"># 新 Pod ready 后等 10s 再继续，避免假就绪</span>
+
+<span class="c"># 2. 金丝雀：两个 Deployment 共享一个 Service，靠副本数控制流量比例</span>
+<span class="c"># 稳定版 9 副本 + 金丝雀 1 副本 ≈ 10% 流量</span>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-canary
+spec:
+  replicas: 1                  <span class="c"># 用副本数近似流量比例（粗粒度）</span>
+  template:
+    metadata:
+      labels:
+        app: demo
+        track: canary          <span class="c"># 打上 canary 标签</span>
+    spec:
+      containers:
+      - name: app
+        image: registry/myapp:v2.0.0-a1b2c3d
+
+<span class="c"># 3. 蓝绿：切 Service 的 selector，一键把流量从 blue 切到 green</span>
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+spec:
+  selector:
+    app: demo
+    track: blue                <span class="c"># 改成 green 即完成切换</span>
+  ports:
+  - port: 80</pre>
+  <div class="callout ok">
+    <b>怎么选：</b>不确定就用<b>滚动更新</b>（K8s 默认，够用）。需要秒级回滚或做重大变更 → <b>蓝绿</b>。流量大、想用真实流量验证 → <b>金丝雀</b>。想随时开关某个功能、不重新部署 → <b>功能开关</b>。<br>
+    <b>实际上这四者常常组合使用：</b>金丝雀发布 + 功能开关，是很多大厂的标准组合——金丝雀控制"代码版本"的灰度，功能开关控制"功能"的灰度，两者解耦。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>数据库变更与发布</h2></div>
+  <p class="lead">这是发布里<b>最难、最容易出事</b>的部分。因为代码可以秒级回滚，但数据库一旦改了结构或数据，回滚就非常痛苦。<b>核心原则：让数据库变更和代码变更解耦，永远保持"新旧两个版本的代码都能在同一个数据库上正常工作"。</b></p>
+  <h4>先加后删的三步法（Expand-Contract）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一步：Expand（扩展）</b>——只做<b>新增</b>，不做删除或破坏性修改。比如加一个新列 <span class="k">full_name</span>，同时保留旧列。此时旧代码完全不受影响。</div></div>
+    <div class="step"><div class="txt"><b>第二步：双写 + 迁移数据</b>——新代码同时写新旧两列，后台任务把历史数据从旧列迁到新列。此时新旧代码都能正常工作（旧代码读旧列，新代码读新列）。</div></div>
+    <div class="step"><div class="txt"><b>第三步：Contract（收缩）</b>——等所有实例都升级完、观察一段时间后，再<b>删除</b>旧列。这一步是破坏性的，但此时已经没有代码依赖它了。</div></div>
+  </div>
+  <pre><span class="c"># 三步法的具体时序（关键：每一步都可回滚）</span>
+<span class="g">T1</span> 加新列 full_name（旧代码不知道它，无影响）        <span class="c"># 可安全回滚</span>
+<span class="g">T2</span> 部署新代码：同时写 old_name 和 full_name         <span class="c"># 回滚 = 回退代码，数据还在</span>
+<span class="g">T3</span> 后台任务回填历史数据的 full_name
+<span class="g">T4</span> 新代码改成只读 full_name，不再读 old_name
+<span class="g">T5</span> 观察稳定后，删除 old_name 列                    <span class="c"># 到这一步才不可逆</span>
+
+<span class="c"># ✗ 反例：一条 ALTER 同时改名 + 改类型 + 加约束</span>
+<span class="c"># 一旦失败或需要回滚，你可能已经丢了数据</span></pre>
+  <h4>大表加索引：必须用 CONCURRENTLY</h4>
+  <pre><span class="c"># PostgreSQL：普通 CREATE INDEX 会锁表，大表上会阻塞所有写</span>
+<span class="r">CREATE INDEX idx_order_user ON orders(user_id);</span>        <span class="c"># ✗ 大表上会锁住写入</span>
+
+<span class="c"># 正确做法：CONCURRENTLY 不锁表，在线建索引</span>
+<span class="g">CREATE INDEX CONCURRENTLY idx_order_user ON orders(user_id);</span>
+
+<span class="c"># 注意 CONCURRENTLY 的限制：</span>
+<span class="c"># ① 不能在事务块里执行（很多迁移工具默认包事务，要单独配）</span>
+<span class="c"># ② 失败会留下 INVALID 状态的索引，需要手动 DROP 后重建</span>
+<span class="c"># ③ 建索引期间会有额外 CPU 和 IO 开销，别在业务高峰期做</span>
+
+<span class="c"># MySQL 8.0+ 的在线 DDL（大多数加索引操作默认就是 ONLINE）</span>
+ALTER TABLE orders ADD INDEX idx_user (user_id), ALGORITHM=INPLACE, LOCK=NONE;</pre>
+  <div class="callout danger">
+    <b>为什么"数据回滚"比"代码回滚"难得多？</b>代码回滚只是把镜像换成旧版本，几秒钟的事。但如果新版本已经<b>写入或修改了数据</b>（比如把某列的值批量改了、删了一些记录），回滚代码后，旧代码面对的是被新代码改过的数据——<b>结构对不上、值语义变了，回滚后反而更糟</b>。<br>
+    <b>所以铁律是：数据库变更必须"向后兼容"，让新旧代码都能跑。</b>任何"只有新代码才能处理"的数据变更，都必须先确认旧代码已经不可能再运行，才能做。这就是 Expand-Contract 存在的意义。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>回滚与降级</h2></div>
+  <p class="lead">回滚能力是发布安全的底线。<b>一个没有回滚方案的发布，等于一次不可逆的赌博。</b>而回滚最关键的不是"怎么做"，是"<b>什么时候做</b>"——这个判断必须在发布<b>之前</b>就定好，不能等到出事时临时拍脑袋。</p>
+  <h4>回滚决策阈值：提前定义，用数据触发</h4>
+  <table>
+    <tr><th style="width:200px">信号</th><th>阈值示例（达到即回滚）</th></tr>
+    <tr><td><b>错误率</b></td><td>5xx 占比 &gt; 1%，且持续 2 分钟</td></tr>
+    <tr><td><b>延迟</b></td><td>P99 &gt; 基线值 × 2，且持续 5 分钟</td></tr>
+    <tr><td><b>核心业务指标</b></td><td>下单成功率下降 &gt; 5%，或支付成功率异常</td></tr>
+    <tr><td><b>健康检查</b></td><td>冒烟测试失败，或就绪探针连续失败</td></tr>
+  </table>
+  <p>把这些阈值写成<b>自动化的</b>：金丝雀发布时，流水线自动对比新旧版本的指标，超阈值自动回滚，不需要人盯着。</p>
+  <h4>回滚的几种方式</h4>
+  <pre><span class="c"># 1. K8s 回滚到上一个版本（滚动/蓝绿都适用）</span>
+kubectl rollout undo deployment/demo
+kubectl rollout undo deployment/demo --to-revision=3   <span class="c"># 回滚到指定版本</span>
+kubectl rollout history deployment/demo                 <span class="c"># 查看历史版本</span>
+
+<span class="c"># 2. 蓝绿：切换 Service selector，秒级回滚</span>
+kubectl patch service demo -p '{"spec":{"selector":{"track":"blue"}}}'
+
+<span class="c"># 3. 功能开关：最快的"回滚"，不重新部署</span>
+<span class="c"># 直接把开关关掉，新功能立即对用户不可见（代码还在，但走不到）</span>
+<span class="c"># 注意：功能开关只能回滚"功能"，回滚不了"有 bug 的公共代码"</span>
+
+<span class="c"># 4. 数据库：只能靠"向前修复"（forward fix）</span>
+<span class="c"># 因为回滚数据太难，通常的做法是发一个新版本修好它，而不是回退数据</span></pre>
+  <div class="callout ok">
+    <b>重新定义"回滚"：回滚不是失败，是能力。</b>一个团队如果从不回滚，通常意味着两种情况：要么发布太频繁但每次都幸运，要么出了问题宁可硬扛也不回滚（因为回滚流程不熟练、怕丢数据）。<b>后者是灾难。</b><br>
+    健康的文化是：<b>回滚是一个被充分演练、可以在几分钟内完成的常规操作</b>。团队应该定期演练回滚，确保它真的能用——"纸上有回滚方案"和"回滚方案真的能跑通"是两回事。
+  </div>
+  <h4>降级预案：回滚之外的第二条路</h4>
+  <p>有时候回滚也来不及（比如依赖的下游服务挂了，回滚自己的代码没用）。这时需要<b>降级</b>——牺牲非核心功能，保住核心链路。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>功能降级</div><div class="cd">关掉非核心功能（推荐位、个性化），保住主流程。如大促时关掉"猜你喜欢"</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>返回兜底数据</div><div class="cd">下游超时就直接返回缓存值或默认值，不让请求失败。如推荐服务挂了返回热门榜</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>限流</div><div class="cd">主动丢弃部分请求，保住系统整体可用，避免雪崩</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>只读模式</div><div class="cd">关闭写操作，保证读可用。适合数据库压力过大时</div></div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>混沌工程</h2></div>
+  <p class="lead">混沌工程（Chaos Engineering）不是"随机搞破坏"，而是<b>用受控的实验，主动验证系统在故障下的表现</b>。它的核心信念是：<b>系统一定会出故障，与其等着它在最坏的时刻以最意外的方式出问题，不如主动把它找出来。</b></p>
+  <h4>四条核心原则</h4>
+  <table>
+    <tr><th style="width:150px">原则</th><th>含义</th></tr>
+    <tr><td><b>从假设出发</b></td><td>先写下"我们相信，即使某个节点挂掉，服务仍然可用"这样的<b>假设</b>，再用实验去验证它。<b>不是漫无目的地杀进程</b></td></tr>
+    <tr><td><b>用真实环境</b></td><td>测试环境的故障行为和生产往往不同（流量、数据量、配置都不同）。条件允许时，在生产做小规模实验</td></tr>
+    <tr><td><b>控制爆炸半径</b></td><td><b>最重要的原则。</b>实验必须限定影响范围：只影响 1 个实例、只影响 1% 流量、只影响测试账号。绝不"一次搞挂整个系统"</td></tr>
+    <tr><td><b>持续进行</b></td><td>系统在变，一次实验不能保证永远安全。把混沌实验纳入 CI/CD，持续自动运行</td></tr>
+  </table>
+  <h4>实验设计方法</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>定义稳态假设</b>：先明确"正常"是什么样。比如"下单接口成功率 &gt; 99.9%，P99 &lt; 500ms"。</div></div>
+    <div class="step"><div class="txt"><b>设计实验</b>：选定故障类型（杀 Pod、注入延迟、断网、填满磁盘）和影响范围（哪个服务、多少实例）。</div></div>
+    <div class="step"><div class="txt"><b>控制爆炸半径</b>：限定只影响最小范围，并准备好"一键停止"的机制。</div></div>
+    <div class="step"><div class="txt"><b>执行并观察</b>：运行实验，同时紧盯监控。如果稳态假设被打破，说明系统有韧性缺陷。</div></div>
+    <div class="step"><div class="txt"><b>修复与验证</b>：修复发现的问题（如加超时、加重试、加熔断），然后<b>重跑同一个实验</b>验证修复有效。</div></div>
+  </div>
+  <h4>Chaos Mesh 能做什么</h4>
+  <p>Chaos Mesh 是 CNCF 的 K8s 原生混沌工程平台，通过 CRD 定义实验。<b>它的优势是"声明式"</b>：你用 YAML 描述"要对哪些 Pod 施加什么故障"，Chaos Mesh 负责执行和恢复。</p>
+  <pre><span class="c"># 实验 1：Pod 故障（随机杀掉部分 Pod，验证副本自愈能力）</span>
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-kill-demo
+spec:
+  action: pod-kill              <span class="c"># 杀 Pod</span>
+  mode: one                     <span class="c"># 只影响 1 个 Pod（控制爆炸半径）</span>
+  selector:
+    labelSelectors:
+      app: demo
+  scheduler:
+    cron: "@every 5m"           <span class="c"># 每 5 分钟杀一次，持续验证</span>
+
+<span class="c"># 实验 2：网络延迟（模拟下游变慢，验证超时和降级）</span>
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: net-delay-demo
+spec:
+  action: delay
+  mode: all
+  selector:
+    labelSelectors:
+      app: demo
+  delay:
+    latency: "500ms"            <span class="c"># 注入 500ms 延迟</span>
+    jitter: "100ms"
+  direction: to
+  target:
+    selector:
+      labelSelectors:
+        app: inventory          <span class="c"># 只影响 demo 到 inventory 的调用</span>
+
+<span class="c"># 实验 3：网络分区（模拟服务间断网）</span>
+<span class="c"># action: partition，验证服务降级和熔断是否生效</span>
+
+<span class="c"># 实验 4：资源压力（打满 CPU / 内存 / 磁盘）</span>
+<span class="c"># kind: StressChaos，验证限流和 HPA 扩容是否及时</span>
+
+<span class="c"># 实验 5：DNS 故障（模拟域名解析失败）</span>
+<span class="c"># kind: DNSChaos，验证服务发现和重试机制</span></pre>
+  <div class="callout warn">
+    <b>混沌工程 vs 故障演练的区别：</b><br>
+    <b>故障演练</b>通常是<b>手动、有剧本</b>的：组织一次演练，按预定步骤关掉某个服务，看大家怎么响应。它更像一次消防演习，重点是<b>检验人的响应流程</b>。<br>
+    <b>混沌工程</b>是<b>自动化、持续、以验证系统假设为目标</b>的：用工具持续注入随机故障，重点是<b>发现系统本身的韧性缺陷</b>。它不依赖人的参与，可以在半夜无人值守时运行。<br>
+    两者不冲突，但混沌工程是更高阶的形态。<b>没有完善的监控和可观测性，不要贸然做混沌工程</b>——你连"系统是否还正常"都判断不了，实验就变成了纯粹的破坏。
+  </div>
+  <div class="callout danger">
+    <b>混沌工程的三条红线：</b><br>
+    ① <b>必须先有可观测性。</b>没有监控和告警，你不知道实验有没有造成伤害。<br>
+    ② <b>必须有紧急停止机制。</b>实验失控时能一键终止（Chaos Mesh 支持 <span class="k">kubectl delete</span> 掉实验 CRD 立即恢复）。<br>
+    ③ <b>必须从最小爆炸半径开始。</b>第一次实验只影响 1 个非核心服务的 1 个实例，验证流程跑通后，再逐步扩大。<b>绝不允许"第一次就在生产全量做"。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">预发和生产分别构建镜像</div><div class="pd">生产跑的制品从未被测试过。两次构建可能有微妙差异。必须"制品只构建一次"，同一份镜像部署到所有环境。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">没有回滚方案就发布</div><div class="pd">出事时手忙脚乱，只能硬扛或现场想办法。发布前必须有明确、经过演练的回滚方案，以及提前定好的回滚阈值。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">数据库变更和代码同时上线</div><div class="pd">一旦要回滚代码，数据库已经变了，旧代码面对新结构直接崩。必须用 Expand-Contract 三步法解耦，保持向后兼容。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">流水线太慢，没人愿意等</div><div class="pd">一条跑 1 小时的流水线，开发者会绕过它直接发布，CI 形同虚设。用并行和缓存把核心流水线压到 10 分钟以内。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">只在预发测过就上生产</div><div class="pd">预发没有真实流量、数据量小，很多问题（性能、并发、数据边界）根本暴露不出来。关键变更要用金丝雀在真实流量下验证。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">回滚时忘了数据已经变更</div><div class="pd">新版本写了新数据，回滚代码后旧代码读不懂这些数据，问题反而更严重。数据变更必须设计成"新旧代码都能处理"。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">镜像用 latest tag</div><div class="pd">latest 是移动目标，无法确定生产跑的是哪一版，回滚无从下手。用 git commit SHA 或语义版本号做 tag，并开启不可变策略。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">flaky 测试长期留在流水线里</div><div class="pd">开发者开始习惯性"重跑一次看看"，最终对红灯麻木，真正的失败被忽略。发现 flaky 立即隔离修复。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">混沌实验爆炸半径过大</div><div class="pd">第一次就在生产全量杀 Pod，直接把服务搞挂。必须从最小范围（1 个非核心实例）开始，配好紧急停止机制。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">没有可观测性就做混沌工程</div><div class="pd">连系统是否正常都判断不了，实验就变成了纯粹的破坏。混沌工程的前提是完善的监控、告警和链路追踪。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 为什么"部署频率高"反而是件好事？</div>
+      <button class="opt">因为部署本身很快</button>
+      <button class="opt">因为高频部署能省服务器成本</button>
+      <button class="opt">因为每次发布的变更量小，风险更低、更容易定位和回滚</button>
+      <div class="ans">正确答案：<b>变更量小所以风险低</b>。DORA 研究发现速度和稳定性不矛盾。频繁小步发布，每次改动小、出问题概率低、定位容易、回滚快。反而是"一个月攒一个大版本"的做法每次都是豪赌。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 关于制品的构建，正确的做法是？</div>
+      <button class="opt">预发环境构建一次，生产环境再构建一次，保证各自最优</button>
+      <button class="opt">只构建一次，同一份镜像部署到所有环境</button>
+      <button class="opt">每个环境单独构建，方便针对环境优化</button>
+      <div class="ans">正确答案：<b>只构建一次，所有环境复用同一份镜像</b>。如果预发和生产分别构建，那你上线的东西从来没被测试过——两次构建可能有依赖版本、构建时间等微妙差异。制品必须唯一且不可变。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 需要修改数据库表结构，正确的做法是？</div>
+      <button class="opt">用 Expand-Contract 三步法：先加新列，双写并迁数据，最后删旧列</button>
+      <button class="opt">直接一条 ALTER 同时改结构并和代码一起上线</button>
+      <button class="opt">先删旧列再加新列，一次到位</button>
+      <div class="ans">正确答案：<b>Expand-Contract 三步法</b>。核心是让数据库变更和代码变更解耦，任何时刻新旧代码都能在同一数据库上正常工作。一条 ALTER 改结构再和代码同时上线，一旦回滚代码，旧代码面对新结构会直接崩。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于回滚，哪个说法是对的？</div>
+      <button class="opt">回滚代表发布失败，应该尽量避免</button>
+      <button class="opt">数据回滚和代码回滚一样简单</button>
+      <button class="opt">回滚是能力不是失败，回滚阈值要提前定义，数据回滚比代码回滚难得多</button>
+      <div class="ans">正确答案：<b>回滚是能力，阈值要提前定</b>。回滚决策必须在发布前就定好（错误率、延迟超阈值即回滚），不能临时拍脑袋。代码回滚只是换镜像，数据回滚则可能不可逆，所以数据库变更必须向后兼容。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 混沌工程最重要的原则是？</div>
+      <button class="opt">尽可能多地注入故障，覆盖所有场景</button>
+      <button class="opt">控制爆炸半径，只影响最小范围并准备好紧急停止</button>
+      <button class="opt">只在测试环境做，生产环境绝对不能碰</button>
+      <div class="ans">正确答案：<b>控制爆炸半径</b>。混沌工程是受控实验而非随意破坏，必须限定影响范围（1 个实例、1% 流量），并有一键停止机制。原则是"从最小范围开始、逐步扩大"，绝不是"一次搞挂整个系统"。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 做混沌工程的前提条件是什么？</div>
+      <button class="opt">有足够的服务器资源</button>
+      <button class="opt">团队规模足够大</button>
+      <button class="opt">完善的可观测性（监控、告警、链路追踪）</button>
+      <div class="ans">正确答案：<b>完善的可观测性</b>。如果连"系统是否还正常"都判断不了，实验就变成了纯粹的破坏。没有监控和告警，你无法知道注入的故障有没有造成伤害。可观测性是混沌工程的先决条件。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>流水线配置模板</h3>
+  <pre><span class="c"># 一条完整流水线的骨架（GitHub Actions 风格）</span>
+name: ci-cd
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  <span class="c"># 阶段 1：快速反馈（并行，最便宜的先跑）</span>
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make lint
+
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: m2-${{ hashFiles('**/pom.xml') }}
+      - run: make test
+
+  <span class="c"># 阶段 2：构建唯一制品（只此一次）</span>
+  build:
+    needs: [lint, unit-test]
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: build
+        run: |
+          IMAGE=registry/myapp:${{ github.sha }}
+          docker build -t $IMAGE .
+          docker push $IMAGE
+          echo "image=$IMAGE" &gt;&gt; $GITHUB_OUTPUT
+
+  <span class="c"># 阶段 3：集成测试（用同一个制品）</span>
+  integration-test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - run: make integration-test IMAGE=${{ needs.build.outputs.image }}
+
+  <span class="c"># 阶段 4：部署 + 冒烟 + 金丝雀</span>
+  deploy:
+    needs: integration-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: kubectl set image deploy/demo app=${{ needs.build.outputs.image }}
+      - run: ./scripts/smoke-test.sh          <span class="c"># 冒烟测试</span>
+      - run: ./scripts/canary-watch.sh         <span class="c"># 观察指标，超阈值自动回滚</span></pre>
+
+  <h3>发布前检查清单</h3>
+  <div class="cmds">
+    <div class="crow"><code>制品是否唯一且可追溯</code><span class="desc">用 git SHA 打 tag，同一镜像部署到所有环境，不用 latest</span><button class="copy">复制</button></div>
+    <div class="crow"><code>是否有明确的回滚方案</code><span class="desc">回滚命令写好了吗？演练过吗？数据变更可逆吗？</span><button class="copy">复制</button></div>
+    <div class="crow"><code>回滚阈值是否已定义</code><span class="desc">错误率、延迟、业务指标的阈值和持续时间，且最好自动化</span><button class="copy">复制</button></div>
+    <div class="crow"><code>数据库变更是否向后兼容</code><span class="desc">新旧代码能否在同一 schema 上工作？是否用了 Expand-Contract？</span><button class="copy">复制</button></div>
+    <div class="crow"><code>大表操作是否在线执行</code><span class="desc">加索引用 CONCURRENTLY，DDL 用 INPLACE + LOCK=NONE</span><button class="copy">复制</button></div>
+    <div class="crow"><code>是否配了冒烟测试</code><span class="desc">部署后立即验证核心路径，失败自动回滚</span><button class="copy">复制</button></div>
+    <div class="crow"><code>可观测性是否就绪</code><span class="desc">新版本的关键指标在大盘上能看到吗？告警配了吗？</span><button class="copy">复制</button></div>
+    <div class="crow"><code>发布窗口是否合适</code><span class="desc">避开业务高峰；周五下午发布需要更谨慎（但不应绝对禁止）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>是否通知了相关方</code><span class="desc">重大变更通知依赖方、客服、值班人员</span><button class="copy">复制</button></div>
+    <div class="crow"><code>降级预案是否就绪</code><span class="desc">下游挂了怎么办？能不能关掉非核心功能保住主链路？</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>混沌实验速查（Chaos Mesh CRD）</h3>
+  <div class="cmds">
+    <div class="crow"><code>kubectl apply -f pod-kill.yaml</code><span class="desc">启动 Pod 杀灭实验</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get podchaos</code><span class="desc">查看所有 Pod 混沌实验状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl delete podchaos pod-kill-demo</code><span class="desc">立即停止实验并恢复（紧急停止机制）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mode: one / all / fixed / fixed-percent</code><span class="desc">控制爆炸半径：影响 1 个 / 全部 / 固定数 / 固定百分比</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get networkchaos,stresschaos,dnschaos</code><span class="desc">查看各类混沌实验</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>CI 持续集成</b></td><td>代码一提交就自动构建并跑测试，尽早发现问题</td></tr>
+    <tr><td><b>CD 持续交付/部署</b></td><td>交付是随时可发布但人工确认；部署是通过测试后自动发布</td></tr>
+    <tr><td><b>DORA 四指标</b></td><td>部署频率、变更前置时间、变更失败率、恢复时长</td></tr>
+    <tr><td><b>制品 artifact</b></td><td>构建产出的可部署文件，如镜像、jar 包、二进制</td></tr>
+    <tr><td><b>不可变制品</b></td><td>一个 tag 推送后内容永不改变，要改就发新版本</td></tr>
+    <tr><td><b>SemVer</b></td><td>语义化版本 MAJOR.MINOR.PATCH，分别表示破坏性/新增/修复</td></tr>
+    <tr><td><b>冒烟测试</b></td><td>部署后立刻跑的最小核心路径验证，失败即回滚</td></tr>
+    <tr><td><b>契约测试</b></td><td>验证服务间接口约定是否匹配，无需启动全部服务</td></tr>
+    <tr><td><b>flaky test</b></td><td>结果不稳定、时好时坏的测试，会摧毁流水线公信力</td></tr>
+    <tr><td><b>滚动更新</b></td><td>逐个替换旧实例，K8s 默认策略，新旧版本短暂共存</td></tr>
+    <tr><td><b>蓝绿部署</b></td><td>部署全新一套，验证后一键切流量，可秒级回滚</td></tr>
+    <tr><td><b>金丝雀发布</b></td><td>先放小比例真实流量到新版本，观察指标后逐步扩大</td></tr>
+    <tr><td><b>功能开关</b></td><td>代码已部署但功能由开关控制，把发布和上线解耦</td></tr>
+    <tr><td><b>Expand-Contract</b></td><td>先加后删的数据库变更三步法，保证新旧代码兼容</td></tr>
+    <tr><td><b>CONCURRENTLY</b></td><td>PostgreSQL 在线建索引的选项，不锁表</td></tr>
+    <tr><td><b>向前修复</b></td><td>数据无法回滚时，发新版本修好而非回退数据</td></tr>
+    <tr><td><b>降级</b></td><td>牺牲非核心功能保住核心链路，如关掉推荐位</td></tr>
+    <tr><td><b>混沌工程</b></td><td>用受控实验主动验证系统在故障下的表现</td></tr>
+    <tr><td><b>爆炸半径</b></td><td>一次故障/实验影响的范围，混沌工程要求把它控到最小</td></tr>
+    <tr><td><b>稳态假设</b></td><td>实验前对"系统正常是什么样"的明确描述，用于判断实验影响</td></tr>
+    <tr><td><b>Chaos Mesh</b></td><td>CNCF 的 K8s 原生混沌工程平台，用 CRD 声明式定义实验</td></tr>
+    <tr><td><b>故障演练</b></td><td>手动、有剧本的演练，侧重检验人的响应流程</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 kind 起一个集群，完成这五件事 —— ① 写一条包含 lint → test → build → deploy 的流水线，并加上缓存和并行；② 用 git SHA 给镜像打 tag，配好制品仓库；③ 用 Deployment 的 maxUnavailable: 0 做一次零中断滚动更新；④ 在 PostgreSQL 上用 CONCURRENTLY 给一张大表加索引，感受不锁表；⑤ 装 Chaos Mesh，对 demo 应用做一次"只杀 1 个 Pod"的实验，观察副本自愈。<br><br>
+    <b>之后值得单独学：</b>Argo CD / Flux 的 GitOps 工作流、Argo Rollouts 的自动化金丝雀、Pact 契约测试的落地、以及功能开关平台（Unleash、LaunchDarkly）的治理。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 CI/CD 与混沌工程 · 发布前问自己：制品唯一吗？能回滚吗？数据向后兼容吗？</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 6（数据库变更）和模块 8（混沌工程）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 kind 集群里做实验。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 kind/minikube 集群 + Chaos Mesh，边看边做实验';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

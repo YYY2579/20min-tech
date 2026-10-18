@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透系统调用与内核边界</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透系统调用与内核边界</h1>
+    <p class="sub">应用和硬件之间隔着一道墙，所有跨墙动作都要付费。<b>系统调用就是那道墙上的门</b>——这篇讲清楚门有多窄、过一次要多少钱、什么情况下可以不走门。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>7</b> 类常用系统调用</span>
+      <span class="chip">一次切换约 <b>50~500ns</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开一台 Linux（虚拟机或容器都行）跟着敲 strace</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>把观察工具准备好</h2></div>
+  <p class="lead">这篇是"看得见"的底层知识。理论只有一页，剩下全靠你亲手 strace 一次。</p>
+  <pre><span class="c"># 1. 确认是 Linux（strace 是 Linux 专有工具）</span>
+uname -r
+<span class="c"># 6.8.0-45-generic</span>
+
+<span class="c"># 2. 装工具</span>
+sudo apt-get install -y strace ltrace linux-perf
+
+<span class="c"># 3. 用容器也行，但必须放开 ptrace 能力，否则 strace 会报 EPERM</span>
+docker run --rm -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined ubuntu:24.04 bash
+
+<span class="c"># 4. 看一个最熟悉的命令背后发生了什么</span>
+strace -c ls /tmp
+<span class="c"># 输出末尾是一张表：每个系统调用被调了多少次、花了多少时间</span></pre>
+  <div class="callout warn">
+    <b>两个前置认知：</b>① <b>strace 会让被测程序慢 10~100 倍</b>，它靠 <span class="k">ptrace</span> 让目标每次进出内核都停下来等调试器，所以<b>永远不要在压测时挂 strace</b>。② 容器里 strace 大概率报 <span class="k">ptrace: Operation not permitted</span>，不是命令写错，是 Docker 默认 seccomp 挡掉了 <span class="k">ptrace</span>，且没给 <span class="k">CAP_SYS_PTRACE</span>（模块 8 详述）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>用户态与内核态的边界</h2></div>
+  <p class="lead">CPU 在设计上就只信任一小部分代码。这个"信任"是硬件级别的，不是软件约定。</p>
+
+  <h3>特权级：Ring 0 到 Ring 3</h3>
+  <p>x86 定义了四个特权级，Linux 只用了两个：<b>内核跑 Ring 0，应用跑 Ring 3</b>。ARM64 上对应 EL0（用户态）和 EL1（内核态），概念一样。Ring 3 下 CPU 会<b>硬件层面拒绝</b>执行一批指令——不是内核检查后返回错误，而是直接抛 #GP（General Protection Fault）。</p>
+  <table>
+    <tr><th style="width:170px">被禁的指令</th><th style="width:190px">例子</th><th>为什么禁</th></tr>
+    <tr><td>I/O 端口访问</td><td class="f">in / out</td><td>能直接读写设备寄存器，绕过所有文件权限</td></tr>
+    <tr><td>改控制寄存器</td><td class="f">mov cr3, ...</td><td>cr3 指向页表根，改了就能映射任意物理内存</td></tr>
+    <tr><td>关中断 / 停机</td><td class="f">cli / sti / hlt</td><td>关掉中断就能独占 CPU，一条 hlt 让整机停住</td></tr>
+    <tr><td>加载 IDT/GDT</td><td class="f">lidt / lgdt</td><td>能改写中断入口，等于接管整个系统</td></tr>
+  </table>
+
+  <h3>为什么应用不能直接操作硬件</h3>
+  <p>不是"不安全"这么笼统，而是四个具体问题，每一个都足以让系统崩掉：</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>隔离</div><div class="cd">一块网卡只有一组寄存器。A 进程能直接写，B 进程的包就发不出去。硬件必须由内核仲裁。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>抽象</div><div class="cd">硬盘有 SATA/NVMe/SCSI 十几种协议。内核统一成"文件"，应用只认 <span class="k">read</span>。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>复用</div><div class="cd">一千个进程读同一块盘，内核用页缓存和 IO 调度合并。没内核就是一千份随机读。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>记账</div><div class="cd">谁用了多少 CPU、内存、带宽，得有地方统计和限额。这是 cgroup 和调度器的活。</div></div>
+  </div>
+
+  <h3>跨界的三条通道</h3>
+  <table>
+    <tr><th style="width:110px">通道</th><th style="width:250px">触发方式</th><th>典型场景</th></tr>
+    <tr><td><b>系统调用</b></td><td>主动执行 <span class="k">syscall</span> 指令（老平台是 <span class="k">int 0x80</span>）</td><td>主动请求服务：读文件、发包、建进程</td></tr>
+    <tr><td><b>异常</b></td><td>执行出错，CPU 同步抛出，如缺页 #PF、除零 #DE</td><td>访问未映射内存、栈溢出。处理完可能重试原指令</td></tr>
+    <tr><td><b>中断</b></td><td>外部设备异步发出，如网卡收包、时钟滴答</td><td>与当前指令无关，处理完回到被中断处</td></tr>
+  </table>
+  <p>三者都叫"陷入内核"，但语义完全不同：<b>系统调用是自愿的、异常是被迫的、中断是外来的</b>。</p>
+
+  <h3>系统调用长什么样</h3>
+  <p>一次调用需要三样东西：<b>编号</b>（要哪个服务）、<b>参数</b>（最多 6 个，放寄存器）、<b>返回码</b>。x86-64 的约定是：</p>
+  <table>
+    <tr><th style="width:170px">寄存器</th><th>用途</th></tr>
+    <tr><td class="f">rax</td><td>入参：调用号；出参：返回值（负数表示错误，如 <span class="k">-EPERM</span>）</td></tr>
+    <tr><td class="f">rdi, rsi, rdx, r10, r8, r9</td><td>第 1~6 个参数（注意第 4 个是 r10，不是 rcx）</td></tr>
+    <tr><td class="f">rcx, r11</td><td>被 <span class="k">syscall</span> 指令自动占用：存返回地址和 rflags</td></tr>
+  </table>
+  <pre><span class="c"># 手写一次系统调用，不经过 libc 包装（x86-64）</span>
+.global _start
+_start:
+    mov $39, %rax        <span class="c"># 39 = __NR_getpid</span>
+    syscall              <span class="c"># 陷入内核</span>
+    mov %rax, %rdi       <span class="c"># 返回值当 exit 的退出码</span>
+    mov $60, %rax        <span class="c"># 60 = __NR_exit</span>
+    syscall</pre>
+  <p>调用号是<b>架构相关</b>的：x86-64 的 <span class="k">getpid</span> 是 39，ARM64 上是 172，i386 上是 20。所以别硬编码，用 <span class="k">syscall(SYS_getpid)</span> 或直接调 <span class="k">getpid()</span>。</p>
+  <pre><span class="c"># 查本机的调用号表</span>
+cat /usr/include/x86_64-linux-gnu/asm/unistd_64.h | head -8
+<span class="c"># #define __NR_read 0 / __NR_write 1 / __NR_open 2 / __NR_close 3</span>
+
+<span class="c"># 数一数这个内核有多少个系统调用</span>
+grep -c '__NR_' /usr/include/x86_64-linux-gnu/asm/unistd_64.h
+<span class="c"># 约 360~460（随内核版本增长，6.x 已超过 450）</span></pre>
+  <div class="callout">
+    <b>三个概念别混：</b><b>系统调用</b>是内核提供的唯一合法入口（约 450 个）；<b>库函数</b>是 libc 的普通函数（几千个），有的内部调系统调用（<span class="k">fopen</span> → <span class="k">openat</span>），有的纯用户态（<span class="k">strlen</span>）；<b>命令</b>是用户态程序（<span class="k">ls</span>），一个命令内部可能发起几十上百次系统调用。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>一次系统调用到底花了什么</h2></div>
+  <p class="lead">"系统调用很贵"人人会说，但贵在哪里必须能一条条列出来，否则优化时只能瞎猜。</p>
+
+  <h3>陷入内核时发生了什么</h3>
+  <table>
+    <tr><th style="width:150px">阶段</th><th>动作</th><th style="width:100px">谁做的</th></tr>
+    <tr><td>1. 保存返回位置</td><td>下一条指令地址存进 <span class="k">rcx</span>，rflags 存进 <span class="k">r11</span></td><td>CPU</td></tr>
+    <tr><td>2. 切换栈</td><td>从 TSS 读出内核栈指针，<b>栈从用户栈换到内核栈</b></td><td>CPU</td></tr>
+    <tr><td>3. 切特权级</td><td>CS 段选择子改为 Ring 0，跳到内核入口</td><td>CPU</td></tr>
+    <tr><td>4. 保存现场</td><td>压栈通用寄存器、浮点/SIMD 状态（按需）</td><td>内核</td></tr>
+    <tr><td>5. 换页表</td><td>开了 KPTI 时切 CR3，<b>最贵的一步，会冲刷 TLB</b></td><td>内核</td></tr>
+    <tr><td>6. 查表分发</td><td>按 rax 查 <span class="k">sys_call_table</span>，做参数合法性检查</td><td>内核</td></tr>
+    <tr><td>7. 拷参数</td><td>用户指针指向的数据必须 <span class="k">copy_from_user</span> 拷进来，不能直接解引用</td><td>内核</td></tr>
+    <tr><td>8. 干活 / 返回</td><td>真正的逻辑；然后恢复现场、切回用户栈和页表、<span class="k">sysret</span></td><td>内核 + CPU</td></tr>
+  </table>
+
+  <h3>为什么参数必须拷贝</h3>
+  <p>用户传进来的是<b>虚拟地址</b>，只在当前进程页表里有效。内核不能信任它：野指针会让<b>内核</b>崩溃；指针可能指向内核空间，成为提权漏洞；拷贝中可能触发缺页；另一个线程随时可能改写这块内存（TOCTOU 竞态）。所以必须先 <span class="k">copy_from_user</span> 复制一份再校验。</p>
+  <p>这就是 <span class="k">copy_from_user</span> / <span class="k">copy_to_user</span> 存在的原因。一次 <span class="k">write(fd, buf, 65536)</span> 至少拷 64KB，<b>是实打实的内存拷贝</b>，驱动层通常还要再拷一次（除非零拷贝）。</p>
+
+  <h3>量级：多少纳秒</h3>
+  <p>下面是普通 x86-64 服务器（3.0GHz 左右）的典型数量级。<b>绝对值随 CPU 代次、KPTI、Spectre 缓解而变化，看比例比看绝对值有用。</b></p>
+  <table>
+    <tr><th style="width:240px">操作</th><th style="width:140px">典型耗时</th><th>说明</th></tr>
+    <tr><td>函数调用（同进程内）</td><td>1~2 ns</td><td>基线，只是压栈跳转</td></tr>
+    <tr><td><span class="k">clock_gettime</span>（vDSO）</td><td>20~30 ns</td><td>不陷入内核，只读共享内存</td></tr>
+    <tr><td><span class="k">getpid</span>（真实系统调用）</td><td>50~100 ns</td><td>几乎不干活，纯切换开销</td></tr>
+    <tr><td><span class="k">read</span> 命中页缓存（4KB）</td><td>0.5~1.5 μs</td><td>切换 + 拷贝 4KB</td></tr>
+    <tr><td><span class="k">write</span> 到 socket（小包）</td><td>1~3 μs</td><td>切换 + 协议栈 + 可能触发软中断</td></tr>
+    <tr><td>线程上下文切换（同进程）</td><td>1~2 μs</td><td>不用换页表，便宜些</td></tr>
+    <tr><td>进程上下文切换</td><td>2~5 μs</td><td>比系统调用贵一个数量级，要换地址空间、冲 TLB</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>KPTI（内核页表隔离）的代价必须知道。</b>它是 Meltdown 漏洞的缓解措施，把内核页表从用户态页表里摘出去，代价是<b>每次进出内核都要切 CR3 并冲刷 TLB</b>。实测系统调用开销增加 <b>30%~200%</b>，IO 密集负载整体性能下降 5%~30%。用 <span class="k">cat /sys/devices/system/cpu/vulnerabilities/meltdown</span> 看当前状态。云上买到"未打补丁"的老镜像确实更快，但那不安全，不要这么做。
+  </div>
+
+  <h3>怎么自己测</h3>
+  <p>用 <span class="k">clock_gettime(CLOCK_MONOTONIC)</span> 夹住一个百万次循环，算平均耗时；注意别让编译器把循环优化掉。也可以直接用 <span class="k">sudo perf bench syscall all</span>，内核自带基准。</p>
+  <div class="callout ok">
+    <b>一句话结论：</b>系统调用不是"很慢"，而是"<b>比函数调用贵 30~100 倍</b>"。一次 100ns 无所谓；但循环里做 100 万次就是 100ms——这就是"频繁小调用"问题的全部根源。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>常用系统调用速览</h2></div>
+  <p class="lead">450 多个系统调用里，日常真正会碰到的不到 40 个。按用途分组记，比按字母背有效。</p>
+
+  <h3>文件与 IO</h3>
+  <table>
+    <tr><th style="width:160px">调用</th><th style="width:240px">作用</th><th>要点</th></tr>
+    <tr><td class="f">openat</td><td>打开文件，返回 fd</td><td><b>取代了 open</b>。多一个 dirfd，支持相对目录打开，避免 TOCTOU 漏洞</td></tr>
+    <tr><td class="f">read / write</td><td>顺序读写</td><td>返回值<b>可能小于请求长度</b>，必须循环；返回 0 表示 EOF</td></tr>
+    <tr><td class="f">pread / pwrite</td><td>带偏移的读写</td><td><b>不改变文件偏移量</b>，多线程读写同一 fd 时必须用</td></tr>
+    <tr><td class="f">readv / writev</td><td>一次读写多块不连续内存</td><td>减少系统调用次数，见模块 4</td></tr>
+    <tr><td class="f">stat / statx</td><td>取文件元信息</td><td>statx 能取创建时间（btime）和挂载 ID</td></tr>
+    <tr><td class="f">fsync / fdatasync</td><td>把脏页刷到持久介质</td><td><b>最贵的调用之一</b>，一次几毫秒到几十毫秒</td></tr>
+    <tr><td class="f">mmap / munmap</td><td>把文件或匿名内存映射进地址空间</td><td>省掉 read 的拷贝，但引入缺页开销</td></tr>
+    <tr><td class="f">ioctl</td><td>设备专用控制通道</td><td>"万能后门"，参数语义完全由驱动定义，<b>没有统一规范</b></td></tr>
+    <tr><td class="f">fcntl</td><td>改 fd 属性</td><td>设 <span class="k">O_NONBLOCK</span>、文件锁、<span class="k">FD_CLOEXEC</span> 都靠它</td></tr>
+    <tr><td class="f">dup2</td><td>复制 fd 到指定编号</td><td>shell 的 <span class="k">2&gt;&amp;1</span> 就是它</td></tr>
+  </table>
+
+  <h3>进程与线程</h3>
+  <p><span class="k">clone</span> 是 <span class="k">fork</span> 和 <span class="k">pthread_create</span> 的共同底层，靠 flags 决定共享什么：<span class="k">CLONE_VM</span> 共享地址空间（→ 线程）、<span class="k">CLONE_NEWPID</span> 新建 PID 命名空间（→ 容器）。<span class="k">execve</span> 用新程序替换当前映像，<b>不创建新进程</b>，PID 不变。<span class="k">exit_group</span> 退整个线程组，普通 <span class="k">exit</span> 只退当前线程。<span class="k">wait4</span> 回收子进程，<b>不调它会留僵尸</b>。<span class="k">prctl</span> 设进程属性，如进程名、<span class="k">PR_SET_PDEATHSIG</span>、seccomp 模式。</p>
+
+  <h3>内存与同步</h3>
+  <table>
+    <tr><th style="width:160px">调用</th><th>作用</th></tr>
+    <tr><td class="f">brk</td><td>调整堆顶。glibc malloc 在小块分配时用它</td></tr>
+    <tr><td class="f">mmap</td><td>大块分配（默认 ≥128KB 走 mmap）、文件映射、共享内存</td></tr>
+    <tr><td class="f">mprotect</td><td>改页权限。JIT 用它把代码页从"可写"改成"可执行"</td></tr>
+    <tr><td class="f">madvise</td><td>给内核提建议：<span class="k">MADV_DONTNEED</span> 立刻回收、<span class="k">MADV_HUGEPAGE</span> 用大页</td></tr>
+    <tr><td class="f">futex</td><td>所有 pthread 锁、信号量、条件变量的基石，见下</td></tr>
+  </table>
+  <p><b>futex</b>（Fast Userspace muTEX）的设计思想值得单独说，因为它解释了通用模式：<b>无竞争时完全不进内核</b>。</p>
+  <pre><span class="c">// pthread_mutex_lock 的实质（简化）</span>
+if (atomic_cas(&amp;lock-&gt;state, 0, 1) == 0)
+    return;                  <span class="c">// 抢到锁，20ns 搞定，一次系统调用都没有</span>
+
+<span class="c">// 抢不到，才调 futex 让内核把自己挂到等待队列上睡眠</span>
+syscall(SYS_futex, &amp;lock-&gt;state, FUTEX_WAIT, 1, NULL, NULL, 0);
+
+<span class="c">// 别人解锁时 futex(FUTEX_WAKE) 唤醒一个等待者</span></pre>
+  <p>所以"加锁很慢"不准确：<b>无竞争时只是一条 CAS 指令（约 20ns），有竞争才退化到内核睡眠唤醒（约 2~5μs）</b>。差两个数量级，这也是高并发下"锁竞争"比"锁本身"可怕得多的原因。</p>
+
+  <h3>网络</h3>
+  <p><span class="k">socket</span> 创建 fd；<span class="k">bind</span> + <span class="k">listen</span> 进入监听，backlog 是<b>已完成连接队列</b>上限；<span class="k">accept4</span> 取出连接，比 accept 多 flags，能原子设置 <span class="k">SOCK_NONBLOCK | SOCK_CLOEXEC</span>；<span class="k">connect</span> 非阻塞时返回 <span class="k">EINPROGRESS</span>，要等可写事件；<span class="k">epoll_create1 / epoll_ctl / epoll_wait</span> 中<b>只有 wait 会阻塞</b>，另两个是 O(1)。</p>
+
+  <h3>时间与身份</h3>
+  <p><span class="k">clock_gettime</span> / <span class="k">gettimeofday</span> 都走 vDSO 不进内核（见模块 5）；<span class="k">nanosleep</span> 实际会睡<b>至少</b>指定时长，通常多 50~100μs；<span class="k">getpid</span> 被 glibc 缓存，常常也不进内核；权限判断看 <span class="k">geteuid</span> 而不是 <span class="k">getuid</span>。</p>
+  <div class="callout">
+    <b>为什么新代码都用 openat？</b>它多了 <span class="k">dirfd</span> 参数，可以"相对于某个已打开的目录"打开文件。① 服务长期运行时当前工作目录可能被换掉，绝对路径会打开错文件；② 先用 <span class="k">open(dir, O_PATH)</span> 拿目录 fd，之后所有操作相对它，即使目录被 rename 也不会跑偏。glibc 里 <span class="k">open()</span> 现在本身就是 <span class="k">openat(AT_FDCWD, ...)</span> 的包装。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>为什么频繁小调用慢，怎么批量</h2></div>
+  <p class="lead">这是系统调用知识里<b>最能直接换成性能</b>的一节。</p>
+
+  <h3>先算一笔账</h3>
+  <p>假设要发 1MB 数据，四种写法：</p>
+  <table>
+    <tr><th style="width:200px">写法</th><th style="width:130px">系统调用次数</th><th style="width:130px">纯切换开销</th><th>问题</th></tr>
+    <tr><td>每次 write 1 字节</td><td>1,048,576</td><td>约 105 ms</td><td>还没算协议栈。每字节配 40 字节 TCP/IP 头，<b>带宽放大 40 倍</b></td></tr>
+    <tr><td>每次 write 1KB</td><td>1,024</td><td>约 0.1 ms</td><td>可接受，但仍有一千次切换</td></tr>
+    <tr><td>每次 write 64KB</td><td>16</td><td>约 2 μs</td><td><b>接近最优</b></td></tr>
+    <tr><td>writev 一次发完</td><td>1</td><td>约 1 μs</td><td>需要数据分散在多个 buffer 才划算</td></tr>
+  </table>
+  <p>注意第一行：<b>纯切换开销 105ms，而 1MB 在千兆网上真实传输只要 8ms</b>。切换开销比真实工作大了十几倍。这就是"频繁小调用"的破坏力。</p>
+
+  <h3>第一层：用户态缓冲</h3>
+  <p>标准库早替你想过。<span class="k">stdio</span> 的 <span class="k">FILE*</span> 自带缓冲区，默认 <span class="k">BUFSIZ</span>（glibc 上是 8192 字节）。</p>
+  <pre><span class="c">// 慢：每次 printf 都可能触发一次 write</span>
+for (int i = 0; i &lt; 100000; i++) printf("%d\n", i);
+
+<span class="c">// 快：攒满 8KB 才 write 一次，调用次数降到 1/1000</span>
+<span class="c">// 注意：连终端时是行缓冲（遇 \n 就刷），连文件/管道时是全缓冲</span>
+setvbuf(stdout, NULL, _IOFBF, 1 &lt;&lt; 16);   <span class="c">// 强制全缓冲 64KB</span>
+
+<span class="c">// 更彻底：自己拼大 buffer，最后一次 write</span>
+char buf[65536]; int n = 0;
+for (int i = 0; i &lt; 100000; i++) {
+    n += snprintf(buf + n, sizeof(buf) - n, "%d\n", i);
+    if (n &gt; sizeof(buf) - 64) { write(fd, buf, n); n = 0; }
+}
+if (n) write(fd, buf, n);</pre>
+  <div class="callout warn">
+    <b>行缓冲是个隐蔽的坑。</b>程序在终端里跑得好好的，一重定向到文件就变慢或日志迟迟不落盘——因为缓冲模式变了。排查这类问题第一件事是确认 <span class="k">setvbuf</span> 设置和 <span class="k">isatty(fileno(stdout))</span> 的返回值。
+  </div>
+
+  <h3>第二层：writev 合并多次写</h3>
+  <p>数据天然分散在几个 buffer 里时（比如 HTTP 响应 = 状态行 + 头部 + body），naive 写法是三次 write，<span class="k">writev</span> 一次搞定：</p>
+  <pre><span class="c">#include &lt;sys/uio.h&gt;</span>
+struct iovec iov[3];
+iov[0].iov_base = "HTTP/1.1 200 OK\r\n";  iov[0].iov_len = 17;
+iov[1].iov_base = headers;                iov[1].iov_len = hlen;
+iov[2].iov_base = body;                   iov[2].iov_len = blen;
+
+ssize_t n = writev(fd, iov, 3);   <span class="c">// 1 次系统调用，内核按顺序拼起来发</span>
+ssize_t m = readv(fd, iov, 3);    <span class="c">// 读侧对应，省一次拼接拷贝</span></pre>
+  <p><b>边界：</b><span class="k">IOV_MAX</span> 默认 1024，超过返回 <span class="k">EINVAL</span>。而且 writev 不保证一次写完，返回值可能小于总长度，仍要循环。</p>
+
+  <h3>第三层：零拷贝</h3>
+  <p>普通 <span class="k">read + write</span> 发文件要拷四次（磁盘→页缓存→用户 buffer→socket buffer→网卡），中间两次纯浪费。<span class="k">sendfile(out_fd, in_fd, &amp;off, len)</span> 让数据不经过用户态，拷贝降到 2 次、切换降到 1 次，是 Nginx 发静态文件的默认方式；<span class="k">splice</span> 用管道中转可以做到 0 次拷贝。边界：sendfile 要求数据不需要修改，要加工内容还是得走用户态。</p>
+
+  <h3>第四层：io_uring 的思路</h3>
+  <p>前三层都在"减少次数"，io_uring 走另一条路：<b>把系统调用本身变成共享内存里的队列操作</b>。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>共享两个环。</b>内核和应用共享提交队列（SQ）和完成队列（CQ）。应用把"要做什么"写进 SQ，内核把"做完了"写进 CQ。</div></div>
+    <div class="step"><div class="txt"><b>批量提交。</b>攒 128 个请求调一次 <span class="k">io_uring_enter</span> 全部提交，系统调用次数从 128 降到 1。</div></div>
+    <div class="step"><div class="txt"><b>可选内核轮询。</b>注册 <span class="k">IORING_SETUP_SQPOLL</span> 后内核起线程轮询 SQ 环，应用<b>连那一次 enter 都不用调</b>，实现零系统调用。</div></div>
+    <div class="step"><div class="txt"><b>异步完成。</b>不像 epoll 只说"可读了"，io_uring 是"我已经把数据读进你的 buffer 了"，省掉再调一次 read 的往返。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:170px">方案</th><th style="width:170px">每请求系统调用</th><th>本质</th></tr>
+    <tr><td>阻塞 IO</td><td>1（read 本身阻塞）</td><td>一个线程一个连接</td></tr>
+    <tr><td>epoll + 非阻塞</td><td>2（epoll_wait + read）</td><td>事件通知，仍要自己读</td></tr>
+    <tr><td>io_uring（默认）</td><td>&lt;1（可批量摊薄）</td><td>共享内存提交队列</td></tr>
+    <tr><td>io_uring + SQPOLL</td><td>0</td><td>内核线程轮询，烧一个核</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>但别急着上 io_uring。</b>收益在<b>高 IOPS + 小请求</b>场景才明显（NVMe 上的数据库、代理）。普通业务一次请求读几十 KB，切换开销占比不到 1%，改造成本远大于收益。而且它有内核版本要求（5.1 引入，5.6 后才逐渐可用），部分容器运行时受 seccomp 限制会直接挡掉 <span class="k">io_uring_setup</span>。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>vDSO：不进内核也能拿时间</h2></div>
+  <p class="lead">如果每次取时间都要陷入内核，一个每秒打一万条日志的服务光取时间就要烧掉 1% 的 CPU。vDSO 就是为这类"高频但只读"的调用准备的旁路。</p>
+
+  <h3>它是什么</h3>
+  <p><b>vDSO</b>（virtual Dynamic Shared Object）是内核在<b>每个进程启动时自动映射进用户地址空间的一小段代码页</b>。它是真正的机器码，由内核提供，但跑在用户态。</p>
+  <pre><span class="c"># 每个 Linux 进程地址空间里都有它，名字就叫 [vdso]</span>
+cat /proc/self/maps | grep vdso
+<span class="c"># 7ffd3b7fe000-7ffd3b800000 r-xp 00000000 00:00 0  [vdso]</span>
+<span class="c"># 权限 r-xp：可读可执行，不可写</span>
+
+<span class="c"># 导出成文件看它导出了哪些函数</span>
+readelf -s /proc/self/map_files/* 2&gt;/dev/null | grep FUNC | head</pre>
+
+  <h3>为什么快</h3>
+  <p>内核把当前时间维护在一个<b>用户态可读的共享内存页</b>里，用 seqlock（乐观锁：读前后各取一次版本号，不一致就重读）保证读到自洽的值。取时间于是变成：读版本号 → 读秒/纳秒/TSC → 再读版本号校验，不一致就重试。</p>
+  <p>整个过程<b>没有特权级切换、没有栈切换、没有页表切换</b>，就是几十条普通指令加一次内存读。</p>
+  <table>
+    <tr><th style="width:280px">调用</th><th style="width:150px">耗时</th><th>走 vDSO？</th></tr>
+    <tr><td class="f">clock_gettime(CLOCK_MONOTONIC)</td><td>20~30 ns</td><td><b>是</b></td></tr>
+    <tr><td class="f">gettimeofday</td><td>20~30 ns</td><td><b>是</b></td></tr>
+    <tr><td class="f">time</td><td>15~25 ns</td><td><b>是</b></td></tr>
+    <tr><td class="f">clock_gettime(REALTIME_COARSE)</td><td>5~10 ns</td><td><b>是</b>，精度只到 tick（1~10ms）</td></tr>
+    <tr><td class="f">getpid</td><td>50~100 ns</td><td>否（glibc 自己缓存）</td></tr>
+  </table>
+
+  <h3>怎么验证它真的没进内核</h3>
+  <pre><span class="c"># 用 strace 统计，你会发现 clock_gettime 一次都没出现</span>
+strace -c -f ./your_program
+<span class="c"># % time     seconds  usecs/call     calls    errors syscall</span>
+<span class="c">#  45.12    0.001234          12    100000           write</span>
+<span class="c">#   3.20    0.000087           8     10000           read</span>
+<span class="c"># 没有 clock_gettime 这一行，因为它压根没陷入内核</span>
+
+<span class="c"># 想强制走真实系统调用（做对比实验）</span>
+syscall(SYS_clock_gettime, CLOCK_MONOTONIC, &amp;ts);   <span class="c">// 绕过 vDSO 包装</span></pre>
+
+  <h3>边界：vDSO 不能做什么</h3>
+  <ul>
+    <li><b>只能读，不能改。</b>无法替代任何需要写内核状态的操作，所以永远不会有 <span class="k">write</span> 或 <span class="k">open</span> 的 vDSO 版本。</li>
+    <li><b>代码由内核决定。</b>老内核可能没有新函数的实现，glibc 会退化成真实系统调用，你无法控制。</li>
+    <li><b>时钟源不稳定时会退化。</b>TSC 不可靠（跨核不同步、频率漂移）时内核会关掉 vDSO 快路径，虚拟机里尤其常见。看 <span class="k">cat /sys/devices/system/clocksource/clocksource0/current_clocksource</span>。</li>
+    <li><b>vsyscall 是它的前身，已废弃。</b>老的固定地址映射有安全风险，新内核默认 <span class="k">vsyscall=none</span>。</li>
+  </ul>
+  <div class="callout">
+    <b>通用启示：</b>凡是"<b>高频、只读、数据结构简单</b>"的内核服务，都可以用"共享内存 + 用户态代码"旁路掉。vDSO 是时间，io_uring 的 SQ/CQ 环本质上是同一个思路用在 IO 上。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>追踪手段：strace / ltrace / perf</h2></div>
+  <p class="lead">三个工具解决三个不同层次的问题，选错了会白忙一天。</p>
+  <table>
+    <tr><th style="width:110px">工具</th><th style="width:200px">原理</th><th style="width:110px">开销</th><th>什么时候用</th></tr>
+    <tr><td><b>strace</b></td><td>ptrace 挂住目标，每次进出内核停一次</td><td><b>10~100 倍</b></td><td>程序卡住、报错、行为诡异</td></tr>
+    <tr><td><b>ltrace</b></td><td>同样用 ptrace，断在库函数入口（PLT）</td><td>10~50 倍</td><td>想知道调了哪些 libc 函数，如 malloc/free 配对</td></tr>
+    <tr><td><b>perf trace</b></td><td>基于内核 tracepoint，不用 ptrace</td><td><b>1.1~2 倍</b></td><td>生产上想知道调用分布，又不方便停机</td></tr>
+    <tr><td><b>bpftrace</b></td><td>eBPF 挂内核函数，聚合在核内完成</td><td>&lt; 1.1 倍</td><td>按进程/参数聚合，长期观察</td></tr>
+  </table>
+
+  <h3>strace 的核心用法</h3>
+  <pre><span class="c"># 1. 统计模式：最常用，先看全局（-f 必加，否则看不到子线程）</span>
+strace -c -f ./app
+
+<span class="c"># 2. 只看某几类调用，大幅降噪</span>
+strace -e trace=file ./app          <span class="c"># 所有带文件路径的调用</span>
+strace -e trace=network ./app       <span class="c"># 所有网络相关</span>
+
+<span class="c"># 3. 加时间戳看每一步耗时（-tt 绝对时间，-T 单次耗时）</span>
+strace -tt -T -f ./app
+
+<span class="c"># 4. 附加到运行中的进程（会暂停目标，生产慎用）</span>
+strace -p 12345 -c
+
+<span class="c"># 5. 输出到文件再分析，避免拖慢终端</span>
+strace -o /tmp/trace.log -f -tt ./app
+grep -E 'E[A-Z]+ ' /tmp/trace.log | head -20    <span class="c"># 找所有失败的调用</span></pre>
+
+  <h3>怎么读 -c 的统计表</h3>
+  <pre>% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ----------------
+ 62.31    0.482913          48     10000           futex
+ 18.44    0.142883          14     10000           write
+  9.87    0.076512           7     10000           read
+  5.12    0.039681           3     12000      4000 openat
+  2.01    0.015582         155       100           fsync
+------ ----------- ----------- --------- --------- ----------------
+100.00    0.775571                 42100      4000 total</pre>
+  <ol>
+    <li><b>先看 errors 列。</b>4000 次 openat 失败，说明在反复尝试打开不存在的文件（常见于配置查找、动态库搜索路径）。这通常是<b>逻辑问题</b>，不是性能问题，但开销是实打实的。</li>
+    <li><b>再看 % time 最高的。</b>futex 占 62%，说明大量时间花在锁等待上——这是<b>并发设计问题</b>，换更快的系统调用没用。</li>
+    <li><b>然后看 usecs/call 异常的。</b>fsync 单次 155μs，只有 100 次但值得注意；如果变成 10000 次就是 1.5 秒。</li>
+    <li><b>最后看 calls 特别大的。</b>10000 次 write 对应 10000 次切换，合并成 100 次就省掉 99%。</li>
+  </ol>
+  <div class="callout warn">
+    <b>strace -c 的三个陷阱：</b>① <b>时间统计包含阻塞等待</b>——一次 read 等网络数据挂 100ms，这 100ms 会记到 read 头上，让你误以为 read 实现得差。看到异常大的 usecs/call 先怀疑"它在等什么"。② <b>必须加 -f</b>，否则子线程的调用完全看不到，你会得出"程序什么都没干"的错误结论。③ <b>绝对值不可信</b>，ptrace 的开销摊到每次调用上，所有值都被放大，看比例和次数。
+  </div>
+
+  <h3>perf trace 与 bpftrace：低开销替代品</h3>
+  <pre><span class="c"># 汇总模式，开销远低于 strace；对运行中进程采样 10 秒</span>
+sudo perf trace -p 12345 -s sleep 10
+
+<span class="c"># 统计系统调用总次数（不记录细节，开销最低）</span>
+sudo perf stat -e 'syscalls:sys_enter_*' -a sleep 5
+
+<span class="c"># bpftrace：按进程统计调用次数，一条命令出结果</span>
+sudo bpftrace -e 'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'</pre>
+  <div class="callout ok">
+    <b>选择建议：</b>开发/测试环境定位 → <b>strace -c -f</b>（信息最全，慢也无所谓）。生产不能停机 → <b>perf trace -s</b> 或 <b>bpftrace</b>。只想看"哪个进程在疯狂调什么" → <b>bpftrace 的 raw_syscalls 计数</b>。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>四个典型性能问题</h2></div>
+  <p class="lead">这四个几乎覆盖了"系统调用用得不对"的绝大多数线上事故。</p>
+
+  <h3>问题一：大量小 write</h3>
+  <p><b>症状：</b><span class="k">%sys</span> 高（超过 30%）、<span class="k">%user</span> 不高；<span class="k">strace -c</span> 里 write 次数惊人；网络包数远大于业务请求数。<b>根因：</b>日志没缓冲、逐条发消息。每次 write 都要切内核、走一遍 TCP 栈、可能触发软中断、组一个几十字节的包。</p>
+  <pre>strace -c -f -p &lt;pid&gt;      <span class="c"># 看 write 的 calls 数</span>
+sar -n DEV 1 5             <span class="c"># 看 pps 是否异常高</span>
+pidstat -w -p &lt;pid&gt; 1      <span class="c"># 看自愿上下文切换是否极高</span></pre>
+  <p><b>修：</b>应用层加缓冲（bufio / 批量接口）、日志改异步批量刷、<span class="k">TCP_CORK</span> 攒包（和 <span class="k">TCP_NODELAY</span> 二选一，别同时开）。</p>
+
+  <h3>问题二：fsync 太多</h3>
+  <p><b>症状：</b>写延迟 P99 从 1ms 涨到 20ms；<span class="k">iostat -x</span> 里 <span class="k">f/sync</span> 高、<span class="k">aqu-sz</span> 排队。<b>根因：</b>每条记录都 <span class="k">write + fsync</span>。fsync 必须等数据真正落到介质，一次就是毫秒级；机械盘随机写 IOPS 只有 100~200，吞吐上限就是每秒一两百条。</p>
+  <table>
+    <tr><th style="width:230px">做法</th><th style="width:150px">每次 fsync 延迟</th><th>吞吐</th></tr>
+    <tr><td>每条记录一次 fsync</td><td>5~20 ms</td><td>50~200 条/秒</td></tr>
+    <tr><td>每 100 条一次 fsync</td><td>5~20 ms（摊薄）</td><td>5000~20000 条/秒</td></tr>
+    <tr><td>group commit（多线程合并）</td><td>同上</td><td>接近设备上限</td></tr>
+  </table>
+  <p>数据库的 <b>group commit</b> 就是这个思路：多个事务的 redo 先写进同一个 buffer，第一个到达的线程负责 fsync，其他线程在条件变量上等它完成再一起返回。<b>100 个并发事务只产生 1 次 fsync</b>。金融交易要求"返回成功即已持久化"，就只能接受延迟或换 NVMe。</p>
+
+  <h3>问题三：epoll_wait 空转</h3>
+  <p><b>症状：</b>单核 100% 的 <span class="k">%sys</span>，但 QPS 很低；epoll_wait 几百万次、几乎每次都返回 0。<b>根因：</b>timeout 传了 0。</p>
+  <pre>int n = epoll_wait(epfd, events, 1024, 0);   <span class="c">// ✗ 立刻返回，没事件也返回</span>
+int n = epoll_wait(epfd, events, 1024, -1);  <span class="c">// ✓ 有事件才醒</span>
+int n = epoll_wait(epfd, events, 1024, 100); <span class="c">// ✓ 需要定时任务时给 100ms 超时</span></pre>
+  <p><b>变种：</b>等一个永远不会就绪的 fd（对端已关闭但没注销），或水平触发下没把数据读干净，每次都立刻返回同一事件。</p>
+  <div class="callout warn">
+    <b>怎么区分空转和真忙：</b>看 epoll_wait 的 <b>calls 数 ÷ 运行秒数</b>。超过 10 万次/秒而 QPS 只有几百，肯定是空转。另外 <span class="k">grep voluntary_ctxt_switches /proc/&lt;pid&gt;/status</span>，空转时这个数会疯涨。
+  </div>
+
+  <h3>问题四：漏了 O_NONBLOCK</h3>
+  <p><b>症状：</b>一个客户端卡住，整个服务无响应，但 CPU 是 0。<span class="k">/proc/&lt;pid&gt;/stack</span> 显示线程停在 read 或 write 上。<b>根因：</b>事件循环单线程，某个 fd 是阻塞模式，对端不发数据就把整个循环卡死。</p>
+  <pre>cat /proc/&lt;pid&gt;/task/&lt;tid&gt;/stack     <span class="c"># 看卡在哪个系统调用</span>
+cat /proc/&lt;pid&gt;/fdinfo/&lt;fd&gt;         <span class="c"># flags 04002 有 O_NONBLOCK；02 没有</span>
+
+int fd = accept4(lfd, NULL, NULL, SOCK_NONBLOCK | SOCK_CLOEXEC);   <span class="c">// ✓ 创建时就带上</span>
+int flags = fcntl(fd, F_GETFL, 0);
+fcntl(fd, F_SETFL, flags | O_NONBLOCK);    <span class="c">// ✓ 修改而不是覆盖</span></pre>
+  <div class="callout danger">
+    <b>O_NONBLOCK 只影响"会不会阻塞"，不影响"数据是否完整"。</b>read 返回 <span class="k">EAGAIN</span> 表示"现在没数据"，返回小于请求长度表示"只读到这么多"，<b>两种情况都必须正确处理</b>。很多"偶发丢包"就是把 EAGAIN 当成了 EOF。
+  </div>
+  <p><b>另外三个高频小问题：</b>错误分支忘记 close 导致 fd 泄漏（最终报 <span class="k">EMFILE</span>，用 <span class="k">ls /proc/&lt;pid&gt;/fd | wc -l</span> 监控）；慢系统调用被信号打断返回 <span class="k">EINTR</span>，语义是"请重试"；<span class="k">getaddrinfo</span> 是阻塞的，DNS 抖动会卡住整个线程。</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>容器里的系统调用</h2></div>
+  <p class="lead">同一份二进制，在物理机上跑得好好的，进了容器就报 <span class="k">Operation not permitted</span>。90% 是 seccomp 干的。</p>
+
+  <h3>seccomp 是什么</h3>
+  <p><b>seccomp</b>（secure computing mode）是内核提供的一层<b>系统调用过滤器</b>。它用 BPF 程序描述"哪些调用允许、哪些拒绝"，在<b>进入内核的第一步</b>就判断，比任何权限检查都早。</p>
+  <p>Docker 默认加载一个白名单 profile，<b>屏蔽约 44 个系统调用</b>。被屏蔽的调用返回 <span class="k">EPERM</span> 而不是 ENOSYS——因为返回 ENOSYS 会让程序以为内核太老，从而走奇怪的兼容路径。</p>
+  <table>
+    <tr><th style="width:220px">被默认屏蔽的调用</th><th>为什么屏蔽</th><th style="width:190px">典型报错</th></tr>
+    <tr><td class="f">mount / umount2</td><td>能挂载宿主机设备，直接逃逸</td><td>EPERM</td></tr>
+    <tr><td class="f">ptrace</td><td>能读写其他进程内存，注入代码</td><td>EPERM（strace 失败的原因）</td></tr>
+    <tr><td class="f">bpf</td><td>能加载 eBPF 程序，历史上出过多次提权漏洞</td><td>EPERM</td></tr>
+    <tr><td class="f">init_module / finit_module</td><td>加载内核模块</td><td>EPERM</td></tr>
+    <tr><td class="f">kexec_load / reboot</td><td>加载新内核 / 重启宿主机</td><td>EPERM</td></tr>
+    <tr><td class="f">perf_event_open</td><td>性能计数器，可做侧信道泄密</td><td>EPERM（perf 用不了）</td></tr>
+    <tr><td class="f">keyctl / add_key</td><td>内核密钥环</td><td>EPERM</td></tr>
+    <tr><td class="f">clone3（老 runc）</td><td>参数结构体新，老 profile 不认，直接拒</td><td>EPERM 或 ENOSYS</td></tr>
+  </table>
+
+  <h3>怎么判断是 seccomp 还是权限问题</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先看 errno。</b><span class="k">EPERM</span> 通常是 seccomp 或 capability 不足；<span class="k">EACCES</span> 是文件权限；<span class="k">ENOSYS</span> 可能是内核不支持，也可能是运行时故意伪装的 seccomp 拒绝。</div></div>
+    <div class="step"><div class="txt"><b>查进程的 seccomp 状态。</b><span class="k">grep Seccomp /proc/&lt;pid&gt;/status</span>：<span class="k">0</span> 未启用，<span class="k">1</span> strict 模式（几乎不用），<span class="k">2</span> filter 模式（Docker 默认）。</div></div>
+    <div class="step"><div class="txt"><b>看容器安全配置。</b><span class="k">docker inspect &lt;name&gt; --format '{{.HostConfig.SecurityOpt}}'</span>，出现 <span class="k">seccomp=unconfined</span> 说明没过滤。</div></div>
+    <div class="step"><div class="txt"><b>做对照实验。</b>用 <span class="k">--security-opt seccomp=unconfined</span> 重跑，问题消失就确认是 seccomp。</div></div>
+  </div>
+  <pre><span class="c"># 1. 看 seccomp 模式与能力位图</span>
+grep -E 'Seccomp|CapEff' /proc/self/status
+<span class="c"># Seccomp: 2            ← 2 = filter 模式，Docker 默认</span>
+<span class="c"># CapEff: 00000000a80425fb</span>
+capsh --decode=00000000a80425fb   <span class="c"># 解码，确认没有 cap_sys_admin</span>
+
+<span class="c"># 2. 复现最小案例</span>
+strace -f -e trace=mount mount -t tmpfs none /mnt
+<span class="c"># mount(...) = -1 EPERM (Operation not permitted)</span>
+
+<span class="c"># 3. 去掉 seccomp 再试，问题消失即确认</span>
+docker run --rm -it --security-opt seccomp=unconfined ubuntu:24.04 \
+  bash -c 'mount -t tmpfs none /mnt &amp;&amp; echo OK'
+
+<span class="c"># 4. 若仍失败，是 capability 不够</span>
+docker run --rm -it --cap-add=SYS_ADMIN ubuntu:24.04 \
+  bash -c 'mount -t tmpfs none /mnt &amp;&amp; echo OK'</pre>
+
+  <h3>clone3 那个著名的坑</h3>
+  <p>2023 年出现过影响面很大的问题：新版 glibc（2.34+）的 <span class="k">pthread_create</span> 优先尝试 <span class="k">clone3</span>，失败再回退 <span class="k">clone</span>。老版本 Docker/runc 的 profile 里没有 <span class="k">clone3</span> 规则，默认动作是 <span class="k">SCMP_ACT_ERRNO(ENOSYS)</span>，按理能正常回退。但某些组合下（runc 1.1.5 之前）返回的是 <span class="k">EPERM</span> 而非 ENOSYS，glibc 认为"这是权限问题"就不回退，于是所有建线程操作失败，程序起不来。判断：<span class="k">runc --version</span> 低于 1.1.5 有风险；根治是升级运行时。</p>
+
+  <h3>该不该放开 seccomp</h3>
+  <div class="callout danger">
+    <b><span class="k">--security-opt seccomp=unconfined</span> 只应作为排查手段，不要写进生产编排。</b>它把 44 个高危调用全部放开，配合默认 root 用户，容器逃逸门槛会大幅降低。正确做法是<b>写自定义 profile</b>：从默认 profile 出发，只把确实需要的那一两个调用（如 <span class="k">clone3</span>、<span class="k">perf_event_open</span>）改成 ALLOW。Kubernetes 里通过 <span class="k">securityContext.seccompProfile</span> 指定。
+  </div>
+  <table>
+    <tr><th style="width:210px">需求</th><th style="width:260px">需要放开什么</th><th>风险</th></tr>
+    <tr><td>容器内跑 strace / gdb</td><td><span class="k">CAP_SYS_PTRACE</span> + seccomp 放行 ptrace</td><td>能读写同命名空间内其他进程内存</td></tr>
+    <tr><td>容器内跑 perf</td><td><span class="k">CAP_PERFMON</span> + 放行 perf_event_open</td><td>可做侧信道攻击</td></tr>
+    <tr><td>容器内挂载卷</td><td><span class="k">CAP_SYS_ADMIN</span> + 放行 mount</td><td><b>接近完全逃逸</b>，慎用</td></tr>
+    <tr><td>容器内改内核参数</td><td><span class="k">/proc/sys</span> 可写 + 该参数非 namespace 化</td><td>影响宿主机所有容器</td></tr>
+  </table>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个真实踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">以为 write 一定会把数据写完</div><div class="pd">socket、管道、被信号打断后，返回值都可能小于请求长度。不检查就丢数据，且只在高压下偶发。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把 EINTR 当成真错误</div><div class="pd">被信号打断时<b>什么都没发生</b>，语义是"请重试"。很多框架在这里抛异常，表现为"偶发连接失败"。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">在压测时挂 strace</div><div class="pd">开销 10~100 倍，测出的 QPS 和延迟毫无意义，还会因超时掩盖真正的瓶颈。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">strace 不加 -f</div><div class="pd">多线程程序的工作线程全看不到，你只看到主线程在 futex 上等，得出"什么都没干"的错误结论。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">日志逐条 write 且不缓冲</div><div class="pd">每秒一万条日志 = 一万次系统调用 + 一万个网络包。用异步 appender + 批量刷盘。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">每条记录都 fsync</div><div class="pd">机械盘上直接把吞吐锁死在每秒一两百条。批量提交、接受延迟、换 NVMe，三选一。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">epoll_wait 传 timeout=0</div><div class="pd">变成忙轮询，单核 100% 的 %sys 但 QPS 极低。传 -1 阻塞，或传有意义的超时。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">accept 出来的 fd 忘了设 O_NONBLOCK</div><div class="pd">监听 fd 非阻塞不代表新连接也是。一个慢客户端就能让整个事件循环停住。用 accept4 一次带上。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">fd 没设 CLOEXEC，被子进程继承</div><div class="pd">父进程 close 了连接也释放不掉（引用计数还在），表现为"端口不释放"和 fd 缓慢泄漏。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">容器报 EPERM 就去加 --privileged</div><div class="pd">这是最危险的"修复"。正确顺序：看 errno → 看 Seccomp → 看 CapEff → 只放开需要的那一项。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 用户态程序执行 <span class="k">cli</span>（关中断）指令，会发生什么？</div>
+      <button class="opt">内核返回 EPERM</button>
+      <button class="opt">CPU 直接抛通用保护异常（#GP），进程被 SIGSEGV 杀掉</button>
+      <button class="opt">指令被静默忽略</button>
+      <div class="ans">正确答案：<b>CPU 抛异常</b>。特权指令的拦截在硬件层，不是内核软件检查，所以进程收到 SIGSEGV 而不是 errno。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一次 <span class="k">getpid</span> 系统调用大约耗时多少？</div>
+      <button class="opt">1~2 纳秒，和普通函数调用差不多</button>
+      <button class="opt">10~20 微秒，和进程切换差不多</button>
+      <button class="opt">50~100 纳秒，比函数调用贵 30~100 倍</button>
+      <div class="ans">正确答案：<b>50~100 纳秒</b>。它几乎不干实事，耗时全是模式切换。梯度：函数调用 1~2ns，系统调用 50~100ns，进程切换 2~5μs。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 为什么 <span class="k">clock_gettime</span> 比 <span class="k">getpid</span> 快好几倍？</div>
+      <button class="opt">走 vDSO，内核把时间放在用户态可读的共享页里，不需要陷入内核</button>
+      <button class="opt">因为它是 libc 函数，根本不涉及内核</button>
+      <button class="opt">因为时钟精度低，计算量小</button>
+      <div class="ans">正确答案：<b>vDSO</b>。内核在每个进程里映射了一段 <span class="k">[vdso]</span> 代码页，用 seqlock 读共享数据，所以 <span class="k">strace -c</span> 里看不到它。但它不是纯 libc 函数，特殊时钟源下会退化成真实系统调用。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 要发 1MB 数据，下面哪种写法最快？</div>
+      <button class="opt">循环 100 万次 write(fd, &amp;c, 1)</button>
+      <button class="opt">每次 write 64KB，共 16 次</button>
+      <button class="opt">每次 write 4KB，共 256 次</button>
+      <div class="ans">正确答案：<b>每次 64KB</b>。1 字节写法光切换就要约 100ms，还要为每字节配 40 字节协议头。64KB 接近 socket 缓冲上限，切换降到 16 次。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. <span class="k">strace -c</span> 显示 futex 占 62% 时间，怎么优化？</div>
+      <button class="opt">换成更快的系统调用</button>
+      <button class="opt">减少线程数</button>
+      <button class="opt">这是锁竞争问题，要改并发设计，换系统调用解决不了</button>
+      <div class="ans">正确答案：<b>改并发设计</b>。futex 时间高说明线程在等锁，方向是缩小临界区、按 key 分片、换无锁结构。而且 strace 的时间<b>包含阻塞等待</b>，62% 不代表 futex 本身慢。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 容器里 strace 报 <span class="k">ptrace: Operation not permitted</span>，最可能的原因是？</div>
+      <button class="opt">Docker 默认 seccomp 屏蔽了 ptrace，且没给 CAP_SYS_PTRACE</button>
+      <button class="opt">strace 版本太老</button>
+      <button class="opt">内核没编译 ptrace 支持</button>
+      <div class="ans">正确答案：<b>seccomp + capability 双重限制</b>。用 <span class="k">grep Seccomp /proc/self/status</span> 看是否返回 2，用 <span class="k">capsh --decode=$(grep CapEff /proc/self/status | awk '{print $2}')</span> 看有没有 SYS_PTRACE。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>追踪与观测</h3>
+  <div class="cmds">
+    <div class="crow"><code>strace -c -f ./app</code><span class="desc">统计系统调用次数与耗时（必加 -f）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>strace -tt -T -f -p &lt;pid&gt;</code><span class="desc">带时间戳和单次耗时，附加到运行中进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf trace -s -p &lt;pid&gt; sleep 10</code><span class="desc">低开销的系统调用统计（生产可用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e 'syscalls:sys_enter_*' -a sleep 5</code><span class="desc">全局统计各类系统调用次数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>bpftrace -e 'tracepoint:raw_syscalls:sys_enter { @[comm]=count(); }'</code><span class="desc">按进程统计调用次数，开销极小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/&lt;pid&gt;/fdinfo/&lt;fd&gt;</code><span class="desc">看 fd 的 flags，确认有没有 O_NONBLOCK</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>容器与安全</h3>
+  <div class="cmds">
+    <div class="crow"><code>grep -E 'Seccomp|CapEff' /proc/self/status</code><span class="desc">看 seccomp 模式和有效 capability 位图</span><button class="copy">复制</button></div>
+    <div class="crow"><code>capsh --decode=00000000a80425fb</code><span class="desc">把 CapEff 十六进制解码成能力名</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined ...</code><span class="desc">让容器内能跑 strace（仅调试用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/clocksource/clocksource0/current_clocksource</code><span class="desc">看时钟源，tsc 才能走 vDSO 快路径</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>常用头文件</h3>
+  <p><span class="k">sys/syscall.h</span>（SYS_* 常量）、<span class="k">unistd.h</span>（read/write/fork）、<span class="k">fcntl.h</span>（openat/O_NONBLOCK）、<span class="k">sys/uio.h</span>（writev）、<span class="k">sys/mman.h</span>（mmap）、<span class="k">sys/socket.h</span> + <span class="k">sys/epoll.h</span>（网络）、<span class="k">linux/futex.h</span>、<span class="k">time.h</span>。</p>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>用户态 / 内核态</b></td><td>CPU 的两个特权级（Ring 3 / Ring 0），后者能执行特权指令</td></tr>
+    <tr><td><b>系统调用</b></td><td>应用请求内核服务的唯一合法入口，通过 syscall 指令触发</td></tr>
+    <tr><td><b>陷入 trap</b></td><td>从用户态切到内核态的统称，包括系统调用、异常、中断</td></tr>
+    <tr><td><b>系统调用号</b></td><td>标识"要哪个服务"的整数，架构相关（x86-64 与 ARM64 不同）</td></tr>
+    <tr><td><b>copy_from_user</b></td><td>把用户态内存安全拷进内核的函数，会做地址合法性检查</td></tr>
+    <tr><td><b>KPTI</b></td><td>内核页表隔离，Meltdown 的缓解措施，代价是每次进出内核切 CR3</td></tr>
+    <tr><td><b>TLB</b></td><td>页表项的高速缓存，切换页表会冲刷它，是上下文切换贵的主因</td></tr>
+    <tr><td><b>vDSO</b></td><td>内核映射到用户态的代码页，让取时间这类只读操作免于陷入</td></tr>
+    <tr><td><b>futex</b></td><td>快速用户态互斥锁，无竞争时纯用户态 CAS，有竞争才进内核睡眠</td></tr>
+    <tr><td><b>零拷贝</b></td><td>sendfile/splice 等，让数据不经过用户态缓冲区，减少拷贝</td></tr>
+    <tr><td><b>io_uring</b></td><td>用共享内存环形队列提交 IO 请求，可批量、可零系统调用</td></tr>
+    <tr><td><b>seccomp</b></td><td>内核的系统调用过滤器，用 BPF 决定哪些调用允许</td></tr>
+    <tr><td><b>capability</b></td><td>把 root 权限拆成细粒度能力（CAP_SYS_ADMIN 等），容器默认只给一小部分</td></tr>
+    <tr><td><b>ptrace</b></td><td>调试器附加进程的系统调用，strace/gdb 的基础，也是容器默认禁止的</td></tr>
+    <tr><td><b>EINTR</b></td><td>慢系统调用被信号打断的返回码，语义是"请重试"</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个循环调 100 万次 <span class="k">getpid</span> 的程序，用 clock_gettime 测单次耗时，再对比 clock_gettime 自己；② 用 <span class="k">strace -c</span> 跑一遍 <span class="k">ls</span>、<span class="k">cat</span>、<span class="k">curl</span>，看它们的调用画像差异；③ 把一段逐条 write 的日志代码改成 64KB 缓冲，用 <span class="k">strace -c</span> 对比 calls 数；④ 在容器里跑 strace 故意让它失败，按模块 8 的流程定位到 seccomp；⑤ 用 <span class="k">perf trace -s</span> 观察一个生产进程 10 秒，找出调用次数最多的三个系统调用。<br><br>
+    <b>接下来该读：</b>《中断与软中断》（同一层的另一半：异步进入内核的路径）、《IO 模型》（epoll 到底怎么工作）、《内存管理》（mmap 和缺页背后的页表机制）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透系统调用与内核边界 · 优化前先量一下：strace -c 里谁排第一</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（批量与零拷贝）和模块 8（容器 seccomp）最值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里敲 strace。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开一台 Linux（虚拟机或容器都行）跟着敲 strace';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 RocksDB 与 LSM 树</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 数据库篇 · 高密度版</span>
+    <h1>二十分钟学透 RocksDB 与 LSM 树</h1>
+    <p class="sub">RocksDB 不是一个数据库，是<b>嵌进你程序里的存储引擎</b>。LSM 树用"追加写 + 后台合并"换来高写入吞吐，代价是写放大、读放大、空间放大的三角权衡。这篇把这套机制和调参的坑一次讲清。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">层级 <b>L0 ~ L6</b>（默认 7 层）</span>
+      <span class="chip">MemTable 默认 <b>64MB</b></span>
+      <span class="chip">Block Cache 默认 <b>8MB</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">RocksDB 是嵌入式库，练手方式：编译一个几十行的 C++ demo（见模块 6）</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>它是什么，不是什么</h2></div>
+  <p class="lead">RocksDB 是 Facebook 基于 LevelDB 重写的<b>嵌入式 KV 存储引擎</b>（C++ 库），没有网络服务、没有账号体系、没有 SQL。<b>你的进程链接它，它把数据落在你指定的目录</b>——这就是"嵌入式"的含义。</p>
+  <table>
+    <tr><th style="width:150px">认知</th><th>事实</th></tr>
+    <tr><td>"像 MySQL 一样装一个服务"</td><td><b>不对。</b>没有独立进程，没有连接协议。它是你程序里的一个 .so/.a，API 就是函数调用</td></tr>
+    <tr><td>"数据在内存里所以快"</td><td><b>不对。</b>数据全在磁盘（SSTable 文件），MemTable 只是写缓冲。它靠顺序 IO + 缓存提速，不是内存数据库</td></tr>
+    <tr><td>"能替代 Redis"</td><td><b>不对。</b>RocksDB 是磁盘 KV，微秒级延迟；Redis 是内存数据结构服务，亚毫秒到毫秒级。定位不同，经常搭配使用</td></tr>
+    <tr><td>"MyRocks / TiKV 是新数据库"</td><td><b>对了一半。</b>它们是把 RocksDB 当存储引擎、外面包一层分布式/协议层的产品</td></tr>
+  </table>
+  <h4>谁在用 RocksDB</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>MyRocks</div><div class="cd">MySQL 的存储引擎，替代 InnoDB，Facebook 主力</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>TiKV</div><div class="cd">分布式 KV，Raft 层 + RocksDB 层，TiDB 的存储底座</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>Flink</div><div class="cd">有状态流计算的本地状态后端（大 state 场景标配）</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>Kafka Streams</div><div class="cd">本地状态存储 + changelog topic 恢复</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>CockroachDB / Yugabyte</div><div class="cd">分别 fork 出 Pebble / DocDB 做单机存储层</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>业务自研</div><div class="cd">本地缓存持久化、特征存储、消息投递状态、元数据存储</div></div>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>LSM 树层次结构</h2></div>
+  <p class="lead">LSM（Log-Structured Merge）树的核心思想：<b>把随机写变成顺序写</b>。数据从内存逐层往下刷，每下一层数据量约扩大 10 倍。理解层级结构，后面所有参数都有了意义。</p>
+  <h4>L0 到 L6 各是什么</h4>
+  <table>
+    <tr><th style="width:90px">层</th><th style="width:200px">数据来源</th><th>键范围特性</th></tr>
+    <tr><td><b>L0</b></td><td>MemTable flush 直接产生</td><td><b>多个文件间键范围可重叠</b>，新的在左边。一次读可能要查多个 L0 文件</td></tr>
+    <tr><td><b>L1 ~ L6</b></td><td>Compaction 逐层下推</td><td><b>每层内部全局有序、文件间键范围不重叠</b>，查一层最多命中一个文件</td></tr>
+    <tr><td><b>容量</b></td><td>每层约为上一层的 10 倍</td><td><span class="k">target_file_size_base=64MB</span>，<span class="k">max_bytes_for_level_base=256MB</span>（默认值）</td></tr>
+    <tr><td><b>层数</b></td><td><span class="k">num_levels=7</span>（即 L0~L6）</td><td>最后一层（L6）即 bottom level，删除标记在这里被真正物理清除</td></tr>
+  </table>
+  <h4>一次点查的完整路径</h4>
+  <pre>db-&gt;Get(ReadOptions(), <span class="y">"user:1001"</span>, &amp;value)
+
+<span class="c">// 1. 查活跃 MemTable（内存 skiplist）</span>
+<span class="c">// 2. 查 Immutable MemTable（如果有）</span>
+<span class="c">// 3. 查 L0 的每个 SSTable（按生成时间从新到旧，找到即停）</span>
+<span class="c">// 4. 查 L1 ~ L6，每层最多一个文件可能命中（键范围不重叠）</span>
+<span class="c">//    每层都先过布隆过滤器，说"不存在"就跳过整个文件</span>
+<span class="c">// 5. 全部没命中 → Not Found</span></pre>
+  <div class="callout">
+    <b>为什么 L0 特殊：</b>flush 是并发进行的，多个 Immutable MemTable 可能同时刷出多个 L0 文件，它们键范围互相重叠。而 L1 及以下由 compaction 保证"层内有序不重叠"，所以点查每层只查一个文件。<b>L0 文件越多，读放大越严重</b>，这是 <span class="k">level0_file_num_compaction_trigger</span>（默认 4）存在的原因。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>写路径：从 WAL 到 SSTable</h2></div>
+  <p class="lead">一次 <span class="k">Put</span> 要经过四站。<b>每一站的设计目标只有一个：不丢数据 + 顺序写磁盘。</b></p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>① 写 WAL（Write-Ahead Log）</b>：先把操作<b>追加</b>到日志文件（顺序 IO，快），再动内存。进程崩溃后靠重放 WAL 恢复。支持组提交（group commit）：多个并发写共享一次 fsync</div></div>
+    <div class="step"><div class="txt"><b>② 写 MemTable</b>：内存里的跳表（skiplist），同时是全量数据的活跃写缓冲。<span class="k">write_buffer_size</span> 默认 64MB</div></div>
+    <div class="step"><div class="txt"><b>③ MemTable 写满 → 变为 Immutable MemTable</b>：切换为只读，同时新建活跃 MemTable 接收写入。<span class="k">max_write_buffer_number</span> 默认 2，即最多 1 个活跃 + 1 个不可变；超过就<b>阻塞写入</b>等 flush</div></div>
+    <div class="step"><div class="txt"><b>④ Flush → L0 SSTable</b>：Immutable MemTable 刷成有序的 SSTable 文件（含数据块 + 索引块 + 布隆过滤器块），落 L0。删掉对应的 WAL 段</div></div>
+    <div class="step"><div class="txt"><b>⑤ Compaction 逐层下推</b>：L0 文件攒够触发 compaction，挑选与 L1 重叠的文件归并排序后下沉，逐级直到 L6。删除旧文件、合并多版本、物理清除已删数据</div></div>
+  </div>
+  <h4>关键机制</h4>
+  <table>
+    <tr><th style="width:150px">机制</th><th>说明</th></tr>
+    <tr><td><b>删除 = 写墓碑</b></td><td>Delete 不是原地删，是写一个 tombstone 标记。<b>直到 compaction 到 bottom level 才物理移除</b>——所以删完立刻看磁盘占用不会降</td></tr>
+    <tr><td><b>多版本共存</b></td><td>同一 key 的新旧值可同时存在不同层/文件，Get 时取<b>最新版本</b>。这是迭代器快照和 MVCC 语义的基础</td></tr>
+    <tr><td><b>组提交</b></td><td>并发写共享一次 WAL fsync，吞吐远高于一写一刷。默认 WAL 同步策略 <span class="k">WriteOptions::sync=false</span>（异步，崩了可能丢尾部）</td></tr>
+    <tr><td><b>写停顿保护</b></td><td>L0 文件超过 <span class="k">level0_slowdown_writes_trigger</span>（默认 20）降速，超过 <span class="k">level0_stop_writes_trigger</span>（默认 36）<b>停写</b>等 compaction</td></tr>
+  </table>
+  <pre><span class="c">// 写路径上的 API 选择</span>
+db-&gt;Put(WriteOptions(), key, value);              <span class="c">// 单条写，每次一个 WAL 追加</span>
+rocksdb::WriteBatch batch;                        <span class="c">// 批量写，合并成一次 WAL 追加 + 一次 MemTable 插入</span>
+batch.Put(cf, <span class="y">"k1"</span>, <span class="y">"v1"</span>);
+batch.Put(cf, <span class="y">"k2"</span>, <span class="y">"v2"</span>);
+batch.Delete(cf, <span class="y">"k3"</span>);
+db-&gt;Write(WriteOptions(), &amp;batch);                <span class="c">// 整个 batch 原子生效</span>
+
+rocksdb::WriteOptions wo;
+wo.sync = true;                                   <span class="c">// 等 WAL fsync 才返回，最安全最慢</span>
+wo.disableWAL = true;                             <span class="c">// 完全不写 WAL，崩了丢未刷盘数据（缓存场景）</span></pre>
+  <div class="callout warn">
+    <b>"数据写进去了"是个有歧义的说法。</b>默认 <span class="k">sync=false</span> 时，写进 MemTable 就算成功，但还在操作系统页缓存里，进程崩了有 WAL 兜底，<b>机器掉电则丢失</b>。要"掉电不丢"必须 <span class="k">wo.sync=true</span> 或开 WAL 自动同步。批量导入时先用 disableWAL 提速、导完 CompactRange，是常见组合拳。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Compaction 策略与三种放大</h2></div>
+  <p class="lead">Compaction 是 LSM 的心脏，也是<b>唯一可以调出巨大性能差异的旋钮</b>。先记住三角权衡，再看策略。</p>
+  <h4>三种放大</h4>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:200px">定义</th><th>量级参考</th></tr>
+    <tr><td><b>写放大</b></td><td>磁盘写入总量 ÷ 用户写入量。 compaction 反复重写同一份数据</td><td>Leveled 典型 10~40x；Universal/Tiered 可降到 5~10x</td></tr>
+    <tr><td><b>读放大</b></td><td>一次点查实际访问的 SSTable 数量（含布隆过滤器检查）</td><td>Leveled 约 1~2 次/层，靠布隆过滤；Universal 层内多文件，显著更高</td></tr>
+    <tr><td><b>空间放大</b></td><td>磁盘占用 ÷ 逻辑数据量。旧版本数据未及时清除</td><td>Leveled 约 10%；Tiered/Universal 可达 2 倍以上</td></tr>
+  </table>
+  <p>三角不可能同时最优：<b>压写放大 → 空间/读放大升；压读放大 → 写放大升。</b>调参就是按你的读写比例选站位。</p>
+  <h4>策略对比</h4>
+  <table>
+    <tr><th style="width:150px">策略</th><th style="width:230px">结构</th><th>适用</th></tr>
+    <tr><td><b>Leveled</b><br>（RocksDB 默认）</td><td>每层一个有序 run，层间 10 倍容量。compaction 拿 L_n 一个文件和 L_n+1 重叠文件归并</td><td><b>读多写少、数据量大、要求低读放大。</b>写放大最高</td></tr>
+    <tr><td><b>Universal</b><br>（≈ Size-Tiered）</td><td>动态层：把大小相近的多个 SSTable 合成一个 tier，整 tier 归并</td><td><b>写多读少、批量导入。</b>写放大低，读放大和空间放大高</td></tr>
+    <tr><td><b>FIFO</b></td><td>不管键，按时间淘汰最老的文件（类 TTL 队列）</td><td>日志、时序数据，只留最近 N 天</td></tr>
+  </table>
+  <div class="callout">
+    <b>术语对齐：</b>"Tiered（Size-Tiered）"是通用 LSM 术语，Cassandra 默认用它；RocksDB 原生只有 Leveled / Universal / FIFO 三种 style，其中 <b>Universal 就是 Size-Tiered 思路的工程实现</b>。看到"分层 compaction"和"平铺 compaction"的争论，指的是这一对。
+  </div>
+  <pre><span class="c">// Leveled（默认）关键参数</span>
+options.write_buffer_size = 64 &lt;&lt; 20;        <span class="c">// 64MB MemTable</span>
+options.target_file_size_base = 64 &lt;&lt; 20;    <span class="c">// L1 文件目标大小</span>
+options.max_bytes_for_level_base = 256 &lt;&lt; 20;<span class="c">// L1 总容量，下层逐层 ×10</span>
+options.level0_file_num_compaction_trigger = 4;<span class="c">// L0 攒够 4 个文件触发 compaction</span>
+
+<span class="c">// 切 Universal：写密集场景</span>
+options.compaction_style = rocksdb::kCompactionStyleUniversal;
+options.num_levels = 1;                        <span class="c">// 常配合少量层级</span>
+
+<span class="c">// 切 FIFO：纯时序/TTL 数据</span>
+options.compaction_style = rocksdb::kCompactionStyleFIFO;
+options.max_open_files = -1;                   <span class="c">// FIFO 需要能打开所有文件</span>
+
+<span class="c">// compaction 限速：防后台 IO 打满前台请求</span>
+options.rate_limiter = std::shared_ptr&lt;rocksdb::RateLimiter&gt;(
+    rocksdb::NewGenericRateLimiter(100 &lt;&lt; 20));   <span class="c">// 限制 compaction 合计 100MB/s</span></pre>
+  <div class="callout danger">
+    <b>Leveled 写放大的来源：</b>每下一层，数据就要被<b>重写一遍</b>。7 层、每层 10 倍容量时，一份数据从 L1 到 L6 平均被重写约 5~6 次，这就是 10~40x 写放大的算术本质。<b>SSD 有写入寿命</b>——云盘按量计费的 IOPS 也会被 compaction 悄悄吃光。写密集业务用 Universal 或平铺策略，别用默认。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>布隆过滤器与块缓存</h2></div>
+  <p class="lead">LSM 读多层的代价靠两样东西抵消：<b>布隆过滤器挡掉不存在的文件，块缓存挡住热数据</b>。不配这两样，LSM 的读性能会难看。</p>
+  <h4>布隆过滤器</h4>
+  <table>
+    <tr><th style="width:150px">属性</th><th>说明</th></tr>
+    <tr><td>粒度</td><td><b>每个 SSTable 一个过滤器</b>，存在文件尾部的 filter block</td></tr>
+    <tr><td>语义</td><td>"这个 key <b>一定不在</b>这个文件" / "可能在"。<b>有误判（假阳性），无漏判</b></td></tr>
+    <tr><td>默认精度</td><td>约 10 bits/key，误判率约 1%</td></tr>
+    <tr><td>代价</td><td>约 1.2% 的额外空间；查询时多一次内存计算</td></tr>
+  </table>
+  <pre><span class="c">// 创建 DB 时显式配置（RocksDB 默认不建布隆过滤器！）</span>
+rocksdb::BlockBasedTableOptions table_options;
+table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10, false));  <span class="c">// 10 bits/key</span>
+options.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
+
+<span class="c">// 效果：点查不在库里的 key，只碰内存，零磁盘 IO</span>
+<span class="c">// 注意：RangeScan / 迭代器遍历用不上过滤器，只加速点查</span></pre>
+  <h4>块缓存（Block Cache）</h4>
+  <table>
+    <tr><th style="width:150px">属性</th><th>说明</th></tr>
+    <tr><td>是什么</td><td>内存 LRU 缓存，存<b>解压后的数据块、索引块、过滤器块</b></td></tr>
+    <tr><td>默认大小</td><td><b>仅 8MB</b>——生产基本都要调大。经验值：可用内存的 20%~30%</td></tr>
+    <tr><td>块大小</td><td><span class="k">block_size</span> 默认 4KB。范围扫描多可调到 16~64KB 减索引开销</td></tr>
+    <tr><td>索引块</td><td><span class="k">cache_index_and_filter_blocks</span> 默认 false（每次查询重新加载）。数据量大时设 true</td></tr>
+  </table>
+  <pre><span class="c">// 共享块缓存（多列族/多实例时复用）</span>
+auto cache = rocksdb::NewLRUCache(1 &lt;&lt; 30);   <span class="c">// 1GB</span>
+rocksdb::BlockBasedTableOptions table_options;
+table_options.block_cache = cache;
+table_options.cache_index_and_filter_blocks = true;   <span class="c">// 索引/过滤器也进缓存</span>
+table_options.block_size = 16 &lt;&lt; 10;                 <span class="c">// 16KB 块，适合范围扫描</span></pre>
+  <div class="callout ok">
+    <b>读优化三件套：</b>① 建布隆过滤器（点查必备）；② 块缓存给到 1GB 以上并缓存索引过滤器块；③ 热 key 少就还能再上 <span class="k">optimize_filters_for_hits</span>。顺序全量遍历（迭代器）的场景反过来：过滤器没用，块要设大减少索引查找。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>列族与合并算子</h2></div>
+  <p class="lead">列族（Column Family）让一个 DB 里跑多套独立配置的数据；合并算子（Merge Operator）让你在服务端做"读-改-写"而不必先读出来。</p>
+  <h4>列族</h4>
+  <table>
+    <tr><th style="width:150px">问题</th><th>答案</th></tr>
+    <tr><td>是什么</td><td>同一 DB 内的<b>独立键空间</b>，各有自己的 MemTable、SSTable 和 compaction 参数</td></tr>
+    <tr><td>默认列族</td><td><span class="k">default</span> 永远存在。不指定 CF 的读写都落在它上面</td></tr>
+    <tr><td>原子性</td><td>一个 WriteBatch 跨多个 CF 的写入<b>原子生效</b>（同一个 WAL 序列）</td></tr>
+    <tr><td>最大坑</td><td><b>打开 DB 时必须列出所有已存在的 CF</b>，漏一个直接报错（见坑 7）</td></tr>
+  </table>
+  <pre><span class="c">// 1. 创建列族</span>
+rocksdb::ColumnFamilyHandle* cf_orders = nullptr;
+db-&gt;CreateColumnFamily(rocksdb::ColumnFamilyOptions(), <span class="y">"orders"</span>, &amp;cf_orders);
+
+<span class="c">// 2. 跨列族原子写（订单 + 用户统计一个批次）</span>
+rocksdb::WriteBatch batch;
+batch.Put(cf_orders, <span class="y">"order:1001"</span>, <span class="y">"{status:PAID}"</span>);
+batch.Put(default_cf,    <span class="y">"stats:orders"</span>, <span class="y">"1"</span>);
+db-&gt;Write(rocksdb::WriteOptions(), &amp;batch);
+
+<span class="c">// 3. 重启时必须带全部列族打开，否则报错</span>
+std::vector&lt;rocksdb::ColumnFamilyDescriptor&gt; cf_descs;
+cf_descs.emplace_back(rocksdb::kDefaultColumnFamilyName, rocksdb::ColumnFamilyOptions());
+cf_descs.emplace_back(<span class="y">"orders"</span>, rocksdb::ColumnFamilyOptions());
+std::vector&lt;rocksdb::ColumnFamilyHandle*&gt; handles;
+rocksdb::DB::Open(rocksdb::DBOptions(), path, cf_descs, &amp;handles, &amp;db);</pre>
+  <h4>合并算子（Merge Operator）</h4>
+  <p>场景：计数器、累加器、只追加的列表。没有 Merge 时，你要 Get 出来、改、再 Put——<b>并发下丢更新，还多一次读</b>。Merge 把"合并逻辑"下沉到引擎：读路径遇到 merge 操作数会自动合并出结果。</p>
+  <pre><span class="c">// 自定义 Merge：把所有操作数累加到现有值上</span>
+class CounterMerge : <span class="b">public</span> rocksdb::MergeOperator {
+ <span class="b">public</span>:
+  <span class="b">bool</span> FullMerge(<span class="b">const</span> rocksdb::Slice&amp; key, <span class="b">const</span> rocksdb::Slice* existing_value,
+                  <span class="b">const</span> std::deque&lt;std::string&gt;&amp; operand_list,
+                  std::string* new_value, std::shared_ptr&lt;rocksdb::Logger&gt; logger) <span class="b">const</span> override {
+    int64_t total = existing_value ? std::stoll(existing_value-&gt;ToString()) : 0;
+    <span class="b">for</span> (<span class="b">const</span> <span class="b">auto</span>&amp; op : operand_list) total += std::stoll(op);
+    new_value-&gt;append(std::to_string(total));
+    <span class="b">return</span> <span class="b">true</span>;
+  }
+  <span class="b">const char</span>* Name() <span class="b">const</span> override { <span class="b">return</span> <span class="y">"CounterMerge"</span>; }
+};
+
+options.merge_operator = std::make_shared&lt;CounterMerge&gt;();
+
+<span class="c">// 使用：三条 Merge 累加，Get 直接拿到 3</span>
+batch.Merge(<span class="y">"page:home:pv"</span>, <span class="y">"1"</span>);
+batch.Merge(<span class="y">"page:home:pv"</span>, <span class="y">"1"</span>);
+batch.Merge(<span class="y">"page:home:pv"</span>, <span class="y">"1"</span>);
+db-&gt;Write(wo, &amp;batch);
+db-&gt;Get(ro, <span class="y">"page:home:pv"</span>, &amp;value);   <span class="c">// value == "3"</span></pre>
+  <div class="callout warn">
+    <b>Merge 算子的正确性条件：</b>合并操作必须<b>可结合、可交换</b>（引擎可能把多个 merge 操作数分批部分合并，顺序不保证）。计数、位或、集合并集都满足；<b>"append 到字符串末尾"要小心</b>——部分合并会打乱拼接顺序，需要额外带序号自己排序。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>嵌入式 KV 的典型用法</h2></div>
+  <p class="lead">用法就一句话：链接库、Open、CRUD、迭代。真正难的是<b>选对使用场景和参数</b>。</p>
+  <h4>最小可用示例</h4>
+  <pre><span class="c">// demo.cpp —— 编译：g++ -std=c++17 demo.cpp -o demo -lrocksdb</span>
+#include &lt;cstdio&gt;
+#include &lt;string&gt;
+#include <span class="y">"rocksdb/db.h"</span>
+#include <span class="y">"rocksdb/options.h"</span>
+#include <span class="y">"rocksdb/write_batch.h"</span>
+
+int main() {
+  rocksdb::DB* db = nullptr;
+  rocksdb::Options options;
+  options.create_if_missing = true;               <span class="c">// 目录不存在则创建</span>
+
+  rocksdb::Status s = rocksdb::DB::Open(options, <span class="y">"/tmp/rocksdb_demo"</span>, &amp;db);
+  if (!s.ok()) { fprintf(stderr, <span class="y">"open failed: %s\n"</span>, s.ToString().c_str()); return 1; }
+
+  db-&gt;Put(rocksdb::WriteOptions(), <span class="y">"user:1001"</span>, <span class="y">"Alice"</span>);
+  db-&gt;Put(rocksdb::WriteOptions(), <span class="y">"user:1002"</span>, <span class="y">"Bob"</span>);
+
+  std::string value;
+  db-&gt;Get(rocksdb::ReadOptions(), <span class="y">"user:1001"</span>, &amp;value);
+  printf(<span class="y">"user:1001 = %s\n"</span>, value.c_str());   <span class="c">// Alice</span>
+
+  <span class="c">// 全量迭代（生产大库别这么干，会慢）</span>
+  rocksdb::Iterator* it = db-&gt;NewIterator(rocksdb::ReadOptions());
+  for (it-&gt;SeekToFirst(); it-&gt;Valid(); it-&gt;Next()) {
+    printf(<span class="y">"%s = %s\n"</span>, it-&gt;key().ToString().c_str(), it-&gt;value().ToString().c_str());
+  }
+  delete it;
+  delete db;
+  return 0;
+}</pre>
+  <h4>快照迭代（遍历中不被写入干扰）</h4>
+  <pre><span class="c">// 拿一个一致性快照，之后的所有读都基于这个版本</span>
+<span class="b">const</span> rocksdb::Snapshot* snap = db-&gt;GetSnapshot();
+rocksdb::ReadOptions ro;
+ro.snapshot = snap;
+
+rocksdb::Iterator* it = db-&gt;NewIterator(ro);
+<span class="b">for</span> (it-&gt;Seek(<span class="y">"user:"</span>); it-&gt;Valid(); it-&gt;Next()) {
+  <span class="c">// ... 处理，期间别人的写入不影响这次遍历</span>
+}
+delete it;
+db-&gt;ReleaseSnapshot(snap);   <span class="c">// 用完必须释放，否则旧版本永不回收，空间泄漏</span></pre>
+  <h4>选场景的判据</h4>
+  <ul>
+    <li><b>键值访问模式</b>：点查、前缀扫描、范围遍历为主。需要二级索引/复杂查询 → 不选它</li>
+    <li><b>数据量大于内存</b>：内存放得下用 map 更快；放不下又必须本地持久 → RocksDB 主场</li>
+    <li><b>写密集 + 读可预测</b>：顺序灌、后台 compaction、布隆挡空——LSM 的甜蜜点</li>
+    <li><b>同进程内共享</b>：多进程同时 Open 同一目录会冲突（单写者模型），需要分布式就上 TiKV/Pebble 这类外层</li>
+  </ul>
+  <div class="callout">
+    <b>常用维护操作：</b><span class="k">CompactRange()</span> 手动触发全量 compaction（删数据后回收空间、批量导入后整理）；<span class="k">Checkpoint</span> 做一致性备份（快照式硬链/拷贝，不停写）；<span class="k">ldb</span> 工具（随源码构建）可命令行查看 SST 内容、触发 compaction。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>MyRocks 简介</h2></div>
+  <p class="lead">MyRocks = MySQL + RocksDB 存储引擎。Facebook 为解决"InnoDB 在我们这种体量下太占空间"的问题，把 RocksDB 塞进了 MySQL。它是理解 LSM 工业落地的最好样本。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:240px">InnoDB</th><th>MyRocks</th></tr>
+    <tr><td>存储结构</td><td>B+Tree，<b>原地更新</b>页</td><td>LSM，追加写 + compaction</td></tr>
+    <tr><td>空间效率</td><td>页分裂留下碎片，压缩一般</td><td>整块压缩（zstd/lz4），<b>Facebook 报告省约 50% 空间</b></td></tr>
+    <tr><td>内存</td><td>Buffer Pool 独占一份缓存</td><td>直接吃 OS page cache，<b>无双份缓存</b></td></tr>
+    <tr><td>写入</td><td>随机写，SSD 上写放大明显</td><td>顺序写为主，海量小写入吞吐更高</td></tr>
+    <tr><td>读</td><td>B+Tree 三四层，随机 IO 少</td><td>多层 SST + 布隆，<b>随机读略逊</b>（依赖缓存）</td></tr>
+    <tr><td>功能</td><td>外键、全文、空间索引齐全</td><td>不支持外键/空间索引；<b>范围删除和热点行反复更新</b>不如 InnoDB</td></tr>
+    <tr><td>复制</td><td>binlog 逻辑复制</td><td>同样用 binlog，但要注意 compaction 的磁盘抖动</td></tr>
+  </table>
+  <h4>什么时候认真考虑 MyRocks</h4>
+  <ul>
+    <li>数据量 TB 级、<b>存储成本敏感</b>（云盘按 GB 计费时省一半空间很香）</li>
+    <li>写入吞吐是瓶颈，SSD 寿命/IOPS 预算紧张</li>
+    <li>读模式偏点查和前缀扫描，热点数据能被 page cache 兜住</li>
+  </ul>
+  <div class="callout warn">
+    <b>代价清单（迁移前必读）：</b>① 丢掉外键和空间索引，应用层自己保证完整性；② 热点行反复 UPDATE 会让 LSM 堆积多版本，compaction 压力山大；③ 大范围 DELETE 靠 range tombstone，比 InnoDB 慢；④ 团队要学会看 compaction 指标（stall、IO 队列、写放大）。<b>OLTP 通用负载上 InnoDB 仍是更稳的默认选择。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>定位对比：Redis / B-Tree / LSM</h2></div>
+  <p class="lead">三个都"存数据"，但属于三个不同的世界。放错位置是架构事故的开始。</p>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:220px">Redis</th><th style="width:220px">B-Tree（InnoDB）</th><th>RocksDB（LSM）</th></tr>
+    <tr><td>定位</td><td>内存数据结构<b>服务</b></td><td>通用 OLTP 关系<b>数据库</b></td><td>嵌入式 KV <b>引擎</b></td></tr>
+    <tr><td>数据位置</td><td>内存（可选持久化）</td><td>磁盘，Buffer Pool 缓存</td><td>磁盘，MemTable + Block Cache 缓存</td></tr>
+    <tr><td>写模型</td><td>内存改 + 异步持久化</td><td>原地更新页，随机写</td><td>追加 + 后台 compaction，顺序写</td></tr>
+    <tr><td>点查延迟</td><td>亚毫秒（内存）</td><td>低（缓存命中时）</td><td>低~中（看缓存与 L0 文件数）</td></tr>
+    <tr><td>吞吐特征</td><td>单线程，10 万 QPS 级</td><td>写受随机 IO 限制</td><td>写吞吐极高，读依赖缓存</td></tr>
+    <tr><td>数据结构</td><td>String/Hash/ZSet 等</td><td>表、索引、事务</td><td>字节 KV，无 schema</td></tr>
+    <tr><td>事务</td><td>Lua/单线程原子</td><td>完整 ACID + MVCC</td><td>单 KV 原子 + 批量原子</td></tr>
+    <tr><td>删除语义</td><td>立即删</td><td>标记删除 + 空间重用</td><td>墓碑，compaction 才物理清</td></tr>
+    <tr><td>典型用法</td><td>缓存、锁、排行榜</td><td>业务主库</td><td>状态后端、引擎底座</td></tr>
+  </table>
+  <h4>组合使用的经典架构</h4>
+  <pre>热点读        →  Redis（扛 QPS，挡住磁盘）
+持久化/事务   →  MySQL/PostgreSQL（B-Tree，业务正确性）
+大状态/高写入 →  RocksDB（Flink state、Kafka Streams、特征库）
+                  ↓ 外层包分布式协议
+                  TiKV / CockroachDB / Pebble → 分布式 KV 数据库</pre>
+  <div class="callout ok">
+    <b>一句话选型：</b>要"快"用 Redis，要"对"用 B-Tree，要"装得下还写得动"用 LSM。<b>现实中三者常常同时出现在一个系统里，不是三选一。</b>RocksDB 的定位更接近"零件"——单独用的场景，多半是本地状态存储。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">write_buffer_size 调到几 GB 当"内存库"</div><div class="pd">MemTable 越大 flush 尖刺越狠（一次刷几个 GB 的 SST），恢复时重放 WAL 也更慢。64~256MB 是常见合理区间，别靠它撑吞吐。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">块缓存用默认 8MB</div><div class="pd">数据量上 GB 后 8MB 缓存形同虚设，点查大量打磁盘。按可用内存的 20%~30% 给，并开 cache_index_and_filter_blocks。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">不建布隆过滤器</div><div class="pd">RocksDB 默认不建过滤器，查不存在的 key 要把每层每个文件都翻一遍。点查多的场景必须显式配 NewBloomFilterPolicy。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">迭代器不用快照</div><div class="pd">遍历期间并发写入会让迭代器看到"半新半旧"的数据，业务逻辑出错。长遍历先 GetSnapshot，用完 ReleaseSnapshot。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">compaction 不限速</div><div class="pd">后台 compaction 把磁盘 IO 打满，前台读写延迟毛刺。用 NewGenericRateLimiter 限制 compaction 总带宽，和业务 IO 错峰。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">L0 文件堆积导致停写</div><div class="pd">L0 超过 level0_stop_writes_trigger（默认 36）时 RocksDB 直接拒绝写入。根因常是 compaction 跟不上（磁盘慢/限速太狠/单线程 flush），看日志里的 stall 信息。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">打开 DB 漏掉列族</div><div class="pd">Open 时只列了 default，报 "Column families not opened" 或数据"消失"。必须先用 ListColumnFamilies 拿到全部 CF 再 Open，CF 名是硬编码在代码里的契约。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">批量删除后磁盘不释放就以为删干净了</div><div class="pd">Delete 只写墓碑，数据文件原样躺着。要么等 compaction 下沉到底层，要么手动 CompactRange 立即回收。监控的是逻辑量，磁盘可是物理量。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">拿 RocksDB 当关系数据库</div><div class="pd">没有二级索引、没有 JOIN、没有范围事务。需要这些能力要么应用层自己建索引表，要么外层用 TiKV/CockroachDB，别硬拗。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">备份只拷贝 SST 文件</div><div class="pd">缺了 WAL 和 MANIFEST，恢复时状态不一致，直接打不开。用 DB::Checkpoint 或 Flush 后配合归档，别手工 cp 文件了事。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. L0 和 L1 及以下层级的关键区别是？</div>
+      <button class="opt">L0 在内存里，L1 以下在磁盘里</button>
+      <button class="opt">L0 由 flush 产生、文件间键范围可重叠；L1 以下由 compaction 产生、层内有序且文件间不重叠</button>
+      <button class="opt">L0 只存热点数据，L1 以下存全量数据</button>
+      <div class="ans">正确答案：<b>L0 文件键范围重叠</b>。所以一次点查可能要翻多个 L0 文件（按新到旧），而 L1~L6 每层最多一个文件命中。L0 文件过多会推高读放大甚至停写，这正是 level0_file_num_compaction_trigger 存在的原因。所有层都在磁盘上。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 一次 Put 的正确写路径顺序是？</div>
+      <button class="opt">MemTable → WAL → Immutable MemTable → SSTable</button>
+      <button class="opt">WAL → MemTable → Immutable MemTable → L0 SSTable → compaction 逐层下沉</button>
+      <button class="opt">WAL → SSTable → MemTable → compaction 逐层下沉</button>
+      <div class="ans">正确答案：<b>先 WAL 再 MemTable</b>。WAL 先行保证崩溃可恢复；MemTable 写满转 Immutable，flush 成 L0 SSTable，之后靠 compaction 逐层归并下沉。顺序反了（先内存后日志）崩溃窗口内就会丢数据。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 Leveled 和 Universal（Size-Tiered）compaction，哪个说法正确？</div>
+      <button class="opt">Leveled 写放大高但读放大和空间放大低；Universal 写放大低但读/空间放大高</button>
+      <button class="opt">Universal 在各方面都优于 Leveled，应该总是用它</button>
+      <button class="opt">两者只是命名不同，内部实现完全一样</button>
+      <div class="ans">正确答案：<b>三角权衡</b>。Leveled 每层单 run，查找高效、旧版本清理快，代价是数据被反复重写（写放大 10~40x）；Universal 整 tier 归并，重写少（写放大 5~10x），但层内多文件让读要翻更多 SST、旧数据停留更久（空间放大可达 2x）。写密集选 Universal，读密集/大数据量选 Leveled。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 布隆过滤器说某个 key "不存在"时？</div>
+      <button class="opt">可能误判，key 也许真的存在，需要再查一次 SSTable</button>
+      <button class="opt">说明 key 一定刚从库里删掉，数据已物理清除</button>
+      <button class="opt">key 一定不在这个 SSTable 里，可以直接跳过；说"存在"才可能误判</button>
+      <div class="ans">正确答案：<b>说不存在就一定不存在</b>。布隆过滤器只可能假阳性（说"存在"其实不在，默认 10 bits/key 约 1% 误判率），判定"不存在"100% 可靠。它只加速点查，范围扫描用不上；而且"删除"只是写墓碑，未 compaction 前数据还在文件里。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 合并算子（Merge Operator）最适合解决什么问题？</div>
+      <button class="opt">把两个 SSTable 文件合并成一个</button>
+      <button class="opt">并发累加计数器：直接 batch.Merge(k,"1")，读时自动合并出结果，免去 Get-Modify-Put 的竞态</button>
+      <button class="opt">在后台压缩数据块以节省空间</button>
+      <div class="ans">正确答案：<b>服务端 read-modify-write</b>。计数器场景里 Get 出来加一再 Put 有并发丢更新和双倍读的代价；Merge 把合并逻辑下沉到引擎，读路径自动合并操作数。前提是合并操作可结合、可交换——引擎可能分批部分合并，顺序不保证。"合并文件"那是 compaction 的活。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. MyRocks 相对 InnoDB 的核心优势是？</div>
+      <button class="opt">顺序追加写 + 整块压缩，海量写入吞吐更高、存储占用可省约一半</button>
+      <button class="opt">完整兼容 InnoDB 的所有特性，包括外键和空间索引</button>
+      <button class="opt">随机点读性能显著优于 InnoDB，因为它有多层缓存</button>
+      <div class="ans">正确答案：<b>写吞吐 + 空间</b>。LSM 把随机写变顺序写，配合 zstd/lz4 整块压缩，Facebook 报告省约 50% 空间。代价是丢掉外键/空间索引、随机读略逊、热点行反复更新会让 compaction 承压——所以它不是 InnoDB 的无脑替代品。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查配置</h3>
+  <div class="cmds">
+    <div class="crow"><code>write_buffer_size = 64&lt;&lt;20</code><span class="desc">MemTable 大小，默认 64MB</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_write_buffer_number = 2</code><span class="desc">MemTable 总数上限，超出停写等 flush</span><button class="copy">复制</button></div>
+    <div class="crow"><code>level0_file_num_compaction_trigger = 4</code><span class="desc">L0 文件数触发 compaction</span><button class="copy">复制</button></div>
+    <div class="crow"><code>level0_slowdown_writes_trigger = 20</code><span class="desc">L0 超此数写降速</span><button class="copy">复制</button></div>
+    <div class="crow"><code>level0_stop_writes_trigger = 36</code><span class="desc">L0 超此数停写</span><button class="copy">复制</button></div>
+    <div class="crow"><code>target_file_size_base = 64&lt;&lt;20</code><span class="desc">L1 文件目标大小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_bytes_for_level_base = 256&lt;&lt;20</code><span class="desc">L1 总容量，下层逐层 ×10</span><button class="copy">复制</button></div>
+    <div class="crow"><code>NewBloomFilterPolicy(10, false)</code><span class="desc">建布隆过滤器，10 bits/key</span><button class="copy">复制</button></div>
+    <div class="crow"><code>NewLRUCache(1&lt;&lt;30)</code><span class="desc">块缓存，默认仅 8MB 需调大</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cache_index_and_filter_blocks = true</code><span class="desc">索引/过滤器块进缓存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>NewGenericRateLimiter(100&lt;&lt;20)</code><span class="desc">限制 compaction 带宽 100MB/s</span><button class="copy">复制</button></div>
+    <div class="crow"><code>compaction_style = kCompactionStyleUniversal</code><span class="desc">写密集场景切平铺策略</span><button class="copy">复制</button></div>
+    <div class="crow"><code>db-&gt;CompactRange(...)</code><span class="desc">手动全量 compaction 回收空间</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>LSM 树</b></td><td>日志结构合并树：内存写满后顺序刷盘、后台逐层归并</td></tr>
+    <tr><td><b>MemTable</b></td><td>内存写缓冲，跳表结构，默认 64MB</td></tr>
+    <tr><td><b>Immutable MemTable</b></td><td>写满后切换为只读、等待 flush 的 MemTable</td></tr>
+    <tr><td><b>WAL</b></td><td>预写日志，先落盘再改内存，崩溃恢复的依据</td></tr>
+    <tr><td><b>SSTable</b></td><td>有序字符串表，LSM 的磁盘文件格式，含数据/索引/过滤器块</td></tr>
+    <tr><td><b>L0 ~ L6</b></td><td>层级，默认 7 层；L0 文件键重叠，L1 以下不重叠</td></tr>
+    <tr><td><b>Flush</b></td><td>Immutable MemTable 刷成 L0 SSTable</td></tr>
+    <tr><td><b>Compaction</b></td><td>挑选多层文件归并排序下沉，清多版本、物理删数据</td></tr>
+    <tr><td><b>Leveled</b></td><td>默认策略：每层单 run，写放大高读放大低</td></tr>
+    <tr><td><b>Universal</b></td><td>平铺策略（≈Size-Tiered）：整 tier 归并，写放大低读放大高</td></tr>
+    <tr><td><b>写放大</b></td><td>磁盘总写入 ÷ 用户写入，compaction 重写的代价</td></tr>
+    <tr><td><b>读放大</b></td><td>一次点查访问的 SSTable 数量</td></tr>
+    <tr><td><b>空间放大</b></td><td>磁盘占用 ÷ 逻辑数据量，旧版本占比</td></tr>
+    <tr><td><b>布隆过滤器</b></td><td>说"不存在"一定可靠、说"存在"可能误判的位图结构</td></tr>
+    <tr><td><b>块缓存</b></td><td>LRU 内存缓存，存解压后的数据/索引/过滤器块</td></tr>
+    <tr><td><b>列族</b></td><td>DB 内独立键空间，各有配置，WriteBatch 跨族原子</td></tr>
+    <tr><td><b>合并算子</b></td><td>服务端 read-modify-write，要求可结合可交换</td></tr>
+    <tr><td><b>墓碑 Tombstone</b></td><td>删除标记，compaction 到底层才物理清除</td></tr>
+    <tr><td><b>RateLimiter</b></td><td>限制 flush/compaction 磁盘带宽，保护前台 IO</td></tr>
+    <tr><td><b>MyRocks</b></td><td>MySQL 的 RocksDB 存储引擎，省空间、提写吞吐</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>编译一个 C++ demo（g++ -std=c++17 demo.cpp -o demo -lrocksdb），完成这五件事 —— ① 写 10 万个 key，用 Get 逐个读，统计耗时；② 给 DB 配上布隆过滤器和 1GB 块缓存，对比读 10 万个<b>不存在</b>的 key 的耗时差异；③ 用 WriteBatch + 自定义 Merge 算子实现一个并发累加计数器，起多线程验证不丢更新；④ 删掉一半 key，观察目录大小不变，再调 CompactRange 看空间回收；⑤ 创建第二个列族，重启程序验证"必须列出全部 CF"才能 Open。<br><br>
+    <b>之后值得单独学：</b>RocksDB 的事务 API（TransactionDB）、压缩算法选型（LZ4 vs zstd 分级）、Pebble（CockroachDB 的 Go 重写版）、以及读放大优化的 Partitioned Index/Filter。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 RocksDB · 上线前务必检查：块缓存大小、布隆过滤器、compaction 限速</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（compaction 与三种放大）和模块 4（过滤器与缓存）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边编译 demo.cpp 敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='RocksDB 是嵌入式库，练手方式：编译一个几十行的 C++ demo（见模块 6）';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透调试与排错</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 工程基础</span>
+    <h1>二十分钟学透调试与排错</h1>
+    <p class="sub">调试不是"加个 print 看看"。它是一套<b>可证伪的推理流程</b>：把现象收敛成能稳定复现的最小案例，用一次只改一个变量的实验去排除假设。这篇讲的是流程、工具和边界。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>5</b> 类故障路径</span>
+      <span class="chip"><b>4</b> 种二分法</span>
+      <span class="chip"><b>10</b> 个反模式</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开一个终端跟着敲：准备好 gdb / pdb / strace 任意一个</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先确认你手上有这些工具</h2></div>
+  <p class="lead">调试能力的一半来自工具熟练度。下面这张表按语言分组，只要能在自己的技术栈里找到对应的那一行，这篇就够用了。</p>
+  <table>
+    <tr><th style="width:130px">运行时</th><th style="width:210px">交互式调试器</th><th>非交互 / 事后工具</th></tr>
+    <tr><td><b>C / C++ / Rust</b></td><td class="f">gdb / lldb</td><td class="f">core dump、valgrind、ASan、perf</td></tr>
+    <tr><td><b>Go</b></td><td class="f">dlv debug / dlv attach</td><td class="f">pprof、GOTRACEBACK、SIGQUIT 栈转储</td></tr>
+    <tr><td><b>Java</b></td><td class="f">jdb、IDE Remote JVM</td><td class="f">jstack、jmap、jcmd、hs_err_pid 文件</td></tr>
+    <tr><td><b>Python</b></td><td class="f">pdb / pdbpp、debugpy</td><td class="f">faulthandler、py-spy dump</td></tr>
+    <tr><td><b>Node.js</b></td><td class="f">node --inspect-brk</td><td class="f">--cpu-prof、process.report</td></tr>
+  </table>
+  <pre><span class="c"># 通用三件套，几乎所有 Linux 排错都会用到</span>
+<span class="b">strace</span> -f -p &lt;pid&gt;          <span class="c"># 看进程在跟内核要什么（卡在哪个 syscall）</span>
+<span class="b">lsof</span> -p &lt;pid&gt;              <span class="c"># 看它打开了哪些文件、端口、socket</span>
+<span class="b">perf top</span> -p &lt;pid&gt;          <span class="c"># 看 CPU 时间花在哪些函数上（需要 perf 权限）</span></pre>
+  <div class="callout warn">
+    <b>别在动手前就装一堆工具。</b>先把 <span class="k">strace</span>、<span class="k">lsof</span>、你语言的栈转储命令练熟，这三样能解决八成的"进程卡住了/连不上/文件找不到"。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>第一原则：先收敛，再定位</h2></div>
+  <p class="lead">新手最常见的失败不是"不会用工具"，而是<b>在问题还没定义清楚时就开始猜</b>。三条铁律，按顺序执行。</p>
+
+  <h3>铁律一：先稳定复现，再谈定位</h3>
+  <p>一个不能复现的 bug，你对它做的任何修改都无法验证。所以第一步永远是<b>把复现条件收敛到最小</b>：删掉无关输入、无关配置、无关步骤，直到"少任何一个条件就不出问题"。</p>
+  <table>
+    <tr><th style="width:120px">复现要素</th><th style="width:250px">要问的问题</th><th>为什么重要</th></tr>
+    <tr><td><b>输入</b></td><td>哪一条数据触发的？能缩到多小？</td><td>缩到最小后往往一眼能看出是哪个字段异常</td></tr>
+    <tr><td><b>环境</b></td><td>哪个版本、哪台机器、什么配置？</td><td>区分"代码 bug"和"环境差异"的唯一办法</td></tr>
+    <tr><td><b>时序</b></td><td>必须先做什么再做什么？并发几个请求？</td><td>竞态类问题只在特定交错顺序下出现</td></tr>
+    <tr><td><b>频率</b></td><td>100% 必现？1/1000？有没有规律？</td><td>决定后面用"断点"还是"埋点统计"</td></tr>
+  </table>
+  <pre><span class="c"># 复现记录应该长这样，而不是"偶尔报错"</span>
+现象：下单接口返回 500，日志里 NullPointerException at OrderService.java:142
+复现：用户 ID 尾号为偶数 + 优惠券已过期 → 100% 必现
+不触发：优惠券未过期 / 用户无优惠券
+版本：order-service 2.4.1（2.4.0 不复现）
+结论：2.4.0 → 2.4.1 之间引入</pre>
+
+  <h3>铁律二：一次只改一个变量</h3>
+  <p>同时改日志、改配置、重启服务、清缓存，然后问题消失了 —— 你不知道是哪个动作起的作用，下次还会复发。<b>每次实验只动一个变量，并且先写下预期结果</b>：如果我的假设成立，应该看到什么？看不到就说明假设错了。</p>
+  <div class="callout">
+    <b>可证伪的假设 vs 不可证伪的猜测：</b><br>
+    ✗ "可能是缓存的问题" —— 无法验证，也无法推翻。<br>
+    ✓ "如果是缓存脏了，那么清掉 <span class="k">user:42</span> 这个 key 后立刻恢复正常" —— 能做实验，能出结论。
+  </div>
+
+  <h3>铁律三：别凭直觉猜，先看证据</h3>
+  <p>经验的价值是<b>帮你排出假设的优先级</b>，不是替代验证。人脑对"最近见过的模式"有过拟合倾向：上周是连接池打满，这周所有问题看起来都像连接池。用数据打脸比用直觉赌要快。</p>
+  <table>
+    <tr><th style="width:200px">直觉式排查</th><th>证据式排查</th></tr>
+    <tr><td>凭印象改代码，改完重启试试</td><td>先在关键路径打点，确认耗时分布，再决定改哪</td></tr>
+    <tr><td>一次改五处，总有一处是对的</td><td>一次改一处，每处都能归因</td></tr>
+    <tr><td>修好了就收工，不写结论</td><td>记录"根因 + 验证方式"，下次能直接查</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>一句话总结第一原则：</b>把"我觉得"换成"我观察到"，把"应该是"换成"如果是，那么应该能测到"。调试的全部技术，都是为这句话服务的。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>日志调试：最便宜也最容易搞砸</h2></div>
+  <p class="lead">日志是最通用的调试手段 —— 不需要暂停进程，不需要调试器权限，生产环境也能用。但它也是最容易变成噪音的地方。</p>
+
+  <h3>该在哪加日志</h3>
+  <table>
+    <tr><th style="width:150px">位置</th><th style="width:270px">打什么</th><th>作用</th></tr>
+    <tr><td><b>函数入口 / 出口</b></td><td>关键参数、返回值、耗时</td><td>能直接看出"有没有进来""出去时是什么"</td></tr>
+    <tr><td><b>外部调用前后</b></td><td>目标地址、请求 ID、耗时、状态码</td><td>区分"我的问题"和"依赖的问题"</td></tr>
+    <tr><td><b>状态变更点</b></td><td>变更前后的值</td><td>定位"值是什么时候被改坏的"</td></tr>
+    <tr><td><b>分支决策点</b></td><td>走了哪个分支、判据的实际值</td><td>解释"为什么走了这条路"</td></tr>
+    <tr><td><b>异常捕获处</b></td><td>完整堆栈 + 上下文</td><td>不要只打 <span class="k">e.message</span>，堆栈才是定位依据</td></tr>
+  </table>
+
+  <h3>不该在哪加日志</h3>
+  <ul>
+    <li><b>循环体内</b>：10 万次循环就是 10 万行日志，磁盘写满、日志系统被打爆，而且真正有用的那行被淹了。要打就打循环外的汇总（次数、耗时、异常计数）。</li>
+    <li><b>超高频路径</b>：网关、序列化、鉴权这类每秒几万次的代码，即使 DEBUG 级别也要谨慎。</li>
+    <li><b>Getter / toString</b>：会被框架隐式调用，日志量和调用次数完全失控。</li>
+    <li><b>含敏感信息处</b>：密码、token、身份证、完整手机号。脱敏后再打，否则日志系统本身变成泄露源。</li>
+  </ul>
+  <pre><span class="c"># 反例：在循环里打日志</span>
+for order in orders:
+    logger.info(f"processing order {order.id}")   <span class="r"># ✗ 10 万行</span>
+    process(order)
+
+<span class="c"># 正例：聚合后打一条</span>
+ok, failed, cost = 0, [], 0
+for order in orders:
+    try:
+        process(order); ok += 1
+    except Exception as e:
+        failed.append((order.id, type(e).__name__))
+logger.info(<span class="g">"batch done"</span>, extra={<span class="g">"total"</span>: len(orders), <span class="g">"ok"</span>: ok,
+            <span class="g">"failed"</span>: len(failed), <span class="g">"cost_ms"</span>: cost})
+<span class="c"># 失败明细单独打，且限制条数</span>
+if failed:
+    logger.warning(<span class="g">"batch failures"</span>, extra={<span class="g">"sample"</span>: failed[:5]})</pre>
+
+  <h3>日志级别的语义边界</h3>
+  <p>级别不是"重要程度"，是<b>"谁该被叫醒"</b>。定错了，要么告警疲劳，要么事故无人知。</p>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:230px">语义</th><th>线上应该有多少</th></tr>
+    <tr><td class="f">ERROR</td><td>需要人介入，功能已经不可用</td><td>应该是 0 或个位数/天。持续有 ERROR 说明告警配置失效了</td></tr>
+    <tr><td class="f">WARN</td><td>异常但已自愈（重试成功、降级生效）</td><td>少量。突然放量通常是大故障的前兆</td></tr>
+    <tr><td class="f">INFO</td><td>关键业务事实：订单创建、任务完成</td><td>每条业务主流程 1~3 条。用来还原时间线</td></tr>
+    <tr><td class="f">DEBUG</td><td>排查用的细节，默认关闭</td><td>线上通常关闭，需要时动态打开</td></tr>
+    <tr><td class="f">TRACE</td><td>逐帧级别的细节，几乎不用</td><td>只在本地复现疑难问题时开</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>把异常吞掉只打 WARN 是最坏的实践。</b>"<span class="k">catch (Exception e) { log.warn(...) }</span>" 会让一个真实故障在监控里完全隐形 —— 接口已经在返回错误了，日志里却风平浪静。捕获后要么处理，要么 ERROR 并带上堆栈，不要静默降级。
+  </div>
+
+  <h3>结构化日志：让日志能被机器查</h3>
+  <p>纯文本日志只能靠正则硬抠，字段一改就全废。结构化日志把上下文变成字段，日志系统就能按字段过滤、聚合、画图。</p>
+  <pre><span class="c"># 纯文本（难查）</span>
+2026-10-17 10:23:41 INFO 用户 42 下单成功，订单 9001，耗时 137ms
+
+<span class="c"># 结构化（可查）</span>
+{<span class="g">"ts"</span>:<span class="y">"2026-10-17T10:23:41.238Z"</span>,<span class="g">"level"</span>:<span class="y">"INFO"</span>,<span class="g">"msg"</span>:<span class="y">"order created"</span>,
+ <span class="g">"trace_id"</span>:<span class="y">"a3f9..."</span>,<span class="g">"user_id"</span>:42,<span class="g">"order_id"</span>:9001,<span class="g">"cost_ms"</span>:137}</pre>
+  <p>字段命名要统一，否则跨服务串不起来。工程上够用的最小集合是：</p>
+  <table>
+    <tr><th style="width:150px">字段</th><th>约定</th></tr>
+    <tr><td class="f">trace_id</td><td>贯穿一次请求的全链路 ID，跨服务透传。没有它就无法把多个服务的日志拼成一条时间线</td></tr>
+    <tr><td class="f">level / ts / msg</td><td>固定三件套。<span class="k">ts</span> 用带毫秒的 ISO8601，且统一时区（建议 UTC）</td></tr>
+    <tr><td class="f">service / instance</td><td>哪个服务、哪个实例。多副本时定位到具体机器</td></tr>
+    <tr><td class="f">cost_ms</td><td>耗时统一用毫秒整数，不要混用秒和微秒</td></tr>
+    <tr><td class="f">err / stack</td><td>错误类型和堆栈分开存，方便按错误类型聚合计数</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>三条实操建议：</b>① 高频路径用<b>采样</b>（例如每 100 次打 1 条 + 计数）；② ERROR 不采样，全留；③ 日志框架的"是否输出"判断要放在字符串拼接之前，否则参数序列化的开销白付。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>断点调试：把进程按暂停</h2></div>
+  <p class="lead">日志回答"发生了什么"，断点回答"现在是什么状态"。能暂停进程，就能随意翻看任意变量、任意层调用栈 —— 这是日志做不到的。</p>
+
+  <h3>五种断点，各有用途</h3>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:250px">什么时候用</th><th>注意</th></tr>
+    <tr><td><b>行断点</b></td><td>已经大致知道问题在哪一段</td><td>最常用，但循环里会反复命中</td></tr>
+    <tr><td><b>条件断点</b></td><td>只在特定输入下才出问题</td><td><b>性价比最高</b>，能把 10 万次循环收敛到 1 次</td></tr>
+    <tr><td><b>观察点 watchpoint</b></td><td>不知道谁改坏了这个变量</td><td>变量被写时自动停下，直接抓到凶手</td></tr>
+    <tr><td><b>异常断点</b></td><td>异常被上层 catch 吞掉，看不到抛出点</td><td>在异常<b>抛出</b>的瞬间停，而不是被捕获处</td></tr>
+    <tr><td><b>方法断点</b></td><td>想知道谁调用了这个方法</td><td>命中时先看调用栈，比读代码快</td></tr>
+  </table>
+
+  <pre><span class="c"># gdb：条件断点 + 观察点</span>
+(gdb) break process_order if order-&gt;amount &gt; 100000     <span class="c"># 只在大额订单停</span>
+(gdb) watch balance                                      <span class="c"># balance 被写时停</span>
+(gdb) catch throw                                        <span class="c"># C++ 异常抛出时停</span>
+
+<span class="c"># pdb：条件断点</span>
+(Pdb) break order.py:142, amount &gt; 100000
+(Pdb) break order.py:142, user_id == 42
+
+<span class="c"># Java（jdb）</span>
+&gt; stop at com.demo.OrderService:142
+&gt; stop in com.demo.OrderService.calc
+&gt; catch java.lang.NullPointerException</pre>
+  <div class="callout">
+    <b>条件断点的表达式有副作用要小心。</b>很多调试器允许在条件里调用函数，但如果那个函数会修改状态（比如 <span class="k">queue.pop()</span>），断点本身就会改变程序行为 —— 你调试的已经不是原来那个程序了。条件里只做纯读取。
+  </div>
+
+  <h3>读调用栈：自下而上还是自上而下</h3>
+  <p>栈是"谁调用了谁"。停住时，<b>最上面一帧是当前位置，最下面是入口</b>（main / 线程启动函数）。</p>
+  <pre><span class="c"># 典型的栈（gdb bt）</span>
+#0  OrderService.calcTotal (this=0x7f...) at OrderService.java:142   <span class="y">&lt;-- 崩在这里</span>
+#1  OrderService.createOrder (...) at OrderService.java:88
+#2  OrderController.submit (...) at OrderController.java:41
+#3  HttpHandler.handle (...) at HttpHandler.java:203
+#4  Thread.run (...) at Thread.java:748                              <span class="c">&lt;-- 线程入口</span></pre>
+  <ul>
+    <li><b>看崩溃</b>：从 #0 往上看，找到<b>第一个属于你自己代码的帧</b>。框架内部的帧通常只是转发。</li>
+    <li><b>看"谁传了脏参数"</b>：从 #0 往下走，逐个帧检查入参，找到参数第一次变成错值的那一层。</li>
+    <li><b>看"为什么会走到这"</b>：看 #2、#3 的分支条件，而不是死磕 #0。</li>
+  </ul>
+
+  <h3>变量查看的坑</h3>
+  <table>
+    <tr><th style="width:190px">现象</th><th>原因与对策</th></tr>
+    <tr><td class="f">&lt;optimized out&gt;</td><td>编译开了优化（-O2），变量被寄存器复用或消除。用 <b>-O0 -g</b> 重编，或看反汇编</td></tr>
+    <tr><td>指针显示一个地址</td><td>需要解引用。<span class="k">p *ptr</span>、<span class="k">p ptr-&gt;field</span>，数组用 <span class="k">p *arr@10</span> 看前 10 个</td></tr>
+    <tr><td>容器只显示摘要</td><td>gdb 需要 pretty-printer。C++ 装 libstdc++ 的 python 脚本；Go 用 dlv 原生命令更好</td></tr>
+    <tr><td>值和你预期不符</td><td>先确认断点位置是"赋值前"还是"赋值后"。差一行，结论完全相反</td></tr>
+  </table>
+
+  <h3>表达式求值：能问就不猜</h3>
+  <pre><span class="c"># 不用改代码、不用重启，直接问进程</span>
+(gdb) p order-&gt;items.size()
+(gdb) p/x flags                      <span class="c"># 十六进制看位标志</span>
+(gdb) p *linked_list                 <span class="c"># 顺着链表看下一个节点</span>
+(gdb) call strlen(buf)               <span class="c"># 调用函数（有副作用，慎用）</span>
+
+<span class="c"># Python 调试器里可以直接执行任意语句</span>
+(Pdb) p [o.id for o in orders if o.amount &gt; 100]
+(Pdb) pp vars(order)</pre>
+  <div class="callout warn">
+    <b>在多线程程序里，被暂停的只是当前线程。</b>gdb 默认会停住所有线程（all-stop 模式），但某些调试器和某些平台下其他线程仍在跑 —— 你看到的变量可能在下一秒就变了。排查竞态时，用 <span class="k">info threads</span> 逐个线程切过去看栈，比盯着一个线程猜更有效。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>二分定位：把 O(n) 变成 O(log n)</h2></div>
+  <p class="lead">二分的本质不是"找中间"，是<b>利用单调性做排除</b>：只要能把搜索空间切成两半、并且能判断问题在哪一半，就能用 10 次实验定位 1000 个候选。</p>
+
+  <h3>四种二分对象</h3>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:250px">切什么</th><th>适用场景</th></tr>
+    <tr><td><b>代码二分</b></td><td>注释掉一半逻辑 / 提前 return</td><td>一个长函数里有十几步处理，不知道哪步坏了</td></tr>
+    <tr><td><b>数据二分</b></td><td>只喂一半输入数据</td><td>批量任务里某几条数据触发了问题</td></tr>
+    <tr><td><b>环境二分</b></td><td>换机器 / 换版本 / 换配置项</td><td>本地好、测试环境坏、生产更坏</td></tr>
+    <tr><td><b>提交二分</b></td><td>在提交历史中找"第一个坏掉的版本"</td><td>以前好的，最近坏了，但不知道哪次改动引入的</td></tr>
+  </table>
+
+  <h3>代码二分：把函数切成两段</h3>
+  <pre><span class="c"># 一个 300 行的处理方法，输出不对。在中间插一个 return</span>
+def handle(payload):
+    step1(payload)
+    step2(payload)
+    dump(payload)          <span class="c"># 打印中间状态</span>
+    return payload         <span class="y"># &lt;-- 临时插在这里，看此时结果对不对</span>
+    step3(payload)
+    step4(payload)
+    return payload
+<span class="c"># 如果此时对 → 问题在 step3/4；如果不对 → 问题在 step1/2。一次实验砍掉一半。</span></pre>
+  <div class="callout">
+    <b>二分的前提是"单调"。</b>如果前半段坏了、后半段又修回来了（比如两次 bug 相互抵消），二分就会给出错误结论。所以每次二分都要验证：<b>切出来的那一半，确实是坏的</b>，而不是"看起来坏"。
+  </div>
+
+  <h3>数据二分：找出那条毒数据</h3>
+  <pre><span class="c"># 10 万条记录导入失败，先切成 5 万</span>
+head -n 50000 all.csv &gt; half.csv &amp;&amp; import half.csv
+<span class="c"># 失败 → 毒数据在前 5 万；成功 → 在后 5 万。继续对半，17 次左右定位到 1 条。</span>
+<span class="c"># 100000 → 2^17 = 131072，所以最多 17 轮</span>
+
+<span class="c"># 更快的做法：先用 grep 按可疑字段过滤</span>
+awk -F, <span class="y">'$3 == ""'</span> all.csv | head        <span class="c"># 先看有没有空字段</span></pre>
+
+  <h3>环境二分：控制变量表</h3>
+  <table>
+    <tr><th style="width:170px">变量</th><th>怎么切</th></tr>
+    <tr><td>机器</td><td>同一份代码换一台机器跑，排除硬件 / 内核参数</td></tr>
+    <tr><td>版本</td><td>逐个降级依赖版本，找"从哪个版本开始坏"</td></tr>
+    <tr><td>配置</td><td>把生产配置整份拷到本地；或本地配置逐段拷到测试环境</td></tr>
+    <tr><td>数据量</td><td>小数据量正常、大数据量异常 → 指向内存 / 索引 / 分页</td></tr>
+    <tr><td>并发度</td><td>单线程正常、并发异常 → 指向共享状态</td></tr>
+  </table>
+
+  <h3>git bisect：让机器帮你二分提交</h3>
+  <p>当你确认"上个版本是好的、这个版本是坏的"，但中间有几百个提交，手工一个个 checkout 太慢。<span class="k">git bisect</span> 会用二分法自动帮你挑提交，你只需要回答"好/坏"。</p>
+  <pre><span class="c"># 手动模式</span>
+git bisect start
+git bisect bad                  <span class="c"># 当前版本是坏的</span>
+git bisect good v2.3.0          <span class="c"># 这个 tag 是好的</span>
+<span class="c"># git 会自动 checkout 到中间的提交，你测一下，然后回答：</span>
+git bisect good                 <span class="c"># 或者 git bisect bad</span>
+<span class="c"># 重复 log2(N) 次后，git 会输出 "first bad commit"</span>
+git bisect reset                <span class="c"># 回到原来的分支</span>
+
+<span class="c"># 自动模式：写一个脚本，返回 0 = 好，1 = 坏</span>
+git bisect start HEAD v2.3.0
+git bisect run ./scripts/check_bug.sh
+<span class="c"># 300 个提交只需约 9 次构建 + 测试</span></pre>
+  <div class="callout ok">
+    <b>bisect run 的脚本要满足两点：</b>① 退出码严格是 0/1（125 表示跳过这个提交，比如编译不过）；② <b>必须真的能区分好坏</b>，不能有随机性。如果测试本身 flaky，bisect 会指向一个错误提交 —— 这比不 bisect 更糟。
+  </div>
+  <p>成本对比很直观：</p>
+  <table>
+    <tr><th style="width:180px">提交数量</th><th style="width:150px">线性排查</th><th>二分</th></tr>
+    <tr><td>100</td><td>最多 100 次</td><td>7 次</td></tr>
+    <tr><td>1000</td><td>最多 1000 次</td><td>10 次</td></tr>
+    <tr><td>10000</td><td>最多 10000 次</td><td>14 次</td></tr>
+  </table>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>五类故障的排查路径</h2></div>
+  <p class="lead">不同类型的故障，第一步该做什么完全不同。先分类，再动手 —— 用错路径会浪费大量时间。</p>
+
+  <h3>类型一：不报错但结果不对</h3>
+  <p><b>首要问题：错在哪一步？</b>这类问题没有异常、没有日志、没有告警，只能靠比对中间状态。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>固定一份最小输入和期望输出</b>。没有"正确答案"就无法判断对错，先把预期写成断言。</div></div>
+    <div class="step"><div class="txt"><b>沿着数据流打点</b>：入口、每个转换步骤后、出口，各打一次。找到"第一次偏离预期"的位置。</div></div>
+    <div class="step"><div class="txt"><b>对比"对"与"错"两次执行的中间值</b>。同一份代码，一个输入对、一个输入错，差异点就是嫌疑点。</div></div>
+    <div class="step"><div class="txt"><b>检查隐式转换</b>：精度丢失、时区、字符编码、类型强转、四舍五入方向。这类问题占比极高。</div></div>
+  </div>
+
+  <h3>类型二：偶发故障</h3>
+  <p><b>首要问题：触发条件是什么？</b>偶发不等于随机，绝大多数"偶发"背后有确定的触发条件，只是你还没观察到。</p>
+  <table>
+    <tr><th style="width:150px">可能的触发源</th><th style="width:230px">怎么验证</th><th>典型症状</th></tr>
+    <tr><td><b>并发 / 竞态</b></td><td>加压到高并发，看是否必现</td><td>只在流量高峰出问题</td></tr>
+    <tr><td><b>时序 / 超时</b></td><td>人为注入延迟（如 tc netem）</td><td>错误集中在某个时段</td></tr>
+    <tr><td><b>资源耗尽</b></td><td>长时间跑，观察句柄 / 内存曲线</td><td>运行越久越容易出</td></tr>
+    <tr><td><b>数据相关</b></td><td>记录失败请求的完整输入</td><td>换个用户 / 换个 ID 就好</td></tr>
+    <tr><td><b>外部依赖抖动</b></td><td>统计失败时的下游耗时分布</td><td>和下游的 P99 尖刺对齐</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>偶发问题的正确做法是"先收集，后分析"。</b>不要试图复现，而是<b>把失败现场的上下文完整记录下来</b>：完整请求、trace_id、线程名、时间戳、当时的资源指标。等攒够 3~5 个样本，规律自然浮现。靠"再跑一次看看"永远收敛不了。
+  </div>
+
+  <h3>类型三：性能问题</h3>
+  <p><b>首要问题：慢在哪一层？</b>不要一上来就优化代码，先把时间拆开。</p>
+  <pre><span class="c"># 先量，再改。一次请求的总耗时 = 各段之和</span>
+网关 2ms → 应用 15ms → 数据库 480ms → 序列化 3ms
+<span class="c"># 结论：优化应用代码毫无意义，问题在 DB</span>
+
+<span class="c"># 常见分层工具</span>
+<span class="b">perf top</span> -p &lt;pid&gt;        <span class="c"># CPU 花在哪些函数（on-cpu）</span>
+<span class="b">py-spy top</span> --pid &lt;pid&gt;   <span class="c"># Python 进程的实时火焰视图</span>
+<span class="b">go tool pprof</span> http://localhost:6060/debug/pprof/profile   <span class="c"># CPU profile</span>
+<span class="b">EXPLAIN ANALYZE</span> ...      <span class="c"># 看 SQL 的真实执行计划</span></pre>
+  <table>
+    <tr><th style="width:150px">现象</th><th>大概率原因</th></tr>
+    <tr><td>CPU 高、QPS 低</td><td>算法复杂度问题、锁竞争、GC 频繁、序列化开销</td></tr>
+    <tr><td>CPU 低、延迟高</td><td>等 IO：DB 慢查询、下游超时、磁盘、网络。<b>先看等待，不要看 CPU</b></td></tr>
+    <tr><td>延迟随流量线性上升</td><td>排队。某处是串行瓶颈（单线程、连接池、全局锁）</td></tr>
+    <tr><td>P99 高但 P50 正常</td><td>少量请求走了慢路径：缓存未命中、大 key、锁等待、GC 停顿</td></tr>
+    <tr><td>内存持续上涨</td><td>泄漏（未关闭的句柄 / 无界缓存 / 事件监听未移除）</td></tr>
+  </table>
+
+  <h3>类型四：崩溃</h3>
+  <p><b>首要问题：有没有留下现场？</b>崩溃的第一优先级不是"猜原因"，是<b>保住 core dump 和堆栈</b>。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先确认 core dump 有没有开</b>：<span class="k">ulimit -c</span> 为 0 就永远不会生成，事后无法补救。</div></div>
+    <div class="step"><div class="txt"><b>看退出码和信号</b>：137 = SIGKILL（多半是 OOM Killer），139 = SIGSEGV（段错误），134 = SIGABRT（断言失败）。</div></div>
+    <div class="step"><div class="txt"><b>读堆栈最上面那帧自己的代码</b>，检查指针、数组下标、空值。</div></div>
+    <div class="step"><div class="txt"><b>如果是"随机崩溃"</b>，优先怀疑内存越界 / use-after-free，用 ASan 重编一次跑。</div></div>
+  </div>
+  <pre><span class="c"># 判断是不是被 OOM Killer 杀的（最常见的"无故消失"）</span>
+dmesg -T | grep -i <span class="y">"killed process"</span>
+<span class="c"># 输出类似：Out of memory: Killed process 12345 (java) total-vm:8g</span>
+
+<span class="c"># 看进程退出码</span>
+systemctl status myapp        <span class="c"># 看 Main PID exited, code=killed, status=9/KILL</span></pre>
+
+  <h3>类型五：只在生产复现</h3>
+  <p><b>首要问题：生产和测试的差异清单是什么？</b>这类问题不要试图"在生产上调试"，而要<b>把差异搬回本地</b>。</p>
+  <table>
+    <tr><th style="width:150px">差异维度</th><th style="width:260px">常见具体项</th><th>排查手段</th></tr>
+    <tr><td><b>数据</b></td><td>数据量、脏数据、历史遗留字段、编码</td><td>脱敏后导一份生产数据到测试库</td></tr>
+    <tr><td><b>配置</b></td><td>连接池大小、超时、开关、线程数</td><td>diff 两份配置文件，逐项对齐</td></tr>
+    <tr><td><b>拓扑</b></td><td>多副本、负载均衡、CDN、代理层</td><td>看是否只在特定实例上出错</td></tr>
+    <tr><td><b>依赖版本</b></td><td>中间件、JDK、内核、glibc</td><td>打印运行时版本，和本地比对</td></tr>
+    <tr><td><b>流量</b></td><td>并发度、请求大小、长连接</td><td>用生产流量的录制回放</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>最有效的一招：流量录制回放。</b>把生产入口的请求（脱敏后）录下来，在测试环境按原速率重放。如果能在测试环境复现，问题就变成了普通问题；如果复现不了，说明差异在环境而非代码，继续对照上表逐项排除。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>远程与生产调试：先划安全边界</h2></div>
+  <p class="lead">生产调试的第一原则不是"怎么查到"，是<b>"怎么查才不制造第二个故障"</b>。一个 SIGSTOP 就能让健康检查失败、流量被打到别的实例、甚至触发滚动重启。</p>
+
+  <h3>attach 到运行中的进程</h3>
+  <pre><span class="c"># 通用：先找到 pid</span>
+pgrep -f <span class="y">"order-service"</span>
+ps -eo pid,ppid,rss,pcpu,etime,cmd --sort=-rss | head
+
+<span class="c"># gdb attach（会暂停进程，谨慎）</span>
+gdb -p &lt;pid&gt;
+(gdb) thread apply all bt        <span class="c"># 一次看所有线程的栈，找卡住的那个</span>
+(gdb) detach                     <span class="c"># 一定要 detach，直接退出会杀掉进程</span>
+
+<span class="c"># Go：不暂停也能看栈（向进程发 SIGQUIT 会打印所有 goroutine 栈后退出，慎用）</span>
+dlv attach &lt;pid&gt; --headless --listen=:2345
+<span class="c"># 更安全的做法：开 pprof 端口，用 HTTP 抓</span>
+curl http://127.0.0.1:6060/debug/pprof/goroutine?debug=2
+
+<span class="c"># Python：py-spy 不需要暂停进程，几乎零开销</span>
+py-spy dump --pid &lt;pid&gt;          <span class="c"># 打印所有线程的当前栈</span>
+py-spy top --pid &lt;pid&gt;           <span class="c"># 实时看热点函数</span>
+
+<span class="c"># Java：jstack 会触发 safepoint，有短暂停顿</span>
+jcmd &lt;pid&gt; Thread.print &gt; /tmp/stack.txt
+jcmd &lt;pid&gt; GC.heap_info</pre>
+
+  <h3>容器内调试</h3>
+  <table>
+    <tr><th style="width:230px">手段</th><th>适用与代价</th></tr>
+    <tr><td class="f">docker exec -it &lt;c&gt; sh</td><td>镜像里有 shell 和工具才行。生产镜像常是 distroless，什么都没有</td></tr>
+    <tr><td class="f">kubectl debug -it pod --image=busybox --target=app</td><td>临时容器（ephemeral container），共享进程命名空间，能 nsenter 进目标</td></tr>
+    <tr><td class="f">nsenter -t &lt;pid&gt; -n -p</td><td>从宿主机进入容器的网络 / 进程命名空间，不依赖镜像内容</td></tr>
+    <tr><td class="f">kubectl cp</td><td>把 core dump / 堆转储拷出来慢慢分析，<b>最安全</b></td></tr>
+    <tr><td class="f">kubectl port-forward</td><td>把 pprof / actuator 端口映射到本地，不暴露到公网</td></tr>
+  </table>
+  <pre><span class="c"># 从宿主机进入容器命名空间排查（无需容器内有工具）</span>
+pid=$(docker inspect -f <span class="y">'{{.State.Pid}}'</span> mycontainer)
+nsenter -t $pid -n ss -lntp            <span class="c"># 看容器内监听端口</span>
+nsenter -t $pid -p -f --preserve-credentials strace -p 1
+
+<span class="c"># Kubernetes：起一个共享进程空间的临时容器</span>
+kubectl debug -it mypod --image=nicolaka/netshoot --target=myapp
+<span class="c"># 进去之后可以直接看到目标容器的进程</span>
+ps aux</pre>
+
+  <h3>生产操作的risk分级</h3>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:280px">操作</th><th>要求</th></tr>
+    <tr><td><b>绿</b></td><td>读日志、抓 pprof、dump 栈、看指标</td><td>可直接做。注意抓栈本身有开销，别高频重复</td></tr>
+    <tr><td><b>黄</b></td><td>动态调日志级别、attach 调试器、抓包</td><td>需要有人知情；限定时长；记录操作</td></tr>
+    <tr><td><b>橙</b></td><td>改配置、重启单实例、摘流量</td><td>走变更流程；确认有多副本兜底</td></tr>
+    <tr><td><b>红</b></td><td>改数据、删缓存、kill 进程、回滚</td><td>双人复核；先备份；准备好回滚方案</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>生产调试的三条硬规则：</b><br>
+    ① <b>只读优先</b>。能用 dump 解决就不 attach，能 attach 就不改代码。任何写操作都要先问"如果这一步出错，怎么恢复"。<br>
+    ② <b>限时</b>。调试器 attach、抓包、开 TRACE 日志，全都要有超时。忘了关的 TRACE 日志能把磁盘写满，比原故障更严重。<br>
+    ③ <b>先摘流量再动手</b>。要暂停进程，先把它从负载均衡里摘掉。否则健康检查超时 → 触发重启 → 你的调试现场直接消失。
+  </div>
+  <div class="callout warn">
+    <b>不要在生产上直接改代码试。</b>"我改一行日志再发一版看看" —— 这句话在事故期间意味着一次完整发布流程（构建、镜像、滚动更新、健康检查），通常 10 分钟起步，而且新版本可能引入新问题。<b>事故期间只做可逆的、秒级生效的操作</b>：调配置、切开关、摘流量、扩容。代码修复留到事后。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>事后分析：从现场还原真相</h2></div>
+  <p class="lead">故障恢复不等于排查结束。真正有价值的产出是<b>一份能防止同类问题再发生的复盘</b>，而它的原料是崩溃现场和日志时间线。</p>
+
+  <h3>core dump：崩溃现场的快照</h3>
+  <pre><span class="c"># 1. 确认是否开启（0 表示不生成，事后无法补救）</span>
+ulimit -c                 <span class="c"># 当前 shell 的限制</span>
+cat /proc/sys/kernel/core_pattern   <span class="c"># core 文件写到哪里</span>
+<span class="c"># 常见值：core → 当前目录；|/usr/lib/systemd/systemd-coredump %P → 交给 systemd</span>
+
+<span class="c"># 2. 临时开启（只对当前 shell 生效）</span>
+ulimit -c unlimited
+echo <span class="y">'/var/crash/core.%e.%p.%t'</span> &gt; /proc/sys/kernel/core_pattern
+
+<span class="c"># 3. 分析</span>
+gdb /path/to/binary /var/crash/core.myapp.12345.1729134567
+(gdb) bt full                  <span class="c"># 完整栈 + 每帧的局部变量</span>
+(gdb) thread apply all bt      <span class="c"># 所有线程（多线程崩溃必看）</span>
+(gdb) info registers           <span class="c"># 寄存器状态</span>
+(gdb) frame 3                  <span class="c"># 切到第 3 帧再看变量</span></pre>
+  <div class="callout">
+    <b>core 文件和二进制必须严格匹配。</b>版本不一致时 gdb 会给出错误的符号，看起来像"栈乱了"。所以发布时要把每个版本的二进制（带调试符号）归档保留，否则 core dump 拿到手也读不懂。
+  </div>
+
+  <h3>读 stack trace 的正确姿势</h3>
+  <table>
+    <tr><th style="width:200px">看到什么</th><th>说明什么</th></tr>
+    <tr><td class="f">最顶层是框架代码</td><td>通常不是框架的错。往下找第一帧你的代码，问题多半在那</td></tr>
+    <tr><td class="f">栈里出现 native 方法</td><td>JNI / cgo 边界。检查传进去的参数类型和生命周期</td></tr>
+    <tr><td class="f">"Caused by" 链</td><td>从<b>最下面</b>那个 Caused by 开始读，那才是根因，上面都是包装</td></tr>
+    <tr><td class="f">栈深度异常（几千层）</td><td>递归没有终止条件，或者循环引用导致序列化爆栈</td></tr>
+    <tr><td class="f">同一个方法反复出现</td><td>递归。检查基准条件</td></tr>
+  </table>
+  <pre><span class="c"># Java 典型的异常链，从下往上读</span>
+org.springframework.web.util.NestedServletException: Request processing failed
+  <span class="y">Caused by:</span> org.springframework.dao.DataIntegrityViolationException: could not execute statement
+    <span class="y">Caused by:</span> org.postgresql.util.PSQLException: <span class="r">duplicate key value violates unique constraint "uk_order_no"</span>
+<span class="c"># 根因是最后一行：唯一约束冲突。前面两层只是包装。</span></pre>
+
+  <h3>日志时间线还原</h3>
+  <p>把多个服务的日志按时间排序，是理解"事故到底怎么发生的"的唯一可靠方式。前提是<b>时钟对齐</b>和<b>链路 ID 透传</b>。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先对齐时钟</b>。多机部署必须开 NTP。时钟漂移几秒，时间线就会得出完全错误的因果结论。</div></div>
+    <div class="step"><div class="txt"><b>用 trace_id 串起一次请求</b>，按时间排序，画出它经过了哪些服务、每段耗时多少。</div></div>
+    <div class="step"><div class="txt"><b>找出"第一个异常"</b>，而不是"最响的那个"。下游雪崩往往由上游一个不起眼的超时引发。</div></div>
+    <div class="step"><div class="txt"><b>对齐指标拐点</b>：CPU、QPS、错误率、连接数的拐点时间和日志事件对上，因果链就成立了。</div></div>
+  </div>
+  <pre><span class="c"># 按时间合并多个服务的日志（先各自排序再 merge）</span>
+for f in logs/*.log; do
+  <span class="b">sort</span> -k1,1 <span class="y">"$f"</span> &gt; <span class="y">"$f.sorted"</span>
+done
+<span class="b">sort</span> -m -k1,1 logs/*.sorted | <span class="b">grep</span> <span class="y">"a3f9c2"</span> | <span class="b">less</span>
+
+<span class="c"># 只看某个 trace 的耗时分布</span>
+<span class="b">jq</span> -r <span class="y">'select(.trace_id=="a3f9c2") | "\(.ts) \(.service) \(.msg) \(.cost_ms)ms"'</span> app.jsonl</pre>
+
+  <h3>复盘模板</h3>
+  <table>
+    <tr><th style="width:130px">部分</th><th>要写什么</th><th>常见错误</th></tr>
+    <tr><td><b>影响面</b></td><td>多少用户、多少请求、持续多久、损失多少</td><td>写"部分用户"，不给数字</td></tr>
+    <tr><td><b>时间线</b></td><td>精确到分钟：首次异常、发现、响应、恢复</td><td>只写"发现后立即处理"</td></tr>
+    <tr><td><b>直接原因</b></td><td>触发故障的那件事（一条 SQL、一次发布）</td><td>把直接原因当根因</td></tr>
+    <tr><td><b>根本原因</b></td><td>为什么这件事能造成这么大影响（缺防护、缺监控、缺隔离）</td><td>停在"人为失误"</td></tr>
+    <tr><td><b>改进项</b></td><td>每条都要有 <b>owner + 截止时间 + 验收标准</b></td><td>写"加强监控"这种无法验收的项</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>5 Whys 的正确用法是往下挖系统缺陷，不是往下挖人的责任。</b><br>
+    "发布导致故障" → 为什么发布会导致故障？→ 因为新代码有慢查询 → 为什么慢查询能上线？→ 因为 CI 没有 SQL 审查 → 为什么没有？→ 因为没人负责这块。<br>
+    前三层是技术，第四层是流程。<b>只停在"某人粗心"的复盘，什么都不会改变。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>调试的反模式</h2></div>
+  <p class="lead">下面这些做法不是"效率低"，是<b>会主动误导你</b>。它们让你以为在推进，实际上在扩大搜索空间。</p>
+
+  <h3>反模式一：乱加 print 不思考</h3>
+  <p>在十个地方加 print，输出几百行，然后盯着屏幕找"哪里不对"。问题是你没有<b>预期值</b>，所以任何输出看起来都"好像有点怪"。</p>
+  <p><b>替代做法：</b>加日志前先写下"如果假设 A 成立，这行应该打印什么"。打印结果和预期不符，才是有信息量的实验。</p>
+
+  <h3>反模式二：改代码试错</h3>
+  <p>"我把这个判空去掉试试""我把这个超时调大试试" —— 每次改动都要重启、重跑、观察，单次成本几十秒到几分钟，而且改完之后<b>你面对的是一个新程序</b>，之前的观察全部失效。</p>
+  <table>
+    <tr><th style="width:200px">做法</th><th>单次成本</th><th>可归因性</th></tr>
+    <tr><td>改代码 + 重启 + 重跑</td><td>30 秒 ~ 5 分钟</td><td>差：同时改变了多个条件</td></tr>
+    <tr><td>调试器里改变量 / 调函数</td><td>1 秒</td><td>好：只改了内存状态</td></tr>
+    <tr><td>加日志后重跑</td><td>一次完整运行</td><td>好：只增加了观察，没改行为</td></tr>
+  </table>
+
+  <h3>反模式三：不看文档瞎猜</h3>
+  <p>库的行为、API 的默认值、配置项的语义，全都有文档。花 30 秒查一下，比花 30 分钟验证一个错误假设划算得多。典型的"猜错"包括：</p>
+  <ul>
+    <li>以为连接池默认大小是 100，实际是 10（不同库不一样，必须查）。</li>
+    <li>以为超时单位是秒，实际是毫秒，于是"超时设了 30"变成 30 毫秒。</li>
+    <li>以为某个方法线程安全，实际不是。</li>
+    <li>以为异常会被抛出，实际被库内部吞掉并返回了默认值。</li>
+  </ul>
+
+  <h3>反模式四：忽略"最近改了什么"</h3>
+  <p>这是<b>投入产出比最高的一条线索</b>，却最常被跳过。"以前一直是好的"这句话意味着：变化发生在某个时间点，找到那个变化就找到了大半答案。</p>
+  <pre><span class="c"># 三分钟内能查完的清单</span>
+git log --oneline -20                    <span class="c"># 最近提交了什么</span>
+git log -p --since=<span class="y">"2 days ago"</span> -- path/to/module   <span class="c"># 只看相关模块</span>
+git diff v2.3.0..HEAD --stat             <span class="c"># 两个版本之间改了哪些文件</span>
+
+<span class="c"># 别忘了非代码变更</span>
+<span class="c"># - 配置中心有没有人改过？</span>
+<span class="c"># - 依赖有没有升级？</span>
+<span class="c"># - 数据库有没有加索引 / 改表结构？</span>
+<span class="c"># - 证书 / 域名 / DNS 有没有动？</span>
+<span class="c"># - 流量模式有没有变化（活动、爬虫、压测）？</span></pre>
+
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个调试中的典型错误</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">在没复现的情况下就开始改代码</div><div class="pd">改完之后无法验证，只能靠"感觉好了"。先花时间把复现条件收敛，是唯一能省时间的做法。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">一次改多个地方</div><div class="pd">问题消失了也不知道是哪处起的作用，下次复发还得重来。每次只动一个变量，并写下预期。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">在循环里打日志</div><div class="pd">10 万次循环就是 10 万行，磁盘写满、日志系统被打爆，有用的那行被淹没。改成循环外聚合统计。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">catch 住异常只打 WARN 或干脆不打</div><div class="pd">接口已经在返回错误，监控里却一片安静。捕获后要么处理，要么 ERROR 带堆栈，不要静默吞掉。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">gdb attach 后直接 quit</div><div class="pd">没有 detach 就退出，会把被调试进程一起杀掉。生产上这一步等于人为制造一次故障。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">调试时忘了关 TRACE 日志</div><div class="pd">开了就忘，几小时后磁盘写满，服务挂掉。所有临时调试开关都必须设超时或加进检查清单。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">条件断点里调用有副作用的函数</div><div class="pd">断点本身改变了程序状态，你调试的已经不是原来的程序了。条件表达式只做纯读取。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用优化过的二进制去读 core dump</div><div class="pd">变量显示 optimized out，栈帧错位。发布时归档带符号的二进制，core 才有分析价值。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">不看最近变更，直接怀疑老代码</div><div class="pd">"一直好好的突然坏了"，九成是最近有变化：发布、配置、依赖、证书、流量。先查变更记录。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把直接原因当成根本原因</div><div class="pd">"某条 SQL 慢"是直接原因；"慢 SQL 能上线且没有监控"才是根本原因。只修前者，同类问题必然复发。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 线上偶发报错，一天出现三五次，本地无法复现。最合理的下一步是？</div>
+      <button class="opt">反复在本地跑，直到复现为止</button>
+      <button class="opt">在失败路径上埋点，完整记录请求上下文，攒够样本再分析</button>
+      <button class="opt">先把可疑的代码都加一遍判空</button>
+      <div class="ans">正确答案：<b>先收集现场</b>。偶发问题靠"再跑一次"收敛不了，必须把失败时的完整输入、trace_id、线程、资源指标记下来。攒 3~5 个样本后规律自然浮现。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一个变量在某个时刻被改成了错误的值，但不知道是谁改的。最直接的手段是？</div>
+      <button class="opt">在整个模块里加满日志</button>
+      <button class="opt">读一遍所有相关代码</button>
+      <button class="opt">设观察点（watchpoint），变量被写时自动停下</button>
+      <div class="ans">正确答案：<b>观察点</b>。watchpoint 会在变量被写入的瞬间中断，直接给出写入位置和调用栈，不需要事先知道有哪些写入点。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 300 个提交之间引入了 bug，已知 v2.3.0 是好的。用 git bisect 大约需要几次验证？</div>
+      <button class="opt">约 9 次（log2(300) ≈ 8.2）</button>
+      <button class="opt">约 30 次</button>
+      <button class="opt">约 150 次</button>
+      <div class="ans">正确答案：<b>约 9 次</b>。二分每次砍掉一半，300 → 150 → 75 → 38 → 19 → 10 → 5 → 3 → 2 → 1。前提是测试脚本稳定，不能有随机性。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 服务延迟高，但 CPU 使用率只有 15%。应该优先看什么？</div>
+      <button class="opt">用 perf 分析 CPU 热点函数</button>
+      <button class="opt">看等待：下游调用耗时、数据库慢查询、锁等待、磁盘 IO</button>
+      <button class="opt">直接扩容加机器</button>
+      <div class="ans">正确答案：<b>看等待</b>。CPU 低而延迟高，说明时间花在等 IO 或等锁上，profiling CPU 只会看到一堆 idle。先按链路分段量耗时。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 进程莫名其妙消失，日志没有任何异常。第一步应该查什么？</div>
+      <button class="opt">怀疑代码有内存泄漏</button>
+      <button class="opt">加更多日志再观察</button>
+      <button class="opt">看退出码和 dmesg，确认是不是被 OOM Killer 杀了</button>
+      <div class="ans">正确答案：<b>看退出码和 dmesg</b>。退出码 137（SIGKILL）配合 dmesg 里的 "Killed process" 就是 OOM Killer 的典型特征。这种情况下应用层日志当然什么都没有。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于生产环境调试，哪个做法是错的？</div>
+      <button class="opt">为了快速定位，直接在生产实例上改代码重新部署</button>
+      <button class="opt">先把实例从负载均衡摘掉，再 attach 调试器</button>
+      <button class="opt">把 core dump 拷到本地分析，而不是在生产机上跑 gdb</button>
+      <div class="ans">正确答案：<b>在生产上改代码重部署</b>。事故期间只做秒级可逆操作（调配置、切开关、摘流量）。重新部署要几分钟到十几分钟，还会引入新变量，是最危险的做法。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>排查命令速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>strace -f -p &lt;pid&gt;</code><span class="desc">看进程卡在哪个系统调用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lsof -p &lt;pid&gt;</code><span class="desc">看进程打开的文件、端口、socket</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -lntp</code><span class="desc">看监听端口和对应进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -eo pid,rss,pcpu,etime,cmd --sort=-rss</code><span class="desc">按内存排序看进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dmesg -T | grep -i "killed process"</code><span class="desc">确认是否被 OOM Killer 杀掉</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gdb -p &lt;pid&gt; -ex "thread apply all bt" -ex detach</code><span class="desc">一次性抓所有线程栈后脱离</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jcmd &lt;pid&gt; Thread.print</code><span class="desc">Java 线程栈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jcmd &lt;pid&gt; GC.heap_info</code><span class="desc">Java 堆使用情况</span><button class="copy">复制</button></div>
+    <div class="crow"><code>py-spy dump --pid &lt;pid&gt;</code><span class="desc">Python 全线程栈，不暂停进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl 127.0.0.1:6060/debug/pprof/goroutine?debug=2</code><span class="desc">Go 所有 goroutine 栈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git bisect start HEAD v2.3.0</code><span class="desc">开始二分提交</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git bisect run ./check.sh</code><span class="desc">自动二分（脚本退出码 0 好 / 1 坏 / 125 跳过）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ulimit -c unlimited</code><span class="desc">开启 core dump</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gdb ./bin core.12345</code><span class="desc">加载 core 文件分析崩溃现场</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl debug -it pod --image=busybox --target=app</code><span class="desc">给 Pod 挂一个临时调试容器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nsenter -t &lt;pid&gt; -n -p</code><span class="desc">从宿主机进入容器命名空间</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>日志与调试参数</h3>
+  <pre><span class="c"># 动态调日志级别（示例：Spring Boot Actuator）</span>
+curl -X POST http://localhost:8080/actuator/loggers/com.demo \
+  -H <span class="y">"Content-Type: application/json"</span> \
+  -d <span class="y">'{"configuredLevel":"DEBUG"}'</span>
+
+<span class="c"># Go：开启 pprof（只在排查时暴露，且绑 127.0.0.1）</span>
+import _ <span class="y">"net/http/pprof"</span>
+go func() { http.ListenAndServe(<span class="y">"127.0.0.1:6060"</span>, nil) }()
+
+<span class="c"># 抓一次 30 秒的 CPU profile</span>
+go tool pprof -http=:8081 http://127.0.0.1:6060/debug/pprof/profile?seconds=30
+
+<span class="c"># Node：启动即断点，等调试器连上才继续</span>
+node --inspect-brk=127.0.0.1:9229 app.js
+
+<span class="c"># Python：崩溃时自动打印栈（比什么都抓不到强）</span>
+import faulthandler; faulthandler.enable()</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>复现</b></td><td>用最小条件稳定重现问题，是排查的前提</td></tr>
+    <tr><td><b>可证伪假设</b></td><td>能设计实验来验证或推翻的猜测，而不是"可能是缓存问题"</td></tr>
+    <tr><td><b>断点 breakpoint</b></td><td>让程序在指定位置暂停，以便检查状态</td></tr>
+    <tr><td><b>条件断点</b></td><td>只在表达式为真时暂停，用于循环和特定输入</td></tr>
+    <tr><td><b>观察点 watchpoint</b></td><td>变量被写入时自动暂停，用于抓"谁改的"</td></tr>
+    <tr><td><b>调用栈 call stack</b></td><td>当前线程的函数调用链，栈顶是当前位置</td></tr>
+    <tr><td><b>core dump</b></td><td>进程崩溃时的内存快照，配合符号可还原现场</td></tr>
+    <tr><td><b>stack trace</b></td><td>异常发生时的调用栈文本，从抛出点向外展开</td></tr>
+    <tr><td><b>attach</b></td><td>把调试器挂到已运行的进程上，无需重启</td></tr>
+    <tr><td><b>safepoint</b></td><td>JVM 中所有线程可安全暂停的位置，抓栈会等待它</td></tr>
+    <tr><td><b>OOM Killer</b></td><td>Linux 内存不足时内核直接杀进程，应用层无感知</td></tr>
+    <tr><td><b>二分定位</b></td><td>每次砍掉一半候选空间，用 log2(N) 次实验定位</td></tr>
+    <tr><td><b>git bisect</b></td><td>Git 内置的提交二分工具，可脚本化自动执行</td></tr>
+    <tr><td><b>结构化日志</b></td><td>以 key=value / JSON 输出字段，便于机器检索聚合</td></tr>
+    <tr><td><b>trace_id</b></td><td>贯穿一次请求全链路的唯一 ID，跨服务透传</td></tr>
+    <tr><td><b>采样 sampling</b></td><td>高频日志只保留一部分，控制量级同时保留统计特征</td></tr>
+    <tr><td><b>P99 延迟</b></td><td>99% 的请求快于这个值，比平均值更能暴露长尾</td></tr>
+    <tr><td><b>on-cpu / off-cpu</b></td><td>时间花在计算上 / 花在等待上，两类问题的优化方向完全相反</td></tr>
+    <tr><td><b>流量回放</b></td><td>录制生产请求在测试环境重放，用于复现"只在生产出现"的问题</td></tr>
+    <tr><td><b>5 Whys</b></td><td>连续追问五次"为什么"，从直接原因挖到系统性缺陷</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 找一个你自己项目里的慢接口，用分段计时把耗时拆开，确认瓶颈在哪一层；② 故意写一个数组越界，生成 core dump 并用 gdb 读出来；③ 用 git bisect 在一个有历史的仓库里找一个真实引入的 bug；④ 把某个服务的日志改成结构化输出，加 trace_id，然后用 jq 按 trace 还原一条请求的完整路径。<br><br>
+    <b>之后值得单独学：</b>分布式追踪（OpenTelemetry）的埋点与采样策略、eBPF 观测（bpftrace 做无侵入排查）、以及混沌工程 —— 主动注入故障来验证你的可观测性是否够用。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透调试与排错 · 排查前先问三句：能复现吗？改了几个变量？最近改了什么？</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（第一原则）和模块 5（五类路径）值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里试一条命令。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开一个终端跟着敲：准备好 gdb / pdb / strace 任意一个';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

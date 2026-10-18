@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透容器内核机制</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透容器内核机制</h1>
+    <p class="sub">容器不是"轻量虚拟机"，是<b>一个被七层视图隔离、被 cgroup 限额、被 chroot 换了根目录的普通进程</b>。这句话能解释容器 90% 的"怪现象"。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>7</b> 种 namespace</span>
+      <span class="chip">cgroup <b>v1 → v2</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">起一个容器：docker run -it --rm ubuntu:24.04 bash</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个容器，先看它的"内脏"</h2></div>
+  <p class="lead">这一节的所有结论，都能在下面这几条命令里亲眼看到。</p>
+  <pre><span class="c"># 1. 起一个容器，记下它的 PID（宿主机视角）</span>
+docker run -d --name demo nginx:alpine
+PID=$(docker inspect -f '{{.State.Pid}}' demo)
+echo $PID
+<span class="c"># 12345</span>
+
+<span class="c"># 2. 在宿主机上，它就是一个普通进程</span>
+ps -p $PID -o pid,ppid,user,comm,args
+<span class="c"># 12345  1  root  nginx  nginx: master process nginx -g daemon off;</span>
+
+<span class="c"># 3. 看它有哪些 namespace（每个 ns 是一个 inode）</span>
+ls -l /proc/$PID/ns/
+<span class="c"># cgroup -&gt; 'cgroup:[4026531835]'</span>
+<span class="c"># ipc    -&gt; 'ipc:[4026532508]'</span>
+<span class="c"># mnt    -&gt; 'mnt:[4026532506]'</span>
+<span class="c"># net    -&gt; 'net:[4026532509]'</span>
+<span class="c"># pid    -&gt; 'pid:[4026532507]'</span>
+<span class="c"># user   -&gt; 'user:[4026531837]'</span>
+<span class="c"># uts    -&gt; 'uts:[4026532505]'</span>
+
+<span class="c"># 4. 看它的根目录（不是宿主机的 /）</span>
+sudo ls -l /proc/$PID/root/
+<span class="c"># 这就是 overlayfs 的 merged 目录</span></pre>
+  <div class="callout warn">
+    <b>记住这个 PID。</b>后面所有排查手段——nsenter、看真实 /proc、抓包、strace——都建立在"容器进程在宿主机有真实 PID"这个事实上。容器里的 PID 1，在宿主机上可能是 12345。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>七种 namespace，各自隔离什么</h2></div>
+  <p class="lead">namespace 的作用是<b>让进程看到不同的"系统视图"</b>，不限制用量（那是 cgroup 的事）。</p>
+
+  <table>
+    <tr><th style="width:110px">namespace</th><th style="width:100px">clone 标志</th><th style="width:250px">隔离什么</th><th>典型表现</th></tr>
+    <tr><td><b>PID</b></td><td class="f">CLONE_NEWPID</td><td>进程 ID 空间。<b>容器里的 1 号进程是宿主机上某个普通进程</b>，且看不到宿主机其他进程</td><td>容器里 <span class="k">ps aux</span> 只有自己几个进程；<span class="k">kill -9 1</span> 会把容器干掉</td></tr>
+    <tr><td><b>NET</b></td><td class="f">CLONE_NEWNET</td><td>网卡、IP、路由表、iptables 规则、端口空间、<span class="k">/proc/net</span></td><td>容器有自己的 eth0 和 172.17.0.x；<b>lo 默认是 down 的</b></td></tr>
+    <tr><td><b>MNT</b></td><td class="f">CLONE_NEWNS</td><td>挂载点视图。每个 ns 有独立的 mount table</td><td>容器看不到宿主机的挂载；<span class="k">/proc</span> 要重新挂一次才是自己的</td></tr>
+    <tr><td><b>UTS</b></td><td class="f">CLONE_NEWUTS</td><td>主机名（hostname）和域名（domainname）</td><td>容器里 <span class="k">hostname</span> 返回容器 ID，不影响宿主机</td></tr>
+    <tr><td><b>IPC</b></td><td class="f">CLONE_NEWIPC</td><td>System V 共享内存、消息队列、信号量、POSIX 消息队列</td><td>容器间的共享内存互不可见</td></tr>
+    <tr><td><b>USER</b></td><td class="f">CLONE_NEWUSER</td><td>UID/GID 映射。<b>容器里的 root 可以映射成宿主机的普通用户</b></td><td>容器内 <span class="k">id</span> 是 0，宿主机上对应 100000</td></tr>
+    <tr><td><b>CGROUP</b></td><td class="f">CLONE_NEWCGROUP</td><td><span class="k">/proc/self/cgroup</span> 的显示路径</td><td>容器里看到 <span class="k">/</span>，宿主机看到 <span class="k">/docker/&lt;id&gt;</span></td></tr>
+  </table>
+  <p>Linux 5.6 之后还有第八种 <b>time namespace</b>（<span class="k">CLONE_NEWTIME</span>），隔离 <span class="k">CLOCK_MONOTONIC</span> 和 <span class="k">CLOCK_BOOTTIME</span> 的起点，主要用于 CRIU 迁移后保持时间连续。日常运维基本碰不到。</p>
+
+  <h3>PID namespace：1 号进程的特殊性</h3>
+  <p>容器里的 PID 1 和普通 init 一样，承担两个额外职责：<b>回收孤儿进程</b>和<b>转发信号</b>。这带来两个经典问题：</p>
+  <ul>
+    <li><b>应用不是为 PID 1 写的。</b>很多程序（如 nginx、java）不会处理 <span class="k">SIGTERM</span> 转发，也不会 <span class="k">wait()</span> 孤儿进程，导致 <span class="k">docker stop</span> 等 10 秒超时后 <span class="k">SIGKILL</span>，以及僵尸进程堆积。解法是用 <span class="k">tini</span> 或 <span class="k">--init</span>。</li>
+    <li><b>PID 1 对默认信号免疫。</b>内核不会给 PID 1 投递没有注册 handler 的信号。所以 <span class="k">kill -9 1</span> 在容器里有效（SIGKILL 不可捕获），但 <span class="k">kill 1</span>（SIGTERM）可能毫无反应。</li>
+  </ul>
+  <pre><span class="c"># 看容器里的进程树（只有自己的）</span>
+docker exec demo ps -ef
+<span class="c"># PID   USER     TIME  COMMAND</span>
+<span class="c">#     1 root      0:00 nginx: master process</span>
+<span class="c">#    29 nginx     0:00 nginx: worker process</span>
+
+<span class="c"># 宿主机上看到的是完整 PID，且能看到父进程是 containerd-shim</span>
+ps -ef | grep nginx
+<span class="c"># root 12345 12300  0 10:00 ?  00:00:00 nginx: master process</span>
+<span class="c"># root 12400 12345  0 10:00 ?  00:00:00 nginx: worker process</span>
+
+<span class="c"># 用 --init 给容器加一个 tini 作为 PID 1</span>
+docker run -d --init --name demo2 nginx:alpine</pre>
+
+  <h3>NET namespace：为什么容器里 ping 不通 127.0.0.1</h3>
+  <p>新建的 net namespace 里只有一块 <span class="k">lo</span>，而且状态是 <b>DOWN</b>。Docker 会把容器接到网桥上并启用 eth0，但不会自动启用 lo——除非镜像的启动脚本自己做了。</p>
+  <pre><span class="c"># 容器里看网卡</span>
+ip addr
+<span class="c"># 1: lo: &lt;LOOPBACK&gt; mtu 65536 qdisc noop state DOWN</span>
+<span class="c"># 2: eth0@if15: &lt;BROADCAST,MULTICAST,UP&gt; mtu 1500 state UP</span>
+<span class="c">#    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0</span>
+
+<span class="c"># 手动启用 lo（容器内需要 CAP_NET_ADMIN）</span>
+ip link set lo up
+
+<span class="c"># 注意 eth0@if15 的 if15：这是宿主机上 veth 对的另一端索引</span>
+<span class="c"># 在宿主机上 ip link 能看到 vethXXXX，两边是一对</span></pre>
+
+  <h3>USER namespace：容器里的 root 不一定是真 root</h3>
+  <p>默认情况下（非 rootless），Docker 容器里的 root <b>就是宿主机的 root</b>，只是被 capability 和 seccomp 削掉了大部分权力。开启 userns-remap 后才会映射：</p>
+  <pre><span class="c"># 看 UID 映射表（三个数字：容器内起始、宿主起始、长度）</span>
+cat /proc/$PID/uid_map
+<span class="c">#          0       1000          1</span>
+<span class="c"># 表示容器里的 uid 0 对应宿主机的 uid 1000</span>
+
+<span class="c"># 默认 Docker 没开 userns-remap 时是这样</span>
+cat /proc/$PID/uid_map
+<span class="c">#          0          0 4294967295   ← 一一对应，容器 root = 宿主 root</span>
+
+<span class="c"># 开启 userns-remap（/etc/docker/daemon.json）</span>
+<span class="c">{ "userns-remap": "default" }</span></pre>
+  <div class="callout danger">
+    <b>这是容器安全的核心认知：</b>"容器里是 root"默认等于"宿主机上是 root"，只是被 capability 限制了。一旦容器拿到 <span class="k">CAP_SYS_ADMIN</span> 或发生内核逃逸，攻击者直接就是宿主 root。真正要靠 userns-remap 或 rootless 容器才能改变这个等式。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>cgroup v1 与 v2</h2></div>
+  <p class="lead">namespace 管"看到什么"，cgroup 管"能用多少"。两套机制合起来才是一个容器。</p>
+
+  <table>
+    <tr><th style="width:170px">维度</th><th style="width:280px">cgroup v1</th><th>cgroup v2</th></tr>
+    <tr><td>层级结构</td><td><b>多棵树</b>，每个控制器一棵（cpu 一棵、memory 一棵、blkio 一棵）</td><td><b>一棵树</b>，所有控制器挂在同一棵树上</td></tr>
+    <tr><td>进程归属</td><td>一个进程可以同时属于不同树的不同的组</td><td>一个进程只能属于一个组，路径唯一</td></tr>
+    <tr><td>挂载点</td><td class="f">/sys/fs/cgroup/cpu/...<br>/sys/fs/cgroup/memory/...</td><td class="f">/sys/fs/cgroup/&lt;group&gt;/</td></tr>
+    <tr><td>CPU 限额</td><td class="f">cpu.cfs_quota_us + cpu.cfs_period_us</td><td class="f">cpu.max（"配额 周期"两个数一行）</td></tr>
+    <tr><td>内存限额</td><td class="f">memory.limit_in_bytes</td><td class="f">memory.max / memory.high</td></tr>
+    <tr><td>IO 限额</td><td class="f">blkio.throttle.read_bps_device</td><td class="f">io.max（按设备号一行配 rbps/wbps/riops/wiops）</td></tr>
+    <tr><td>压力指标</td><td>无统一接口</td><td><b>PSI</b>（pressure stall information），能看 CPU/IO/内存的真实阻塞时间</td></tr>
+    <tr><td>子组权限</td><td>混乱，各控制器规则不同</td><td>统一，支持委派给非 root 用户</td></tr>
+  </table>
+
+  <h3>v1 的四个具体问题</h3>
+  <ul>
+    <li><b>无法原子地限制一组资源。</b>要给容器同时设 CPU 和内存，得往两棵树的目录里分别写，中间有窗口期。</li>
+    <li><b>统计口径不一致。</b>memory 和 blkio 对同一个页的记账方式不同，OOM 时经常算不清是谁的责任。</li>
+    <li><b>层级冲突。</b>同一个进程在 cpu 树里在 A 组，在 memory 树里在 B 组，出问题时无法用一条路径定位。</li>
+    <li><b>控制器数量爆炸。</b>每个控制器一棵树，容器运行时要做十几次挂载，启动慢、易出错。</li>
+  </ul>
+
+  <h3>v2 的关键改进</h3>
+  <pre><span class="c"># v2 的目录结构：一个容器一个目录，所有控制器都在里面</span>
+ls /sys/fs/cgroup/system.slice/docker-&lt;id&gt;.scope/
+<span class="c"># cgroup.controllers  cgroup.subtree_control  cpu.max  cpu.stat</span>
+<span class="c"># io.max  io.stat  memory.max  memory.current  memory.events  pids.max</span>
+
+<span class="c"># 限制 2 核（200ms / 100ms）</span>
+echo "200000 100000" &gt; /sys/fs/cgroup/.../cpu.max
+
+<span class="c"># 限制内存 1G，软限 800M（超过软限会先触发回收而不是直接 OOM）</span>
+echo 1073741824 &gt; /sys/fs/cgroup/.../memory.max
+echo 838860800  &gt; /sys/fs/cgroup/.../memory.high
+
+<span class="c"># 限制 8:0 这块盘：读 10MB/s 写 10MB/s，读写各 1000 IOPS</span>
+echo "8:0 rbps=10485760 wbps=10485760 riops=1000 wiops=1000" \
+  &gt; /sys/fs/cgroup/.../io.max
+
+<span class="c"># 看当前用量和 OOM 次数</span>
+cat /sys/fs/cgroup/.../memory.current
+cat /sys/fs/cgroup/.../memory.events
+<span class="c"># low 0 / high 12 / max 3 / oom 1 / oom_kill 1</span></pre>
+
+  <h3>为什么要迁移</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>PSI 是刚需</div><div class="cd">v2 的 <span class="k">cpu.pressure</span> / <span class="k">io.pressure</span> / <span class="k">memory.pressure</span> 能直接告诉你"有多少时间被卡住了"，比看使用率有用得多。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>rootless 容器</div><div class="cd">v2 支持把子树的控制权委派给普通用户，这是 rootless Docker / Podman 的前提。v1 做不到干净地委派。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>systemd 统一管理</div><div class="cd">新版本 systemd 默认用 v2 记账，v1 下很多资源统计对不上，<span class="k">systemd-cgtop</span> 数字会漂。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>内核在移除 v1</div><div class="cd">新内核（6.x）里部分控制器的 v1 实现已经不再积极维护，新特性只加在 v2 上。</div></div>
+  </div>
+  <pre><span class="c"># 看当前用的是 v1 还是 v2</span>
+stat -fc %T /sys/fs/cgroup/
+<span class="c"># cgroup2fs  → v2</span>
+<span class="c"># tmpfs      → v1（混合模式也是 tmpfs）</span>
+
+<span class="c"># 看挂载情况</span>
+mount | grep cgroup
+
+<span class="c"># 内核启动参数强制 v2（GRUB 里加）</span>
+<span class="c"># systemd.unified_cgroup_hierarchy=1</span></pre>
+  <div class="callout warn">
+    <b>迁移时最容易踩的坑：</b>v1 的 <span class="k">cpu.cfs_quota_us = -1</span> 表示"不限制"，v2 里没有这个概念——<b>不写 <span class="k">cpu.max</span> 就是 <span class="k">max</span></b>。很多脚本把 -1 直接写进 v2 会报错。另外 v1 的 <span class="k">memory.memsw</span>（内存+swap 合计限制）在 v2 里被拆成了 <span class="k">memory.max</span> + <span class="k">memory.swap.max</span>，换算关系不是 1:1。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>容器的文件系统：overlayfs</h2></div>
+  <p class="lead">容器能"秒级启动"，一半功劳在镜像分层。overlayfs 是让多个只读层叠成一个可写视图的技术。</p>
+
+  <h3>四个目录</h3>
+  <table>
+    <tr><th style="width:130px">角色</th><th>作用</th></tr>
+    <tr><td><b>lowerdir</b></td><td>只读层，可以有多个（镜像的每一层一个）。<b>多个容器共享同一份</b></td></tr>
+    <tr><td><b>upperdir</b></td><td>可写层，容器自己的修改都落在这里。<b>每个容器一份</b></td></tr>
+    <tr><td><b>workdir</b></td><td>overlayfs 内部用的临时目录，必须在同一文件系统</td></tr>
+    <tr><td><b>merged</b></td><td>合并后的视图，这就是容器看到的 <span class="k">/</span></td></tr>
+  </table>
+  <pre><span class="c"># 宿主机上看某个容器的 overlay 挂载</span>
+mount | grep overlay
+<span class="c"># overlay on /var/lib/docker/overlay2/abc.../merged type overlay (rw,relatime,</span>
+<span class="c">#   lowerdir=/var/lib/docker/overlay2/l/A1:/var/lib/docker/overlay2/l/B2:...,</span>
+<span class="c">#   upperdir=/var/lib/docker/overlay2/abc.../diff,</span>
+<span class="c">#   workdir=/var/lib/docker/overlay2/abc.../work)</span>
+
+<span class="c"># 镜像有几层，lowerdir 就有几个，用冒号分隔，靠前的优先级高</span>
+docker image inspect nginx:alpine --format '{{len .RootFS.Layers}}'
+<span class="c"># 6</span></pre>
+
+  <h3>写时复制（copy-up）</h3>
+  <p>容器要修改一个在只读层里的文件时，overlayfs 不会改原文件，而是：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>把整个文件从 lowerdir 复制到 upperdir</b>（copy-up）。注意是<b>整个文件</b>，不是只复制要改的那几个字节。</div></div>
+    <div class="step"><div class="txt"><b>在 upperdir 的副本上做修改。</b>lowerdir 里的原文件纹丝不动，其他容器看到的还是旧内容。</div></div>
+    <div class="step"><div class="txt"><b>之后的读也走 upperdir</b>（因为上层优先）。原文件被"遮蔽"了，但仍然占着磁盘。</div></div>
+  </div>
+  <p><b>copy-up 的代价和文件大小成正比。</b>改一个 1GB 镜像层里的 1 字节配置文件，要先把 1GB 复制一遍。这就是为什么"容器里改大文件"很慢，也是为什么镜像层要尽量小。</p>
+  <pre><span class="c"># 看某个容器的可写层占了多少空间</span>
+docker ps -s
+<span class="c"># CONTAINER ID   ...   SIZE</span>
+<span class="c"># abc123         ...   12.3MB (virtual 142MB)</span>
+<span class="c">#                       ↑可写层  ↑含镜像层的总大小</span>
+
+<span class="c"># 直接看 upperdir 目录</span>
+sudo du -sh /var/lib/docker/overlay2/&lt;id&gt;/diff</pre>
+
+  <h3>为什么容器层不能持久化</h3>
+  <p>因为 <b>upperdir 的生命周期绑在容器上</b>：</p>
+  <table>
+    <tr><th style="width:200px">操作</th><th>upperdir 会怎样</th></tr>
+    <tr><td><span class="k">docker restart</span></td><td><b>保留</b>，容器没被删除，可写层还在</td></tr>
+    <tr><td><span class="k">docker stop</span> + <span class="k">start</span></td><td><b>保留</b></td></tr>
+    <tr><td><span class="k">docker rm</span></td><td><b>删除</b>，数据全丢</td></tr>
+    <tr><td><span class="k">docker run</span> 新容器</td><td>全新的空 upperdir，看不到旧容器的修改</td></tr>
+    <tr><td>K8s Pod 重建</td><td><b>删除</b>，Pod 是最小生命周期单位</td></tr>
+  </table>
+  <p>所以要持久化，必须把数据写到<b>挂载卷</b>（volume/bind mount）上，让路径绕过 overlayfs，直接落到宿主机目录或网络存储。</p>
+  <pre><span class="c"># 三种挂载方式</span>
+docker run -v /data:/app/data nginx        <span class="c"># bind mount，直接映射宿主目录</span>
+docker run -v myvol:/app/data nginx        <span class="c"># named volume，Docker 管理的目录</span>
+docker run --tmpfs /tmp nginx              <span class="c"># 内存盘，容器删除即消失</span>
+
+<span class="c"># 注意：挂载点会"盖住"镜像里同路径的内容</span>
+<span class="c"># 如果镜像里 /app/data 有初始文件，挂一个空 volume 上去就看不见了</span>
+<span class="c"># 这叫 "volume shadowing"，是"挂载后配置丢失"的常见原因</span></pre>
+  <div class="callout danger">
+    <b>不要用 <span class="k">docker commit</span> 当备份。</b>它把可写层打包成新镜像，看起来能"保存状态"，但：① 镜像会越来越大（每一层都是全量 diff）；② 里面混进了日志、临时文件、密钥；③ 无法回滚到某个时间点。正确做法是数据进 volume，配置进镜像构建流程。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>容器到底是什么</h2></div>
+  <p class="lead">把所有机制拆掉之后，剩下的就是一个 <span class="k">clone()</span> 出来的进程。</p>
+
+  <h3>一次容器启动，内核里发生了什么</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>clone() 带一堆 CLONE_NEW* 标志。</b>创建新进程的同时创建新的 namespace。这一步之后，子进程已经"看不到"宿主机的 PID、网络、挂载。</div></div>
+    <div class="step"><div class="txt"><b>准备 rootfs。</b>把镜像的若干层用 overlayfs 挂成一个 merged 目录，然后 <span class="k">pivot_root()</span> 或 <span class="k">chroot()</span> 切过去。</div></div>
+    <div class="step"><div class="txt"><b>挂 /proc、/sys、/dev。</b>注意 <span class="k">/proc</span> 必须在新 PID namespace 里<b>重新挂载</b>，否则看到的是宿主机的进程列表。</div></div>
+    <div class="step"><div class="txt"><b>设置 cgroup 限额。</b>把 PID 写进 cgroup 的 <span class="k">cgroup.procs</span>，设 cpu.max / memory.max / pids.max。</div></div>
+    <div class="step"><div class="txt"><b>降权。</b>设置 capability 集合（丢掉大部分）、seccomp 过滤器、AppArmor/SELinux 策略、只读挂载。</div></div>
+    <div class="step"><div class="txt"><b>execve() 启动应用。</b>容器里看到的 PID 1，就是这次 exec 的程序。</div></div>
+  </div>
+
+  <h3>宿主机上它长什么样</h3>
+  <pre><span class="c"># 1. 就是一个进程，父进程是 containerd-shim</span>
+ps -ef | grep -E 'containerd-shim|nginx'
+<span class="c"># root 12300     1  0 10:00 ?  00:00:00 containerd-shim-runc-v2 -namespace moby</span>
+<span class="c"># root 12345 12300  0 10:00 ?  00:00:00 nginx: master process</span>
+
+<span class="c"># 2. 它的 cgroup 路径暴露了归属</span>
+cat /proc/12345/cgroup
+<span class="c"># 0::/system.slice/docker-abc123...scope</span>
+
+<span class="c"># 3. 它的根目录是 overlay 的 merged</span>
+sudo ls -l /proc/12345/root
+<span class="c"># /proc/12345/root -&gt; /var/lib/docker/overlay2/abc.../merged</span>
+
+<span class="c"># 4. 它挂载的文件系统和宿主机不同</span>
+sudo cat /proc/12345/mountinfo | head -5
+<span class="c"># 会看到 overlay / 以及容器自己的 proc、tmpfs、/dev/shm</span>
+
+<span class="c"># 5. 它的能力集被削过</span>
+grep Cap /proc/12345/status
+<span class="c"># CapInh: 0000000000000000</span>
+<span class="c"># CapPrm: 00000000a80425fb</span>
+<span class="c"># CapEff: 00000000a80425fb   ← 只有默认那十几项</span>
+<span class="c"># CapBnd: 00000000a80425fb</span></pre>
+  <p>所以"容器"没有对应的内核对象。你在 <span class="k">/proc</span> 里找不到叫 container 的东西，只有进程、namespace、cgroup、挂载点。<b>容器是一个约定，不是内核实体。</b></p>
+  <div class="callout">
+    <b>一个直接推论：</b>宿主机上 <span class="k">ps aux</span> 能看到所有容器里的进程（因为 PID namespace 只影响"容器内怎么看"，不影响"宿主机怎么看"）。同样，<span class="k">top</span> 里也能看到它们的 CPU 占用。这让排查变简单，也让"容器隔离"这件事的边界变得很清楚。
+  </div>
+
+  <h3>为什么"容器里看不到宿主机进程"</h3>
+  <p>不是内核隐藏了，而是 <b><span class="k">/proc</span> 是在新 PID namespace 里挂载的</b>。<span class="k">/proc</span> 是虚拟文件系统，列出的内容由"挂载时所在的 PID namespace"决定。同一个内核挂两次，就是两份不同的视图。</p>
+  <pre>ls /proc | grep -E '^[0-9]+$' | sort -n | tail -1          <span class="c"># 宿主机：89432</span>
+docker exec demo sh -c 'ls /proc | grep -E "^[0-9]+$" | wc -l'
+<span class="c"># 容器里只有几十个，因为只列出本 namespace 的进程</span></pre>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>为什么容器里的 CPU/内存和宿主机不一致</h2></div>
+  <p class="lead">这是容器运维最常见的困惑：<span class="k">-m 512m</span> 起的容器，<span class="k">free -h</span> 显示 64G。</p>
+
+  <h3>根因：/proc 里的很多文件不是 namespace 化的</h3>
+  <table>
+    <tr><th style="width:200px">文件</th><th style="width:130px">是否隔离</th><th>容器里看到什么</th></tr>
+    <tr><td class="f">/proc/cpuinfo</td><td><b>否</b></td><td>宿主机的所有 CPU 和型号，<b>看不到 cgroup 的 CPU 限额</b></td></tr>
+    <tr><td class="f">/proc/meminfo</td><td><b>否</b></td><td>宿主机总内存，不是 cgroup 的 memory.max</td></tr>
+    <tr><td class="f">/proc/stat</td><td><b>否</b></td><td>宿主机的全局 CPU 时间，包含其他容器</td></tr>
+    <tr><td class="f">/proc/loadavg</td><td><b>否</b></td><td>宿主机的负载，不是容器的</td></tr>
+    <tr><td class="f">/proc/uptime</td><td><b>否</b></td><td>宿主机开机时长（time namespace 可以改）</td></tr>
+    <tr><td class="f">/proc/self/cgroup</td><td>是（cgroup ns）</td><td>容器自己的 cgroup 路径</td></tr>
+    <tr><td class="f">/proc/net/*</td><td>是（net ns）</td><td>容器自己的网络统计</td></tr>
+    <tr><td class="f">/proc/sys/net/*</td><td>是（net ns）</td><td>容器自己的网络参数</td></tr>
+  </table>
+
+  <h3>后果：运行时和监控全部误判</h3>
+  <ul>
+    <li><b>JVM 按 <span class="k">/proc/meminfo</span> 算默认堆</b>，在 512MB 的容器里可能把 <span class="k">-Xmx</span> 设成物理内存的 1/4（比如 16G），一启动就被 OOM Kill。Java 10+ 支持 <span class="k">UseContainerSupport</span> 才会读 cgroup。</li>
+    <li><b>Node.js / Python 的并发度按 CPU 核数算</b>，容器限了 1 核但看到 64 核，起 64 个 worker，全部挤在 1 核上互相抢。</li>
+    <li><b>监控 agent 采集 <span class="k">/proc/stat</span></b>，报的是宿主机的 CPU 使用率，容器明明在打满却显示 5%。</li>
+    <li><b><span class="k">free -h</span> 显示内存充足</b>，实际 cgroup 已经接近 memory.max，随时 OOM。</li>
+  </ul>
+
+  <h3>lxcfs 的作用</h3>
+  <p><b>lxcfs</b> 是一个 FUSE 文件系统，它把 <span class="k">/proc</span> 里的若干文件"替换"成按 cgroup 计算出来的值，再 bind mount 进容器。这样容器里 <span class="k">free</span>、<span class="k">top</span>、<span class="k">nproc</span> 看起来就"正常"了。</p>
+  <pre><span class="c"># 宿主机上装并启动 lxcfs</span>
+apt-get install -y lxcfs
+systemctl start lxcfs
+ls /var/lib/lxcfs/
+<span class="c"># proc/  cgroup/</span>
+
+<span class="c"># Docker 里挂进去（只挂需要的几个文件）</span>
+docker run -it --rm \
+  -v /var/lib/lxcfs/proc/cpuinfo:/proc/cpuinfo:ro \
+  -v /var/lib/lxcfs/proc/meminfo:/proc/meminfo:ro \
+  -v /var/lib/lxcfs/proc/stat:/proc/stat:ro \
+  -v /var/lib/lxcfs/proc/uptime:/proc/uptime:ro \
+  --cpus=2 --memory=1g ubuntu:24.04 bash
+
+<span class="c"># 容器里现在看到的是限额后的值</span>
+nproc        <span class="c"># 2</span>
+free -h      <span class="c"># 1.0Gi 而不是 64Gi</span></pre>
+  <div class="callout warn">
+    <b>lxcfs 不是万能的。</b>① 它只覆盖有限的几个文件（cpuinfo、meminfo、stat、uptime、diskstats、swaps、loadavg）；② 它是 FUSE，有额外开销，某些高并发读 <span class="k">/proc/stat</span> 的场景会变慢；③ Kubernetes 默认不装，需要 DaemonSet 部署；④ <b>它只是"让显示正确"，不改变实际的资源限制</b>。真正的限额还是靠 cgroup。
+  </div>
+
+  <h3>更现代的做法：直接读 cgroup</h3>
+  <pre><span class="c"># 容器内读 cgroup v2 的限额和用量</span>
+cat /sys/fs/cgroup/memory.max        <span class="c"># 1073741824（1G）或 max</span>
+cat /sys/fs/cgroup/memory.current    <span class="c"># 当前用了多少</span>
+cat /sys/fs/cgroup/cpu.max           <span class="c"># 200000 100000 = 2 核</span>
+cat /sys/fs/cgroup/cpu.stat          <span class="c"># nr_throttled / throttled_usec</span>
+cat /sys/fs/cgroup/pids.max          <span class="c"># 进程数上限</span>
+
+<span class="c"># 应用应该优先读这些，而不是 /proc/meminfo</span>
+<span class="c"># Java: -XX:+UseContainerSupport（默认开启）</span>
+<span class="c"># Go: 用 automaxprocs 读 cpu.max</span>
+<span class="c"># Python: os.cpu_count() 仍然返回宿主机核数，需要自己读 cgroup</span></pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>容器逃逸的常见路径</h2></div>
+  <p class="lead">逃逸的本质只有一句话：<b>找到一条能影响宿主机内核或其他 namespace 的路径</b>。下面按"配置错误"和"内核漏洞"分两类。</p>
+
+  <h3>配置错误类（占绝大多数）</h3>
+  <table>
+    <tr><th style="width:210px">路径</th><th style="width:250px">为什么危险</th><th>检测</th></tr>
+    <tr><td><b>特权容器</b><br><span class="k">--privileged</span></td><td>给全部 capability、放开所有设备、关掉 seccomp 和 AppArmor。<b>等于宿主机 root</b></td><td><span class="k">docker inspect -f '{{.HostConfig.Privileged}}'</span></td></tr>
+    <tr><td><b>挂载 docker.sock</b></td><td>容器内能调 Docker API，直接起一个挂载宿主 <span class="k">/</span> 的新容器</td><td>检查 mounts 里有没有 <span class="k">docker.sock</span></td></tr>
+    <tr><td><b>CAP_SYS_ADMIN</b></td><td>能 mount、能改 namespace、能用 <span class="k">/proc/sysrq-trigger</span>，几乎等于 root</td><td><span class="k">capsh --decode=$(grep CapEff /proc/self/status | awk '{print $2}')</span></td></tr>
+    <tr><td><b>挂载宿主目录</b><br><span class="k">-v /:/host</span></td><td>直接读写宿主机文件系统，改 <span class="k">/etc/cron.d</span> 或 <span class="k">authorized_keys</span> 即可提权</td><td>检查 mounts 的 source 路径</td></tr>
+    <tr><td><b>cgroup v1 release_agent</b></td><td>v1 的 <span class="k">release_agent</span> 能在 cgroup 空时以宿主 root 执行任意命令</td><td>检查是否 v1 + 有写权限</td></tr>
+    <tr><td><b>core_pattern 管道</b></td><td>把 core dump 管道指向一个脚本，崩溃时以宿主 root 执行</td><td>检查 <span class="k">/proc/sys/kernel/core_pattern</span> 是否可写</td></tr>
+    <tr><td><b>hostPath 挂载 /proc</b></td><td>K8s 里挂宿主 <span class="k">/proc</span>，能读写宿主内核参数</td><td>检查 Pod spec 的 hostPath</td></tr>
+  </table>
+
+  <pre><span class="c"># 一个经典的 docker.sock 逃逸（仅用于理解原理，勿在未授权环境尝试）</span>
+<span class="c"># 容器内如果能访问 /var/run/docker.sock：</span>
+docker -H unix:///var/run/docker.sock run -it --privileged \
+  -v /:/host alpine chroot /host sh
+<span class="c"># 此时已经是宿主机 root</span>
+
+<span class="c"># 检测：容器里有没有 docker.sock</span>
+ls -l /var/run/docker.sock
+find / -name 'docker.sock' 2&gt;/dev/null
+
+<span class="c"># 检测：CapEff 全 f 基本就是特权容器</span>
+grep CapEff /proc/self/status</pre>
+
+  <h3>内核漏洞类</h3>
+  <p>这类不依赖配置错误，只要共享内核就可能被利用。历史上影响大的几个：</p>
+  <table>
+    <tr><th style="width:200px">漏洞</th><th style="width:130px">年份</th><th>原理</th></tr>
+    <tr><td><b>Dirty COW</b> (CVE-2016-5195)</td><td>2016</td><td>写时复制的竞态，可改写只读文件（如 /etc/passwd）</td></tr>
+    <tr><td><b>runc 逃逸</b> (CVE-2019-5736)</td><td>2019</td><td>覆盖宿主机上的 runc 二进制，下次 exec 时执行恶意代码</td></tr>
+    <tr><td><b>Dirty Pipe</b> (CVE-2022-0847)</td><td>2022</td><td>管道缓冲区标志未初始化，可写只读文件页缓存</td></tr>
+    <tr><td><b>overlayfs 提权</b> (CVE-2023-0386)</td><td>2023</td><td>copy-up 时权限检查不当，可把 setuid 文件带进容器</td></tr>
+  </table>
+  <p>共同点：都是<b>内核态的内存/权限管理缺陷</b>，与运行时无关，只能靠升级内核或 VM 级隔离。</p>
+  <div class="callout danger">
+    <b>一条实用的判断：</b>如果你的容器满足以下任意一条，就不该把它当安全边界——① <span class="k">--privileged</span>；② 挂载了 <span class="k">docker.sock</span>；③ 有 <span class="k">CAP_SYS_ADMIN</span>；④ 以 root 运行且没开 userns-remap；⑤ 挂载了宿主机敏感目录。<br>
+    这五条中任何一条成立，攻击者拿到容器基本等于拿到宿主机。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>容器里排查问题</h2></div>
+  <p class="lead">容器里缺工具、/proc 被隔离、没有权限——三个障碍各有解法。</p>
+
+  <h3>障碍一：镜像里没有 ps / top / ss</h3>
+  <p>精简镜像（alpine、distroless、scratch）里没有这些工具。三条路：临时装（<span class="k">apk add procps</span>）、起一个 sidecar 共享 <span class="k">--pid=container:x --net=container:x</span>、或者<b>直接回宿主机用 <span class="k">/proc/&lt;pid&gt;</span> 和 nsenter 看</b>——最后一条最可靠。</p>
+
+  <h3>障碍二：nsenter 进入容器的命名空间</h3>
+  <pre><span class="c"># 语法：nsenter -t &lt;宿主PID&gt; -m -u -i -n -p -- &lt;命令&gt;</span>
+<span class="c"># -m 挂载  -u UTS  -i IPC  -n 网络  -p PID  -U user  -C cgroup</span>
+
+<span class="c"># 进入容器的完整命名空间，跑一个 shell</span>
+PID=$(docker inspect -f '{{.State.Pid}}' demo)
+sudo nsenter -t $PID -m -u -i -n -p -- /bin/sh
+
+<span class="c"># 只进网络命名空间（在容器网络里抓包）</span>
+sudo nsenter -t $PID -n -- tcpdump -i eth0 -nn
+
+<span class="c"># 只进挂载命名空间（看容器的文件系统）</span>
+sudo nsenter -t $PID -m -- ls /app
+
+<span class="c"># 注意：-p 进 PID ns 后，ps 看到的是容器内的 PID</span>
+<span class="c"># 但当前 shell 本身还是宿主机上的进程，只是"视图"变了</span></pre>
+
+  <h3>障碍三：docker exec 的原理</h3>
+  <p><span class="k">docker exec</span> 做的事很简单：</p>
+  <div class="steps">
+    <div class="step"><div class="txt">Docker 向 containerd 发请求，containerd 找到容器对应的 <b>init 进程 PID</b> 和它的 namespace 文件（<span class="k">/proc/&lt;pid&gt;/ns/*</span>）。</div></div>
+    <div class="step"><div class="txt">调用 <span class="k">setns()</span> 把新进程加入这些 namespace——<b>和 nsenter 是同一个系统调用</b>。</div></div>
+    <div class="step"><div class="txt">设置 cgroup（新进程也受同样的限额）、capability、seccomp。</div></div>
+    <div class="step"><div class="txt"><span class="k">execve()</span> 执行你指定的命令。</div></div>
+  </div>
+  <p>所以 <span class="k">docker exec</span> 启动的进程：<b>在容器内看是新进程，在宿主机上看是 docker/containerd 的子进程</b>，而且它<b>不受容器 PID 1 管理</b>——PID 1 退出时它不会自动被杀（除非 cgroup 被销毁）。</p>
+  <pre><span class="c"># 验证：exec 进去的进程，父进程在宿主机上是谁</span>
+docker exec -d demo sleep 1000
+ps -ef | grep 'sleep 1000'
+<span class="c"># root 23456 23400 ... sleep 1000</span>
+<span class="c"># 23400 是 containerd-shim，不是容器里的 PID 1</span>
+
+<span class="c"># 在容器里看，它是 PID 30 左右，父进程是 0（因为父进程不在这个 ns 里）</span>
+docker exec demo ps -ef | grep sleep</pre>
+
+  <h3>排查清单</h3>
+  <table>
+    <tr><th style="width:200px">想看什么</th><th>怎么做</th></tr>
+    <tr><td>容器进程在宿主机的 PID</td><td><span class="k">docker inspect -f '{{.State.Pid}}' &lt;name&gt;</span></td></tr>
+    <tr><td>容器的资源限额</td><td><span class="k">cat /sys/fs/cgroup/.../memory.max</span> 等</td></tr>
+    <tr><td>容器被 OOM 了几次</td><td><span class="k">cat memory.events</span> 或 <span class="k">docker inspect</span> 的 <span class="k">OOMKilled</span></td></tr>
+    <tr><td>容器的网络</td><td>宿主机 <span class="k">nsenter -t $PID -n -- ss -tnp</span></td></tr>
+    <tr><td>容器的文件系统</td><td><span class="k">ls /proc/$PID/root</span> 或 <span class="k">nsenter -m</span></td></tr>
+    <tr><td>容器的系统调用 / 启动失败</td><td><span class="k">strace -f -p $PID</span>、<span class="k">docker logs</span>、<span class="k">dmesg</span></td></tr>
+  </table>
+  <div class="callout ok">
+    <b>最有用的一条：</b>容器出问题时，<b>先回到宿主机</b>。宿主机的视角是"上帝视角"——所有进程、所有 cgroup、所有 namespace 都在。容器内的工具缺失和 /proc 失真，会让你在错误的数字上做判断。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>容器里不能随便改 sysctl</h2></div>
+  <p class="lead">sysctl 分三类：<b>namespace 化的</b>（改了只影响自己）、<b>全局的</b>（改了影响整机）、<b>只读的</b>（根本不让改）。</p>
+
+  <table>
+    <tr><th style="width:250px">参数</th><th style="width:130px">隔离级别</th><th>说明</th></tr>
+    <tr><td class="f">net.*（ipv4.ip_forward、tcp_tw_reuse、somaxconn…）</td><td><b>net ns</b></td><td>每个容器独立，可以改（需要 CAP_NET_ADMIN）</td></tr>
+    <tr><td class="f">kernel.hostname / domainname</td><td><b>UTS ns</b></td><td>改的是容器自己的主机名</td></tr>
+    <tr><td class="f">kernel.msgmax / msgmnb / shmmax / sem</td><td><b>IPC ns</b></td><td>容器内独立</td></tr>
+    <tr><td class="f">fs.mqueue.*</td><td><b>IPC ns</b></td><td>POSIX 消息队列参数</td></tr>
+    <tr><td class="f">vm.swappiness / dirty_ratio / overcommit_memory</td><td><b>全局</b></td><td>改了影响宿主机所有容器，通常不允许</td></tr>
+    <tr><td class="f">kernel.pid_max / threads-max</td><td><b>全局</b></td><td>同上</td></tr>
+    <tr><td class="f">fs.file-max / nr_open</td><td><b>全局</b></td><td>同上。容器内的 fd 限制靠 <span class="k">ulimit</span> 和 cgroup，不靠这个</td></tr>
+    <tr><td class="f">kernel.core_pattern</td><td><b>全局</b></td><td>改它可以让 core dump 执行任意程序，是逃逸手法之一</td></tr>
+    <tr><td class="f">net.ipv4.ping_group_range</td><td>net ns</td><td>允许非 root 用户 ping 的组范围</td></tr>
+  </table>
+
+  <pre><span class="c"># 容器里改 net.* 通常可以（有 CAP_NET_ADMIN）</span>
+sysctl -w net.ipv4.tcp_tw_reuse=1
+<span class="c"># net.ipv4.tcp_tw_reuse = 1</span>
+
+<span class="c"># 改全局参数会被拒绝</span>
+sysctl -w vm.swappiness=10
+<span class="c"># sysctl: setting key "vm.swappiness": Read-only file system</span>
+<span class="c"># 或者 Permission denied，取决于挂载方式</span>
+
+<span class="c"># Docker 允许在启动时通过 --sysctl 设置一部分参数</span>
+docker run --sysctl net.core.somaxconn=1024 --sysctl net.ipv4.tcp_syncookies=1 nginx
+<span class="c"># 只能设 namespace 化的；设全局的会报 "sysctl is not in a separate namespace"</span>
+
+<span class="c"># K8s 里通过 securityContext.sysctls 设置（同样有限制）</span>
+<span class="c"># 从 1.22 起，net.* 之外的安全 sysctl 需要显式开启</span></pre>
+
+  <p>原因很简单：全局参数是<b>整机共享的一份状态</b>。容器 A 改了 <span class="k">vm.overcommit_memory</span>，容器 B 的内存分配行为也会变，多租户环境不可接受。</p>
+  <div class="callout warn">
+    <b>几个高频踩坑：</b><br>
+    ① <b>Redis 要求 <span class="k">vm.overcommit_memory=1</span></b>，容器里改不了。正确做法是在宿主机上设，或者接受 fork 失败的风险。<br>
+    ② <b>Elasticsearch 要求 <span class="k">vm.max_map_count=262144</span></b>，同样必须在宿主机设（<span class="k">sysctl -w vm.max_map_count=262144</span>），这是 K8s 部署 ES 的必做步骤。<br>
+    ③ <b>改 <span class="k">net.core.somaxconn</span></b> 看起来是 net ns 的，但 <b>宿主机上的 nginx/HAProxy 监听队列</b>用的是宿主的，容器内改了只影响容器内的监听。<br>
+    ④ <b><span class="k">ulimit -n</span></b> 不是 sysctl，容器里改的是当前进程的限制，持久化要在 docker run 时加 <span class="k">--ulimit nofile=65536:65536</span>。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个真实踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">在容器里用 free / nproc 判断资源</div><div class="pd">/proc/meminfo 和 /proc/cpuinfo 没被隔离，看到的是宿主机。要看 <span class="k">/sys/fs/cgroup/memory.max</span> 和 <span class="k">cpu.max</span>，或装 lxcfs。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把数据写在容器可写层</div><div class="pd">docker rm 或 Pod 重建后全丢。数据必须进 volume 或 bind mount，且要注意挂载会盖住镜像里的初始文件。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">容器里 PID 1 不转发信号</div><div class="pd">docker stop 等 10 秒超时后 SIGKILL，业务无法优雅退出。加 <span class="k">--init</span> 或用 tini，或在应用里显式处理 SIGTERM。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">镜像里改大文件导致构建/启动慢</div><div class="pd">overlayfs 的 copy-up 是整文件复制，改 1 字节也要复制 1GB。把易变的内容放到靠上的层，或挂载出去。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 --privileged 解决权限问题</div><div class="pd">这等于交出宿主机。正确做法是逐个加 capability（--cap-add）、逐个放开设备（--device），并保持 seccomp 开启。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">挂载 docker.sock 做 CI</div><div class="pd">CI 容器能通过 socket 起特权容器，等于宿主 root。改用 rootless 构建（kaniko/buildah）或独立的构建节点。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">容器里 ping 不通 127.0.0.1</div><div class="pd">新 net ns 的 lo 默认 DOWN。启动脚本加 <span class="k">ip link set lo up</span>，或用 <span class="k">--network host</span>。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">JVM 堆按宿主机内存算</div><div class="pd">老版本 JDK 不读 cgroup，512MB 容器里设了 16G 堆，一启动就 OOMKilled。JDK 10+ 默认开启 UseContainerSupport，老版本要手动加参数。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">在容器里改全局 sysctl</div><div class="pd">vm.max_map_count、vm.overcommit_memory 这类参数必须宿主机设。容器里改会报只读，用 --privileged 硬改则影响整机。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">以为容器是安全边界</div><div class="pd">共享内核，一个内核漏洞影响所有容器。多租户跑不可信代码，要用 VM、Kata 或 gVisor。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 容器里的 PID 1，在宿主机上是什么？</div>
+      <button class="opt">一个特殊的内核线程</button>
+      <button class="opt">不存在的虚拟进程</button>
+      <button class="opt">一个普通进程，有自己的真实 PID，父进程通常是 containerd-shim</button>
+      <div class="ans">正确答案：<b>普通进程</b>。PID namespace 只改变"容器内怎么编号"，不改变宿主机视角，<span class="k">ps</span> 能看到所有容器进程。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 容器限了 512MB 内存，但 <span class="k">free -h</span> 显示 64G，原因是？</div>
+      <button class="opt">/proc/meminfo 没有被 namespace 化，读到的是宿主机数据</button>
+      <button class="opt">cgroup 限额没生效</button>
+      <button class="opt">free 命令版本太老</button>
+      <div class="ans">正确答案：<b>/proc 未隔离</b>。cgroup 限额是生效的（超了会 OOM），只是 meminfo 显示整机内存。看 <span class="k">memory.max</span>，或装 lxcfs。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. overlayfs 修改一个只读层里的 1GB 文件中的 1 个字节，会发生什么？</div>
+      <button class="opt">只复制那 1 个字节到 upperdir</button>
+      <button class="opt">把整个 1GB 文件复制到 upperdir，再在副本上修改</button>
+      <button class="opt">直接原地修改 lowerdir</button>
+      <div class="ans">正确答案：<b>整文件 copy-up</b>。这是写时复制语义，也是"容器里改大文件很慢"的原因。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 下面哪个 sysctl 在容器里修改<b>不会</b>影响宿主机？</div>
+      <button class="opt">vm.swappiness</button>
+      <button class="opt">kernel.pid_max</button>
+      <button class="opt">net.ipv4.tcp_tw_reuse</button>
+      <div class="ans">正确答案：<b>net.* 是 net namespace 化的</b>，每个容器独立。vm.* 和大部分 kernel.* 是全局的，容器里通常只读。kernel.hostname 属于 UTS ns，也可以改。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. docker exec 的底层原理是？</div>
+      <button class="opt">通过 SSH 登录容器</button>
+      <button class="opt">用 setns() 加入容器的 namespace，再 execve() 执行命令</button>
+      <button class="opt">在容器里启动一个 agent 进程转发命令</button>
+      <div class="ans">正确答案：<b>setns + execve</b>。和 nsenter 同一个系统调用。所以 exec 的进程不受容器 PID 1 管理。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 下面哪种配置最接近"把宿主机 root 交出去"？</div>
+      <button class="opt">--privileged</button>
+      <button class="opt">--cap-add=NET_BIND_SERVICE</button>
+      <button class="opt">--read-only</button>
+      <div class="ans">正确答案：<b>--privileged</b>。给全部 capability、放开设备、关掉 seccomp/AppArmor，基本等于宿主 root。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>查看容器</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker inspect -f '{{.State.Pid}}' &lt;name&gt;</code><span class="desc">容器进程在宿主机的真实 PID</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ls -l /proc/&lt;pid&gt;/ns/</code><span class="desc">看容器用了哪些 namespace</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>进入与排查</h3>
+  <div class="cmds">
+    <div class="crow"><code>nsenter -t &lt;pid&gt; -m -u -i -n -p -- /bin/sh</code><span class="desc">进入容器的全部命名空间</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/fs/cgroup/memory.max</code><span class="desc">容器内存限额（v2）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/fs/cgroup/cpu.max</code><span class="desc">CPU 限额（配额 周期）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>namespace</b></td><td>隔离"能看到什么"的内核机制，共七种（加 time 是八种）</td></tr>
+    <tr><td><b>cgroup</b></td><td>限制"能用多少"的内核机制，管 CPU、内存、IO、进程数</td></tr>
+    <tr><td><b>PID namespace</b></td><td>隔离进程编号，容器内的 1 号在宿主机上是普通进程</td></tr>
+    <tr><td><b>NET namespace</b></td><td>隔离网卡、IP、路由、iptables，新 ns 的 lo 默认 DOWN</td></tr>
+    <tr><td><b>MNT namespace</b></td><td>隔离挂载表，每个 ns 看到不同的文件系统树</td></tr>
+    <tr><td><b>IPC namespace</b></td><td>隔离 SysV 共享内存、消息队列、信号量</td></tr>
+    <tr><td><b>USER namespace</b></td><td>隔离 UID/GID，容器 root 可映射成宿主普通用户</td></tr>
+    <tr><td><b>veth pair</b></td><td>一对虚拟网卡，一端在容器、一端在宿主网桥</td></tr>
+    <tr><td><b>overlayfs</b></td><td>联合文件系统，把多个只读层 + 一个可写层叠成一个视图</td></tr>
+    <tr><td><b>copy-up</b></td><td>写只读层文件时，先整文件复制到可写层再改</td></tr>
+    <tr><td><b>pivot_root</b></td><td>切换进程根目录的系统调用，比 chroot 更彻底</td></tr>
+    <tr><td><b>setns</b></td><td>把进程加入已有 namespace 的系统调用，nsenter/exec 的基础</td></tr>
+    <tr><td><b>capability</b></td><td>把 root 权限拆成细粒度能力，容器默认只给十几项</td></tr>
+    <tr><td><b>seccomp</b></td><td>系统调用过滤器，Docker 默认屏蔽约 44 个高危调用</td></tr>
+    <tr><td><b>lxcfs</b></td><td>用 FUSE 伪造 /proc 文件，让容器看到限额后的 CPU/内存</td></tr>
+    <tr><td><b>PSI</b></td><td>cgroup v2 的压力指标，直接反映资源阻塞时间</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个容器，在宿主机找到它的 PID，用 <span class="k">nsenter</span> 进去对比内外 <span class="k">ps</span>；② 用 <span class="k">-m 512m</span> 起容器，对比 <span class="k">free</span> 和 <span class="k">memory.max</span>；③ 在容器里写 100MB 文件，看 <span class="k">docker ps -s</span> 的可写层增长；④ 用 <span class="k">--sysctl</span> 试改 <span class="k">net.core.somaxconn</span> 和 <span class="k">vm.swappiness</span>，看哪个被拒；⑤ 用 <span class="k">capsh --decode</span> 看默认能力集。<br><br>
+    <b>接下来该读：</b>《虚拟化原理》（VM 和容器的边界到底在哪）、《系统调用与内核边界》（seccomp 与 capability 的底层）、《文件系统》（overlayfs 之外的联合文件系统）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透容器内核机制 · 容器是一个进程，不是一台机器</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（七种 namespace）和模块 5（/proc 未隔离）最值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在宿主机上找容器的 PID。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='起一个容器：docker run -it --rm ubuntu:24.04 bash';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

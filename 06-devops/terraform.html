@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Terraform 与 IaC</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 Terraform 与 IaC</h1>
+    <p class="sub">Terraform 的语法一天就能学会，难的是 <b>state 管理、模块边界和重构不炸生产</b>。这篇直接讲声明式模型的本质、远程后端、count/for_each 的资源重建陷阱，以及和 Ansible 怎么分工。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 类核心对象</span>
+      <span class="chip"><b>4</b> 种多云 Provider</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议本地装 terraform 跟敲：winget install Hashicorp.Terraform</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一个最小可用骨架</h2></div>
+  <pre><span class="c"># 安装（任选其一）</span>
+brew install terraform                  <span class="c"># macOS</span>
+choco install terraform                 <span class="c"># Windows</span>
+apt install terraform                    <span class="c"># Debian/Ubuntu 官方源</span>
+
+<span class="c"># 验证</span>
+terraform version
+
+<span class="c"># 目录骨架（真实生产项目的常见布局）</span>
+infra/
+├── versions.tf          <span class="c"># required_version + required_providers 版本约束</span>
+├── providers.tf         <span class="c"># provider 配置（region、默认标签）</span>
+├── backend.tf           <span class="c"># 远程后端（S3 + 锁）</span>
+├── main.tf              <span class="c"># 资源定义</span>
+├── variables.tf         <span class="c"># 输入变量</span>
+├── outputs.tf           <span class="c"># 输出（供人看或供下游用）</span>
+├── terraform.tfvars     <span class="c"># 变量取值（含环境差异，prod.tfvars / dev.tfvars）</span>
+└── modules/             <span class="c"># 本地模块目录</span>
+    ├── vpc/
+    └── eks/
+
+<span class="c"># 一条命令看当前这套代码到底要干嘛（不落任何改动）</span>
+terraform init &amp;&amp; terraform validate &amp;&amp; terraform plan</pre>
+  <div class="callout warn">
+    <b>第一次跑一定会卡在 <span class="k">terraform init</span>：</b>它会下载 provider 插件（AWS provider 一个就 500MB+）。<b>国内网络建议配镜像</b>（<span class="k">.terraformrc</span> 或 <span class="k">TF_CLI_CONFIG_FILE</span> 指向镜像站），CI 里用 <span class="k">terraform init -backend=false</span> 先做静态检查。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>IaC 理念与声明式配置</h2></div>
+  <p class="lead">IaC（Infrastructure as Code）的核心主张：<b>基础设施的状态应该由代码完整描述，代码是唯一事实来源（single source of truth）</b>。Terraform 是其中"声明式"的代表。</p>
+  <table>
+    <tr><th style="width:150px">范式</th><th style="width:260px">做法</th><th>特点</th></tr>
+    <tr><td><b>命令式</b>（Imperative）</td><td>写"步骤"：先建 VPC，再建子网，再建安全组……</td><td>Ansible、shell 脚本、CloudFormation 的 Custom Resource。灵活，但<b>重复执行结果不确定</b></td></tr>
+    <tr><td><b>声明式</b>（Declarative）</td><td>写"终态"：我要 3 台 t3.medium 的 EC2</td><td>Terraform 自己算 diff。<b>幂等</b>：跑 100 次结果一样</td></tr>
+  </table>
+  <h4>声明式带来的三个工程红利</h4>
+  <ul>
+    <li><b>可评审：</b>基础设施变更走 Pull Request，和业务代码一样 review，改了什么一目了然</li>
+    <li><b>可复现：</b>用同一套代码 + 不同变量文件，建出开发 / 测试 / 生产三套环境，杜绝"环境差异"</li>
+    <li><b>可回滚：</b>git revert 一次提交，再 apply，环境回到上一个已知良好状态</li>
+  </ul>
+  <div class="callout">
+    <b>关键认知：Terraform 不管你"怎么建"，只在乎"现在长什么样"和"应该长什么样"的差。</b>所以你不需要在代码里写创建顺序——Terraform 用依赖图（resource → reference 隐式依赖 + depends_on 显式依赖）自动排拓扑序，能并行的并行，不能并行的排队。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>核心对象模型：Provider / Resource / Data / State</h2></div>
+  <table>
+    <tr><th style="width:160px">对象</th><th>角色</th></tr>
+    <tr><td><b>Provider</b></td><td>与某个云/服务对话的插件（aws、alicloud、kubernetes、helm、random……）。<b>配置的是"怎么连"</b></td></tr>
+    <tr><td><b>Resource</b></td><td>要管理的实体，如 <span class="k">aws_instance.web</span>。<b>配置的是"要什么"</b>，Terraform 负责 create/read/update/delete</td></tr>
+    <tr><td><b>Data Source</b></td><td>只读查询已有实体，如 <span class="k">data.aws_ami.ubuntu</span>。<b>不归 Terraform 管生命周期</b>，每次 plan 都重新读</td></tr>
+    <tr><td><b>Variable</b></td><td>输入参数，可带 type 校验、默认值、sensitive 标记</td></tr>
+    <tr><td><b>Output</b></td><td>对外暴露的值（如 RDS 连接地址），供人查看或下游模块/CI 消费</td></tr>
+    <tr><td><b>State</b></td><td><b>Terraform 的记忆</b>：记录"哪些真实资源对应哪段代码、哪些属性上次是什么"</td></tr>
+  </table>
+  <pre><span class="c"># ===== 一个真实的最小例子：AWS 上一台 Web 机 =====</span>
+<span class="b">terraform</span> {
+  required_version = <span class="g">"&gt;= 1.5.0"</span>
+  required_providers {
+    aws = {
+      source  = <span class="g">"hashicorp/aws"</span>
+      version = <span class="g">"~&gt; 5.0"</span>       <span class="c"># 锁大版本，小版本自动升</span>
+    }
+  }
+}
+
+<span class="b">provider</span> <span class="y">"aws"</span> {
+  region = <span class="b">var</span>.aws_region
+  default_tags {
+    tags = {
+      Environment = <span class="b">var</span>.env
+      ManagedBy   = <span class="g">"terraform"</span>   <span class="c"># 标记归属，防手改误伤</span>
+    }
+  }
+}
+
+<span class="c"># data source：查一个现成的镜像 ID（只读，不创建）</span>
+<span class="b">data</span> <span class="y">"aws_ami"</span> <span class="y">"ubuntu"</span> {
+  most_recent = <span class="g">true</span>
+  owners      = [<span class="g">"099720109477"</span>]     <span class="c"># Canonical 官方账号</span>
+  filter {
+    name   = <span class="g">"name"</span>
+    values = [<span class="g">"ubuntu/images/hvm-ssd/ubuntu-22.04-amd64-server-*"</span>]
+  }
+}
+
+<span class="c"># resource：创建一台 EC2，Terraform 会记录它的全部属性到 state</span>
+<span class="b">resource</span> <span class="y">"aws_instance"</span> <span class="y">"web"</span> {
+  ami           = <span class="b">data</span>.aws_ami.ubuntu.id          <span class="c"># 引用 data → 隐式依赖</span>
+  instance_type = <span class="b">var</span>.instance_type             <span class="c"># 引用 variable → 隐式依赖</span>
+  subnet_id     = <span class="b">aws_subnet</span>.public.id
+  vpc_security_group_ids = [<span class="b">aws_security_group</span>.web.id]
+
+  user_data = <span class="b">templatefile</span>(<span class="g">"${path.module}/userdata.sh"</span>, {
+    pkg = <span class="g">"nginx"</span>
+  })
+
+  tags = { Name = <span class="g">"web-${var.env}"</span> }
+}
+
+<span class="b">output</span> <span class="y">"web_public_ip"</span> {
+  description = <span class="g">"Web 服务器公网 IP"</span>
+  value       = <span class="b">aws_instance</span>.web.public_ip
+}</pre>
+  <div class="callout ok">
+    <b>读代码时盯住引用关系：</b><span class="k">data.aws_ami.ubuntu.id</span>、<span class="k">var.instance_type</span>、<span class="k">aws_subnet.public.id</span> 这三个引用，就是 Terraform 画依赖图的边。<b>改引用目标 = 改依赖 = 可能触发重建</b>，这是后面所有坑的根源。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>State 文件管理与远程后端</h2></div>
+  <p class="lead">State 是 Terraform 的<b>唯一真相来源</b>：代码描述"终态"，state 记录"现状与映射"。没有 state，Terraform 就不知道哪个真实资源对应哪段代码。</p>
+  <h4>本地 state 的四个风险</h4>
+  <ul>
+    <li><b>没有锁：</b>两个人同时 apply，后写的覆盖先写的，资源双份或配置丢失</li>
+    <li><b>不进 git：</b>state 含敏感信息（数据库密码明文），但为了协作又必须共享——死结</li>
+    <li><b>丢失即失忆：</b>笔记本硬盘坏了，state 没了，只能 import 重建映射</li>
+    <li><b>CI/CD 拿不到：</b>流水线跑完 state 留在 runner 容器里，下次跑又是"全新环境"</li>
+  </ul>
+  <h4>远程后端（backend）：S3 + 锁</h4>
+  <pre><span class="c"># backend.tf —— 把 state 放对象存储，并加分布式锁</span>
+<span class="b">terraform</span> {
+  backend <span class="y">"s3"</span> {
+    bucket       = <span class="g">"mycorp-tfstate-prod"</span>
+    key          = <span class="g">"network/vpc/terraform.tfstate"</span>   <span class="c"># 每个环境/组件一个 key</span>
+    region       = <span class="g">"cn-north-1"</span>
+    encrypt      = <span class="g">true</span>                       <span class="c"># 服务端加密</span>
+    dynamodb_table = <span class="g">"tfstate-locks"</span>          <span class="c"># 经典方案：用 DynamoDB 做锁表</span>
+  }
+}
+
+<span class="c"># AWS provider 5.x / Terraform 1.10+ 也可以不用 DynamoDB：</span>
+<span class="c"># backend "s3" { ... use_lockfile = true }   ← S3 原生条件写锁</span>
+
+<span class="c"># 非 AWS 场景对应物：</span>
+<span class="c">#   阿里云 OSS + OSS 锁 / Terraform Cloud / Consul / etcd / HTTP 后端</span>
+
+<span class="c"># 换后端 = 迁移 state，用 init 的 -migrate-state</span>
+terraform init -migrate-state -backend-config=prod.backend.hcl
+
+<span class="c"># 看当前后端和全部资源映射</span>
+terraform state list
+terraform state show aws_instance.web</pre>
+  <h4>后端设计的工程原则</h4>
+  <table>
+    <tr><th style="width:220px">原则</th><th>做法</th></tr>
+    <tr><td><b>一环境一 state</b></td><td>key 按 <span class="k">环境/组件</span> 隔离：<span class="k">prod/network/vpc.tfstate</span>。blast radius 最小化</td></tr>
+    <tr><td><b>锁必须开</b></td><td>远程后端的核心价值不是备份，是<b>并发互斥</b></td></tr>
+    <tr><td><b>加密 + 最小权限</b></td><td>开启服务端加密；IAM 策略只允许特定角色读写，禁止公网访问桶</td></tr>
+    <tr><td><b>版本化 + 备份</b></td><td>开桶的版本控制，误删 state 能回滚；<b>state 永远不进 git</b></td></tr>
+  </table>
+  <div class="callout danger">
+    <b>State 里的敏感信息是明文。</b>RDS 密码、AK/SK 全在 state 里躺着，加密只是存储层加密，有读权限的人打开文件就能看到。<b>对策：</b>① 用 KMS 客户管理密钥；② IAM 最小化；③ 敏感值尽量用 <span class="k">data</span> 从 Secrets Manager 读，不在 tfvars 里硬编码；④ 输出也标 <span class="k">sensitive = true</span>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>模块化与复用：module、workspace 与目录分离</h2></div>
+  <h4>Module：Terraform 的复用单元</h4>
+  <pre><span class="c"># 调用方：root module</span>
+<span class="b">module</span> <span class="y">"vpc"</span> {
+  source  = <span class="g">"git::https://git.internal/infra/vpc-module.git?ref=v2.3.1"</span>
+  <span class="c"># source 也支持：./modules/vpc（本地）、registry（官方/社区）、OSS/HTTP</span>
+
+  name       = <span class="g">"prod"</span>
+  cidr_block = <span class="g">"10.0.0.0/16"</span>
+  azs        = [<span class="g">"cn-north-1a"</span>, <span class="g">"cn-north-1b"</span>]
+
+  <span class="c"># 模块之间传值用 output</span>
+}
+
+<span class="b">resource</span> <span class="y">"aws_instance"</span> <span class="y">"app"</span> {
+  subnet_id = <span class="b">module</span>.vpc.public_subnet_ids[0]    <span class="c"># 消费模块输出</span>
+}
+
+<span class="c"># 被调用方：modules/vpc/{main,variables,outputs}.tf</span>
+<span class="c"># variables.tf 声明入参（可带 validation 校验块）</span>
+<span class="c"># outputs.tf   声明出参（output "public_subnet_ids" { value = aws_subnet.public[*].id }）</span></pre>
+  <h4>workspace vs 目录分离：环境隔离怎么选</h4>
+  <table>
+    <tr><th style="width:150px">方案</th><th style="width:260px">机制</th><th>问题</th></tr>
+    <tr><td><b>Workspace</b></td><td>同一套代码，<span class="k">terraform workspace new prod</span> 切 state，代码里用 <span class="k">terraform.workspace</span> 区分</td><td>所有环境<b>共享一份代码和 provider 配置</b>；prod/dev 差异只能靠 count 技巧绕；<b>prod 和 dev 的变量漂移容易误伤</b></td></tr>
+    <tr><td><b>目录分离</b><br>（推荐）</td><td><span class="k">envs/dev/</span> <span class="k">envs/prod/</span> 各自一份 root module，各自一个 state key，共同引用 <span class="k">modules/</span></td><td>代码有重复，但<b>环境差异显式化</b>，改 prod 不影响 dev，权限也能按目录拆</td></tr>
+  </table>
+  <pre><span class="c"># 目录分离的真实布局</span>
+infra/
+├── modules/            <span class="c"># 纯复用逻辑，无环境概念</span>
+│   ├── vpc/
+│   └── rds/
+├── envs/
+│   ├── dev/main.tf     <span class="c"># module "vpc" { source = "../../modules/vpc" ... }</span>
+│   └── prod/main.tf    <span class="c"># 同 module，不同入参 + 不同 backend key</span>
+└── global/             <span class="c"># 跨环境共享资源（如 DNS zone）单独一份</span>
+
+<span class="c"># 模块版本锁定：git ref / registry version，别用浮动分支</span>
+source = <span class="g">"git::https://git.internal/infra/vpc-module.git?ref=v2.3.1"</span></pre>
+  <div class="callout ok">
+    <b>选型结论：</b>多环境用<b>目录分离</b>（生产级项目的默认答案）；workspace 只适合"同一环境的临时实验分支"或开发者本地 sandbox。<b>模块要带语义化版本 tag</b>，升级模块 = 改 ref + 单独 PR review，而不是"一升级全环境跟着动"。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>工作流：plan / apply / destroy 与漂移检测</h2></div>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>init：</b>下载 provider、初始化后端。新克隆的仓库第一步永远是 init</div></div>
+    <div class="step"><div class="txt"><b>validate：</b>静态检查语法与引用，不连云。CI 里最先跑</div></div>
+    <div class="step"><div class="txt"><b>plan：</b>对比"代码终态 vs 现状"，输出将做的增/改/删。<span class="k">+</span> 创建 <span class="k">~</span> 修改 <span class="k">-</span> 销毁 <span class="k">-/+</span> 先建后删</div></div>
+    <div class="step"><div class="txt"><b>apply：</b>执行变更。<b>生产必须走 plan 文件</b>：<span class="k">terraform plan -out=tfplan</span> → <span class="k">terraform apply tfplan</span>，保证"批准的就是执行的"</div></div>
+    <div class="step"><div class="txt"><b>destroy：</b>按依赖图逆序删除全部资源。<b>生产库资源必须加 lifecycle prevent_destroy 挡住</b></div></div>
+  </div>
+  <pre><span class="c"># 标准 CI 安全流</span>
+terraform init
+terraform validate
+terraform plan  -out=tfplan -var-file=prod.tfvars
+<span class="c"># ↓ 人工审批 / PR review plan 输出</span>
+terraform apply tfplan
+
+<span class="c"># 只刷状态不改资源（探测漂移，不落变更）</span>
+terraform plan -refresh-only
+
+<span class="c"># 强制替换某个资源（重建），比老命令 taint 更明确</span>
+terraform apply -replace=aws_instance.web
+
+<span class="c"># 只操作指定资源（只建议故障恢复用，日常禁用）</span>
+terraform apply -target=module.vpc
+
+<span class="c"># 保存的 plan 是二进制，人能看的用 -no-color 落文件</span>
+terraform plan -no-color &gt; plan.txt</pre>
+  <h4>漂移（drift）检测</h4>
+  <p>漂移 = <b>有人在控制台/CLI 手改了 Terraform 管的资源</b>。表现：下次 plan 出现一堆你没写过的"修改"。</p>
+  <table>
+    <tr><th style="width:220px">场景</th><th>处理</th></tr>
+    <tr><td>手改了标签等无害字段</td><td><span class="k">lifecycle { ignore_changes = [tags] }</span> 让 Terraform 闭嘴</td></tr>
+    <tr><td>手改了实例类型等关键配置</td><td>下一轮 apply 会改回去。<b>要在代码里改，让 plan 说话</b></td></tr>
+    <tr><td>控制台建的资源想纳入管理</td><td><span class="k">terraform import</span> 或 import 块（见模块 6）</td></tr>
+    <tr><td>想周期性发现漂移</td><td>CI 定时跑 <span class="k">plan -refresh-only -detailed-exitcode</span>，退出码 2 = 有漂移，发告警</td></tr>
+  </table>
+  <div class="callout warn">
+    <b><span class="k">-target</span> 是糖衣毒药：</b>它只算目标资源的依赖，<b>很容易漏掉间接依赖，产出一个"看起来成功实则状态不一致"的结果</b>。官方文档明说仅供故障恢复。日常排障请全量 plan。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>import 与 refactor：不重建的前提下改代码</h2></div>
+  <h4>把存量资源收编（import）</h4>
+  <pre><span class="c"># 老式两步：先写 resource 代码，再 import 映射</span>
+<span class="b">resource</span> <span class="y">"aws_instance"</span> <span class="y">"web"</span> {
+  <span class="c"># 先按真实属性把代码写全，否则 import 后第一次 plan 一堆 diff</span>
+  ami           = <span class="g">"ami-0abc123"</span>
+  instance_type = <span class="g">"t3.medium"</span>
+}
+terraform import aws_instance.web i-0abc123def456
+
+<span class="c"># 新式（1.5+）：import 块直接写在代码里，生成配置也自动化</span>
+<span class="b">import</span> {
+  to = <span class="b">aws_instance</span>.web
+  id = <span class="g">"i-0abc123def456"</span>
+}
+<span class="c"># terraform plan -generate-config-out=generated.tf 可让 Terraform 帮你写出初始配置</span></pre>
+  <h4>重构（refactor）：移动资源而不重建</h4>
+  <p>重命名资源、把资源挪进 module、把 count 改 for_each——这些在旧版本里意味着"先 state rm 再 import"的极限操作。<b>Terraform 1.1+ 的 moved 块让重构变成声明式：</b></p>
+  <pre><span class="c"># 场景 1：资源重命名 aws_instance.web → aws_instance.app</span>
+<span class="b">moved</span> {
+  from = <span class="b">aws_instance</span>.web
+  to   = <span class="b">aws_instance</span>.app
+}
+
+<span class="c"># 场景 2：把散资源收进模块（地址前缀要带 module.）</span>
+<span class="b">moved</span> {
+  from = <span class="b">aws_s3_bucket</span>.logs
+  to   = <span class="b">module</span>.logging.aws_s3_bucket.main
+}
+
+<span class="c"># 场景 3：count 改 for_each（键值保持不变时零重建）</span>
+<span class="c"># from 用索引、to 用键，Terraform 只改映射不动真资源</span>
+<span class="b">moved</span> {
+  from = <span class="b">aws_instance</span>.web[0]
+  to   = <span class="b">aws_instance</span>.web[<span class="g">"a"</span>]
+}
+
+<span class="c"># 反向：代码里删掉了 resource，但不想删真资源</span>
+<span class="c"># ① terraform state rm aws_instance.web（从 state 除名，资源保留）</span>
+<span class="c"># ② 或 1.7+ 的 removed 块：声明"这个资源已不在代码里，也别销毁它"</span>
+<span class="b">removed</span> {
+  from = <span class="b">aws_instance</span>.legacy
+  lifecycle { destroy = <span class="g">false</span> }
+}</pre>
+  <div class="callout ok">
+    <b>重构三原则：</b>① 先 <span class="k">moved</span> 后改代码，<b>一次重构一个动作</b>，plan 确认 0 变更再下一步；② 永远不在两个 PR 里同时重构同一块；③ 大规模重构前 <span class="k">terraform state pull &gt; backup.tfstate</span> 手动备份。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>与 Ansible 的分工</h2></div>
+  <p class="lead">两者不是竞争关系：<b>Terraform 管"基础设施生命周期"，Ansible 管"机器内部配置"</b>。分界线是"资源创建/销毁"与"软件安装/配置文件"。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:250px">Terraform</th><th>Ansible</th></tr>
+    <tr><td><b>管什么</b></td><td>VPC、子网、EC2、RDS、LB、DNS、IAM、K8s 集群</td><td>软件包、系统参数、配置文件、用户、服务状态</td></tr>
+    <tr><td><b>模型</b></td><td>声明式 + state，幂等靠 diff 计算</td><td>声明式任务，幂等靠模块自身设计</td></tr>
+    <tr><td><b>连不进去怎么办</b></td><td>不关心机器内部，只调云 API</td><td><b>需要机器已存在且可 SSH</b></td></tr>
+    <tr><td><b>典型时序</b></td><td>先跑：把机器、网络、数据库建出来</td><td>后跑：用 Terraform 产出的 IP/连接信息进场配置</td></tr>
+  </table>
+  <h4>经典组合：Terraform 产出 → Ansible 消费</h4>
+  <pre><span class="c"># Terraform 侧：把新机器信息渲染成 Ansible inventory</span>
+<span class="b">resource</span> <span class="y">"local_file"</span> <span class="y">"inventory"</span> {
+  filename = <span class="g">"${path.module}/inventory.ini"</span>
+  content  = <span class="b">templatefile</span>(<span class="g">"inventory.tftpl"</span>, {
+    hosts = <span class="b">aws_instance</span>.web[*].public_ip
+  })
+}
+
+<span class="b">output</span> <span class="y">"web_ips"</span> {
+  value = <span class="b">aws_instance</span>.web[*].public_ip
+}
+
+<span class="c"># ===== provisioner 能用，但请当作最后手段 =====</span>
+<span class="b">resource</span> <span class="y">"aws_instance"</span> <span class="y">"web"</span> {
+  <span class="c"># ...</span>
+
+  <span class="b">provisioner</span> <span class="y">"local-exec"</span> {
+    <span class="c"># 机器建好后，本地触发一次 ansible-playbook</span>
+    command = <span class="g">"ansible-playbook -i inventory.ini site.yml --limit ${self.private_ip}"</span>
+  }
+}
+
+<span class="c"># 更云原生的做法：不用 provisioner，把配置烧进 user_data / cloud-init，</span>
+<span class="c"># 或让 CI 在 terraform apply 成功后单独跑 ansible。这样 Terraform 侧零 SSH 依赖。</span></pre>
+  <div class="callout danger">
+    <b>为什么 provisioner 是反模式：</b>① 它执行失败会把资源标记为 tainted，下次重建——<b>一次 SSH 超时毁掉一台生产机</b>；② provisioner 只在创建时跑，更新镜像后老机器不会重新配置；③ 它要求 Terraform 到机器的网络可达，把"云 API 工具"拖进"配置管理"的泥潭。<b>正确分层：cloud-init 管首次引导，Ansible 管持续配置。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>常见坑与防御性写法</h2></div>
+  <h4>多云 Provider 与版本管理</h4>
+  <pre><span class="c"># 同一套代码跨云：provider 是插件化的，换云≈换 provider 资源前缀</span>
+<span class="b">terraform</span> {
+  required_version = <span class="g">"&gt;= 1.5.0"</span>
+  required_providers {
+    aws        = { source = <span class="g">"hashicorp/aws"</span>,        version = <span class="g">"~&gt; 5.0"</span> }
+    alicloud   = { source = <span class="g">"aliyun/alicloud"</span>,      version = <span class="g">"~&gt; 1.200"</span> }
+    kubernetes = { source = <span class="g">"hashicorp/kubernetes"</span>, version = <span class="g">"~&gt; 2.20"</span> }
+    helm       = { source = <span class="g">"hashicorp/helm"</span>,       version = <span class="g">"~&gt; 2.10"</span> }
+    random     = { source = <span class="g">"hashicorp/random"</span>,     version = <span class="g">"~&gt; 3.5"</span> }
+  }
+}
+
+<span class="c"># .terraform.lock.hcl 必须提交进 git —— 它锁的是 provider 二进制校验和，</span>
+<span class="c"># 保证每个人、每条流水线下载到的 provider 一模一样</span>
+terraform providers lock -platform=linux_amd64 -platform=darwin_arm64</pre>
+  <h4>循环依赖与 count / for_each 的坑</h4>
+  <pre><span class="c"># 循环依赖：A 引用 B 的属性，B 又引用 A 的属性 → "Cycle error"</span>
+<span class="c"># 解法：把公共输入（如 VPC ID）提成 variable 或用 data source 查，打断环</span>
+
+<span class="c"># count 的索引陷阱：列表删掉中间一项，后面全部"位移"→ 连锁重建</span>
+<span class="b">resource</span> <span class="y">"aws_instance"</span> <span class="y">"web"</span> {
+  count = <span class="b">length</span>(<span class="b">var</span>.subnets)
+  <span class="c"># var.subnets 从 ["a","b","c"] 变成 ["a","c"]</span>
+  <span class="c"># → web[1] 从子网 b 挪到 c，web[2] 被销毁 → 看起来"删一个毁两个"</span>
+}
+
+<span class="c"># for_each 按 key 寻址，删一项只动那一项</span>
+<span class="b">resource</span> <span class="y">"aws_instance"</span> <span class="y">"web"</span> {
+  for_each = <span class="b">var</span>.instances        <span class="c"># map 或 set，不能用 list</span>
+  subnet_id = <span class="b">each</span>.value.subnet
+  tags      = { Name = <span class="g">"web-${each.key}"</span> }
+}
+
+<span class="c"># 删除即重建：改不可变属性（如 aws_instance 的 ami）→ 先删后建</span>
+<span class="c"># 想零停机先建后删：</span>
+<span class="b">lifecycle</span> {
+  create_before_destroy = <span class="g">true</span>
+  prevent_destroy       = <span class="g">true</span>       <span class="c"># 生产数据库必加</span>
+  ignore_changes        = [tags[<span class="g">"LastScan"</span>]]
+}</pre>
+  <h4>敏感变量与调试</h4>
+  <pre><span class="c"># 标记敏感：plan/apply 输出里显示 (sensitive value)</span>
+<span class="b">variable</span> <span class="y">"db_password"</span> {
+  type      = <span class="g">string</span>
+  sensitive = <span class="g">true</span>
+  <span class="c"># nullable + validation 双重保险</span>
+  validation {
+    condition     = <span class="b">length</span>(<span class="b">var</span>.db_password) &gt;= 16
+    error_message = <span class="g">"密码至少 16 位。"</span>
+  }
+}
+
+<span class="c"># 环境变量注入，绝不出现在命令行历史里</span>
+export TF_VAR_db_password=$(vault kv get -field=password secret/prod/db)
+terraform apply
+
+<span class="c"># 出问题时的日志（调试完记得降级，DEBUG 日志巨大）</span>
+TF_LOG=DEBUG terraform apply 2&gt;&amp;1 | tee tf-debug.log
+TF_LOG_PATH=/tmp/tf.log terraform plan          <span class="c"># 落盘，不刷屏</span></pre>
+  <div class="callout warn">
+    <b>版本约束用 <span class="k">~&gt;</span> 不用 <span class="k">&gt;=</span>：</b><span class="k">~&gt; 5.0</span> 允许 5.x 任意小版本、锁死大版本；<span class="k">&gt;= 5.0</span> 会让半年后的 6.0 悄悄进来，把你的配置炸掉。升级大版本 = 单独 PR + 单独 state 备份 + 灰度环境先跑。
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">排坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用本地 state 多人协作</div><div class="pd">两个人同时 apply，state 互相覆盖，资源双份或配置丢失。第一天就上远程后端 + 锁，这是 Terraform 工程化的分水岭。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">state 文件提交进了 git</div><div class="pd">state 里 RDS 密码、AK 全明文，进 git 等于进所有开发者的电脑和 CI 日志。.gitignore 必须屏蔽 *.tfstate 和 .terraform/。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">锁冲突就 force-unlock</div><div class="pd">force-unlock 是给"持锁进程确定已死"的场景用的。流水线还在跑你强开锁，两个 apply 并发写 state，事故瞬间翻倍。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用 count 管理一批机器，删列表中间项</div><div class="pd">count 按索引寻址，删中间项导致后面全部位移重建。实例类资源一律 for_each + map/set，键稳定，删一个只动一个。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">在控制台改 Terraform 管的资源</div><div class="pd">产生漂移，下次 plan 出现一堆意外 diff，有人手一滑 apply 回去，把控制台的紧急修复也覆盖没了。改可以，改完同步回代码。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">生产 RDS 没加 prevent_destroy</div><div class="pd">一次 terraform destroy -target 误操作或模块重构，数据库直接蒸发。production 级别的有状态资源必须 lifecycle prevent_destroy = true。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">重度依赖 provisioner 做配置</div><div class="pd">SSH 超时一次资源就被标记 tainted 重建，update 时 provisioner 又不重跑，配置悄悄过期。用 cloud-init + Ansible 替代。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">循环依赖，A 引用 B、B 引用 A</div><div class="pd">plan 直接报 Cycle error。根因是共享输入被互相引用。把公共值提成 variable 或用 data source 查询，依赖图立刻变 DAG。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">敏感变量没标 sensitive</div><div class="pd">密码出现在 plan 输出、CI 日志、同事的终端录屏里。variable 和 output 都要标，注入走 TF_VAR_ 环境变量或 Secrets Manager。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">provider 版本写 &gt;= 且不提交 lock 文件</div><div class="pd">半年后一次 apply，新大版本 provider 改了 schema，全量 plan 报错甚至误改资源。用 ~&gt; 锁大版本，.terraform.lock.hcl 必须进 git。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 两个人同时 terraform apply 报 "Error acquiring the state lock"，正确的处理是？</div>
+      <button class="opt">立即 force-unlock，然后继续 apply</button>
+      <button class="opt">先确认没有其他人/流水线在跑，确认安全后再 force-unlock</button>
+      <button class="opt">把 backend 改成本地 state 绕开锁</button>
+      <div class="ans">正确答案：<b>先确认再强解</b>。锁存在说明有并发。force-unlock 只用于持锁方确定已死的场景；改本地 state 更是倒洗澡水把孩子倒掉——丢掉了锁保护。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. var.subnets 从 ["a","b","c"] 改成 ["a","c"]，用 count 创建的 3 台实例会发生什么？</div>
+      <button class="opt">只删除中间那台，其余不动</button>
+      <button class="opt">三台全部重建</button>
+      <button class="opt">后面的实例位移：实例 2 换子网、实例 3 被销毁，实际是"改一台毁一台"</button>
+      <div class="ans">正确答案：<b>索引位移导致连锁重建</b>。count 按位置寻址，删中间项后 web[1]、web[2] 的内容全错位。for_each 按 key 寻址就没有这个问题——这就是生产代码优先 for_each 的原因。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 远程后端（S3 + 锁）解决的核心问题是？</div>
+      <button class="opt">共享 state 存储 + 并发互斥，支撑团队协作与 CI/CD</button>
+      <button class="opt">让 terraform 跑得更快</button>
+      <button class="opt">自动优化云资源成本</button>
+      <div class="ans">正确答案：<b>共享 + 锁</b>。远程后端的本质是把 state 变成团队共享且并发安全的单一事实来源，本地 state 做不到这两点，与性能成本无关。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于 provisioner，业界共识的定位是？</div>
+      <button class="opt">配置机器内部软件的首选方式，应该大量使用</button>
+      <button class="opt">最后手段：仅在 cloud-init/Ansible 无法覆盖时使用</button>
+      <button class="opt">可以完全替代 Ansible</button>
+      <div class="ans">正确答案：<b>最后手段</b>。provisioner 失败会污染资源（tainted 重建）、只在创建时执行、还要求 Terraform 到机器的网络可达。正确分层是 cloud-init 引导 + Ansible 持续配置。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 想把 aws_instance.web 重命名为 aws_instance.app 且不重建机器，最佳做法是？</div>
+      <button class="opt">直接改资源名然后 apply</button>
+      <button class="opt">terraform state rm 删掉再 import 进来</button>
+      <button class="opt">加 moved { from = aws_instance.web  to = aws_instance.app }</button>
+      <div class="ans">正确答案：<b>moved 块</b>（1.1+）。直接改名会被判定为"删旧建新"；state rm + import 是老式手工体操，容易出错。moved 声明只改映射不动真资源。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 多环境（dev/staging/prod）隔离，社区主流推荐哪种？</div>
+      <button class="opt">目录分离：envs/dev、envs/prod 各自 root module + 各自 state</button>
+      <button class="opt">workspace 切换，一套代码通吃所有环境</button>
+      <button class="opt">所有环境挤在一个 state 里，靠标签区分</button>
+      <div class="ans">正确答案：<b>目录分离</b>。环境差异显式、state 隔离、权限可拆。workspace 共享代码与 provider 配置，prod/dev 变量容易误伤，只适合临时实验。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>terraform init</code><span class="desc">初始化：下载 provider、配置后端</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform validate</code><span class="desc">静态检查语法与引用，不连云，CI 第一步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform plan -out=tfplan</code><span class="desc">生成计划文件，生产 apply 的前提</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform apply tfplan</code><span class="desc">精确执行已批准的 plan</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform plan -refresh-only</code><span class="desc">只刷状态探测漂移，不改资源</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform apply -replace=aws_instance.web</code><span class="desc">强制替换单个资源（taint 的现代替代）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform state list / show / rm</code><span class="desc">查看 / 查看详情 / 从 state 除名（不删真资源）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform import 资源地址 云ID</code><span class="desc">把存量资源收编进 state</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform workspace new prod</code><span class="desc">新建/切换 workspace（各自独立 state）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform force-unlock LOCK_ID</code><span class="desc">强解锁，仅限持锁方确定已死</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform providers lock -platform=...</code><span class="desc">多平台锁定 provider 校验和</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform graph | dot -Tpng &gt; dep.png</code><span class="desc">导出依赖图，排查循环依赖</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置项</h3>
+  <pre><span class="c"># versions.tf —— 版本约束模板</span>
+<span class="b">terraform</span> {
+  required_version = <span class="g">"&gt;= 1.5.0"</span>
+  required_providers {
+    aws = { source = <span class="g">"hashicorp/aws"</span>, version = <span class="g">"~&gt; 5.0"</span> }
+  }
+}
+
+<span class="c"># backend.tf —— 远程后端模板（S3 + DynamoDB 锁）</span>
+<span class="b">terraform</span> {
+  backend <span class="y">"s3"</span> {
+    bucket         = <span class="g">"corp-tfstate-prod"</span>
+    key            = <span class="g">"prod/network/vpc.tfstate"</span>
+    region         = <span class="g">"cn-north-1"</span>
+    encrypt        = <span class="g">true</span>
+    dynamodb_table = <span class="g">"tfstate-locks"</span>
+  }
+}
+
+<span class="c"># 敏感变量模板</span>
+<span class="b">variable</span> <span class="y">"db_password"</span> {
+  type      = <span class="g">string</span>
+  sensitive = <span class="g">true</span>
+}
+
+<span class="c"># .gitignore 必须包含</span>
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+tfplan</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>IaC</b></td><td>基础设施即代码，用代码完整描述并管理基础设施状态</td></tr>
+    <tr><td><b>HCL</b></td><td>HashiCorp 配置语言，Terraform 的 DSL，也兼容 JSON</td></tr>
+    <tr><td><b>声明式</b></td><td>只描述期望终态，由工具计算达成路径（对比命令式写步骤）</td></tr>
+    <tr><td><b>Provider</b></td><td>与云/服务对话的插件，定义资源类型与 API 映射</td></tr>
+    <tr><td><b>Resource</b></td><td>Terraform 管理的实体，有完整生命周期</td></tr>
+    <tr><td><b>Data Source</b></td><td>只读查询已有实体，不管理生命周期</td></tr>
+    <tr><td><b>State</b></td><td>记录"代码 ↔ 真实资源"映射与属性的唯一真相文件</td></tr>
+    <tr><td><b>Backend</b></td><td>state 的存储与锁定方式（S3、OSS、Consul、Terraform Cloud）</td></tr>
+    <tr><td><b>Drift</b></td><td>真实资源被 Terraform 之外的途径修改，与代码产生偏差</td></tr>
+    <tr><td><b>Module</b></td><td>可复用的 Terraform 代码单元，通过 input/output 交互</td></tr>
+    <tr><td><b>Workspace</b></td><td>同一代码下相互隔离的 state 实例，多环境场景慎用</td></tr>
+    <tr><td><b>for_each</b></td><td>按 map/set 键寻址批量创建，删减不牵连其他资源</td></tr>
+    <tr><td><b>count</b></td><td>按数量批量创建，索引寻址，中间项删除会引发连锁重建</td></tr>
+    <tr><td><b>moved 块</b></td><td>声明资源地址迁移，重构时不销毁不重建</td></tr>
+    <tr><td><b>import</b></td><td>把已存在的云资源纳入 Terraform 管理</td></tr>
+    <tr><td><b>provisioner</b></td><td>资源创建后执行的动作，业界共识为最后手段</td></tr>
+    <tr><td><b>tainted / -replace</b></td><td>资源被标记为需重建；-replace 是显式触发重建的命令</td></tr>
+    <tr><td><b>sensitive</b></td><td>标记变量/输出为敏感，CLI 输出中脱敏</td></tr>
+    <tr><td><b>lock file</b></td><td>.terraform.lock.hcl，锁定 provider 二进制校验和，必须入 git</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作重复执行结果一致，是 IaC 的基石属性</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 local provider 或免费层云账号完成这五件事 —— ① 写一个 VPC + EC2 最小栈，配 S3 远程后端（没有云账号就用本地 backend 加文件级备份）；② 把 count 改成 for_each 并用 moved 块零重构迁移；③ terraform import 一台控制台建的机器；④ 手改一个标签观察 plan 的漂移输出，再用 ignore_changes 消音；⑤ 把密码改成 sensitive + TF_VAR_ 注入。<br><br>
+    <b>之后值得单独学：</b>Terragrunt（DRY 多环境）、Terraform Cloud/Atlantis 的 PR 工作流、check 块做资源级断言、以及 OpenTofu（Terraform 的 MPL 开源分叉）生态。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Terraform 与 IaC · 上线前务必检查：远程后端 + 锁、provider 版本锁定、生产资源 prevent_destroy</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（state 与后端）和模块 8（坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边本地起个 terraform 敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议本地装 terraform 跟敲：winget install Hashicorp.Terraform';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

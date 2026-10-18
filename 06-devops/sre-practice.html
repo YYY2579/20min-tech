@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 SRE 工程实践</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 26 期 · 高密度版</span>
+    <h1>二十分钟学透 SRE 工程实践</h1>
+    <p class="sub">SRE 不是"高级运维"，是<b>用软件工程方法解决稳定性问题</b>。这篇的重点：SLI/SLO/SLA 怎么落地、错误预算怎么算、多窗口多燃率告警规则怎么写、Toil 怎么消灭、postmortem 怎么开。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 级燃率告警</span>
+      <span class="chip"><b>50%</b> Toil 上限</span>
+      <span class="chip"><b>10</b> 个工程坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议拿一个线上服务对照：它的 SLI 是什么？SLO 定的是多少？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先建立一个坐标系</h2></div>
+  <p class="lead">SRE 一词出自 Google（《SRE：Google运维解密》），一句话定义：<b>"当你要求一个软件工程师去设计一个运维团队时，你会得到 SRE。"</b>核心主张：运维问题的 70% 是工程问题，应该用写代码的方式解决，而不是堆人。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:250px">传统运维</th><th>SRE</th></tr>
+    <tr><td><b>核心动作</b></td><td>人肉值守、手工操作、救火</td><td>写自动化代码、定 SLO、做容量与发布工程</td></tr>
+    <tr><td><b>对故障的态度</b></td><td>故障是失败，要追责、要杜绝</td><td>故障是常态，用错误预算管理"可以失败多少"</td></tr>
+    <tr><td><b>度量方式</b></td><td>看 CPU、内存、在线时长（活动指标）</td><td>看 SLI/SLO、错误预算、MTTD/MTTR（结果指标）</td></tr>
+    <tr><td><b>变更方式</b></td><td>变更窗口、人工审批、能不动就不动</td><td>小步快跑、自动化发布、用渐进式交付控制爆炸半径</td></tr>
+    <tr><td><b>时间分配</b></td><td>80% 手工劳动 + 20% 改进</td><td><b>最多 50% Toil，至少 50% 工程时间</b></td></tr>
+    <tr><td><b>规模逻辑</b></td><td>人随服务数量线性增长</td><td>用自动化让团队规模随服务数量亚线性增长</td></tr>
+  </table>
+  <div class="callout">
+    <b>DevOps 和 SRE 的关系：</b>DevOps 是一场文化运动（打破开发与运维的墙，没有标准答案）；SRE 是 Google 对 DevOps 理念的一种<b>具体工程实现</b>——SRE Workbook 原话：DevOps 是"class"，SRE 是"class 的一个具体实例"，它有可落地的规范（SLO、错误预算、Toil 上限）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>SLI / SLO / SLA：可靠性三角</h2></div>
+  <p class="lead">整个 SRE 体系的地基。三者的区别一句话：<b>SLI 是"怎么量"，SLO 是"目标定多少"，SLA 是"违约了怎么办"。</b></p>
+  <table>
+    <tr><th style="width:90px">概念</th><th style="width:300px">定义</th><th>例子</th></tr>
+    <tr><td><b>SLI</b><br>指标</td><td>服务可靠性的<b>精细量化度量</b>，通常是一个比值：好的事件数 / 总事件数</td><td>HTTP 请求成功率、P99 延迟 &lt; 300ms 的请求占比、数据新鲜度</td></tr>
+    <tr><td><b>SLO</b><br>目标</td><td>SLI 在某个时间窗口内的<b>目标值</b>，是内部承诺</td><td>过去 30 天，API 成功率 ≥ 99.9%</td></tr>
+    <tr><td><b>SLA</b><br>协议</td><td>对外的<b>合同承诺</b>，达不到就赔钱。通常比 SLO 更宽松</td><td>月度可用性 99.5%，未达标赔偿 10% 费用</td></tr>
+  </table>
+  <h3>怎么定义一条好 SLI</h3>
+  <ul>
+    <li><b>用比率，不用绝对值。</b>"99.9% 的请求成功"比"每分钟错误少于 100 个"更抗流量波动</li>
+    <li><b>贴近用户感知。</b>用户请求级指标（成功率、延迟分位数）优先于系统指标（CPU、磁盘）</li>
+    <li><b>能算出来。</b>SLI 必须能从监控数据直接算出，依赖现成的埋点，不能靠人工统计</li>
+    <li><b>宁少勿多。</b>一个服务 3~5 条核心 SLI 足够（可用性、延迟、吞吐、新鲜度），多了等于没有重点</li>
+  </ul>
+  <h3>真实 SLO 表（一个典型的 API 服务）</h3>
+  <table>
+    <tr><th style="width:170px">SLI</th><th style="width:230px">口径</th><th>SLO</th></tr>
+    <tr><td>请求成功率</td><td>非 5xx 且非超时的请求 / 总请求</td><td>30 天滚动 ≥ 99.9%</td></tr>
+    <tr><td>延迟达标率</td><td>P99 延迟 &lt; 300ms 的请求占比</td><td>30 天滚动 ≥ 99%</td></tr>
+    <tr><td>数据新鲜度</td><td>写入到可读的延迟 &lt; 5s 的比例</td><td>30 天滚动 ≥ 99.95%</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>SLO 不是越高越好。</b>SRE 的核心理念是 <b>"just reliable enough"（可靠得刚刚好）</b>：定 99.999% 意味着 30 天只允许 25.9 秒故障，任何小抖动都会烧光预算，团队会被禁掉一切发布 —— 最后系统不是更可靠，而是更僵化、更不敢动。<b>SLO 是产品决策，不是技术人员的虚荣心。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>错误预算：把可靠性变成可以花的钱</h2></div>
+  <p class="lead">错误预算 = (1 − SLO) × 时间窗口。它的革命性在于：<b>把"稳定性 vs 迭代速度"的扯皮，变成一个可以量化、可以分配、可以烧完再说的数字。</b></p>
+  <h3>预算速算表（30 天窗口）</h3>
+  <table>
+    <tr><th style="width:130px">SLO</th><th style="width:150px">允许不可用比例</th><th>30 天错误预算</th></tr>
+    <tr><td>99.9%（三个九）</td><td>0.1%</td><td><b>43.2 分钟</b>（720h × 0.001）</td></tr>
+    <tr><td>99.95%</td><td>0.05%</td><td>21.6 分钟</td></tr>
+    <tr><td>99.99%（四个九）</td><td>0.01%</td><td>4.32 分钟</td></tr>
+    <tr><td>99.999%</td><td>0.001%</td><td>25.9 秒</td></tr>
+  </table>
+  <h3>预算花超了怎么办（错误预算政策）</h3>
+  <pre><span class="c"># 一条可以写进团队 Wiki 的错误预算政策</span>
+预算剩余 &gt; 0        → 正常发布新功能
+预算消耗 &gt; 50%      → 所有发布必须过可靠性评审（灰度 + 回滚预案）
+预算耗尽（SLO 已破） → 冻结功能发布，全员转入稳定性工作，
+                       直到滚动窗口内 SLO 重新达标</pre>
+  <div class="callout ok">
+    <b>错误预算的真正威力：</b>它给了你一个<b>停止发布、理直气壮拒绝需求的依据</b>。以前"稳定性 vs 业务"靠嗓门大小，现在靠数字说话：预算烧完了，就是不许发。Google 的经验：这个机制让 SRE 和产品团队从对立变成协作，因为双方看同一个仪表盘。
+  </div>
+  <div class="callout danger">
+    <b>一个常见误读：</b>错误预算 ≠ "可以随便挂 43 分钟"。它是<b>已消耗故障时间的滚动统计</b>，窗口一直在滚动，旧故障的影响会随时间淡出。所以一次大事故的代价，取决于它发生后你还惹不惹事。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>多窗口多燃率告警（SRE Workbook 标准方案）</h2></div>
+  <p class="lead">"CPU 超过 80% 告警"是活动指标告警，最大的问题是<b>要么漏报要么狼来了</b>。SRE Workbook 的答案是：基于 SLO 的<b>多窗口、多燃率（Multiwindow Multi-Burn-Rate）</b>告警。</p>
+  <h3>燃率（Burn Rate）</h3>
+  <pre>燃率 = 实际错误率 ÷ SLO 允许的错误率
+
+例：SLO = 99.9%（允许错误率 0.1%）
+    当前 1 小时错误率 = 1.4%
+    燃率 = 1.4% / 0.1% = <span class="b">14.4</span>  → 1 小时烧掉 30 天预算的 2%
+    按这个速度，30 天预算 2 天就烧光</pre>
+  <h3>标准三级告警表（30 天 SLO）</h3>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:120px">长窗口</th><th style="width:110px">短窗口</th><th style="width:80px">燃率</th><th>含义与动作</th></tr>
+    <tr><td><b>Page</b></td><td>1 小时</td><td>5 分钟</td><td>14.4×</td><td>1 小时烧掉 2% 预算，约 2 天耗尽 → <b>立即叫人</b></td></tr>
+    <tr><td><b>Page</b></td><td>6 小时</td><td>30 分钟</td><td>6×</td><td>6 小时烧掉 5% 预算，约 5 天耗尽 → <b>立即叫人</b></td></tr>
+    <tr><td><b>Ticket</b></td><td>3 天</td><td>6 小时</td><td>1×</td><td>3 天烧掉 10% 预算 → <b>开工单，工作时间处理</b></td></tr>
+  </table>
+  <h3>为什么必须两个窗口</h3>
+  <ul>
+    <li><b>只有短窗口（5 分钟）</b>：一次流量尖刺误报，短信疲劳，很快没人看告警</li>
+    <li><b>只有长窗口（1 小时）</b>：真实故障被平均掉，等触发时已经烧掉大量预算</li>
+    <li><b>两个窗口都触发才告警</b>：短窗口保证"现在正在坏"，长窗口保证"不是偶发尖刺"，误报和漏报同时下降</li>
+  </ul>
+  <h3>可直接用的 Prometheus 规则（SLO = 99.9%）</h3>
+  <pre><span class="c"># prometheus-rules.yaml —— 以 http_requests_total 为例</span>
+groups:
+- name: slo-availability-burn
+  rules:
+  <span class="c"># 14.4x：1h 窗口 + 5min 窗口，烧 2% 预算 → page</span>
+  - alert: ErrorBudgetBurn_14.4x
+    expr: |
+      (
+        sum by (service) (
+          rate(http_requests_total{code=~"5.."}[1h])
+        ) / sum by (service) (
+          rate(http_requests_total[1h])
+        )
+        &gt; 14.4 * 0.001
+      )
+      and
+      (
+        sum by (service) (
+          rate(http_requests_total{code=~"5.."}[5m])
+        ) / sum by (service) (
+          rate(http_requests_total[5m])
+        )
+        &gt; 14.4 * 0.001
+      )
+    labels: {severity: page}
+    annotations:
+      summary: "{{ $labels.service }} 错误预算以 14.4 倍速燃烧"
+
+  <span class="c"># 6x：6h 窗口 + 30min 窗口，烧 5% 预算 → page</span>
+  - alert: ErrorBudgetBurn_6x
+    expr: |
+      (
+        sum by (service) (
+          rate(http_requests_total{code=~"5.."}[6h])
+        ) / sum by (service) (
+          rate(http_requests_total[6h])
+        )
+        &gt; 6 * 0.001
+      )
+      and
+      (
+        sum by (service) (
+          rate(http_requests_total{code=~"5.."}[30m])
+        ) / sum by (service) (
+          rate(http_requests_total[30m])
+        )
+        &gt; 6 * 0.001
+      )
+    labels: {severity: page}
+    annotations:
+      summary: "{{ $labels.service }} 错误预算以 6 倍速燃烧"
+
+  <span class="c"># 1x：3d 窗口 + 6h 窗口，烧 10% 预算 → ticket</span>
+  - alert: ErrorBudgetBurn_1x
+    expr: |
+      (
+        sum by (service) (
+          rate(http_requests_total{code=~"5.."}[3d])
+        ) / sum by (service) (
+          rate(http_requests_total[3d])
+        )
+        &gt; 0.001
+      )
+      and
+      (
+        sum by (service) (
+          rate(http_requests_total{code=~"5.."}[6h])
+        ) / sum by (service) (
+          rate(http_requests_total[6h])
+        )
+        &gt; 0.001
+      )
+    labels: {severity: ticket}
+    annotations:
+      summary: "{{ $labels.service }} 错误预算以 1 倍速燃烧"</pre>
+  <div class="callout">
+    <b>数字怎么来的：</b>30 天 = 720 小时预算。14.4 倍燃率意味着每小时消耗 14.4/720 = 2% 的预算；6 倍燃率下 6 小时消耗 36/720 = 5%；1 倍燃率下 72 小时（3 天）消耗 72/720 = 10%。<b>换 SLO 只需改阈值里的 0.001</b>（99.9% 的允许错误率）。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Toil：识别它，然后消灭它</h2></div>
+  <p class="lead">SRE 书对 Toil 的定义：<b>与服务直接相关的、手工的、重复的、可自动化的、战术性的、没有持久价值的、并且随服务规模线性增长的工作。</b></p>
+  <table>
+    <tr><th style="width:170px">Toil 特征</th><th>反例（这不是 toil）</th></tr>
+    <tr><td><b>手工</b>：人敲命令、人点页面</td><td>设计一套自动化发布系统（这是工程项目）</td></tr>
+    <tr><td><b>重复</b>：同样的事每周都在做</td><td>一次性的架构迁移方案设计</td></tr>
+    <tr><td><b>可自动化</b>：脚本能替人干</td><td>创造性排障、新型事故的根因分析</td></tr>
+    <tr><td><b>没持久价值</b>：干完系统没变好</td><td>沉淀 runbook、改进监控覆盖</td></tr>
+    <tr><td><b>O(n) 增长</b>：服务多一倍，活多一倍</td><td>写一次代码，全集群生效的控制器</td></tr>
+  </table>
+  <h3>典型 Toil 清单</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>手工扩容</div><div class="cd">每次大促前手动改副本数 → 应做成 HPA + 定时策略</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>手工发版</div><div class="cd">登录机器 git pull + 重启 → CI/CD 一条命令</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>人肉巡检</div><div class="cd">每天截图 10 个监控面板 → 告警规则 + SLO 面板</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>反复配证书</div><div class="cd">手抄 Nginx 配置 → ACME 自动续期</div></div>
+  </div>
+  <div class="callout warn">
+    <b>50% 上限原则：</b>SRE 团队花在 Toil 上的时间<b>不得超过 50%</b>。超过的后果：人永远在救火，永远没时间做自动化，Toil 越滚越大，团队倦怠离职。落地做法：<b>连续两周记录时间账</b>（每 30 分钟记一次干了什么），然后按"ROI 排序"消灭：优先自动化<b>每周耗时 &gt; 2 小时且规则明确</b>的活。
+  </div>
+  <h3>消灭 Toil 的三板斧</h3>
+  <ol>
+    <li><b>自动化</b>：能写成脚本的绝不做第二遍（注意：先写 runbook，跑顺了再自动化，别跳过第二步）</li>
+    <li><b>自助服务</b>：把能力做成平台/API，让研发自己点按钮，而不是提工单给你</li>
+    <li><b>向上管理（push back）</b>：对"每周让我干一次同样的事"的需求说不，或把它排进产品化路线</li>
+  </ol>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>On-Call 轮值与应急响应</h2></div>
+  <p class="lead">On-call 是 SRE 的最后一道防线，设计目标是：<b>该醒的时候醒，不该醒的时候别醒。</b></p>
+  <h3>Google 的 on-call 设计准则</h3>
+  <table>
+    <tr><th style="width:220px">准则</th><th>数字与理由</th></tr>
+    <tr><td>每班最多 2 起事故</td><td>每起事故平均耗时按 25% 班次估算，2 起就是 50% 时间在救火，超过就没法学习和改进</td></tr>
+    <tr><td>On-call 占总时间 ≤ 25%</td><td>剩下 75% 要留给工程项目，否则团队退化成运维组</td></tr>
+    <tr><td>主备双人制</td><td>主值班（primary）负责响应，副值班（secondary）兜底升级，避免单点失联</td></tr>
+    <tr><td>新人有"跟随期"</td><td>先当 3~6 个月 secondary，跟过至少一次完整事故才转 primary</td></tr>
+    <tr><td>每条告警必须可行动</td><td>看到告警<b>不需要做任何事</b>的告警 = 噪声，直接删。标准："这需要人类智能介入吗？"</td></tr>
+  </table>
+  <h3>事故响应（Incident Response）流程</h3>
+  <div class="steps">
+    <div class="txt"><b>发现（Detect）</b>：告警触发 → 值班人 5 分钟内响应（ack）。MTTD（平均检测时间）是核心指标</div>
+    <div="txt"><b>止损（Mitigate）</b>：<b>先恢复，后定位。</b>回滚、切流量、降级、扩容，先把火扑灭，不要在现场读代码</div>
+    <div="txt"><b>指挥（Command）</b>：大事故指定 Incident Commander（IC），只负责协调和决策，不亲自敲命令</div>
+    <div="txt"><b>沟通（Communicate）</b>：每 30 分钟向干系人同步一次状态，哪怕结论是"还在查"</div>
+    <div="txt"><b>恢复（Recover）</b>：确认 SLI 恢复达标，宣布事故结束，记录时间线</div>
+    <div="txt"><b>复盘（Learn）</b>：48 小时内出 postmortem 草稿，行动项进 backlog</div>
+  </div>
+  <div class="callout danger">
+    <b>止损阶段最常见的错误：</b>值班人在现场 debug 找根因，忘了止损。正确顺序永远是：<b>止损 &gt; 定位 &gt; 根治</b>。回滚慢 5 分钟，可能就是预算多烧 5 分钟。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>事后复盘：Blameless Postmortem</h2></div>
+  <p class="lead">Google 的核心原则：<b>对事不对人（blameless）</b>。追责的团队会隐瞒事故、粉饰时间线，最后复盘变成形式主义。前 Google SRE 总监的说法："如果因为一次失误就开除人，那没人会再告诉你真相。"</p>
+  <h3>Postmortem 模板（可直接抄）</h3>
+  <pre><span class="c"># ===== 元数据 =====</span>
+事故编号:    INC-2026-0312-01
+日期:        2026-03-12
+作者:        值班工程师 A、B
+状态:        草稿 / 评审中 / 已完成
+影响时长:    47 分钟（14:02 - 14:49 UTC）
+
+<span class="c"># ===== 影响 =====</span>
+影响范围:    支付成功率从 99.95% 跌至 91.2%
+受影响用户:  约 3.1 万用户看到支付失败
+收入影响:    约 ¥18.6 万交易失败
+SLO 消耗:    3 天预算的 68%（1x 燃率下 6.8 倍）
+
+<span class="c"># ===== 时间线（全部用 UTC）=====</span>
+14:02  告警 ErrorBudgetBurn_6x 触发，值班 ack
+14:09  定位到 payment-api 5xx 突增，误以为是 DB 慢查询
+14:21  发现是新版本 v2.17.0 引入的连接池配置错误
+14:23  执行回滚到 v2.16.2
+14:31  5xx 开始下降
+14:49  SLI 恢复达标，事故结束
+
+<span class="c"># ===== 根因分析（5 Whys）=====</span>
+1. 为什么支付失败？payment-api 连接池耗尽
+2. 为什么连接池耗尽？新版本把 pool-size 从 50 改成了 5
+3. 为什么没被发现？配置变更没走灰度，直接全量
+4. 为什么没走灰度？该服务的发布流程被标记为"低风险"免检
+5. 为什么免检？风险分级规则只看改动行数，不看配置项
+
+<span class="c"># ===== 检测与响应评估 =====</span>
+MTTD: 2 分钟（告警及时）    MTTR: 47 分钟（定位绕了远路）
+做得好的:  双人值班、回滚 2 分钟内完成
+做得差的:  初期误判方向浪费 12 分钟、无 DB 连接池面板
+运气成分:  事故发生在白天，夜间可能 MTTR 翻倍
+
+<span class="c"># ===== 行动项（没有 owner 和 deadline 的行动项等于没有）=====</span>
+[P0] 发布流程风险分级加入"配置文件变更"类别 —— 负责人 A —— 03-20
+[P0] payment-api 补充连接池使用率面板 —— 负责人 B —— 03-18
+[P1] runbook 补充连接池耗尽排查手册 —— 负责人 C —— 03-25
+[P2] 回滚后自动触发 5xx 对比看板 —— 负责人 B —— 04-10</pre>
+  <div class="callout ok">
+    <b>复盘的质量标准：</b>行动项全部是<b>可执行的工程改进</b>（加监控、改流程、补自动化），而不是"加强意识""提高重视"这类空话。Google 的经验值是：一次重大事故应该产出 3~5 个行动项，其中至少 1 个 P0。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>容量管理：别让系统饿死</h2></div>
+  <p class="lead">容量管理的目标：<b>保证容量始终跟得上需求，且成本不失控。</b>核心公式只有一个：</p>
+  <pre>所需容量 = 预测峰值需求 × (1 + 缓冲系数)
+
+缓冲系数参考：
+  常规服务        +30%
+  核心支付/登录   +50%（峰值不可预测）
+  已做过全链路压测 +20%</pre>
+  <h3>容量规划四步法</h3>
+  <table>
+    <tr><th style="width:130px">步骤</th><th style="width:260px">做法</th><th>工具/指标</th></tr>
+    <tr><td><b>1. 需求预测</b></td><td>用历史数据做趋势 + 季节性预测（大促、早晚高峰）</td><td>Prometheus + predict_linear()、业务侧排期</td></tr>
+    <tr><td><b>2. 压力测试</b></td><td>找到单机极限 QPS / 并发上限，得出单机容量</td><td>压测平台，记录拐点而非打挂为止</td></tr>
+    <tr><td><b>3. 配冗余</b></td><td>N+1 起步（一台故障不雪崩），核心服务 N+2</td><td>多可用区部署，反亲和打散</td></tr>
+    <tr><td><b>4. 持续验证</b></td><td>容量水位超 60% 预警，超 80% 触发扩容评审</td><td>容量看板 + 定期巡检自动化</td></tr>
+  </table>
+  <h3>容量水位看板（PromQL 示例）</h3>
+  <pre><span class="c"># CPU 水位：过去 7 天 P95 值，避免被尖刺骗到</span>
+quantile_over_time(0.95,
+  rate(container_cpu_usage_seconds_total[7d])
+)[7d:5m]
+
+<span class="c"># 单机极限：压测记录的 max_qps = 5000，当前峰值 1800</span>
+<span class="c"># 水位 = 1800 / 5000 = 36% → 健康；若 &gt; 60% 预警，&gt; 80% 必须扩容</span></pre>
+  <div class="callout warn">
+    <b>最常见的容量错误：按平均值规划。</b>按日均 QPS 买机器，大促当天直接雪崩。永远按<b>预测峰值</b>规划，并且留 N+1：任何一台机器挂掉，剩余机器要能扛住峰值流量。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>发布工程：让发布变得无聊</h2></div>
+  <p class="lead">SRE Workbook 的发布理念：<b>发布应该是无聊的（boring）——高频、小步、自动、可回滚。</b>发布越频繁，每次变更越小，事故率越低。</p>
+  <h3>渐进式发布（Progressive Delivery）阶段表</h3>
+  <table>
+    <tr><th style="width:130px">阶段</th><th style="width:120px">流量比例</th><th style="width:130px">观察时长</th><th>通过条件</th></tr>
+    <tr><td><b>内部测试</b></td><td>0%（内部账号）</td><td>1 天</td><td>功能正确、无新告警</td></tr>
+    <tr><td><b>金丝雀</b></td><td>1%</td><td>2~4 小时</td><td>错误率、延迟与基线无显著差异</td></tr>
+    <tr><td><b>小流量</b></td><td>10%</td><td>1 天</td><td>SLO 燃率无异常，业务指标正常</td></tr>
+    <tr><td><b>半量</b></td><td>50%</td><td>1 天</td><td>同上</td></tr>
+    <tr><td><b>全量</b></td><td>100%</td><td>-</td><td>保留回滚通道 24 小时</td></tr>
+  </table>
+  <h3>发布自动化三件套</h3>
+  <pre><span class="c"># 1. 金丝雀分析（示例：Argo Rollouts / Flagger 的判定逻辑）</span>
+分析模板:
+  指标:        error_rate, p99_latency
+  基线:        稳定版过去 1 小时 P50
+  通过条件:    error_rate &lt; 基线 × 1.2 且 p99 &lt; 基线 × 1.5
+  失败动作:    自动回滚 + 通知值班
+
+<span class="c"># 2. 特性开关（Feature Flag）：发布与解耦</span>
+代码合并 = 功能上线（默认关闭）
+灰度 1% → 10% → 100% = 逐步开 flag
+出问题 = 秒级关 flag，无需回滚代码
+
+<span class="c"># 3. 自动回滚条件（示例）</span>
+IF 新版 5xx 率 &gt; 1% 持续 5 分钟
+OR SLO 燃率 &gt; 6x 持续 30 分钟
+THEN 自动回滚到上一版本</pre>
+  <div class="callout ok">
+    <b>发布检查单（每次发布前过一遍）：</b>① 有回滚方案且演练过；② 有监控覆盖新功能；③ 变更半径可控（配置、代码、数据库分开发布）；④ 数据库变更必须兼容旧版本（先加列后删列）；⑤ 发布时间避开业务高峰。
+  </div>
+  <div class="callout danger">
+    <b>反模式：月度发布窗口。</b>一个月发一次，每次几百个变更捆在一起，出问题无法定位是哪个变更，只能整体回滚。正确的做法是<b>持续发布</b>：小而频繁的变更，每次爆炸半径只有一个功能。
+  </div>
+  <h3>Google SRE Workbook 方法论落地清单</h3>
+  <p>SRE Workbook 不是理论书，是一套"该怎么做"的清单。按投入产出排序的落地顺序：</p>
+  <table>
+    <tr><th style="width:60px">优先级</th><th style="width:190px">行动</th><th>落地标准</th></tr>
+    <tr><td><b>P0</b></td><td>定义核心 SLI</td><td>每个服务 3~5 条，能从现有监控直接算出</td></tr>
+    <tr><td><b>P0</b></td><td>设定 SLO 并公开</td><td>全员可见的仪表盘，业务方签字认可</td></tr>
+    <tr><td><b>P0</b></td><td>错误预算政策</td><td>预算耗尽 = 冻结发布，写进团队规范</td></tr>
+    <tr><td><b>P1</b></td><td>燃率告警替换阈值告警</td><td>page 类告警 100% 走多窗口多燃率</td></tr>
+    <tr><td><b>P1</b></td><td>Toil 记账</td><td>团队 Toil 占比 &lt; 50%，有月度数字</td></tr>
+    <tr><td><b>P1</b></td><td>事故响应机制</td><td>IC 角色、升级路径、沟通节奏演练过一次</td></tr>
+    <tr><td><b>P2</b></td><td>Blameless postmortem</td><td>每次事故 48h 内出稿，行动项有 owner</td></tr>
+    <tr><td><b>P2</b></td><td>容量水位看板</td><td>所有服务 &gt; 80% 水位自动告警</td></tr>
+    <tr><td><b>P2</b></td><td>渐进式发布</td><td>发布 = 自动金丝雀 + 自动回滚，无需人工盯</td></tr>
+  </table>
+  <div class="callout">
+    <b>一句话总结整篇：</b>SRE 的全部技术，就是<b>把"系统稳不稳"这个感性问题，变成 SLI/SLO/错误预算三个数字，然后用工程手段（自动化、渐进式发布、容量规划）去管理这三个数字。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个工程坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">SLO 拍脑袋定成 99.99% 或 100%</div><div class="pd">30 天只允许 4.32 分钟故障，一次小抖动就烧光预算，团队被永久禁发，最后系统僵化。SLO 是产品决策，要按"用户能容忍多少"倒推。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">告警只看 CPU/内存/磁盘阈值</div><div class="pd">活动指标和用户体验脱节：CPU 90% 用户可能无感，错误率 5% 天塌了。核心告警必须绑 SLI/错误预算。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">用单窗口短时间做燃率告警</div><div class="pd">5 分钟窗口遇到流量尖刺就误报，短信疲劳两周后没人看告警。必须长窗口 + 短窗口双条件。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">错误预算烧穿了还继续发新功能</div><div class="pd">预算是零和的：不冻结发布，稳定性永远让位于迭代。预算政策要有牙齿，烧穿就停。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">on-call 告警一天几十条，90% 不需要动作</div><div class="pd">每条 page 都该问一句"这需要人类智能介入吗？"。不需要的降级为 ticket 或直接删。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">postmortem 追责到人，点名批评</div><div class="pd">下次没人敢写真相，时间线全是粉饰。Blameless 是复盘的命根子：假设每个人都基于当时的信息做了合理决策。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">行动项写成"加强监控意识"且没有 owner</div><div class="pd">没有负责人和 deadline 的行动项 = 不存在。每条行动项必须有 P0/P1/P2、负责人、截止日期。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">容量按日均流量规划，不留峰值缓冲</div><div class="pd">大促/早高峰直接雪崩。按预测峰值 × (1+30%~50%) 规划，且任何一台挂掉不能雪崩（N+1）。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">Toil 不记账，以为"没多少"</div><div class="pd">实际一记账发现 80% 时间在手工劳动。连续两周记时间账，把 Toil 占比压到 50% 以下。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">回滚靠人工操作，没有演练过</div><div class="pd">真故障时找不到人、不会操作、不敢操作。回滚必须是自动化的，且每月演练一次。</div></div></div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 某服务 SLO 定为 99.9%（30 天滚动窗口），它的月度错误预算是多少？</div>
+      <button class="opt">4.32 分钟</button>
+      <button class="opt">43.2 分钟</button>
+      <button class="opt">7.2 分钟</button>
+      <div class="ans">正确答案：<b>43.2 分钟</b>。30 天 = 720 小时，720 × 0.1% = 0.72 小时 = 43.2 分钟。99.99% 才是 4.32 分钟，99.999% 只有 25.9 秒。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. "14.4 倍燃率"告警的含义是？</div>
+      <button class="opt">错误率是平时的 14.4 倍，持续 14.4 小时</button>
+      <button class="opt">CPU 使用率达到 14.4 倍阈值</button>
+      <button class="opt">按当前错误速度，1 小时烧掉 30 天预算的 2%，约 2 天耗尽预算</button>
+      <div class="ans">正确答案：<b>1 小时烧掉 2% 预算</b>。30 天 = 720 小时，14.4/720 = 2%/小时。这是 SRE Workbook 里 page 级告警的核心档位，通常配 1h 长窗口 + 5min 短窗口。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 多窗口多燃率告警为什么要同时要求长窗口和短窗口都触发？</div>
+      <button class="opt">短窗口保证"现在正在坏"，长窗口保证"不是偶发尖刺"，同时降低误报和漏报</button>
+      <button class="opt">为了凑两个指标好看</button>
+      <button class="opt">因为 Prometheus 不支持单个长查询</button>
+      <div class="ans">正确答案：<b>兼顾当下与持续性</b>。只有短窗口：流量尖刺就误报，告警疲劳。只有长窗口：故障被平均掉，触发时预算已烧光。双窗口是工程上的折中最优解。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 下列哪项<b>不属于</b> Toil？</div>
+      <button class="opt">每次大促前手动改副本数扩容</button>
+      <button class="opt">设计一套自动扩容控制器</button>
+      <button class="opt">每周手工给 20 个服务续证书</button>
+      <div class="ans">正确答案：<b>设计自动扩容控制器</b>。Toil 的判定标准：手工、重复、可自动化、无持久价值、O(n) 增长。设计控制器是<b>工程项目</b>，做完后 Toil 归零，这正是 SRE 该花 50% 以上时间做的事。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. Google 对 on-call 班次负载的推荐上限是？</div>
+      <button class="opt">每班 10 起事故，越多越好说明系统活跃</button>
+      <button class="opt">没有限制，看系统稳定性自然决定</button>
+      <button class="opt">每班最多 2 起事故，on-call 总时间占比不超过 25%</button>
+      <div class="ans">正确答案：<b>每班最多 2 起事故、占比 ≤ 25%</b>。按每起事故耗掉 25% 班次估算，2 起就是 50% 时间救火，人就废了。超限的解法是加人轮换或先做稳定性项目。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. Blameless postmortem 的核心原则是？</div>
+      <button class="opt">对事不对人：假设每个人基于当时掌握的信息都做了合理决策，复盘找系统漏洞而非找人背锅</button>
+      <button class="opt">谁出错谁负责，公开点名以儆效尤</button>
+      <button class="opt">只写做得好的，不写失误，保护团队积极性</button>
+      <div class="ans">正确答案：<b>对事不对人</b>。追责会让大家隐瞒事故、粉饰时间线，复盘失去意义。但注意 blameless ≠ 不追责：蓄意违规、能力缺失仍要单独处理。复盘产出的是可执行行动项（有 owner 有 deadline），不是检讨书。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查数字与公式</h3>
+  <div class="cmds">
+    <div class="crow"><code>错误预算 = (1 − SLO) × 时间窗口</code><span class="desc">99.9% × 30 天 = 43.2 分钟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>燃率 = 实际错误率 ÷ SLO 允许错误率</code><span class="desc">14.4 倍 = 1 小时烧 2% 预算</span><button class="copy">复制</button></div>
+    <div class="crow"><code>1x / 6x / 14.4x 燃率</code><span class="desc">ticket / page / page 三级</span><button class="copy">复制</button></div>
+    <div class="crow"><code>长窗口 3d + 短窗口 6h</code><span class="desc">1x ticket 档的窗口组合</span><button class="copy">复制</button></div>
+    <div class="crow"><code>长窗口 6h + 短窗口 30m</code><span class="desc">6x page 档的窗口组合</span><button class="copy">复制</button></div>
+    <div class="crow"><code>长窗口 1h + 短窗口 5m</code><span class="desc">14.4x page 档的窗口组合</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Toil 占比 &lt; 50%</code><span class="desc">其余时间做工程项目</span><button class="copy">复制</button></div>
+    <div class="crow"><code>每班事故 ≤ 2 起</code><span class="desc">on-call 负载红线</span><button class="copy">复制</button></div>
+    <div class="crow"><code>容量 = 峰值需求 × 1.3~1.5</code><span class="desc">核心服务取 1.5 且 N+2</span><button class="copy">复制</button></div>
+    <div class="crow"><code>水位 60% 预警 / 80% 扩容</code><span class="desc">容量看板阈值</span><button class="copy">复制</button></div>
+    <div class="crow"><code>金丝雀 1% → 10% → 50% → 100%</code><span class="desc">渐进式发布标准节奏</span><button class="copy">复制</button></div>
+    <div class="crow"><code>postmortem 48h 内出稿</code><span class="desc">行动项必须有 owner 和 deadline</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>SRE</b></td><td>Site Reliability Engineering，用软件工程方法做稳定性保障的岗位/方法论</td></tr>
+    <tr><td><b>DevOps</b></td><td>打破开发与运维壁垒的文化运动；SRE 是它的一种工程化落地实现</td></tr>
+    <tr><td><b>SLI</b></td><td>服务级别指标，可靠性的量化度量，通常是一个"好事件/总事件"的比率</td></tr>
+    <tr><td><b>SLO</b></td><td>服务级别目标，SLI 在时间窗口内的内部承诺值</td></tr>
+    <tr><td><b>SLA</b></td><td>服务级别协议，对外的合同承诺，违约有赔偿，通常比 SLO 宽松</td></tr>
+    <tr><td><b>Error Budget</b></td><td>错误预算，(1 − SLO) × 时间窗口，允许失败的总量</td></tr>
+    <tr><td><b>Burn Rate</b></td><td>燃率，实际错误率 ÷ SLO 允许错误率，衡量预算消耗速度</td></tr>
+    <tr><td><b>Multiwindow Multi-Burn-Rate</b></td><td>多窗口多燃率告警，长窗口 + 短窗口双条件，兼顾误报与漏报</td></tr>
+    <tr><td><b>Toil</b></td><td>重复、手工、可自动化、无持久价值且随规模线性增长的工作</td></tr>
+    <tr><td><b>On-Call</b></td><td>值班轮值；核心约束是每班事故 ≤ 2 起、时间占比 ≤ 25%</td></tr>
+    <tr><td><b>Incident Commander</b></td><td>事故指挥官，大事故中只协调决策、不亲自执行的指挥角色</td></tr>
+    <tr><td><b>Postmortem</b></td><td>事后复盘文档，记录时间线、根因、行动项</td></tr>
+    <tr><td><b>Blameless</b></td><td>对事不对人的复盘原则，避免追责导致隐瞒真相</td></tr>
+    <tr><td><b>MTTD / MTTR</b></td><td>平均检测时间 / 平均恢复时间，事故响应效率的核心指标</td></tr>
+    <tr><td><b>Capacity Planning</b></td><td>容量规划，按预测峰值需求 × (1 + 缓冲) 配置资源</td></tr>
+    <tr><td><b>N+1 Redundancy</b></td><td>N 份满足峰值的资源 + 1 份冗余，任一故障不雪崩</td></tr>
+    <tr><td><b>Progressive Delivery</b></td><td>渐进式交付，金丝雀小流量逐步放量，控制每次变更爆炸半径</td></tr>
+    <tr><td><b>Canary</b></td><td>金丝雀发布，先让 1% 流量试新版本，指标正常再放量</td></tr>
+    <tr><td><b>Feature Flag</b></td><td>特性开关，代码上线与功能生效解耦，出问题秒级关闭</td></tr>
+    <tr><td><b>Runbook</b></td><td>操作手册，把排障步骤固化成文档，是自动化的前置步骤</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>拿你手上的服务完成这四件事 —— ① 写出 3 条 SLI 并定 SLO，算出 30 天错误预算；② 按 14.4x / 6x / 1x 三档写一套 Prometheus 燃率告警规则，用压测或错误注入验证一次触发；③ 记两周时间账，算出团队 Toil 占比，挑出最该自动化的两件事；④ 找一次历史事故，按本文模板补一份 blameless postmortem，重点检查行动项是否有 owner 和 deadline。<br><br>
+    <b>之后值得单独学：</b>《Google SRE Workbook》第 4~5 章（SLO 与告警原文）、SLO 治理工具（Sloth、Pyrra）、混沌工程与故障注入（Chaos Mesh）、全链路压测平台设计。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 SRE 工程实践 · 记住：错误预算和 blameless，是这套体系的两个车轮</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（错误预算）和模块 3（燃率告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边拿自己的服务对 SLI/SLO。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议拿一个线上服务对照：它的 SLI 是什么？SLO 定的是多少？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

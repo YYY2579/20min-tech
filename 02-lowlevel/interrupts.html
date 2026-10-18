@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透中断与软中断</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透中断与软中断</h1>
+    <p class="sub">CPU 正在跑你的代码，网卡突然说"有包"。<b>这个打断就是中断</b>。它决定了延迟、吞吐，也决定了为什么一台机器 CPU 看起来不高却处理不动请求。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>10</b> 种软中断</span>
+      <span class="chip">硬中断处理约 <b>1~5μs</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">准备一台 Linux，能看 /proc/interrupts 就够了</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个文件，先看一眼真实系统</h2></div>
+  <p class="lead">中断的所有秘密都写在 <span class="k">/proc</span> 里。先建立"数字长什么样"的直觉，再谈原理。</p>
+  <pre><span class="c"># 1. 每个中断线在各 CPU 上被处理了多少次（第一列是 IRQ 号）</span>
+cat /proc/interrupts
+<span class="c">#            CPU0       CPU1       CPU2       CPU3</span>
+<span class="c">#   0:         42          0          0          0   IO-APIC   2-edge      timer</span>
+<span class="c">#   1:          9          0          0          0   IO-APIC   1-edge      i8042</span>
+<span class="c"># 125:   18492033   19283741   20193847   19028374   PCI-MSI 524288-edge  eth0-TxRx-0</span>
+<span class="c"># 126:    9182736    9382716    9283746    9182734   PCI-MSI 524289-edge  eth0-TxRx-1</span>
+
+<span class="c"># 2. 每种软中断在各 CPU 上的累计次数</span>
+cat /proc/softirqs
+<span class="c">#                     CPU0       CPU1       CPU2       CPU3</span>
+<span class="c">#           HI:          2          1          1          1</span>
+<span class="c">#        TIMER:  918273645  918273645  918273645  918273645</span>
+<span class="c">#       NET_TX:       1203        998       1102       1044</span>
+<span class="c">#       NET_RX:   38291033   40192837   39102837   38910273</span>
+<span class="c">#        BLOCK:          0          0          0          0</span>
+
+<span class="c"># 3. 每核的软中断占比（%soft 这一列）</span>
+mpstat -P ALL 1 3
+<span class="c"># CPU    %usr   %sys  %soft  %idle</span>
+<span class="c">#   0   12.00   8.00  38.00   42.00</span>
+<span class="c">#   1   10.00   7.00  41.00   42.00</span></pre>
+  <div class="callout warn">
+    <b>看这三个文件时的两个关键认知：</b><br>
+    ① <span class="k">/proc/interrupts</span> 和 <span class="k">/proc/softirqs</span> 里的数字是<b>开机以来的累计值</b>，不是速率。要看速率必须间隔取两次做差，例如 <span class="k">watch -n1 'grep eth0 /proc/interrupts'</span>。<br>
+    ② 硬中断的计数在<b>哪个 CPU 列增加，就说明这个中断被哪个核处理</b>。这是判断"中断是否集中在一个核"的唯一直接证据。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>中断、异常、陷阱的区别</h2></div>
+  <p class="lead">这三个词经常被混用，但它们在 CPU 手册里是三个不同的概念，处理路径也不同。</p>
+
+  <table>
+    <tr><th style="width:120px">类别</th><th style="width:200px">来源</th><th style="width:150px">与当前指令的关系</th><th>例子</th></tr>
+    <tr><td><b>硬件中断</b><br>（IRQ）</td><td>外部设备拉高电平或发 MSI 消息</td><td><b>异步</b>，随机插入</td><td>网卡收包、磁盘 IO 完成、时钟滴答、键盘</td></tr>
+    <tr><td><b>异常</b><br>（exception）</td><td>CPU 执行指令时自己发现错误</td><td><b>同步</b>，由当前指令引起</td><td>缺页 #PF、除零 #DE、非法指令 #UD、段错误 #GP</td></tr>
+    <tr><td><b>陷阱</b><br>（trap）</td><td>指令故意触发，处理后<b>返回下一条</b></td><td>同步，可预期</td><td><span class="k">int3</span> 断点、<span class="k">into</span> 溢出检查、系统调用（<span class="k">int 0x80</span>）</td></tr>
+  </table>
+  <p>区别的核心在<b>"返回哪里"</b>：硬件中断和陷阱处理完回到<b>下一条</b>指令；异常处理完通常要<b>重新执行</b>出错的那条指令（比如缺页处理完，重新执行这次访存）。</p>
+
+  <h3>中断号从哪来</h3>
+  <p>设备要打断 CPU，得先告诉中断控制器一个编号。x86 上这套机制演进过三代：</p>
+  <table>
+    <tr><th style="width:150px">机制</th><th>工作方式</th><th style="width:150px">局限</th></tr>
+    <tr><td><b>PIC 8259</b></td><td>老式，级联两片，共 15 个 IRQ</td><td>数量太少，只能发给 CPU0</td></tr>
+    <tr><td><b>IO-APIC</b></td><td>可路由到任意 CPU，支持共享中断线</td><td>仍然要共享，一个线多个设备</td></tr>
+    <tr><td><b>MSI / MSI-X</b></td><td>设备直接往指定地址写一个值，本质是一次内存写</td><td>需要设备支持；MSI-X 最多 2048 个向量</td></tr>
+  </table>
+  <p><b>MSI-X 是理解多队列的前提。</b>它让一块网卡可以申请几十上百个独立中断向量，每个队列一个，于是每个队列可以绑到不同的 CPU。传统共享中断线做不到这一点——一根线只能对应一个中断号，也就只能落在一个核上。</p>
+  <div class="callout">
+    <b>为什么中断要"快进快出"：</b>CPU 响应中断时会自动<b>关闭本核的中断</b>（清 IF 标志），直到处理程序执行 <span class="k">iret</span> 或显式开中断。这段时间里，同一核上的其他中断全部排队。所以中断处理必须极短，否则会丢中断、丢包、时钟漂移。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>中断处理流程：上半部与下半部</h2></div>
+  <p class="lead">"中断要快"和"收包要干很多活"是矛盾的。Linux 的解法是把一件事拆成两半。</p>
+
+  <h3>上半部（hardirq）</h3>
+  <p>设备驱动注册的 handler，运行在<b>中断上下文</b>，此时本核中断是关的。它只做三件事：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>确认中断来源。</b>读设备寄存器，判断"是不是我的中断"（共享中断线时必须做，否则会误处理别人的中断）。</div></div>
+    <div class="step"><div class="txt"><b>清中断标志。</b>告诉设备"我收到了"。<b>这一步漏了就会中断风暴</b>——电平触发的中断线一直保持高电平，CPU 会反复进入同一个 handler。</div></div>
+    <div class="step"><div class="txt"><b>把后续工作挂起，立刻返回。</b>网卡是调 <span class="k">napi_schedule()</span> 挂到软中断，其他驱动可能唤醒一个 threaded handler（内核线程）。</div></div>
+  </div>
+  <p>一次上半部的执行时间通常是<b>1~5 微秒</b>，超过 100μs 就值得警惕，超过 1ms 基本可以认定驱动或硬件有问题。</p>
+
+  <h3>下半部（softirq / tasklet / workqueue）</h3>
+  <table>
+    <tr><th style="width:120px">机制</th><th style="width:140px">运行上下文</th><th style="width:110px">能否睡眠</th><th>适用</th></tr>
+    <tr><td><b>softirq</b></td><td>软中断上下文（可被硬中断打断）</td><td><b>不能</b></td><td>性能敏感、可并行的活：网络收发、块设备、定时器、RCU</td></tr>
+    <tr><td><b>tasklet</b></td><td>基于 softirq，同一 tasklet 不会并行</td><td><b>不能</b></td><td>驱动里的简单延后处理，需要"同一个不会重入"的保证</td></tr>
+    <tr><td><b>workqueue</b></td><td><b>进程上下文</b>（内核线程）</td><td><b>能</b></td><td>需要睡眠、分配内存、拿 mutex 的活</td></tr>
+    <tr><td><b>threaded irq</b></td><td>进程上下文（每中断一个内核线程）</td><td><b>能</b></td><td>中断量大又需要睡眠的驱动，配合 <span class="k">request_threaded_irq</span></td></tr>
+  </table>
+
+  <h3>为什么中断上下文不能睡眠</h3>
+  <p>这不是"不建议"，是<b>会直接崩</b>。原因有四条，每条都足够致命：</p>
+  <ul>
+    <li><b>没有进程可切换。</b>中断上下文里的 <span class="k">current</span> 只是"被中断的那个进程"的借用指针，它并不属于这次中断。调度器如果把 <span class="k">current</span> 换走，回来时栈和寄存器状态全对不上。</li>
+    <li><b>没有独立的栈。</b>中断栈是从被中断进程的内核栈里切出来的一小块（x86-64 上通常 16KB 内核栈共享），睡眠意味着长期占用别人的栈。</li>
+    <li><b>关中断状态下睡眠会死锁。</b>上半部进来时本核中断是关的，睡下去就永远等不到唤醒它的那个中断。</li>
+    <li><b>持有自旋锁时睡眠会死锁。</b>中断里常拿 <span class="k">spin_lock_irqsave</span>，睡眠后另一个核永远拿不到锁。</li>
+  </ul>
+  <pre><span class="c">// 中断上下文里绝对不能出现的调用（都会睡眠）</span>
+kmalloc(GFP_KERNEL)      <span class="c">// ✗ 应该用 GFP_ATOMIC</span>
+mutex_lock()             <span class="c">// ✗ 应该用 spin_lock</span>
+copy_from_user()         <span class="c">// ✗ 可能触发缺页，缺页要睡眠</span>
+msleep() / schedule()    <span class="c">// ✗ 直接崩</span>
+
+<span class="c">// 内核开了 CONFIG_DEBUG_ATOMIC_SLEEP 后，这些调用会打印</span>
+<span class="c">// "BUG: sleeping function called from invalid context"</span></pre>
+  <div class="callout danger">
+    <b>一个真实故障模式：</b>驱动在中断里调 <span class="k">kmalloc(GFP_KERNEL)</span>。平时内存充足，分配走快速路径不睡眠，一切正常；流量高峰时内存紧张，分配器决定回收内存 → 睡眠 → 内核报 <span class="k">scheduling while atomic</span>，机器直接 panic。<b>这类 bug 只在压力下出现，测试环境几乎抓不到。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>软中断与 ksoftirqd</h2></div>
+  <p class="lead">软中断是内核里"延后执行但又要快"的一类工作，数量固定、编译期确定，不能像模块那样动态注册。</p>
+
+  <h3>十种软中断</h3>
+  <table>
+    <tr><th style="width:150px">名称</th><th style="width:110px">编号</th><th>用途</th></tr>
+    <tr><td class="f">HI</td><td>0</td><td>高优先级 tasklet，几乎不用</td></tr>
+    <tr><td class="f">TIMER</td><td>1</td><td>低分辨率定时器（timer wheel）</td></tr>
+    <tr><td class="f">NET_TX</td><td>2</td><td><b>发送方向</b>的收尾工作</td></tr>
+    <tr><td class="f">NET_RX</td><td>3</td><td><b>接收方向</b>，NAPI 轮询，最忙的一个</td></tr>
+    <tr><td class="f">BLOCK</td><td>4</td><td>块设备 IO 完成</td></tr>
+    <tr><td class="f">IRQ_POLL</td><td>5</td><td>IO 轮询（NVMe 轮询模式）</td></tr>
+    <tr><td class="f">TASKLET</td><td>6</td><td>普通 tasklet</td></tr>
+    <tr><td class="f">SCHED</td><td>7</td><td>调度器负载均衡、RCU 回调</td></tr>
+    <tr><td class="f">HRTIMER</td><td>8</td><td>高精度定时器</td></tr>
+    <tr><td class="f">RCU</td><td>9</td><td>RCU 延迟回收</td></tr>
+  </table>
+  <p>注意编号是<b>优先级顺序</b>：数字越小越先执行。所以网络收包（NET_RX，3）会排在块设备（BLOCK，4）和 tasklet（6）前面。这也是"磁盘 IO 慢会拖累网络"的一个隐藏原因。</p>
+
+  <h3>软中断什么时候执行</h3>
+  <p>三个时机，按重要性排序：</p>
+  <ol>
+    <li><b>硬中断返回时</b>（<span class="k">irq_exit()</span> 里调 <span class="k">invoke_softirq()</span>）。这是主路径，绝大多数软中断在这里跑完。</li>
+    <li><b>ksoftirqd 内核线程</b>。每个 CPU 一个，名字是 <span class="k">ksoftirqd/0</span>、<span class="k">ksoftirqd/1</span>……当软中断太多、或者已经在处理中又来了新的，就交给它。</li>
+    <li><b>显式调用</b> <span class="k">local_bh_enable()</span>，比如从网卡驱动的 <span class="k">netif_rx</span> 路径出来时。</li>
+  </ol>
+  <p>关键机制是<b>"2 毫秒让出"</b>：<span class="k">__do_softirq()</span> 最多循环 10 轮或累计 2ms，超过就唤醒 ksoftirqd 并把剩余工作交给它，然后返回。这是为了防止软中断饿死用户进程——毕竟软中断优先级高于普通进程。</p>
+  <pre><span class="c"># 看 ksoftirqd 吃了多少 CPU</span>
+ps -eo pid,comm,pcpu | grep ksoftirqd
+<span class="c">#    18 ksoftirqd/0     12.4</span>
+<span class="c">#    26 ksoftirqd/1     38.7   ← 这个核的软中断忙不过来了</span>
+
+<span class="c"># 看每个 ksoftirqd 线程的状态和运行时间</span>
+top -H -p $(pgrep -d, ksoftirqd)
+<span class="c"># 或者</span>
+cat /proc/$(pgrep -f 'ksoftirqd/1' | head -1)/stat | awk '{print "utime="$14" stime="$15}'</pre>
+
+  <h3>NET_RX 与 NAPI</h3>
+  <p>NAPI（New API）是网卡收包的核心机制，它把"每包一次中断"改成了"一次中断，批量轮询"：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一个包到达 → 硬中断。</b>驱动关掉这个队列的中断，避免后续每个包都打断 CPU。</div></div>
+    <div class="step"><div class="txt"><b>把设备挂到 poll 列表</b>（<span class="k">napi_schedule</span>），触发 NET_RX 软中断。</div></div>
+    <div class="step"><div class="txt"><b>软中断里循环 poll。</b>一次最多取 <span class="k">budget</span> 个包（默认 64），取完再重新开中断。</div></div>
+    <div class="step"><div class="txt"><b>如果还有包</b>，继续下一轮 poll；累计超过 <span class="k">netdev_budget</span>（默认 300）就让出，交给 ksoftirqd。</div></div>
+  </div>
+  <pre><span class="c"># 关键参数</span>
+sysctl net.core.netdev_budget          <span class="c"># 一次软中断最多处理多少个包，默认 300</span>
+sysctl net.core.netdev_budget_usecs    <span class="c"># 一次软中断最多占用多少微秒，默认 2000</span>
+sysctl net.core.dev_weight             <span class="c"># 每个设备的 poll 配额，默认 64</span>
+
+<span class="c"># 调大能提升吞吐，但会增加单次软中断的延迟（影响同核上的其他任务）</span>
+sysctl -w net.core.netdev_budget=600</pre>
+  <div class="callout warn">
+    <b>NAPI 不是万能的。</b>它的假设是"流量大，批量处理划算"。如果流量很小很稀疏（比如每秒几个包），NAPI 的轮询反而多花了一点开销；而在极高包速率（小包线速）下，一个核可能连 poll 都跑不完，此时 <span class="k">ksoftirqd</span> 会持续占满 100%，表现为"CPU 满了但业务吞吐上不去"。解法不是调大 budget，而是<b>加队列、加核</b>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>中断亲和性：把中断钉在核上</h2></div>
+  <p class="lead">默认情况下中断会落到"当时最闲"或"第一个可用"的核上，这个决策不一定符合你的业务布局。</p>
+
+  <h3>看和改</h3>
+  <pre><span class="c"># 每个中断号一个目录，里面有亲和性文件</span>
+ls /proc/irq/125/
+<span class="c"># affinity_hint  node  smp_affinity  smp_affinity_list  spurious  ...</span>
+
+<span class="c"># smp_affinity 是十六进制位图：bit0 对应 CPU0</span>
+cat /proc/irq/125/smp_affinity
+<span class="c"># 0000000f   ← 低 4 位是 1，表示 CPU0~3 都可以</span>
+
+<span class="c"># smp_affinity_list 更直观，直接写 CPU 编号</span>
+cat /proc/irq/125/smp_affinity_list
+<span class="c"># 0-3</span>
+
+<span class="c"># 绑到 CPU2（只允许 CPU2 处理）</span>
+echo 2 &gt; /proc/irq/125/smp_affinity_list
+<span class="c"># 或者用掩码：CPU2 = 1&lt;&lt;2 = 4</span>
+echo 4 &gt; /proc/irq/125/smp_affinity
+
+<span class="c"># 注意：写掩码时必须是"合法 CPU 集合"，写 0 会报错</span>
+<span class="c"># 而且如果中断是"managed"的（irqbalance 在管），你的修改可能被覆盖</span></pre>
+
+  <h3>irqbalance 会跟你抢</h3>
+  <p><span class="k">irqbalance</span> 是一个守护进程，定期根据负载把中断重新分配到各核。它在通用场景下有用，但在以下场景是麻烦：</p>
+  <ul>
+    <li>你把网卡队列绑到了业务线程所在的核，irqbalance 又把它挪走，缓存局部性全丢；</li>
+    <li>NUMA 机器上把中断挪到了远端节点，每次访存都跨 socket；</li>
+    <li>它只看中断计数，不理解你的业务拓扑。</li>
+  </ul>
+  <pre><span class="c"># 方案一：直接停掉（推荐给专用服务器）</span>
+systemctl stop irqbalance &amp;&amp; systemctl disable irqbalance
+
+<span class="c"># 方案二：让它忽略某些中断（在 /etc/irqbalance.env 里配 IRQBALANCE_BANNED_INTERRUPTS）</span>
+<span class="c"># 方案三：用 irqbalance --oneshot 手动跑一次，然后停掉</span>
+
+<span class="c"># 检查是否还在运行</span>
+systemctl is-active irqbalance
+pgrep -a irqbalance</pre>
+
+  <h3>绑核的正确姿势</h3>
+  <table>
+    <tr><th style="width:190px">场景</th><th>建议</th></tr>
+    <tr><td>高吞吐网络服务</td><td>网卡每个队列的中断绑到<b>固定</b>的核，业务线程也绑到同一批核（或同 NUMA 节点），让 skb 和 socket 在同一核处理，缓存命中率最高</td></tr>
+    <tr><td>延迟敏感服务</td><td>中断核与业务核<b>分开</b>，避免软中断抢占业务线程；用 <span class="k">isolcpus</span> 把业务核从调度器里隔离出来</td></tr>
+    <tr><td>NUMA 机器</td><td>先看网卡插在哪个节点（<span class="k">cat /sys/class/net/eth0/device/numa_node</span>），中断和内存都绑到该节点</td></tr>
+    <tr><td>容器环境</td><td>容器看不到宿主机的 <span class="k">/proc/irq</span>，需要在宿主机上配；容器内的绑核用 <span class="k">cpuset</span> 限定</td></tr>
+  </table>
+  <pre><span class="c"># 一个典型的 16 核机器，4 队列网卡的绑定方案</span>
+<span class="c"># 队列 0-3 的中断号假设是 125-128</span>
+for i in 0 1 2 3; do
+  echo $i &gt; /proc/irq/$((125+i))/smp_affinity_list
+done
+
+<span class="c"># 业务线程绑到 4-15</span>
+taskset -cp 4-15 $(pgrep -f my_server)
+
+<span class="c"># 验证：看中断是否只落在预期的核上</span>
+watch -n1 'grep -E "eth0-(TxRx|rx)" /proc/interrupts'</pre>
+  <div class="callout ok">
+    <b>一个判断技巧：</b>如果 <span class="k">/proc/interrupts</span> 里某个队列的计数<b>只在一列增长</b>，说明绑定生效了；如果多列都在涨，说明亲和性没生效（或被 irqbalance 改了），或者该中断是"每 CPU 中断"（如 timer、rescheduling），本来就会在所有核上触发。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>中断风暴怎么查</h2></div>
+  <p class="lead">"中断风暴"指单位时间内中断次数异常暴涨，CPU 大部分时间在处理中断，业务代码得不到执行。</p>
+
+  <h3>三个必要证据</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>证据一：计数暴涨</div><div class="cd">间隔 1 秒取两次 <span class="k">/proc/interrupts</span>，某个中断号每秒增加几十万次。正常网卡在满负载下也就几十万 pps。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>证据二：%soft 高</div><div class="cd"><span class="k">mpstat -P ALL 1</span> 里某一核 <span class="k">%soft</span> 超过 30%，甚至 80% 以上，而 <span class="k">%usr</span> 很低。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>证据三：集中在少数核</div><div class="cd">所有队列的中断都落在 CPU0，其他核闲置。这是单队列网卡或亲和性配置错误的典型表现。</div></div>
+  </div>
+
+  <h3>定位步骤</h3>
+  <pre><span class="c"># 1. 找出增长最快的中断号</span>
+cp /proc/interrupts /tmp/i1; sleep 1; cp /proc/interrupts /tmp/i2
+diff &lt;(awk '{print $1, $2+$3+$4+$5}' /tmp/i1) &lt;(awk '{print $1, $2+$3+$4+$5}' /tmp/i2) | head
+
+<span class="c"># 更直接：按秒看某个设备</span>
+watch -n1 'grep eth0 /proc/interrupts'
+
+<span class="c"># 2. 看是哪一类在涨（硬中断还是软中断）</span>
+mpstat -P ALL 1 5
+<span class="c"># %irq 高 = 硬中断多；%soft 高 = 软中断多。两者含义完全不同</span>
+
+<span class="c"># 3. 看软中断明细</span>
+watch -n1 'cat /proc/softirqs | grep -E "NET_RX|NET_TX|TIMER|RCU"'
+
+<span class="c"># 4. 用 perf 看具体是哪个函数在烧 CPU</span>
+sudo perf top -g
+<span class="c"># 典型输出：net_rx_action / napi_poll / mlx5_poll / e1000_clean</span>
+
+<span class="c"># 5. 看是不是"假中断"（spurious）</span>
+grep -i spurious /proc/interrupts
+cat /proc/irq/*/spurious 2&gt;/dev/null | sort -n | tail</pre>
+
+  <h3>常见成因</h3>
+  <table>
+    <tr><th style="width:210px">成因</th><th style="width:230px">特征</th><th>处理</th></tr>
+    <tr><td><b>中断未被正确清除</b></td><td>同一个中断号疯涨，业务却没有对应流量；电平触发的中断线一直是高</td><td>驱动 bug 或硬件故障，升级驱动/换卡</td></tr>
+    <tr><td><b>共享中断线上有坏设备</b></td><td>多个设备共用一个 IRQ，其中一个反复触发</td><td>把设备分到不同 IRQ（MSI-X），或拔掉故障设备</td></tr>
+    <tr><td><b>小包攻击 / 广播风暴</b></td><td>NET_RX 暴涨，包很小，带宽不高但 pps 极高</td><td>上游限流、开 RPS/RSS、启用 XDP 丢弃</td></tr>
+    <tr><td><b>中断合并被关掉</b></td><td>每个包一次中断，<span class="k">ethtool -c</span> 显示 coalesce 全 0</td><td>打开 rx-usecs 合并（用延迟换 CPU）</td></tr>
+    <tr><td><b>定时器精度调太高</b></td><td>TIMER / HRTIMER 暴涨，与网络无关</td><td>检查是否有高频 timerfd、nanosleep 循环</td></tr>
+    <tr><td><b>虚拟机里的虚拟中断</b></td><td>%soft 高但 <span class="k">/proc/interrupts</span> 里看不到对应设备</td><td>看 <span class="k">/proc/interrupts</span> 里的 <span class="k">Hypervisor callback interrupts</span>，调 vCPU 绑核</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>不要用"调大 netdev_budget"来治中断风暴。</b>那只是让每次软中断多干一点活，总工作量没变，反而让单次软中断占用 CPU 更久、业务延迟更大。真正的解法是减少中断源（合并、限流、丢弃）或增加处理能力（多队列、多核）。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>网卡多队列与 RSS</h2></div>
+  <p class="lead">一块 10G 网卡跑满小包，单核根本处理不过来。多队列是把收包工作分给多个核的唯一硬件级手段。</p>
+
+  <h3>RSS 是什么</h3>
+  <p><b>RSS</b>（Receive Side Scaling，接收端缩放）是网卡硬件的功能：网卡收到包后，用<b>四元组</b>（源 IP、目的 IP、源端口、目的端口）做一次哈希（通常是 Toeplitz 算法），用哈希值查一张<b>间接表</b>（RETA），得到队列号，把包 DMA 到该队列的环形缓冲区。</p>
+  <p>关键性质：<b>同一个连接的所有包，哈希值相同，永远进同一个队列</b>。这保证了单条 TCP 流的包不会乱序，也是"多队列能工作"的前提。</p>
+  <table>
+    <tr><th style="width:150px">概念</th><th>含义</th></tr>
+    <tr><td><b>RX queue</b></td><td>接收队列，每个队列有自己的 DMA 环和中断向量</td></tr>
+    <tr><td><b>RETA</b></td><td>间接表，128 或 512 项，把哈希值映射到队列号。可以用 <span class="k">ethtool -X</span> 调整</td></tr>
+    <tr><td><b>RSS key</b></td><td>哈希密钥，40 字节。改它会让所有流的队列分布重新洗牌</td></tr>
+    <tr><td><b>RPS</b></td><td>软件模拟的 RSS：单队列网卡也能把软中断分到多个核，但包已经 DMA 到一个队列了，收益有限</td></tr>
+    <tr><td><b>RFS</b></td><td>在 RPS 基础上，按"哪个核在消费这个 socket"来选核，提升缓存命中</td></tr>
+  </table>
+
+  <h3>看和调</h3>
+  <pre><span class="c"># 1. 看网卡支持几个队列、当前开了几个</span>
+ethtool -l eth0
+<span class="c"># Channel parameters for eth0:</span>
+<span class="c"># Pre-set maximums:</span>
+<span class="c">#   RX:  8      TX:  8</span>
+<span class="c"># Current hardware settings:</span>
+<span class="c">#   RX:  4      TX:  4</span>
+
+<span class="c"># 2. 开到最大（不能超过 Pre-set maximums，也要看 CPU 数）</span>
+ethtool -L eth0 combined 8
+<span class="c"># combined 表示收发共用队列；也可以分别设 rx / tx</span>
+
+<span class="c"># 3. 看每个队列的中断号和分布</span>
+grep -E 'eth0.*(TxRx|rx)' /proc/interrupts
+<span class="c"># 125: ... eth0-TxRx-0</span>
+<span class="c"># 126: ... eth0-TxRx-1</span>
+
+<span class="c"># 4. 看间接表（哪些哈希落到哪个队列）</span>
+ethtool -x eth0
+<span class="c"># RX flow hash indirection table for eth0 with 4 RX ring(s):</span>
+<span class="c">#   0: 0 0 0 0 1 1 1 1 2 2 2 2 3 3 3 3 ...</span>
+
+<span class="c"># 5. 看中断合并参数（用延迟换 CPU 的关键）</span>
+ethtool -c eth0
+<span class="c"># rx-usecs: 3      ← 收到包后等 3 微秒再发中断，攒一批</span>
+<span class="c"># rx-frames: 0</span>
+<span class="c"># adaptive-rx: on ← 自适应，驱动根据流量自动调</span></pre>
+
+  <h3>为什么单队列会打满一个核</h3>
+  <p>因为一个队列只有一个中断向量，而一个中断向量在任一时刻只能由一个 CPU 处理。流程是：</p>
+  <ol>
+    <li>所有包都 DMA 到队列 0 的环；</li>
+    <li>队列 0 的中断只发往 CPU0（MSI-X 的地址固定）；</li>
+    <li>CPU0 上的硬中断挂起 NAPI，NET_RX 软中断也在 CPU0 执行；</li>
+    <li>协议栈处理、socket 排队、甚至应用 read 的唤醒，全在 CPU0；</li>
+    <li>CPU0 的 <span class="k">%soft</span> 冲到 100%，其他核闲着。</li>
+  </ol>
+  <p>这就是"一台 32 核机器，网络吞吐还不如 4 核"的经典原因。</p>
+  <pre><span class="c"># 单队列网卡的补救：RPS，把软中断分到多个核</span>
+<span class="c"># 每个队列一个 rps_cpus 文件，写 CPU 掩码</span>
+echo f &gt; /sys/class/net/eth0/queues/rx-0/rps_cpus     <span class="c"># CPU0-3</span>
+
+<span class="c"># RFS：让软中断跑到"消费该 socket 的核"上</span>
+echo 32768 &gt; /proc/sys/net/core/rps_sock_flow_entries
+echo 4096 &gt; /sys/class/net/eth0/queues/rx-0/rps_flow_cnt
+
+<span class="c"># 注意：RPS 只是把"软中断"分散，包还是从一个队列 DMA 出来的，</span>
+<span class="c"># 单队列的 DMA 带宽和 ring 大小仍是瓶颈，真正的高吞吐必须上多队列</span></pre>
+  <div class="callout warn">
+    <b>队列数不是越多越好。</b>每个队列都有自己的 ring buffer，占内存；队列太多会让中断数量上升、缓存局部性变差；而且队列数超过物理核数没有意义。经验值：<b>队列数 ≈ 处理网络的核数</b>，通常取 4~16。另外开启多队列后要配合中断亲和性，否则所有队列的中断可能还是挤在 CPU0。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>一次网络收包的完整路径</h2></div>
+  <p class="lead">把前面所有概念串起来。这条路径上的每一步都能成为瓶颈，也都能在观测工具里看到对应指标。</p>
+
+  <div class="steps">
+    <div class="step"><div class="txt"><b>1. 网卡收到帧，DMA 写入内存。</b>网卡按 RETA 算出队列号，把数据直接写进该队列的 ring buffer（物理地址由驱动预先填好），<b>不经过 CPU</b>。这一步消耗的是 PCIe 带宽和内存带宽。</div></div>
+    <div class="step"><div class="txt"><b>2. 网卡发 MSI-X 中断。</b>往事先约定的地址写一个值，APIC 把它转成该 CPU 的一个中断向量。如果开了中断合并，网卡会等几微秒或攒够几个包再发。</div></div>
+    <div class="step"><div class="txt"><b>3. CPU 进入硬中断 handler。</b>保存现场、切换栈、执行驱动的 <span class="k">xxx_intr()</span>：读状态寄存器确认是自己的中断、清中断、调 <span class="k">napi_schedule()</span>。全程 1~5μs。</div></div>
+    <div class="step"><div class="txt"><b>4. 硬中断返回，触发 NET_RX 软中断。</b>在 <span class="k">irq_exit()</span> 里执行 <span class="k">__do_softirq()</span>，调用 <span class="k">net_rx_action()</span>，遍历 poll 列表。</div></div>
+    <div class="step"><div class="txt"><b>5. 驱动 poll 取包。</b>从 ring 里摘下描述符，把 DMA 缓冲区包装成 <span class="k">skb</span>（socket buffer），一次最多 64 个（budget），然后补充新的空缓冲区给网卡。</div></div>
+    <div class="step"><div class="txt"><b>6. 协议栈处理。</b>以太网层 → IP 层（校验、路由、分片重组）→ TCP/UDP 层（查连接、序号检查、ACK、拥塞控制）。这一层可能耗时几微秒到几十微秒。</div></div>
+    <div class="step"><div class="txt"><b>7. 放入 socket 接收队列。</b>找到对应的 <span class="k">struct sock</span>，把 skb 挂到 <span class="k">sk_receive_queue</span>，唤醒等待的进程（<span class="k">sk_data_ready</span> → 唤醒 epoll/阻塞的 read）。</div></div>
+    <div class="step"><div class="txt"><b>8. 应用 read 拷贝。</b>进程从内核队列取 skb，<span class="k">copy_to_user</span> 把数据拷进用户缓冲区。这次拷贝是纯粹的浪费，也是零拷贝想省掉的那一次。</div></div>
+  </div>
+
+  <table>
+    <tr><th style="width:170px">阶段</th><th style="width:150px">耗时量级</th><th style="width:170px">瓶颈信号</th><th>优化手段</th></tr>
+    <tr><td>DMA 写入</td><td>1~2 μs/包</td><td>PCIe 带宽、内存带宽</td><td>更大的 ring、多队列</td></tr>
+    <tr><td>硬中断</td><td>1~5 μs</td><td><span class="k">%irq</span> 高</td><td>中断合并、多队列</td></tr>
+    <tr><td>软中断 poll</td><td>0.5~2 μs/包</td><td><span class="k">%soft</span> 高、ksoftirqd 满</td><td>RPS/RSS、调 budget</td></tr>
+    <tr><td>协议栈</td><td>2~20 μs/包</td><td><span class="k">%sys</span> 高</td><td>GRO/GSO、关闭不必要的 netfilter</td></tr>
+    <tr><td>应用 read</td><td>1~3 μs</td><td>拷贝耗时、上下文切换</td><td>mmap、零拷贝、批量读</td></tr>
+  </table>
+
+  <h3>这条路径上的三个"隐形收费站"</h3>
+  <ul>
+    <li><b>netfilter。</b>即使没有任何 iptables 规则，包也要过 <span class="k">NF_HOOK</span>。规则多了（几千条）会显著变慢。用 <span class="k">nftables</span> 的 set/map 或 <span class="k">-m conntrack</span> 优化。</li>
+    <li><b>GRO/GSO。</b>GRO 把多个小包合并成一个大包再交给协议栈，能大幅减少协议栈调用次数。但它会增加延迟（要等后续包），对延迟敏感的场景要评估。</li>
+    <li><b>socket 锁。</b>同一个 socket 的收包在同一时刻只能一个核处理（有锁），所以单条连接的天花板是单核性能。多连接才能并行。</li>
+  </ul>
+  <div class="callout">
+    <b>一个实用推论：</b>如果业务是"少量长连接 + 大流量"，多队列帮不上忙——因为一条流只进一个队列。这时候要么在应用层拆连接（连接池），要么用 SO_REUSEPORT 让多个进程各监听一个队列，要么上 DPDK/XDP 绕过内核协议栈。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>观测命令速查</h2></div>
+  <p class="lead">五个工具覆盖 90% 的场景。先看全局，再下钻。</p>
+
+  <h3>/proc/interrupts：硬中断</h3>
+  <pre><span class="c"># 只看网卡，每秒刷新</span>
+watch -n1 'grep -E "eth0|mlx|nvme" /proc/interrupts'
+
+<span class="c"># 算每个中断号的总次数并排序（看谁最忙）</span>
+awk 'NR&gt;1 &amp;&amp; $1 ~ /:$/ {sum=0; for(i=2;i&lt;=NF-2;i++) if($i ~ /^[0-9]+$/) sum+=$i; print sum, $0}' \
+  /proc/interrupts | sort -rn | head -10
+
+<span class="c"># 注意：第一列是 "125:" 这种带冒号的格式，awk 取数字要处理</span></pre>
+
+  <h3>/proc/softirqs：软中断</h3>
+  <pre><span class="c"># 直接看，NET_RX 是重点</span>
+cat /proc/softirqs
+
+<span class="c"># 算 1 秒内的增量（这才是速率）</span>
+a=$(grep NET_RX /proc/softirqs); sleep 1; b=$(grep NET_RX /proc/softirqs)
+echo "$a"; echo "$b"
+<span class="c"># 手工相减，或者用脚本</span>
+
+<span class="c"># 用 sar 看历史趋势（需要 sysstat）</span>
+sar -n DEV 1 5        <span class="c"># 网卡吞吐和 pps</span>
+sar -n SOFT 1 5       <span class="c"># 软中断统计（部分版本支持）</span></pre>
+
+  <h3>mpstat：分清 %irq 和 %soft</h3>
+  <pre>mpstat -P ALL 1 5
+<span class="c"># 11:20:01  CPU    %usr   %nice  %sys  %iowait  %irq  %soft  %steal  %idle</span>
+<span class="c"># 11:20:02  all    8.21    0.00  6.33     0.12   2.10  18.42    0.00  64.82</span>
+<span class="c"># 11:20:02    0   10.00    0.00  7.00     0.00   4.00  62.00    0.00  17.00</span>
+<span class="c"># 11:20:02    1    9.00    0.00  6.00     0.00   0.00   3.00    0.00  82.00</span>
+
+<span class="c"># %irq  = 硬中断占用；%soft = 软中断占用；%steal = 被虚拟化层抢走</span>
+<span class="c"># 上面这台机器：CPU0 被软中断吃掉 62%，其他核很闲 → 典型单队列问题</span></pre>
+
+  <h3>perf：看到函数级</h3>
+  <pre><span class="c"># 实时看热点函数，按 CPU 排序</span>
+sudo perf top -g
+
+<span class="c"># 只看软中断相关的符号</span>
+sudo perf top -g -e irq:softirq_entry
+
+<span class="c"># 采样 30 秒存下来，再离线分析</span>
+sudo perf record -g -a -e cycles -o /tmp/perf.data sleep 30
+sudo perf report -i /tmp/perf.data --sort symbol
+
+<span class="c"># 统计每个 CPU 上各类软中断的次数</span>
+sudo perf stat -e 'irq:softirq_entry' -a sleep 5
+
+<span class="c"># 看中断延迟（从触发到 handler 开始）</span>
+sudo perf sched latency</pre>
+
+  <h3>ethtool：网卡侧</h3>
+  <div class="cmds">
+    <div class="crow"><code>ethtool -S eth0 | grep -E 'drop|err|miss'</code><span class="desc">看丢包、错误、ring 溢出计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -g eth0</code><span class="desc">看 ring buffer 大小，太小会丢包</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -c eth0</code><span class="desc">看中断合并参数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -l eth0</code><span class="desc">看队列数上限和当前值</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -x eth0</code><span class="desc">看 RSS 间接表分布</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>读 ethtool -S 的三个关键计数器：</b><span class="k">rx_dropped</span>（内核丢弃，通常是 ring 满或内存不足）、<span class="k">rx_missed_errors</span>（网卡侧 ring 满，DMA 写不进去，<b>最严重的丢包</b>）、<span class="k">rx_fifo_errors</span>（FIFO 溢出）。这三个只要有一个在涨，就说明收包路径已经过载，调应用没用，得加队列或加 ring。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个真实踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">在中断上下文里调用可能睡眠的函数</div><div class="pd">kmalloc(GFP_KERNEL)、mutex_lock、copy_from_user 都会睡。平时不炸，内存紧张时直接 panic（scheduling while atomic）。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">中断 handler 里做重活</div><div class="pd">硬中断期间本核关中断，处理 1ms 就意味着 1ms 内其他中断全丢。重活必须推到软中断或 workqueue。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">忘了清中断标志</div><div class="pd">电平触发的中断线会一直保持高，CPU 反复进入同一个 handler，形成中断风暴。表现为某个 IRQ 每秒涨几十万次但业务没流量。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">单队列网卡跑高吞吐</div><div class="pd">所有包进一个队列，中断和软中断都压在 CPU0，%soft 100% 而其他核闲着。开多队列 + 绑核，或至少开 RPS。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">开了多队列但没配中断亲和性</div><div class="pd">队列是多了，但中断可能还是都落在 CPU0（或 irqbalance 乱挪）。要显式把每个队列的中断绑到不同核，并停掉 irqbalance。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">用 /proc/interrupts 的绝对值判断负载</div><div class="pd">那是开机以来的累计值。不看增量就得出"中断很多"或"中断不多"的结论，方向全错。必须间隔取两次做差。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把 %sys 高当成应用问题</div><div class="pd">%sys 里包含了软中断的一部分工作（比如协议栈）。先看 %soft 和 %irq，确认不是中断在吃 CPU，再去查应用。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">为了降 CPU 关掉中断合并</div><div class="pd">ethtool -C rx-usecs 0 会让每个包都触发一次中断，CPU 反而更高。正确方向是适度合并（rx-usecs 3~50）用微秒级延迟换 CPU。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">ring buffer 太小导致 rx_missed_errors</div><div class="pd">突发流量时网卡 DMA 写不进去，包在硬件层就丢了，应用完全无感。用 ethtool -g 看，必要时调大（ethtool -G rx 4096）。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">在容器里找不到 /proc/interrupts 的对应项</div><div class="pd">容器的 /proc 是隔离的，看不到宿主机中断。排查网络中断必须在宿主机上做，或者用 nsenter 进入宿主机的命名空间。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 缺页异常（page fault）属于哪一类？</div>
+      <button class="opt">硬件中断，由外部设备触发</button>
+      <button class="opt">异常，由当前指令同步触发，处理完要重新执行该指令</button>
+      <button class="opt">陷阱，处理完返回下一条指令</button>
+      <div class="ans">正确答案：<b>异常</b>。它是 CPU 执行访存指令时自己发现的，属于同步事件。处理完（比如把页读进内存）要<b>重新执行</b>那条指令。而陷阱（如 int3）处理完返回下一条。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 为什么中断上下文里不能调用 <span class="k">kmalloc(GFP_KERNEL)</span>？</div>
+      <button class="opt">因为中断上下文没有权限访问内存</button>
+      <button class="opt">因为 GFP_KERNEL 分配的内存太小</button>
+      <button class="opt">因为它可能睡眠等待内存回收，而中断上下文没有可切换的进程、且可能处于关中断或持锁状态</button>
+      <div class="ans">正确答案：<b>可能睡眠</b>。中断上下文借用被中断进程的 <span class="k">current</span>，没有独立栈，睡下去就回不来；如果还持有自旋锁或关着中断，直接死锁。应该用 <span class="k">GFP_ATOMIC</span>。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 网卡多队列（RSS）能保证同一条 TCP 连接的包不乱序，是因为？</div>
+      <button class="opt">用四元组做哈希，同一条流的哈希值固定，永远进同一个队列</button>
+      <button class="opt">网卡会按包的序号排序后再分发</button>
+      <button class="opt">内核协议栈会重新排序</button>
+      <div class="ans">正确答案：<b>四元组哈希</b>。源 IP、目的 IP、源端口、目的端口相同 → 哈希相同 → RETA 查表得到同一个队列。所以单条流的天花板是单核性能，多连接才能并行。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. <span class="k">mpstat</span> 显示 CPU0 的 <span class="k">%soft</span> 是 62%，其他核 3%，最可能的原因是？</div>
+      <button class="opt">CPU0 有硬件故障</button>
+      <button class="opt">单队列网卡，所有收包的软中断都落在 CPU0</button>
+      <button class="opt">内存不足导致频繁回收</button>
+      <div class="ans">正确答案：<b>单队列 / 中断集中</b>。一个队列只有一个中断向量，软中断在触发它的那个核上执行。解法是开多队列（ethtool -L combined N）并把各队列中断绑到不同核，或临时开 RPS。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. NAPI 相比"每包一次中断"的核心改进是？</div>
+      <button class="opt">完全不使用中断</button>
+      <button class="opt">把包直接送进用户态</button>
+      <button class="opt">第一个包触发中断后关掉该队列中断，改为批量轮询取包，取完再开中断</button>
+      <div class="ans">正确答案：<b>中断 + 批量轮询</b>。这样高流量下中断次数不再随包数线性增长，而是被 poll 的 budget（默认 64）摊薄。代价是低流量时多了一点轮询开销。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. <span class="k">ethtool -S</span> 里 <span class="k">rx_missed_errors</span> 持续增长说明什么？</div>
+      <button class="opt">网卡 ring buffer 满了，DMA 写不进去，包在硬件层就丢了</button>
+      <button class="opt">应用 read 太慢</button>
+      <button class="opt">TCP 重传太多</button>
+      <div class="ans">正确答案：<b>硬件 ring 溢出</b>。这是最严重的丢包——内核和应用完全不知道。用 <span class="k">ethtool -g</span> 看 ring 大小，用 <span class="k">ethtool -G eth0 rx 4096</span> 调大，同时排查是不是软中断处理不过来。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>观测命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>cat /proc/interrupts</code><span class="desc">硬中断计数，按 CPU 分列</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/softirqs</code><span class="desc">十种软中断的累计计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>watch -n1 'grep eth0 /proc/interrupts'</code><span class="desc">每秒看网卡中断增长</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mpstat -P ALL 1 5</code><span class="desc">分核看 %irq / %soft / %steal</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -eo pid,comm,pcpu | grep ksoftirqd</code><span class="desc">看软中断内核线程吃了多少 CPU</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sudo perf top -g</code><span class="desc">实时热点函数，找 net_rx_action</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sudo perf stat -e 'irq:softirq_entry' -a sleep 5</code><span class="desc">统计软中断进入次数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -S eth0 | grep -E 'drop|err|miss'</code><span class="desc">网卡侧丢包与错误计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -l eth0</code><span class="desc">队列数上限与当前值</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -c eth0</code><span class="desc">中断合并参数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -g eth0</code><span class="desc">ring buffer 大小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -x eth0</code><span class="desc">RSS 间接表分布</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>调优命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>echo 2 &gt; /proc/irq/125/smp_affinity_list</code><span class="desc">把中断 125 绑到 CPU2</span><button class="copy">复制</button></div>
+    <div class="crow"><code>systemctl stop irqbalance</code><span class="desc">停掉自动均衡，避免覆盖手工绑核</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -L eth0 combined 8</code><span class="desc">开启 8 个收发队列</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -G eth0 rx 4096</code><span class="desc">调大接收 ring，缓解突发丢包</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -C eth0 rx-usecs 20</code><span class="desc">中断合并，20μs 内的包一起处理</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo f &gt; /sys/class/net/eth0/queues/rx-0/rps_cpus</code><span class="desc">RPS：软中断分到 CPU0-3</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sysctl -w net.core.netdev_budget=600</code><span class="desc">每次软中断多处理一些包</span><button class="copy">复制</button></div>
+    <div class="crow"><code>taskset -cp 4-15 &lt;pid&gt;</code><span class="desc">把业务线程绑到指定核</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>IRQ</b></td><td>中断请求，设备用来打断 CPU 的信号</td></tr>
+    <tr><td><b>异常 exception</b></td><td>CPU 执行指令时同步发现的错误，如缺页、除零</td></tr>
+    <tr><td><b>陷阱 trap</b></td><td>故意触发的同步事件，处理完返回下一条指令</td></tr>
+    <tr><td><b>上半部 hardirq</b></td><td>硬中断处理程序，关中断执行，必须极短</td></tr>
+    <tr><td><b>下半部</b></td><td>延后执行的收尾工作，包括 softirq、tasklet、workqueue</td></tr>
+    <tr><td><b>softirq</b></td><td>编译期固定的十种软中断，可并行、不可睡眠</td></tr>
+    <tr><td><b>tasklet</b></td><td>基于 softirq 的机制，同一个 tasklet 不会并行执行</td></tr>
+    <tr><td><b>ksoftirqd</b></td><td>每 CPU 一个的内核线程，软中断忙不过来时接手</td></tr>
+    <tr><td><b>NAPI</b></td><td>中断 + 批量轮询的收包机制，避免每包一次中断</td></tr>
+    <tr><td><b>budget</b></td><td>一次 poll 最多取多少个包，默认 64</td></tr>
+    <tr><td><b>MSI-X</b></td><td>设备通过写内存触发中断，支持多达 2048 个独立向量</td></tr>
+    <tr><td><b>中断亲和性</b></td><td>指定某个中断由哪个 CPU 处理</td></tr>
+    <tr><td><b>irqbalance</b></td><td>自动把中断分配到各核的守护进程，专用场景应停掉</td></tr>
+    <tr><td><b>RSS</b></td><td>网卡硬件按四元组哈希把包分到多个队列</td></tr>
+    <tr><td><b>RETA</b></td><td>RSS 的间接表，把哈希值映射到队列号</td></tr>
+    <tr><td><b>RPS / RFS</b></td><td>软件模拟的多队列分发 / 按 socket 消费者选核</td></tr>
+    <tr><td><b>中断合并</b></td><td>攒几个包或等几微秒再发中断，用延迟换 CPU</td></tr>
+    <tr><td><b>中断风暴</b></td><td>单位时间中断数异常暴涨，CPU 被中断占满</td></tr>
+    <tr><td><b>%soft</b></td><td>mpstat 里软中断占用的 CPU 比例</td></tr>
+    <tr><td><b>rx_missed_errors</b></td><td>网卡 ring 满导致 DMA 写不进去的丢包计数</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 <span class="k">mpstat -P ALL 1</span> 观察本机哪个核的 %soft 最高，再去 <span class="k">/proc/interrupts</span> 找对应的中断号；② 用 <span class="k">ethtool -l</span> 看网卡队列数，试着调到最大值并观察中断分布变化；③ 把某个网卡队列的中断绑到指定核，用 <span class="k">watch</span> 确认只有那一列在涨；④ 用 <span class="k">perf top</span> 在压测时观察 <span class="k">net_rx_action</span> 的占比；⑤ 用 <span class="k">tc</span> 或 <span class="k">iperf3</span> 打出小包流量，观察 pps 与 %soft 的关系。<br><br>
+    <b>接下来该读：</b>《系统调用与内核边界》（同步进入内核的那条路）、《IO 模型》（epoll 如何与收包路径衔接）、《性能分析》（perf 的完整用法）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透中断与软中断 · 先分清 %irq 和 %soft，再谈优化</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（上下半部）和模块 7（收包路径）值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里看 /proc/interrupts。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='准备一台 Linux，能看 /proc/interrupts 就够了';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

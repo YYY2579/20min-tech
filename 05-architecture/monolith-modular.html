@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透单体、模块化与微服务边界</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 14 期 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透单体、模块化与微服务边界</h1>
+    <p class="sub">微服务不是免费午餐，是<b>分布式复杂度贷款</b>。这篇讲清楚什么时候该拆、按什么边界拆、绞杀者模式怎么渐进落地，以及"分布式单体"这种拆了比不拆更糟的产物。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>3</b> 种拆分反模式</span>
+      <span class="chip"><b>12</b> 项拆前检验</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边数：你们团队现在有几个"服务"、几个 repo、几条发布流水线。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先记住一句话</h2></div>
+  <p class="lead">拆分服务是<b>手段</b>不是目的。多数团队需要的是模块化单体，而不是微服务——把进程内边界理清楚，能解决 80% 的"代码乱"问题，且不用付分布式的税。</p>
+  <table>
+    <tr><th style="width:170px">症状</th><th style="width:200px">通常病因</th><th>通常药方</th></tr>
+    <tr><td>改个需求动半个系统</td><td>模块边界不清，耦合弥漫</td><td><b>模块化单体</b>（先做这个）</td></tr>
+    <tr><td>A 团队发布总被 B 团队阻塞</td><td>变更频率不同却绑在同一发布节奏</td><td>拆高变更频率模块</td></tr>
+    <tr><td>一个模块 OOM 拖垮全站</td><td>资源不隔离</td><td>进程隔离（拆服务）</td></tr>
+    <tr><td>团队 30 人，沟通成本爆炸</td><td>组织规模超过了单体协作半径</td><td>微服务 + 团队拆分</td></tr>
+  </table>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>演化路径的四个阶段</h2></div>
+  <table>
+    <tr><th style="width:150px">阶段</th><th style="width:210px">特征</th><th>问题</th></tr>
+    <tr><td><b>0. 巨石应用</b><br>Big Ball of Mud</td><td>无模块边界，数据库所有表共享，任何代码可以调任何代码</td><td>改动全局扩散，新人上手按月计</td></tr>
+    <tr><td><b>1. 模块化单体</b></td><td>进程内模块边界清晰，schema 按模块归属，公开 API 交互，架构测试守护</td><td>几乎无分布式问题；<b>部署和扩展仍是整体</b></td></tr>
+    <tr><td><b>2. 分布式单体</b></td><td>服务拆了，但共享数据库、强同步调用链、必须一起部署</td><td><b>最糟形态</b>：微服务的成本 + 单体的坏处</td></tr>
+    <tr><td><b>3. 微服务</b></td><td>独立部署、数据自治、异步优先、故障隔离</td><td>分布式复杂度全部到账</td></tr>
+  </table>
+  <h4>康威定律：结构复刻沟通</h4>
+  <p>Conway's Law：<b>系统设计最终复刻组织的沟通结构。</b>推论很直接：</p>
+  <ul>
+    <li><b>5 个人的团队拆 20 个服务 = 灾难。</b>每人 own 0.25 个服务，排障靠缘分，服务边界天天变。</li>
+    <li>反过来用（逆康威定律 / Inverse Conway Maneuver）：<b>先改组织结构，再拆服务</b>。想让系统按业务能力拆，先按业务能力组团队（Spotify 的 squad 模型即此思路）。</li>
+    <li>经验数字：一个微服务团队 6~10 人（两个披萨能喂饱），超过 15 人沟通成本开始指数上升。</li>
+  </ul>
+  <div class="callout ok">
+    <b>真实参照：</b>GitHub 长期是 Rails 大单体，团队规模数千人；Shopify 的核心系统至今是模块化单体（Rails monolith + 严格的组件化边界），微服务只用于特定任务。<b>大规模团队也能守住单体，关键在模块化。</b>国内不少"微服务改造"项目，改完性能更差、发布更慢，原因是直接从阶段 0 跳到了阶段 2。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>模块化单体：先把这个做好</h2></div>
+  <h4>目录组织：package by feature vs package by layer</h4>
+  <pre><span class="c"># 按层分包（不推荐）：技术层次优先，业务被切碎</span>
+src/main/java/com/shop/
+├── controller/           <span class="c"># 所有 Controller：OrderController + PaymentController + ...</span>
+├── service/              <span class="c"># 所有 Service：OrderService + PaymentService + ...</span>
+├── repository/           <span class="c"># 所有 Repository，随便互相调</span>
+└── model/                <span class="c"># 所有实体，被所有人 import</span>
+<span class="c"># 后果：改"下单"要动 4 个目录 12 个文件；删"优惠券"功能要全文搜索</span>
+
+<span class="c"># 按特性分包（推荐）：业务优先，模块自包含</span>
+src/main/java/com/shop/
+├── order/                <span class="c"># 订单模块：外部只看 api/ 包</span>
+│   ├── api/OrderController.java      <span class="c"># 公开入口</span>
+│   ├── api/OrderQueryService.java    <span class="c"># 对外暴露的接口</span>
+│   ├── domain/Order.java             <span class="c"># 聚合根，包内可见</span>
+│   ├── domain/OrderService.java      <span class="c"># 业务逻辑</span>
+│   ├── infra/OrderRepository.java    <span class="c"># 只操作 order_ 前缀的表</span>
+│   └── dto/
+├── payment/              <span class="c"># 同样结构</span>
+├── catalog/
+└── shared/               <span class="c"># 少量共享内核（工具、基础模型），保持最小</span></pre>
+  <h4>模块化五条规则</h4>
+  <ol>
+    <li><b>公开 API：</b>模块间只通过 <span class="k">api/</span> 包的接口/facade 交互，实现类不跨模块 import。</li>
+    <li><b>数据归属：</b>数据库表按模块前缀归属（<span class="k">order_</span>、<span class="k">payment_</span>），<b>不允许跨模块直接 SQL join 别人的表</b>——这是未来拆服务时数据能否自治的预演。</li>
+    <li><b>依赖方向：</b>依赖单向，禁止循环。用架构测试守护：Java 用 ArchUnit，Python 用 import-linter，Node 用 dependency-cruiser，CI 里跑，违规即构建失败。</li>
+    <li><b>共享内核最小化：</b>shared 包只放真正通用的东西（分页、异常、基础实体）。 shared 膨胀 = 模块化失败的前兆。</li>
+    <li><b>模块可独立测试：</b>每个模块能脱离其他模块跑单测（用接口 mock），这是未来能独立部署的前置条件。</li>
+  </ol>
+  <pre><span class="c"># ArchUnit 示例：守护"order 包不允许依赖 payment 包的实现"</span>
+<span class="b">classes</span>().that().resideInAPackage(<span class="y">"..order.."</span>)
+  .should().onlyDependOnClassesThat().resideInAnyPackage(<span class="y">"..order.."</span>, <span class="y">"..shared.."</span>, <span class="y">"java.."</span>)
+
+<span class="c"># CI 里执行，违反规则构建失败 —— 边界靠机器守护，不靠 review 自觉</span></pre>
+  <div class="callout">
+    <b>模块化单体能撑多大？</b>单团队 10~20 人、日活百万级、单库能扛的 QPS，都可以不拆服务。<b>先模块化，撑不住再拆进程</b>——而且模块化做得好，拆服务只是把 api/ 接口换成 HTTP/RPC，成本低一个数量级。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>微服务的真实代价</h2></div>
+  <table>
+    <tr><th style="width:150px">收益</th><th style="width:200px">代价</th><th>代价的量级</th></tr>
+    <tr><td><b>独立部署扩展</b></td><td>每服务一套流水线 + 监控 + 告警 + on-call</td><td>N 个服务的运维负担超线性增长，Google SRE 经验：服务数翻倍，排障时间可能翻两番</td></tr>
+    <tr><td><b>团队自治</b></td><td>接口版本兼容、跨团队协作成本</td><td>跨服务需求要 N 个团队对齐排期，会议成本指数上升</td></tr>
+    <tr><td><b>故障隔离</b></td><td>网络不可靠：超时、重试、幂等、熔断全套必备</td><td>一个功能调 5 个服务 = 5 套超时重试配置；漏一个就是故障</td></tr>
+    <tr><td><b>技术异构</b></td><td>分布式事务：跨服务一致性只能最终一致 + Saga + 对账</td><td>资金类业务对账补偿逻辑复杂度远超本地事务</td></tr>
+    <tr><td><b>按需伸缩</b></td><td>排障难度：链路追踪、日志聚合、指标关联是必需品</td><td>没有 trace 体系，一个跨 10 服务的请求出问题=盲猜</td></tr>
+  </table>
+  <h4>接口数量的乘法</h4>
+  <pre><span class="c"># N 个服务，两两之间可能有接口：最坏 N*(N-1)/2</span>
+5 个服务  → 最多 10 条链路    <span class="c"># 还能 hold</span>
+20 个服务 → 最多 190 条链路  <span class="c"># 版本兼容开始失控</span>
+50 个服务 → 最多 1225 条链路 <span class="c"># 没有平台团队兜着就是灾难</span>
+
+<span class="c"># 一个"小需求"的真实成本：改 5 个服务</span>
+5 个 repo 改代码 → 5 条 PR → 5 次 review → 5 条流水线 → 5 次发布
+<span class="c"># 单体时代：1 个 repo、1 次发布。这就是"部署独立性"换来的东西</span></pre>
+  <div class="callout warn">
+    <b>微服务让简单的事情变难，让难的事情（大规模团队并行）变可能。</b>团队规模、变更频率、故障隔离需求没到那个量级时，你付的全是前半句的代价。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>拆分依据：三个真正可靠的信号</h2></div>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>DDD 限界上下文</div><div class="cd">同一词汇在不同上下文含义不同："商品"在 catalog 是 SKU 属性，在 order 是下单快照，在 payment 是金额计算单元。<b>限界上下文 = 天然模块/服务边界</b>；聚合根 = 事务一致性边界</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>康威定律</div><div class="cd">边界跟着团队走。<b>一个服务一个团队</b>（6~10 人）。先组团队再拆服务；团队没拆就拆服务，边界会随人员变动反复重划</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>变更频率</div><div class="cd">把"总是一起改的代码"放一起，"从不一起改的"分开。<b>git 提交共现分析</b>能辅助发现真实耦合：两个目录的文件总在同一个 commit 里，就是同一个模块</div></div>
+  </div>
+  <h4>非功能性拆分信号</h4>
+  <ul>
+    <li><b>性能隔离：</b>CPU 密集的报表/算法与在线交易分开，避免报表跑批把交易链路 CPU 吃光。</li>
+    <li><b>安全边界：</b>PCI-DSS 支付卡环境要求网络与数据隔离，合规范围内的代码天然该独立。</li>
+    <li><b>技术栈差异：</b>AI 推理要 Python + GPU，交易核心要 Java + 严格事务，运行时诉求不同，拆开对两边都好。</li>
+  </ul>
+  <h4>拆分顺序</h4>
+  <p><b>先拆"变更最频繁且与其他模块耦合最低"的，别先拆最痛的。</b>最痛的模块往往耦合最深（订单模块谁都调它），拿它开刀会同时得罪所有人还拆不干净。正确的第一个候选通常是：通知、报表、对账、文件处理这类边缘但高频变更的模块——风险小、见效快、能验证整套运维体系。</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>拆分反模式</h2></div>
+  <table>
+    <tr><th style="width:130px">反模式</th><th style="width:220px">症状</th><th>解法</th></tr>
+    <tr><td><b>按层拆分</b></td><td>OrderControllerService、PaymentControllerService……按技术层建服务。改一个需求穿透所有服务，发版要全服务协调</td><td>按<b>业务能力</b>拆（订单服务、支付服务），不按 controller/service 拆</td></tr>
+    <tr><td><b>纳米服务</b></td><td>一个服务一个方法/一个实体。一次用户请求 30 个 RPC，延迟线性叠加，故障点相乘；服务数上百，运维爆炸</td><td>合并到合理粒度：<b>一个聚合根一个服务</b>，服务内允许批量化接口</td></tr>
+    <tr><td><b>分布式单体</b></td><td>服务间共享数据库 + 强同步调用链 + 必须一起部署。本地跑不起来；一个服务故障全局传导；发布要全服务对齐</td><td><b>数据先自治</b>：每个服务只碰自己的表；调用改异步；发布解耦</td></tr>
+    <tr><td><b>按 CRUD 实体拆</b></td><td>UserService/OrderService 就是对单表的 CRUD 包装，没有业务逻辑，纯透传</td><td>按<b>用例</b>拆：谁用这个数据、用来干什么，围绕用例组织</td></tr>
+    <tr><td><b>一刀切同粒度</b></td><td>所有服务一样大。核心交易 30 个功能，边缘工具 2 个功能，都拆成独立服务</td><td>粒度按变更频率和团队配置，<b>允许不同粒度共存</b></td></tr>
+  </table>
+  <div class="callout danger">
+    <b>分布式单体的识别特征（中 3 条以上基本确诊）：</b>① 多个服务直接 SELECT 同一张表；② 接口超时时间设得越来越长（掩盖同步链路过长）；③ 发布窗口要"所有服务一起发"；④ 本地开发必须把 10 个服务全跑起来；⑤ 数据库 ER 图比服务架构图还整齐。<b>拆成了这样，成本已付、收益全无，是最亏的结果。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>绞杀者模式：渐进拆分</h2></div>
+  <p class="lead">Strangler Fig（绞杀者无花果）：榕树种子在宿主树上发芽，气根包围宿主最终取而代之。<b>新功能建新服务，旧功能逐步迁移，老系统自然"枯萎"。</b>核心是在新旧之间加一层 <b>facade（门面）</b>。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>加接入层：</b>在客户端和老系统之间加 facade（API Gateway / 路由层 / BFF）。客户端只依赖 facade，从此后端怎么拆它无感——<b>facade 是保险丝，没有它一切迁移都是大爆炸</b></div></div>
+    <div class="step"><div class="txt"><b>新功能直接建新服务：</b>不经过老系统，facade 直接路由过去。新服务不背历史包袱</div></div>
+    <div class="step"><div class="txt"><b>旧功能逐个迁移：</b>facade 加开关 → 新服务双跑/影子流量验证 → 切换路由 → 摘除老代码。<b>一次一个功能</b>，每步可回滚</div></div>
+    <div class="step"><div class="txt"><b>数据迁移：</b>新旧库双写 + 存量回填 + 对账校验 → 灰度切读 → 切写 → 旧库归档。<b>数据迁移通常占整个迁移 60% 的工作量</b>，且必须带对账工具</div></div>
+    <div class="step"><div class="txt"><b>老系统下线：</b>无人调用的功能先从 facade 摘路由，观察一个完整业务周期，再下线下架</div></div>
+  </div>
+  <table>
+    <tr><th style="width:140px">迁移策略</th><th style="width:180px">做法</th><th>风险</th></tr>
+    <tr><td><b>大爆炸重写</b></td><td>冻结旧系统，重写一套，选日切换</td><td><b>最高。</b>重写周期 6 个月起，期间旧系统继续烂，切换日双系统并行排障，业界成功率极低</td></tr>
+    <tr><td><b>并行运行</b></td><td>新旧同时服务，流量比对</td><td>成本翻倍，适合核心链路的影子验证阶段，不适合长期</td></tr>
+    <tr><td><b>绞杀者</b></td><td>facade 路由 + 逐功能迁移 + 数据双写对账</td><td><b>推荐。</b>每步小、可回滚、风险分散；代价是周期长，要长期维护两套并行</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>绞杀者模式的前提条件是模块化：</b>迁移单元是"一个功能/一个限界上下文"，前提是老系统里这些边界已经清晰。<b>巨石应用上没有"功能"可拆，只有一团代码</b>——所以顺序永远是：先模块化单体，再绞杀者拆服务。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>该不该拆：12 项检验清单</h2></div>
+  <p class="lead">逐项回答是/否。<b>超过 8 项为"是"才考虑拆</b>；6~8 项先做模块化和组织调整；少于 6 项老老实实做单体。</p>
+  <table>
+    <tr><th style="width:40px">#</th><th style="width:230px">检验项</th><th>为"是"的标准</th></tr>
+    <tr><td>1</td><td>模块边界已在代码里清晰</td><td>能画出模块依赖图且无循环，有架构测试守护</td></tr>
+    <tr><td>2</td><td>团队规模超过 15~20 人</td><td>沟通成本已经明显影响交付速度</td></tr>
+    <tr><td>3</td><td>存在变更频率差异大的模块</td><td>有的模块周级发版，有的季度不动</td></tr>
+    <tr><td>4</td><td>部署冲突频繁</td><td>经常"等另一个模块发完才能发"</td></tr>
+    <tr><td>5</td><td>故障需要隔离</td><td>一个模块 OOM/死循环会拖垮全站</td></tr>
+    <tr><td>6</td><td>有技术异构刚需</td><td>如 Python AI 推理必须独立部署</td></tr>
+    <tr><td>7</td><td>拆完能不共享数据库</td><td>数据可划分，跨模块查询可走 API</td></tr>
+    <tr><td>8</td><td>运维体系就绪</td><td>CI/CD、日志聚合、链路追踪、监控告警齐备</td></tr>
+    <tr><td>9</td><td>容错手段就绪</td><td>超时、重试、幂等、熔断、降级有统一封装</td></tr>
+    <tr><td>10</td><td>事务可接受最终一致</td><td>跨模块流程能改 Saga + 对账补偿</td></tr>
+    <tr><td>11</td><td>接口可定义清楚</td><td>能写出稳定的公开 API 契约并版本化</td></tr>
+    <tr><td>12</td><td>拆错能合回去</td><td>接口可逆，facade 常驻，合并成本已知</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>即使全过，也先只拆 1~2 个最独立的模块</b>（通知、报表、对账类），跑完"开发→部署→排障→回滚"全流程，验证运维体系真能兜住，再拆下一个。<b>一次拆 10 个服务的团队，都在同时学习十门新课。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">按技术层拆服务</div><div class="pd">controller-service/repository 三层各建服务，一个需求穿透所有服务，改一行代码发五个版。必须按业务能力（订单、支付）拆，不按技术层拆。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">纳米服务</div><div class="pd">一个服务一个方法，一次页面请求 30 个 RPC，延迟叠加、故障点相乘。粒度按聚合根定，服务内提供批量接口，别把"小"当"干净"。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">拆成分布式单体</div><div class="pd">共享数据库 + 同步调用链 + 统一发布，等于用微服务的成本买单体的坏处。数据先自治（每服务只碰自己的表），这是拆服务的前置条件不是可选项。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">团队没长大先拆服务</div><div class="pd">5 个人维护 20 个服务，没人能完整理解系统，排障靠缘分。康威定律反咬：结构要先匹配组织，拆分节奏跟着团队扩张走。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">没有 facade 直接迁移</div><div class="pd">客户端直连老系统，每迁一个功能就要改所有调用方，迁移变成大爆炸。先在接入层加 facade 让调用方只依赖一层抽象，再逐个换后端。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把共享数据库当"集成数据库"</div><div class="pd">服务间通过对方的表集成（直接 join/查别人的表），schema 一改全网震。集成只能走 API；拆库前先停止跨模块 join，用接口替代。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">拆完没有可观测性</div><div class="pd">链路跨 10 个服务，出问题时没有 trace、日志散在各处，排查以天计。先建 trace/log/metric 体系再拆——这是基础设施不是加分项。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">跨服务事务硬上 2PC</div><div class="pd">分布式事务协调器跨服务锁资源，延迟爆炸、可用性下降、协调器成新单点。改 Saga（本地事务 + 补偿）+ 对账兜底，业务上接受最终一致。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">数据迁移不做对账</div><div class="pd">双写丢了一条差异没发现，切写后新旧库不一致，用户投诉才发现。双写必须带对账工具（行数、校验和、关键字段抽样比对），差异告警，切写前差异必须为零。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">拆完合不回去</div><div class="pd">服务间形成深度耦合（互相 import DTO、共享工具库），合并比重拆还难。拆分时保持接口可逆：facade 常驻、依赖方向单向、共享代码最小化，让"合回去"始终是选项。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 大多数中小团队面对"代码乱、改不动"的问题，最该先做的是？</div>
+      <button class="opt">直接拆微服务，一个团队一个服务</button>
+      <button class="opt">先做模块化单体：理清进程内模块边界、数据归属、依赖方向</button>
+      <button class="opt">重写成新技术栈的单体</button>
+      <div class="ans">正确答案：<b>先模块化单体</b>。模块边界清晰后，既能解决 80% 的耦合问题，又不用付分布式税；而且将来真要拆服务，成本低一个数量级。跳过模块化直接拆服务，大概率拆成分布式单体。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 按 controller/service/repository 三层拆分服务的问题在于？</div>
+      <button class="opt">按技术层拆，一个需求变更会穿透所有服务</button>
+      <button class="opt">服务数量会太多</button>
+      <button class="opt">不利于数据库分库</button>
+      <div class="ans">正确答案：<b>按技术层拆，变更穿透所有服务</b>。改"下单"要动 OrderControllerService + OrderService + OrderRepositoryService 三层，发布要全服务协调。应按业务能力（订单服务、支付服务）拆。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. "分布式单体"的典型特征是？</div>
+      <button class="opt">服务数量超过 50 个</button>
+      <button class="opt">团队分布在不同城市</button>
+      <button class="opt">共享数据库 + 强同步调用链 + 必须一起部署</button>
+      <div class="ans">正确答案：<b>共享数据库 + 同步链 + 统一发布</b>。等于付了微服务的成本（网络、运维、部署）却享受着单体的坏处（全局耦合、无故障隔离）。解法是数据先自治、调用改异步、发布解耦。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 绞杀者模式的第一步是什么？</div>
+      <button class="opt">把老系统整体重写成新服务</button>
+      <button class="opt">在客户端与老系统之间加 facade（路由/网关层），让调用方只依赖抽象</button>
+      <button class="opt">先做数据迁移，双写新旧库</button>
+      <div class="ans">正确答案：<b>先加 facade</b>。facade 是保险丝：有了它，后端换实现调用方无感，每个功能迁移都可灰度可回滚；没有它，每次迁移都是大爆炸。数据双写是后续迁移单个功能时才做的事。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于拆分边界，下面哪个依据最可靠？</div>
+      <button class="opt">按数据表拆，一张表一个服务</button>
+      <button class="opt">按代码行数拆，超过 1 万行就拆</button>
+      <button class="opt">限界上下文（业务语义）+ 变更频率 + 团队结构</button>
+      <div class="ans">正确答案：<b>限界上下文 + 变更频率 + 团队结构</b>。DDD 限界上下文给出业务语义边界，变更频率给出拆分优先级（总是一起改的放一起），康威定律要求边界匹配团队。按表拆和按行数拆都是拍脑袋。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 决定拆微服务之前，必须具备的运维能力是？</div>
+      <button class="opt">CI/CD、日志聚合、链路追踪、监控告警、统一容错（超时/重试/熔断）</button>
+      <button class="opt">只要 Docker 和 K8s 就够了</button>
+      <button class="opt">需要先把数据库拆成 100 个分片</button>
+      <div class="ans">正确答案：<b>可观测性 + CI/CD + 容错体系</b>。服务数上去后，没有 trace 排障靠猜，没有统一容错一个网络抖动放大成全站故障。K8s 只是部署手段不是充分条件；分库更不是前置条件。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>12 项拆前检验（速查版）</h3>
+  <div class="cmds">
+    <div class="crow"><code>1-2 模块边界清晰 + 团队 &gt; 15 人</code><span class="desc">先决条件，不满足免谈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>3-4 变更频率差异 + 部署冲突</code><span class="desc">拆分收益的直接来源</span><button class="copy">复制</button></div>
+    <div class="crow"><code>5-6 故障隔离 + 技术异构刚需</code><span class="desc">非功能性拆分信号</span><button class="copy">复制</button></div>
+    <div class="crow"><code>7 数据可自治（不共享库）</code><span class="desc">硬前置，做不到就是分布式单体</span><button class="copy">复制</button></div>
+    <div class="crow"><code>8-9 运维体系 + 容错手段就绪</code><span class="desc">CI/CD、trace、超时重试熔断</span><button class="copy">复制</button></div>
+    <div class="crow"><code>10-11 事务可最终一致 + 接口可契约化</code><span class="desc">Saga + 版本化 API</span><button class="copy">复制</button></div>
+    <div class="crow"><code>12 拆错能合回去</code><span class="desc">facade 常驻，接口可逆</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>反模式症状速查</h3>
+  <table>
+    <tr><th style="width:150px">如果你看到</th><th>大概率是</th></tr>
+    <tr><td>改一个需求动 3 个以上服务</td><td>按层拆 / 边界划错</td></tr>
+    <tr><td>一次请求 20+ 个 RPC</td><td>纳米服务</td></tr>
+    <tr><td>多个服务直接 SELECT 同一张表</td><td>共享数据库 / 分布式单体</td></tr>
+    <tr><td>发布窗口必须"所有服务一起发"</td><td>分布式单体</td></tr>
+    <tr><td>本地开发要同时跑 10+ 个服务</td><td>拆分过度 / 无 facade</td></tr>
+    <tr><td>接口超时时间越设越长</td><td>同步调用链过长，在掩盖设计问题</td></tr>
+    <tr><td>数据库 ER 图比架构图还整齐</td><td>按数据拆而非按业务拆</td></tr>
+    <tr><td>服务间循环调用（A 调 B，B 又调 A）</td><td>边界违反依赖单向，合并或引入事件解耦</td></tr>
+    <tr><td>为了"技术先进"拆的服务没人敢动</td><td>无 owner 服务，先明确团队归属再拆</td></tr>
+    <tr><td>新需求第一件事是新建服务</td><td>拆分洁癖，默认应该往现有模块里加</td></tr>
+  </table>
+
+  <h3>绞杀者迁移步骤</h3>
+  <pre><span class="c"># 标准动作序列</span>
+1. facade 上线（Gateway/路由层），客户端全量切到 facade
+2. 新功能直接建新服务，facade 直连
+3. 旧功能逐个迁移：
+   facade 开关 → 新服务影子流量 → 切路由 → 摘老代码
+4. 数据迁移：双写 + 回填 + 对账（差异=0）→ 灰度切读 → 切写 → 归档
+5. 老系统观察一个业务周期后下线
+
+<span class="c"># 每步可回滚：facade 开关就是回滚开关</span>
+<span class="c"># 铁律：数据对账差异不为零，不切写</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>单体 / 巨石应用</b></td><td>所有功能一个进程一个部署单元，模块边界模糊时称 Big Ball of Mud</td></tr>
+    <tr><td><b>模块化单体</b></td><td>仍是单进程单部署，但进程内模块边界清晰、数据归属明确、依赖受架构测试守护</td></tr>
+    <tr><td><b>package by feature</b></td><td>按业务特性分包（order/、payment/），替代按技术层分包（controller/、service/）</td></tr>
+    <tr><td><b>公开 API / facade</b></td><td>模块对外唯一的交互入口，实现细节不跨模块暴露</td></tr>
+    <tr><td><b>架构测试</b></td><td>用 ArchUnit/import-linter 等在 CI 里守护模块边界，违规即构建失败</td></tr>
+    <tr><td><b>微服务</b></td><td>独立部署、数据自治、围绕业务能力组织的分布式服务</td></tr>
+    <tr><td><b>限界上下文</b></td><td>DDD 核心概念：同一词汇有明确含义的边界，天然的模块/服务边界</td></tr>
+    <tr><td><b>聚合根</b></td><td>DDD 中事务一致性边界，一个聚合根通常对应一个服务内的一致性单元</td></tr>
+    <tr><td><b>康威定律</b></td><td>系统结构复刻组织沟通结构；逆用即先改组织再改架构</td></tr>
+    <tr><td><b>two-pizza team</b></td><td>两个披萨能喂饱的团队（6~10 人），微服务团队的经典规模</td></tr>
+    <tr><td><b>绞杀者模式</b></td><td>Strangler Fig：facade 路由 + 逐功能迁移，老系统被新服务逐渐包围替代</td></tr>
+    <tr><td><b>防腐层 ACL</b></td><td>Anti-Corruption Layer：在老系统与新系统间做模型转换，防止坏设计污染新代码</td></tr>
+    <tr><td><b>纳米服务</b></td><td>粒度细到一个服务一个方法，延迟叠加、故障点相乘的反模式</td></tr>
+    <tr><td><b>分布式单体</b></td><td>共享数据库 + 强同步链 + 统一发布的伪微服务，最差的中间态</td></tr>
+    <tr><td><b>共享数据库集成</b></td><td>服务间通过对方的表集成，schema 变更全网传导的反模式</td></tr>
+    <tr><td><b>Saga</b></td><td>用本地事务序列 + 补偿操作实现跨服务最终一致的模式</td></tr>
+    <tr><td><b>2PC</b></td><td>两阶段提交，跨服务强一致事务，延迟高、可用性差，慎用</td></tr>
+    <tr><td><b>影子流量</b></td><td>生产流量复制打到新实现，结果不生效只比对，用于迁移验证</td></tr>
+    <tr><td><b>双写 + 对账</b></td><td>新旧库同时写并持续比对（行数/校验和/抽样），差异为零才切写</td></tr>
+    <tr><td><b>大爆炸重写</b></td><td>冻结旧系统整体重写选日切换，业界成功率最低的迁移策略</td></tr>
+    <tr><td><b>提交共现分析</b></td><td>用 git 历史发现总在一个 commit 里的文件群，辅助识别真实模块耦合</td></tr>
+    <tr><td><b>领域事件</b></td><td>模块间通过事件（如 OrderPlaced）解耦，替代直接调用，是拆服务后异步化的基础</td></tr>
+    <tr><td><b>六边形架构</b></td><td>端口与适配器：业务核心不依赖框架和 IO，便于测试与迁移</td></tr>
+    <tr><td><b>回滚开关</b></td><td>facade 层的流量开关，切流与回滚都靠它，是迁移安全感的来源</td></tr>
+  </table>
+
+  <h3>模块化改造四周计划（不动业务、只立边界）</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第 1 周 · 盘点：</b>用 git log 做提交共现分析，统计最近 3 个月哪些目录总在一个 commit 里出现；列出数据库表清单和每张表被哪些模块读写。<b>产出：真实耦合图</b>（通常和你想的不一样）</div></div>
+    <div class="step"><div class="txt"><b>第 2 周 · 划边界：</b>按耦合图 + 限界上下文定义模块（建议先 5~8 个，别一步到 20 个），确定每个模块的公开 API 和表前缀归属。<b>产出：模块依赖图 + API 清单</b>，全员 review 一轮</div></div>
+    <div class="step"><div class="txt"><b>第 3 周 · 立规矩：</b>加架构测试到 CI（依赖方向、禁止跨模块访问 repository/entity），当前违规<b>只告警不拦截</b>；shared 包做瘦身，把业务代码请出去。<b>产出：CI 里的边界守卫</b></div></div>
+    <div class="step"><div class="txt"><b>第 4 周 · 收口：</b>架构测试从告警改为拦截，新代码必须合规；挑一个最大的违规点做一次"样板迁移"（搬家 + 改调用方 + 补测试），跑通全流程。<b>产出：可复制的迁移套路</b></div></div>
+  </div>
+  <div class="callout warn">
+    <b>改造期的三个纪律：</b>① 不借机重写业务逻辑——模块化只搬代码不改行为，混在一起就会无限期烂尾；② 每周违规数只减不增，连续两周增长说明边界划错了，停下来重划；③ 模块数量控制在个位数起步，长出来一个再加一个。
+  </div>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 给你现在的项目画一张模块依赖图，标出循环依赖和 shared 包的胖层；② 用 git log 统计最近 3 个月哪些目录总在同一个 commit 出现（提交共现），对比你想象中的模块边界；③ 加一条架构测试规则到 CI（如"order 包只能依赖 order/shared"），看第一次运行挂几个文件；④ 选一个边缘高频模块（如通知），按绞杀者五步法写一份迁移方案。<br><br>
+    <b>之后值得单独学：</b>DDD 战略设计（上下文映射图、上下文关系模式）、Saga 与对账体系的工程实现、以及服务网格/API 网关在 facade 层的具体选型。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透单体、模块化与微服务边界 · 拆服务是手段，模块化和数据自治才是前提</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 5（反模式）和模块 7（检验清单）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边数你们团队的服务数与发布流水线数。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边数：你们团队现在有几个"服务"、几个 repo、几条发布流水线。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

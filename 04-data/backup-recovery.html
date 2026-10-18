@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透备份与恢复实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 12 期 · 高密度版</span>
+    <h1>二十分钟学透备份与恢复实战</h1>
+    <p class="sub">备份不是为了"有个文件"，是为了<b>在故障时按 RTO 把数据找回来</b>。这篇讲物理与逻辑备份的分界、xtrabackup 与 pg_basebackup 的真实命令、PITR 到秒级的恢复、3-2-1 策略，以及为什么"没验证过的备份等于没备份"。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>2</b> 大数据库体系</span>
+      <span class="chip"><b>3-2-1</b> 备份原则</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起 MySQL 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># MySQL 8.0（必须开 binlog，否则没法做增量恢复和 PITR）</span>
+docker run -d -p 3306:3306 --name mysql \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -v /data/mysql:/var/lib/mysql \
+  mysql:8.0 --log-bin=mysql-bin --binlog-format=ROW
+
+<span class="c"># PostgreSQL 15（开启 WAL 归档）</span>
+docker run -d -p 5432:5432 --name pg \
+  -e POSTGRES_PASSWORD=root \
+  -v /data/pg:/var/lib/postgresql/data \
+  postgres:15 -c wal_level=replica -c archive_mode=on \
+  -c "archive_command=test ! -f /wal_archive/%f && cp %p /wal_archive/%f"
+
+<span class="c"># 验证归档目录</span>
+docker exec pg ls /wal_archive | head      <span class="c"># 应该看到 000000010000000000000001 这类段文件</span></pre>
+  <div class="callout warn">
+    <b>先建立一个认知：备份和恢复是两个不同的系统。</b>备份决定你"有什么可恢复"，恢复流程、脚本、演练决定你"多久能恢复"。生产事故复盘里最常见的一句话是"备份一直有的，但没人会恢复/恢复要 6 小时"——<b>备份做得再勤，恢复没演练过就是零。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>备份类型：两个维度四种组合</h2></div>
+  <p class="lead">备份分类有两个正交维度：<b>物理还是逻辑</b>（拷贝什么）、<b>全量、增量还是差异</b>（拷多少）。</p>
+  <h4>维度一：物理备份 vs 逻辑备份</h4>
+  <table>
+    <tr><th style="width:100px">类型</th><th style="width:220px">内容</th><th>工具与取舍</th></tr>
+    <tr><td><b>物理备份</b></td><td>直接拷贝数据文件、redo/WAL、页结构</td><td>xtrabackup、pg_basebackup、文件系统快照。<b>快、一致性强、可增量</b>；但跨版本/跨平台恢复受限</td></tr>
+    <tr><td><b>逻辑备份</b></td><td>SQL 语句/表数据导出（可读文本）</td><td>mysqldump、pg_dump。<b>灵活、跨版本、可单表恢复</b>；但大数据量慢几倍，恢复是一次次 INSERT</td></tr>
+  </table>
+  <h4>维度二：全量 / 增量 / 差异</h4>
+  <table>
+    <tr><th style="width:100px">类型</th><th style="width:200px">内容</th><th>恢复时需要</th></tr>
+    <tr><td><b>全量</b></td><td>某一时刻的完整数据</td><td>只需要这一份。恢复最简单，占空间最大</td></tr>
+    <tr><td><b>增量</b></td><td>自<b>上次备份（任意类型）</b>以来的变更</td><td>全量 + <b>按顺序的全部增量</b>。省空间，链条断一份就废</td></tr>
+    <tr><td><b>差异</b></td><td>自<b>上次全量</b>以来的变更</td><td>全量 + 最后一份差异。恢复简单，越往后差异越大</td></tr>
+  </table>
+  <div class="callout">
+    <b>数据库的"增量"通常是免费的：</b>MySQL 的增量就是 binlog，PG 的增量就是 WAL——这俩是数据库自己为崩溃恢复写的日志，开启归档就是备份。所以生产组合几乎总是：<b>每周物理全量 + 实时 binlog/WAL 归档</b>。binlog/WAL 归档让 RPO 趋近于 0（取决于归档方式，见模块 2、3），且几乎零额外成本。
+  </div>
+  <div class="callout danger">
+    <b>逻辑备份的经典陷阱：mysqldump 默认不是一致性的。</b>不加 <span class="k">--single-transaction</span> 时，mysqldump 会锁表或逐表 dump，混合 InnoDB/MyISAM 的库 dump 出来的数据是"时间拼图"——A 表是 10:00 的快照，B 表是 10:03 的快照，恢复后关联数据对不上。<b>正确姿势</b>：<span class="k">--single-transaction --quick --triggers --routines --events --hex-blob --master-data=2</span>，且确认所有表都是 InnoDB。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>MySQL 备份体系：xtrabackup + binlog PITR</h2></div>
+  <p class="lead">Percona XtraBackup 是 MySQL 物理备份的事实标准：<b>在线、不锁表（InnoDB）、支持增量</b>。注意老命令 <span class="k">innobackupex</span> 在 2.3 版本后已被 xtrabackup 取代。</p>
+  <h4>完整流程：全量 → 增量 → 恢复到任意时间点</h4>
+  <pre><span class="c"># ===== 1. 全量备份（周日凌晨）=====</span>
+xtrabackup --backup \
+  --user=backup --password=BakPass123 \
+  --target-dir=/backup/full_20261011 \
+  --parallel=4 --compress --compress-threads=2
+
+<span class="c"># ===== 2. 增量备份（每天晚上，基于上次备份）=====</span>
+xtrabackup --backup \
+  --user=backup --password=BakPass123 \
+  --target-dir=/backup/inc_20261012 \
+  --incremental-basedir=/backup/full_20261011
+
+<span class="c"># 链式增量：周三的基于周二</span>
+xtrabackup --backup --target-dir=/backup/inc_20261013 \
+  --incremental-basedir=/backup/inc_20261012 ...
+
+<span class="c"># ===== 3. 准备（prepare）：合并增量 + 回滚未提交事务 =====</span>
+xtrabackup --decompress --target-dir=/backup/full_20261011    <span class="c"># 先解压</span>
+xtrabackup --prepare --apply-log-only \
+  --target-dir=/backup/full_20261011                          <span class="c"># 全量只回滚不应用增量</span>
+xtrabackup --prepare --apply-log-only \
+  --target-dir=/backup/full_20261011 \
+  --incremental-dir=/backup/inc_20261012                      <span class="c"># 应用增量 1</span>
+<span class="c"># 有更多增量就逐个 --incremental-dir 继续；最后一个增量去掉 --apply-log-only 做最终 prepare</span>
+
+<span class="c"># ===== 4. 恢复到测试实例 =====</span>
+<span class="c"># 目标数据目录必须为空（或先停实例）</span>
+xtrabackup --copy-back --target-dir=/backup/full_20261011
+chown -R mysql:mysql /var/lib/mysql</pre>
+  <h4>PITR：全量 + binlog 恢复到指定时间点</h4>
+  <pre><span class="c"># 场景：周二 14:30 有人误删了订单表，现在要恢复到 14:25 的状态</span>
+<span class="c"># 1. 用最近的物理全量（如周日）+ 增量恢复到数据目录（如上）</span>
+<span class="c"># 2. 找到 14:30 时的 binlog 位置</span>
+mysqlbinlog /data/mysql/mysql-bin.000008 \
+  --start-datetime="2026-10-13 14:20:00" \
+  --stop-datetime="2026-10-13 14:30:00" &gt; /tmp/events.sql
+grep -n "DROP\|DELETE" /tmp/events.sql          <span class="c"># 确认误操作 SQL 的位置</span>
+
+<span class="c"># 3. 从 binlog 起点重放到误操作前（跳过危险语句）</span>
+mysqlbinlog /data/mysql/mysql-bin.000008 \
+  --start-position=4 \
+  --stop-position=12345 \                       <span class="c"># 误操作事件的 start position</span>
+  | mysql -u root -p
+
+<span class="c"># 4. 之后的事件如果也要（跳过误操作本身），用 exclude 或手动裁剪</span>
+mysqlbinlog --start-position=12400 ... | mysql -u root -p
+
+<span class="c"># 5. 校验：对比关键表行数、抽查最近订单</span>
+SELECT COUNT(*) FROM orders;
+SELECT MAX(created_at) FROM orders;</pre>
+  <div class="callout danger">
+    <b>binlog 过期 = PITR 能力消失。</b>默认 <span class="k">binlog_expire_logs_seconds=2592000</span>（30 天），但如果磁盘紧张有人手改小、或 purge 策略激进，上周的全量 + 已删的 binlog = 只能恢复到全量时刻。<b>备份系统的第一监控项就是 binlog 归档的连续性和保留期</b>，清理策略必须和备份保留策略对齐（保留 90 天备份，binlog 至少 90 天）。
+  </div>
+  <div class="callout warn">
+    <b>备份账号与锁的影响：</b>xtrabackup 需要 <span class="k">RELOAD、PROCESS、LOCK TABLES、REPLICATION CLIENT、BACKUP_ADMIN</span> 权限（专用低权限账号，别用 root）。非 InnoDB 表备份时 xtrabackup 仍会短暂 <span class="k">FLUSH TABLES WITH READ LOCK</span>——<b>表多的大库，FTWRL 能卡住写入几十秒</b>，安排备份窗口或用 <span class="k">--no-lock</span>（前提是无非 InnoDB 表）。MySQL 8.0 的 <span class="k">LOCK INSTANCE FOR BACKUP</span> 比 FTWRL 轻得多，允许备份期间继续写。
+  </div>
+  <h4>逻辑备份的正确姿势（单表/跨版本场景）</h4>
+  <pre><span class="c"># 一致性逻辑备份</span>
+mysqldump -u root -p \
+  --single-transaction \                        <span class="c"># InnoDB 一致性快照，不锁表</span>
+  --quick \                                    <span class="c"># 逐行读取，不全表进内存</span>
+  --triggers --routines --events \              <span class="c"># 别漏触发器和存储过程（迁移场景必踩）</span>
+  --hex-blob \                                 <span class="c"># 二进制安全</span>
+  --master-data=2 \                            <span class="c"># 在输出里注释记录 binlog 位点（恢复/PITR 要用）</span>
+  --all-databases &gt; /backup/dump_all_20261011.sql
+
+<span class="c"># 恢复逻辑备份（大文件注意 max_allowed_packet）</span>
+mysql -u root -p --max_allowed_packet=512M &lt; /backup/dump_all_20261011.sql
+
+<span class="c"># PG 逻辑备份</span>
+pg_dump -Fc -d prod -f /backup/prod_20261011.dump      <span class="c"># 自定义格式，支持并行恢复</span>
+pg_restore -d prod_test -j 4 /backup/prod_20261011.dump  <span class="c"># -j 并行，恢复快数倍</span>
+pg_dump -d prod --table=orders &gt; orders_only.sql        <span class="c"># 单表导出</span></pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>PostgreSQL 备份：pg_basebackup + WAL 归档 PITR</h2></div>
+  <pre><span class="c"># ===== 1. 基础备份（物理全量，在线不阻塞业务）=====</span>
+pg_basebackup -h primary -D /backup/base_20261011 \
+  -U repl -P -R -X stream -S slot_base -Ft -z -g
+<span class="c"># -R 写 standby.signal + primary_conninfo；-X stream 边传边收 WAL（推荐）</span>
+<span class="c"># -S slot_base 用复制槽保证备份期间 WAL 不被清理；-Ft tar 格式；-z gzip；-g 压缩；-P 进度</span>
+
+<span class="c"># ===== 2. WAL 归档配置（postgresql.conf）=====</span>
+wal_level = replica
+archive_mode = on
+archive_command = 'test ! -f /wal_archive/%f && cp %p /wal_archive/%f'
+<span class="c"># 生产建议用 pg_receivewal 做流式归档，比 archive_command 的 cp 更实时：</span>
+<span class="c"># pg_receivewal -h primary -D /wal_archive --slot=wal_archive -S</span>
+archive_timeout = 300                          <span class="c"># 秒：空闲时最多 5 分钟切一段 WAL，保证归档连续性</span>
+
+<span class="c"># ===== 3. PITR 恢复到指定时间点 =====</span>
+<span class="c"># 3a. 恢复基础备份到新数据目录</span>
+rm -rf /var/lib/postgresql/data/*
+tar -xzf /backup/base_20261011/base.tar.gz -C /var/lib/postgresql/data/
+
+<span class="c"># 3b. 配置恢复参数（PG 12+）</span>
+touch /var/lib/postgresql/data/recovery.signal
+cat &gt;&gt; /var/lib/postgresql/data/postgresql.auto.conf &lt;&lt;EOF
+restore_command = 'cp /wal_archive/%f %p'
+recovery_target_time = '2026-10-13 14:25:00'
+recovery_target_action = 'promote'             <span class="c"># 到达目标时间后提升为新主</span>
+EOF
+
+<span class="c"># 3c. 启动，PG 自动重放 WAL 到目标时间点后 promote</span>
+pg_ctl -D /var/lib/postgresql/data start
+<span class="c"># 日志里看到 "recovery stopping before commit ... " 和 "promoted" 即成功</span></pre>
+  <div class="callout danger">
+    <b>recovery_target_time 用错时区是经典事故：</b><span class="k">recovery_target_time</span> 用的是<b>服务器时区</b>解释的时间字符串，而 binlog/WAL 里记录的时间可能是 UTC。容器里 TZ 没设、跨时区恢复，明明写了 14:25 却恢复到 06:25。<b>对策</b>：恢复前 <span class="k">SHOW timezone;</span> 确认，并在恢复后用关键表 <span class="k">SELECT MAX(created_at)</span> 验证实际恢复到哪一刻。
+  </div>
+  <div class="callout ok">
+    <b>PG 的三个恢复目标（按精度选）：</b><span class="k">recovery_target_time</span>（时间点，最常用）、<span class="k">recovery_target_xid</span>（事务 ID，精确但要先查出误操作事务的 xid）、<span class="k">recovery_target_lsn</span>（WAL 日志序列号，最精确）。配合 <span class="k">recovery_target_inclusive</span> 控制是否包含目标本身。日常恢复用 time 足够；金融对账类恢复用 xid/lsn 更稳。
+  </div>
+  <h4>一致性快照的其他选项</h4>
+  <table>
+    <tr><th style="width:200px">方式</th><th>适用</th></tr>
+    <tr><td><b>pg_backup_start/stop</b></td><td>手工控制的一致性快照（低层 API）</td></tr>
+    <tr><td><b>pgBackRest / Barman / wal-g</b></td><td><b>生产推荐。</b>全量+增量+WAL 归档一体化，支持远程存储、保留策略、并行、校验</td></tr>
+    <tr><td><b>云厂商 RDS 备份</b></td><td>托管版自带，关注下载到本地的能力和跨区域复制</td></tr>
+  </table>
+  <pre><span class="c"># pgBackRest 最小配置（/etc/pgbackrest/pgbackrest.conf）</span>
+[global]
+repo1-path=/var/lib/pgbackrest
+repo1-retention-full=2                       <span class="c"># 保留 2 份全量</span>
+repo1-retention-full-type=count
+
+[prod]
+pg1-path=/var/lib/postgresql/data
+
+<span class="c"># 命令</span>
+pgbackrest --stanza=prod backup --type=full
+pgbackrest --stanza=prod backup --type=incr      <span class="c"># 增量</span>
+pgbackrest --stanza=prod backup --type=diff      <span class="c"># 差异</span>
+pgbackrest --stanza=prod info                    <span class="c"># 备份列表与校验状态</span>
+pgbackrest --stanza=prod restore --target-time="2026-10-13 14:25:00" \
+  --delta --recovery-option=promote</pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>备份策略：3-2-1 原则与 RPO/RTO</h2></div>
+  <p class="lead">策略不是"多备几份"，是<b>用 RPO/RTO 反推出的具体频率、保留期和存放位置</b>。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>3 份数据</div><div class="cd">1 份生产 + 2 份备份。只备一份的话，备份损坏/被误删/勒索病毒一锅端，直接归零</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>2 种介质</div><div class="cd">本地磁盘 + 对象存储/磁带。同介质批量故障（磁盘阵列损坏、机房事故）会同时带走两份</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>1 份异地</div><div class="cd">至少一份在另一个机房/城市。机房级火灾、断电、网络事故，本地备份全部不可用</div></div>
+  </div>
+  <h4>RPO / RTO 的计算与策略推导</h4>
+  <table>
+    <tr><th style="width:90px">指标</th><th style="width:230px">定义</th><th>计算示例</th></tr>
+    <tr><td><b>RPO</b></td><td>能丢多少数据（时间）</td><td>每天 02:00 全备 + binlog 实时归档 → <b>RPO ≈ 0</b>（恢复到故障前最后一刻）<br>每天 02:00 全备、binlog 只留 7 天且归档中断 → RPO = 距上次备份的时间，最坏 24h</td></tr>
+    <tr><td><b>RTO</b></td><td>多久能恢复业务</td><td>500GB 库：物理恢复（copy-back）≈ 2~3h + binlog 重放 ≈ 1h → <b>RTO ≈ 4h</b><br>同数据量逻辑恢复（pg_restore -j 4）≈ 6h+ → 逻辑备份做主力 RTO 不达标</td></tr>
+  </table>
+  <pre><span class="c"># 一套典型生产策略（500GB MySQL，日增量 20GB）</span>
+全量备份：  每周日 02:00  xtrabackup 全量，保留 4 周
+增量备份：  每天 02:00    基于最近备份，保留 2 周
+binlog：    实时归档到对象存储，保留 90 天（对齐审计要求）
+异地：      全量每周同步到异地对象存储（跨区域复制）
+保留：      全量 4 周 + 月度归档保留 1 年（合规）
+监控：      备份失败、binlog 归档中断、备份文件校验和 三项告警
+
+<span class="c"># 保留策略自动化（pgBackRest 示例）</span>
+repo1-retention-full=4          <span class="c"># 4 份全量</span>
+repo1-retention-diff=7          <span class="c"># 7 份差异</span>
+repo1-retention-archive=2       <span class="c"># WAL 归档保留 2 份全量的时长</span>
+repo1-retention-archive-type=full</pre>
+  <div class="callout warn">
+    <b>算 RTO 时必须用"演练值"不是"理论值"：</b>理论上 500GB copy-back 按磁盘 200MB/s 算 40 分钟，实际要算上：备份解压（压缩过的备份翻倍时间）、增量合并（几小时也可能）、binlog 重放（取决于故障期间写入量）、启动校验、业务连接恢复。<b>经验值：理论耗时 × 2~3 才是能写进 SLA 的数字。</b>
+  </div>
+  <div class="callout ok">
+    <b>按业务分级配策略（别一刀切）：</b>核心交易库（RPO≈0，RTO&lt;1h）→ 全量+实时 binlog + 热备（半同步从库）+ 月度恢复演练；一般业务库（RPO&lt;1h，RTO&lt;8h）→ 每日全量或增量 + binlog，季度演练；历史归档库（RPO&lt;24h 可接受）→ 周全量 + 冷存储，年度演练。<b>策略写进文档、纳入监控，否则等于没有。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>恢复演练：备份系统的期末考试</h2></div>
+  <p class="lead">行业调研（Veeam、Databarracks 等机构的年度报告）反复给出同一个结论：<b>约三分之一的组织在过去一年遇到过备份恢复失败，而失败的头号原因就是"没测过恢复"</b>。备份文件的正确率和你的恢复成功率是两个概率，只有演练能把它们拉齐。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>定期恢复测试</b>：每月抽 1 个备份（随机抽，别总抽最新的）恢复到隔离环境，跑通校验脚本</div></div>
+    <div class="step"><div class="txt"><b>记录真实 RTO</b>：从"开始恢复"计时到"业务能读写"，每次记录，和 SLA 对比</div></div>
+    <div class="step"><div class="txt"><b>校验数据不只是启动成功</b>：核心表行数、最大时间戳、金额合计、关键记录抽查，四项全过才算恢复成功</div></div>
+    <div class="step"><div class="txt"><b>混沌场景演练</b>：每季度一次"全挂"演练——假设主库和从库全丢，只许用备份+binlog/WAL 恢复，走完整流程</div></div>
+    <div class="step"><div class="txt"><b>回归生产流程</b>：演练必须用生产同款工具和账号（备份账号权限对不对、脚本路径是否存在），不能是"我知道怎么弄"</div></div>
+  </div>
+  <pre><span class="c"># 自动化恢复验证的最小脚本逻辑（伪代码）</span>
+restore_to_isolated_env $LATEST_FULL_BACKUP       <span class="c"># 恢复到隔离网段的测试实例</span>
+assert_eq $(mysql -e "SELECT COUNT(*) FROM orders") $EXPECTED_COUNT
+assert_eq $(mysql -e "SELECT MAX(id) FROM orders")    $EXPECTED_MAX_ID
+assert_eq $(mysql -e "SELECT SUM(amount) FROM orders") $EXPECTED_SUM
+record_rto $START_TIME                               <span class="c"># 记录耗时到看板</span>
+cleanup                                             <span class="c"># 销毁测试环境，别让它变成影子库</span>
+
+<span class="c"># 备份文件自身的校验（防静默损坏）</span>
+md5sum /backup/full_20261011/* &gt; /backup/full_20261011.md5
+md5sum -c /backup/full_20261011.md5                 <span class="c"># 恢复前先验证，别等 copy-back 一半报错</span>
+xtrabackup --prepare --target-dir=/backup/full_20261011 2&gt;&amp;1 | tail -20
+<span class="c"># prepare 成功本身就是一次校验：能 apply-log 说明备份结构完整</span></pre>
+  <div class="callout danger">
+    <b>"备份成功"≠"备份可用"，三个静默失败场景：</b>① 备份脚本报错但退出码是 0（没写 set -e / 没检查退出码），看板上全是绿色其实文件是空的；② 备份的是<b>从库</b>而从库复制断了三周，备出来的是三周前的数据还以为是最新的；③ 对象存储开了版本控制但存储桶策略变更，旧备份被静默清理。<b>对策</b>：备份任务加"文件大小 &gt; 阈值"校验 + 定期随机恢复 + 备份源数据新鲜度检查。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>云备份与跨区域</h2></div>
+  <table>
+    <tr><th style="width:170px">能力</th><th style="width:230px">做法</th><th>注意点</th></tr>
+    <tr><td><b>快照</b></td><td>云盘快照（EBS/云磁盘）秒级创建、增量存储</td><td>快照≠一致性备份：数据库在线打快照要用文件系统/应用一致性代理，否则像"拔电源"</td></tr>
+    <tr><td><b>对象存储归档</b></td><td>xtrabackup 流式备份直传 OSS/S3：<span class="k">--stream=xbstream</span></td><td>低频/归档型存储取回有延迟和费用，RTO 要算进去</td></tr>
+    <tr><td><b>跨区域复制</b></td><td>对象存储跨区域复制（CRR）自动同步备份桶</td><td>加密备份要确认 KMS 密钥也跨区域可用，否则异地恢复不了</td></tr>
+    <tr><td><b>托管数据库备份</b></td><td>RDS 自动备份 + binlog，支持按时间点恢复</td><td>自动备份在实例删除后的保留策略、能否下载到本地，先确认</td></tr>
+  </table>
+  <pre><span class="c"># xtrabackup 流式备份直传对象存储（不停机、不落本地盘）</span>
+xtrabackup --backup --user=backup --password=xxx \
+  --stream=xbstream --parallel=4 --compress \
+  | ossutil cp - oss://backup-bucket/mysql/full_20261011.xbstream \
+  --meta "Content-Type:application/octet-stream"
+
+<span class="c"># 从对象存储流式恢复</span>
+ossutil cp oss://backup-bucket/mysql/full_20261011.xbstream - \
+  | xbstream -x -C /backup/restore/ --decompress
+
+<span class="c"># 跨区域同步（对象存储侧配置，命令行确认状态）</span>
+aws s3api get-bucket-replication --bucket backup-bucket
+
+<span class="c"># 云盘快照一致性（MySQL 例）</span>
+mysql -e "FLUSH TABLES WITH READ LOCK; SYSTEM aws ec2 create-snapshot ...; UNLOCK TABLES;"
+<span class="c"># 或用备份代理自动处理；生产更推荐 xtrabackup 而不是裸快照做逻辑备份</span></pre>
+  <div class="callout warn">
+    <b>云备份的三个隐性成本：</b>① <b>取流量费</b>——灾时从对象存储拉 500GB 备份回本地机房，出流量费可能是备份存储费的十几倍；② <b>API 限速</b>——大规模恢复时对象存储下载带宽是瓶颈，提前测过实际吞吐；③ <b>密钥依赖</b>——备份用 KMS 加密，灾时 KMS 服务不可用或密钥被禁用，备份就是一堆乱码。<b>对策</b>：灾前把关键备份副本留在目标恢复区域的存储里，密钥做多区域副本。
+  </div>
+  <div class="callout ok">
+    <b>混合云/多云建议：</b>生产在 A 云 → 备份同区域对象存储（快速恢复）+ 跨区域复制（机房级容灾）+ 每季度一份<b>离线/异地物理介质或另一朵云的副本</b>（防账号级事故：AK 泄露被删库、勒索软件有内鬼权限时，异地副本是最后防线）。<b>备份必须防"删备份的人"，隔离（air-gapped/不可变存储 object lock）是 2020 年后备份架构的必选项。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">备份从不验证，故障时才发现是坏的</div><div class="pd">备份任务退出码没检查、文件被截断、存储静默损坏，看板全绿。备份系统必须含：文件大小/校验和校验 + 定期随机恢复演练。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">binlog/WAL 过期，PITR 窗口消失</div><div class="pd">磁盘紧张把 binlog 保留从 90 天改成 3 天，上周的全量备份+已删 binlog = 只能恢复到全量时刻。binlog 保留期必须与备份保留策略对齐并监控。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">备份锁影响业务（FTWRL 卡住写入）</div><div class="pd">mysqldump 不加 --single-transaction，或 xtrabackup 遇到大量非 InnoDB 表触发 FTWRL，备份期间全库写入卡住几十秒，业务超时一片。用 --single-transaction、MySQL 8.0 的 LOCK INSTANCE FOR BACKUP、或物理备份替代。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">备份的是断线几周的从库</div><div class="pd">备份脚本连从库省资源，从库复制线程悄悄挂了三周没人发现，备出来的是三周前的数据还标着"最新备份"。备份源要检查复制状态（Seconds_Behind/GTID 差距），或直接备主库。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">恢复时忘关 binlog，二次故障</div><div class="pd">在从旧备份恢复出来的实例上做修复操作，binlog 开着，这些操作又被复制到别的从库，污染扩大。恢复演练环境必须 reset master/skip-log-bin。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">逻辑备份漏了触发器和存储过程</div><div class="pd">mysqldump/pg_dump 默认行为有差异（MySQL 默认含 routines 是 5.1+ 默认开，PG 的触发器需要 --table 粒度注意），恢复后业务逻辑缺失，报错"找不到存储过程"。备份命令固定带全参数并纳入 checklist。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">备份账号权限不足，任务半夜失败</div><div class="pd">为安全把备份账号权限砍了，RELOCK/PROCESS/BACKUP_ADMIN 缺一个，备份失败告警被当噪音忽略，一周后才发现"最新备份是一个月前"。权限变更要走备份系统回归测试。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">恢复目标目录没清空，copy-back 失败</div><div class="pd">xtrabackup --copy-back 要求数据目录为空，直接往有文件的目录拷报错，惊慌中 rm -rf 错目录。恢复 SOP 第一步永远是"确认目标实例已停止、目录已备份性清空"。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">恢复完不校验，带着脏数据上线</div><div class="pd">物理恢复成功启动 ≠ 数据完整。必须跑核心表行数/时间戳/金额合计校验，确认恢复到的时刻正确（尤其 PITR 目标时间时区问题）。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">备份和密钥、工具绑死在一处</div><div class="pd">备份加密密钥只存在被灾的机器上、恢复用的 xtrabackup 版本和备份版本不匹配、恢复 SOP 只在某个老员工脑子里。灾备三件套：密钥异地、工具版本记录、SOP 文档化。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 每周日全量 + 每天增量 + binlog 实时归档，RPO 和 RTO 的组合是？</div>
+      <button class="opt">RPO=7 天，RTO=1 天</button>
+      <button class="opt">RPO=1 天，RTO=1 周</button>
+      <button class="opt">RPO≈0（binlog 可重放到故障前一刻），RTO=全量恢复+增量合并+binlog 重放的实测时间</button>
+      <div class="ans">正确答案：<b>RPO≈0，RTO 取决于恢复链路实测</b>。binlog/WAL 实时归档让数据可恢复到任意时刻；RTO 则是另一回事——要算全量 copy-back、增量 prepare 合并、binlog 重放的总耗时，500GB 库通常按小时计，必须用演练实测值 ×2~3 作为 SLA。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. xtrabackup 恢复流程的正确顺序是？</div>
+      <button class="opt">全量 backup → 增量 backup → prepare（apply-log-only 逐个合并）→ copy-back → 重放 binlog 到目标时间点</button>
+      <button class="opt">全量 backup → copy-back → prepare → 重放 binlog</button>
+      <button class="opt">增量 backup → prepare → copy-back → 全量 backup</button>
+      <div class="ans">正确答案：<b>先 prepare 再 copy-back</b>。prepare 阶段把增量合并进全量并回滚未提交事务，是恢复前必须的"预处理"；跳过 prepare 直接 copy-back 得到的是不一致的崩溃状态数据。最后一个增量 prepare 时不加 --apply-log-only。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. MySQL 要做一致性逻辑备份，mysqldump 必须加的参数是？</div>
+      <button class="opt">--all-databases，保证数据完整</button>
+      <button class="opt">--single-transaction，用一致性快照且不锁表</button>
+      <button class="opt">--lock-all-tables，锁全库才一致</button>
+      <div class="ans">正确答案：<b>--single-transaction</b>。它在单事务里对 InnoDB 做一致性快照，全程不锁表（FTWRL 只在极短的切换瞬间）。--lock-all-tables 会长时间阻塞写入，只适合全部表都是 MyISAM 的老库。同时建议带 --master-data=2 记录位点供 PITR。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. PostgreSQL 恢复到"今天 14:25 误操作之前"，核心配置是？</div>
+      <button class="opt">恢复基础备份后设 hot_standby=on 等它自己同步</button>
+      <button class="opt">用 pg_dump 重新导入当天的数据</button>
+      <button class="opt">recovery.signal + restore_command 指向 WAL 归档 + recovery_target_time='14:25:00' + promote</button>
+      <div class="ans">正确答案：<b>recovery.signal + restore_command + recovery_target_time</b>。PG 的 PITR 三要素：标记进入恢复模式、告诉它去哪找归档 WAL、设定停止重放的目标（时间/xid/LSN），到达后 promote 成可写。务必先确认服务器时区与目标时间的解释一致，恢复后用 MAX(created_at) 验证。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 关于 3-2-1 备份原则，正确的是？</div>
+      <button class="opt">3 份数据放同一台服务器的三个目录</button>
+      <button class="opt">3 份副本、2 种不同介质、1 份异地；目的是防单点/单介质/单地点故障一锅端</button>
+      <button class="opt">3-2-1 是厂商营销概念，工程上不重要</button>
+      <div class="ans">正确答案：<b>3 份、2 介质、1 异地</b>。只备一份，备份损坏或被误删就归零；只放本地，机房事故全没；同介质批量故障（阵列坏）会同时带走两份。现代演进是再加"一份不可变/隔离副本"防勒索软件和账号级删除。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 备份任务连续一周显示"成功"，最危险的可能是？</div>
+      <button class="opt">备份脚本退出码没检查，实际文件是空的或备份的是断线的从库，看板假绿</button>
+      <button class="opt">备份文件太大占磁盘</button>
+      <button class="opt">备份时间太短不够真实</button>
+      <div class="ans">正确答案：<b>静默失败</b>。备份系统的失败常常不是"报错"而是"没验证"：退出码未检查、文件大小未校验、备份源数据不新鲜。对策：备份任务内置文件校验和 + 备份源状态检查 + 每月随机抽取恢复演练，把"备份成功率"变成实测数字。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>xtrabackup --backup --target-dir=/backup/full --parallel=4</code><span class="desc">MySQL 在线物理全量备份</span><button class="copy">复制</button></div>
+    <div class="crow"><code>xtrabackup --backup --incremental-basedir=/backup/full --target-dir=/backup/inc</code><span class="desc">增量备份</span><button class="copy">复制</button></div>
+    <div class="crow"><code>xtrabackup --prepare --apply-log-only --target-dir=/backup/full --incremental-dir=/backup/inc</code><span class="desc">合并增量到全量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>xtrabackup --copy-back --target-dir=/backup/full</code><span class="desc">物理恢复到数据目录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>xtrabackup --backup --stream=xbstream | xbstream -x -C /restore</code><span class="desc">流式备份/恢复（直传对象存储用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mysqlbinlog binlog.000008 --start-datetime="..." --stop-datetime="..." | mysql -u root -p</code><span class="desc">按时间点重放 binlog（PITR）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mysqldump --single-transaction --quick --triggers --routines --master-data=2 --all-databases</code><span class="desc">一致性逻辑备份</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pg_basebackup -h primary -D /backup/base -U repl -R -X stream -S slot_base -Ft -z</code><span class="desc">PG 物理基础备份</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pgbackrest --stanza=prod backup --type=full</code><span class="desc">PG 生产级备份工具</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pg_dump -Fc -d prod -f dump.dump &amp;&amp; pg_restore -j 4</code><span class="desc">PG 逻辑备份与并行恢复</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pg_create_restore_point('before_migration')</code><span class="desc">PG 创建命名恢复点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT pg_switch_wal();</code><span class="desc">强制切换 WAL 段（确保归档连续）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>策略与关键配置速查</h3>
+  <pre><span class="c"># MySQL 侧</span>
+log_bin = mysql-bin
+binlog_format = ROW
+binlog_expire_logs_seconds = 7776000        <span class="c"># 90 天，与备份保留期对齐</span>
+<span class="c"># 备份账号权限（最小化）</span>
+GRANT RELOAD, PROCESS, LOCK TABLES, REPLICATION CLIENT, BACKUP_ADMIN
+  ON *.* TO 'backup'@'%';
+
+<span class="c"># PostgreSQL 侧</span>
+wal_level = replica
+archive_mode = on
+archive_command = 'test ! -f /wal_archive/%f && cp %p /wal_archive/%f'
+archive_timeout = 300
+<span class="c"># 恢复三要素</span>
+recovery.signal                          <span class="c"># 标记恢复模式</span>
+restore_command = 'cp /wal_archive/%f %p'
+recovery_target_time = '2026-10-13 14:25:00'
+recovery_target_action = 'promote'</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>物理备份</b></td><td>直接拷贝数据文件/页结构，快且一致性强，xtrabackup/pg_basebackup 属此类</td></tr>
+    <tr><td><b>逻辑备份</b></td><td>导出 SQL/数据文本，灵活可跨版本，mysqldump/pg_dump 属此类</td></tr>
+    <tr><td><b>全量 / 增量 / 差异</b></td><td>完整副本 / 自上次任意备份的变更 / 自上次全量的变更</td></tr>
+    <tr><td><b>PITR</b></td><td>时间点恢复，用全量 + binlog/WAL 重放到指定时刻</td></tr>
+    <tr><td><b>binlog / WAL</b></td><td>MySQL / PostgreSQL 的变更日志，既是复制载体也是增量备份源</td></tr>
+    <tr><td><b>prepare（apply-log）</b></td><td>xtrabackup 恢复前处理：合并增量 + 回滚未提交事务</td></tr>
+    <tr><td><b>FTWRL</b></td><td>Flush Tables With Read Lock，锁全表只读，备份期间慎用</td></tr>
+    <tr><td><b>LOCK INSTANCE FOR BACKUP</b></td><td>MySQL 8.0 的轻量备份锁，允许备份期间继续写</td></tr>
+    <tr><td><b>RPO</b></td><td>恢复点目标：能容忍丢多少数据（时间）</td></tr>
+    <tr><td><b>RTO</b></td><td>恢复时间目标：能容忍停多久，按演练实测 ×2~3 估算</td></tr>
+    <tr><td><b>3-2-1 原则</b></td><td>3 份副本、2 种介质、1 份异地，防单点/单介质/单地点故障</td></tr>
+    <tr><td><b>WAL 归档</b></td><td>PG 把 WAL 段持续存到归档目录，PITR 和流式恢复的基础</td></tr>
+    <tr><td><b>recovery.signal</b></td><td>PG 12+ 标记数据目录进入恢复模式的文件</td></tr>
+    <tr><td><b>复制槽</b></td><td>PG 保留 WAL 的机制，备份/流复制用它保证日志不丢</td></tr>
+    <tr><td><b>pgBackRest</b></td><td>PG 生产级备份工具：全量/增量/归档/恢复一体化</td></tr>
+    <tr><td><b>快照一致性</b></td><td>云盘快照需配合应用一致性代理，否则等于拔电源的快照</td></tr>
+    <tr><td><b>不可变备份</b></td><td>对象锁定（object lock）/隔离副本，防勒索软件和误删备份</td></tr>
+    <tr><td><b>恢复演练</b></td><td>定期把备份恢复到隔离环境并校验数据，验证"备份可用"的唯一手段</td></tr>
+    <tr><td><b>异地复制 CRR</b></td><td>对象存储跨区域复制，实现备份的异地容灾</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 MySQL，完成这五件事 —— ① 用 xtrabackup 做一次全量，第二天做增量，练习 prepare 合并；② 灌入测试数据后执行一次"误删表"，用全量+binlog 恢复到误删前一刻并校验行数；③ 用 mysqldump --single-transaction 备份，对比和物理备份的文件大小、耗时；④ 把备份流式传到本地目录模拟对象存储，再从流恢复；⑤ 写一个恢复校验脚本（行数/最大值/合计三项断言），把整个流程的 RTO 计时记下来。<br><br>
+    <b>之后值得单独学：</b>pgBackRest/Barman 的完整策略配置、云厂商备份的 API 化调度、备份数据的加密与密钥轮换、以及勒索软件防护下的不可变存储架构。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透备份与恢复 · 记住：没验证过的备份等于没备份，没演练过的恢复等于没恢复</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（xtrabackup+PITR）和模块 5（恢复演练）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边敲：xtrabackup --backup --target-dir=/tmp/bk1。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起 MySQL 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

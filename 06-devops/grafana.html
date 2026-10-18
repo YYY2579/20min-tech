@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Grafana 可视化与仪表盘</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 第 3 期 · 可视化篇</span>
+    <h1>二十分钟学透 Grafana 可视化与仪表盘</h1>
+    <p class="sub">Grafana 的按钮十分钟就能点完，难的是<b>面板怎么选型、变量怎么联动、告警放哪一层、仪表盘怎么设计才有人看</b>。这篇讲数据源、Dashboard 结构、Transform、Unified Alerting，以及高基数拖垮浏览器这类真实事故。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>8</b> 种面板选型</span>
+      <span class="chip"><b>2</b> 套设计方法</span>
+      <span class="chip"><b>9</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边点：docker run -d -p 3000:3000 grafana/grafana，配 Prometheus 数据源</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起 Grafana（配好第 2 期的 Prometheus 就能练）</span>
+docker run -d -p 3000:3000 --name grafana grafana/grafana:11.2.0
+
+<span class="c"># 默认 admin/admin，首次登录强制改密码</span>
+<span class="c"># 配置目录：/etc/grafana/provisioning/（数据源、仪表盘、告警的预配置入口）</span>
+
+<span class="c"># 常用环境变量</span>
+-e GF_SECURITY_ADMIN_PASSWORD=admin \
+-e GF_USERS_ALLOW_SIGN_UP=false \
+-e GF_SERVER_ROOT_URL=https://grafana.example.com \
+-e GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-piechart-panel
+
+<span class="c"># API 操作（自动化管理用）</span>
+curl -u admin:admin localhost:3000/api/datasources        <span class="c"># 列数据源</span>
+curl -u admin:admin localhost:3000/api/health             <span class="c"># 健康检查</span></pre>
+  <div class="callout">
+    <b>版本说明：</b>Grafana 11.x 为当前主流（11.2 是 2024 年稳定版）。8.0 起 Unified Alerting 成为新告警系统，9.0 起成为默认且旧 Alerting 已移除 —— 本文档所有告警内容按 Unified Alerting 写。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>数据源接入</h2></div>
+  <p class="lead">Grafana 本身不存数据，只做查询和渲染。数据源（Data Source）是核心抽象，一个面板可以引用多个数据源的查询。</p>
+  <table>
+    <tr><th style="width:150px">数据源</th><th>查询语言</th><th>典型用途</th></tr>
+    <tr><td><b>Prometheus / VictoriaMetrics / Thanos</b></td><td>PromQL</td><td>指标监控的主力组合，兼容同一查询语言</td></tr>
+    <tr><td><b>Loki</b></td><td>LogQL</td><td>日志，与指标面板联动排障</td></tr>
+    <tr><td><b>Tempo / Jaeger</b></td><td>TraceQL / 查询 UI</td><td>链路追踪，从指标下钻到 trace</td></tr>
+    <tr><td><b>Elasticsearch / OpenSearch</b></td><td>Lucene / DSQL</td><td>已有 ELK 栈时的日志检索</td></tr>
+    <tr><td><b>MySQL / PostgreSQL / MSSQL</b></td><td>SQL</td><td>业务报表、运营数据</td></tr>
+    <tr><td><b>InfluxDB 2.x</b></td><td>Flux</td><td>IoT/老 InfluxDB 用户</td></tr>
+    <tr><td><b>JSON API / CSV / Infinity</b></td><td>自定义</td><td>接内部接口、第三方 SaaS</td></tr>
+  </table>
+  <h3>Prometheus 数据源配置要点</h3>
+  <pre><span class="c"># UI 路径：Configuration → Data sources → Add → Prometheus</span>
+URL: http://prometheus:9090              <span class="c"># Grafana 容器内可解析的地址，不是 localhost</span>
+Scrape interval: 15s                     <span class="c"># 与 Prometheus 抓取间隔一致</span>
+Query timeout: 60s                       <span class="c"># 大查询放宽，别用默认 30s 截断</span>
+HTTP Method: POST                        <span class="c"># 长 PromQL 用 POST，避免 URL 超长</span>
+Custom query parameters: max_source_resolution=auto   <span class="c"># 让 Prometheus 自动降采样</span>
+
+<span class="c"># 关键：时间序列数据库（TSDB）与仪表盘时间范围的关系</span>
+<span class="c"># 面板查 [5m] 的 rate，时间范围选 30 天 → Prometheus 只返回 30 天前的原始点</span>
+<span class="c"># → 曲线不平滑，因为 rate 窗口内样本太少。长时间范围要用 recording rule</span></pre>
+  <div class="callout warn">
+    <b>容器化部署的头号坑：URL 写 localhost。</b>Grafana 跑在容器里时，<span class="k">localhost:9090</span> 指向的是 Grafana 自己。<b>用 docker-compose 的服务名（如 http://prometheus:9090）或主机网关地址</b>。判断方法：数据源页面点 "Save &amp; test"，提示 "Error reading Prometheus: ... connection refused" 基本就是它。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Dashboard 结构：变量、行与面板</h2></div>
+  <p class="lead">Dashboard 是 JSON。一个仪表盘由 <b>模板变量（templating）+ 行（Row）+ 面板（Panel）+ 注释（Annotation）+ 链接（Link）</b> 组成。</p>
+  <h3>模板变量：仪表盘的"参数"</h3>
+  <table>
+    <tr><th style="width:130px">变量类型</th><th>取值来源</th></tr>
+    <tr><td class="f">query</td><td>从数据源查询，如 label_values(up, job)</td></tr>
+    <tr><td class="f">custom</td><td>手写枚举值，如 env = prod,staging,dev</td></tr>
+    <tr><td class="f">datasource</td><td>让用户切换数据源，$datasource 引用</td></tr>
+    <tr><td class="f">interval</td><td>自动填充 $__interval，图表下采样粒度</td></tr>
+    <tr><td class="f">constant / textbox</td><td>常量 / 输入框，用于传 token 等</td></tr>
+    <tr><td class="f">adhoc</td><td>面板顶部动态加标签过滤器（K8s 场景神器）</td></tr>
+  </table>
+  <pre><span class="c"># 变量配置示例（Dashboard settings → Variables → New）</span>
+Name:        job
+Type:        query
+Data source: Prometheus
+Query:       label_values(up, job)          <span class="c"># 所有 job 的取值</span>
+Multi-value: true                            <span class="c"># 允许多选，等价 {job=~"$job"}</span>
+Include All: true                           <span class="c"># 加一个 All 选项</span>
+
+<span class="c"># 变量在查询里的用法（正则匹配用 =~，等值用 =）</span>
+sum by (instance) (rate(http_requests_total{job=~"$job", env="$env"}[$__rate_interval]))
+
+<span class="c"># 变量进阶：串联依赖（第二个变量依赖第一个的取值）</span>
+Name:   instance
+Query:  label_values(up{job="$job"}, instance)   <span class="c"># 只列 $job 选中的实例</span>
+<span class="c"># ↑ 关键设置：Refresh = On time range change / On dashboard load</span>
+
+<span class="c"># 魔术变量（Grafana 自动提供，查询里直接用）</span>
+$__interval         <span class="c"># 自动计算的下采样间隔，如 15s</span>
+$__rate_interval    <span class="c"># = max($__interval, 4×scrape_interval)，专为 rate 设计</span>
+$__range            <span class="c"># 当前时间范围秒数</span>
+$__from / $__to     <span class="c"># 时间范围毫秒时间戳</span>
+$__dashboard / $__user   <span class="c"># 仪表盘名 / 当前用户名，拼链接常用</span></pre>
+  <h3>Row 与 Panel 组织</h3>
+  <pre><span class="c"># Dashboard JSON 的关键字段（Dashboard settings → JSON model 可看可改）</span>
+{
+  "title": "API 服务监控",
+  "templating": { "list": [ ... ] },       <span class="c"># 模板变量定义</span>
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",                        <span class="c"># 自动刷新间隔</span>
+  "rows": [                                <span class="c"># 新版本已折叠成 panels + gridPos</span>
+    {
+      "title": "核心指标",
+      "panels": [
+        {
+          "type": "timeseries",             <span class="c"># 面板类型</span>
+          "title": "QPS",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },   <span class="c"># 24 列网格布局</span>
+          "targets": [ ... ],               <span class="c"># 查询</span>
+          "fieldConfig": { ... }            <span class="c"># 单位、阈值、覆盖</span>
+        }
+      ]
+    }
+  ]
+}</pre>
+  <div class="callout ok">
+    <b>Row 的两种用法：</b>① <b>分组折叠</b>——把"详细指标"收进 Row，默认折叠，仪表盘首屏只留核心；② <b>Repeat</b>——Row 按变量重复（如每台机器一行），gridPos 自动重排。面板也可以单独 repeat（按变量渲染 N 个面板），但 repeat 超过 20 个面板会明显拖慢页面。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Panel 类型选型</h2></div>
+  <p class="lead">选错面板类型是新手仪表盘显得"不专业"的头号原因。<b>先问：我要看趋势、看单值、看分布，还是看明细？</b></p>
+  <table>
+    <tr><th style="width:120px">面板</th><th style="width:150px">适合看什么</th><th>不适合</th></tr>
+    <tr><td><b>Time series</b></td><td>随时间变化的趋势：QPS、延迟、错误率</td><td>多指标不同量纲时（用双轴或拆面板）</td></tr>
+    <tr><td><b>Stat</b></td><td>单个数字 + 迷你趋势线：当前 QPS、错误总数</td><td>需要精确对比多个时间点</td></tr>
+    <tr><td><b>Gauge</b></td><td>百分比/容量类：磁盘使用率、CPU</td><td>精确值（人眼读刻度不准）</td></tr>
+    <tr><td><b>Bar gauge</b></td><td>Top N 对比：各接口 QPS 排名</td><td>时间趋势</td></tr>
+    <tr><td><b>Table</b></td><td>明细与多维度：实例 × 指标矩阵</td><td>趋势（表格看不出变化）</td></tr>
+    <tr><td><b>Heatmap</b></td><td>分布随时间的变化：延迟分布、GC 停顿</td><td>单点值</td></tr>
+    <tr><td><b>Logs</b></td><td>日志流：错误堆栈、上下文</td><td>聚合统计（用 metrics）</td></tr>
+    <tr><td><b>Piechart / Node graph</b></td><td>构成占比 / 服务拓扑</td><td>严肃的生产监控（可读性差）</td></tr>
+  </table>
+  <pre><span class="c"># 面板配置关键项（Edit panel → 右侧）</span>
+<span class="c"># 1. Query：查询与图例（Legend 决定曲线怎么命名）</span>
+Legend: {{instance}} - {{job}}              <span class="c"># 自定义图例，默认是一长串 label</span>
+Min step: 15s                               <span class="c"># 与采集间隔一致，防过采样</span>
+
+<span class="c"># 2. Standard options：单位与阈值</span>
+Unit: percent (0-100)                       <span class="c"># 别用 raw number，带上单位</span>
+Thresholds: 70 (yellow) / 90 (red)          <span class="c"># Stat/Gauge 的变色阈值</span>
+
+<span class="c"># 3. Time series 专属</span>
+Stack series: normal                        <span class="c"># 堆叠面积图，看构成</span>
+Fill opacity: 10                            <span class="c"># 透明度，多曲线时不打架</span>
+<span class="c"># Display: Bars 适合 alert state，Points 适合稀疏数据</span></pre>
+  <h3>Heatmap 的正确打开方式</h3>
+  <pre><span class="c"># Heatmap 需要 histogram 数据，格式 = [bucket上限] × [时间] × [计数]</span>
+<span class="c"># Prometheus 查询（Format: Heatmap）：</span>
+sum by (le) (increase(http_request_duration_seconds_bucket[$__rate_interval]))
+
+<span class="c"># 或直接查原生直方图序列，Grafana 自动分桶</span>
+<span class="c"># 注意：没有 histogram 数据源时，Heatmap 会显示空白 ——</span>
+<span class="c"># 这是新手最常见的一个"面板坏了"假象</span></pre>
+  <h3>Logs 面板：从指标跳到日志</h3>
+  <pre><span class="c"># Logs 面板查询 Loki（Data source: Loki）</span>
+{job="api", env="$env"} |= "error" | json | line_format "{{.msg}}"
+
+<span class="c"># 与指标面板联动：给 Time series 面板配 Data link</span>
+<span class="c"># Edit panel → Data links → 新增：</span>
+Title: 查看该实例日志
+URL:   /d/logs-dashboard?var-instance=${__field.fields.instance}&amp;from=${__from}&amp;to=${__to}
+<span class="c"># 效果：点曲线上一个点，直接跳到该实例该时刻的日志</span></pre>
+  <div class="callout danger">
+    <b>禁止把 20 条曲线放一个 Time series 面板还不加图例过滤。</b>超过 10 条曲线，颜色就开始重复、图例变成一锅粥。<b>解法：</b>① 用 topk 限制曲线数；② 用变量把多实例拆成 repeat 面板；③ 把次要曲线移到折叠 Row 里。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Transform：查询后的数据处理</h2></div>
+  <p class="lead">Transform 在查询结果返回后、渲染前做加工。核心价值：<b>把多个查询 JOIN 成一个表、把时序聚合成单值、重命名隐藏字段</b>。</p>
+  <table>
+    <tr><th style="width:170px">Transform</th><th>作用</th></tr>
+    <tr><td class="f">Join by field</td><td>按共同字段把多个查询结果横向拼接（如 A 查询的 QPS + B 查询的错误率）</td></tr>
+    <tr><td class="f">Merge</td><td>纵向合并多个查询的结果序列</td></tr>
+    <tr><td class="f">Reduce</td><td>把每条时序聚合成一个值：mean / max / last / sum / count</td></tr>
+    <tr><td class="f">Organize fields</td><td>重命名、隐藏、排序字段 —— Table 面板美化主力</td></tr>
+    <tr><td class="f">Labels to fields</td><td>把 label 提升为表格列</td></tr>
+    <tr><td class="f">Filter by value / name</td><td>按值或名字过滤序列</td></tr>
+    <tr><td class="f">Add field from calculation</td><td>两列做四则运算（如错误率 = 错误 / 总数）</td></tr>
+    <tr><td class="f">Rows to fields / Group by</td><td>透视：把行转成列，按维度分组</td></tr>
+  </table>
+  <pre><span class="c"># 实战：一个 Table 面板同时展示 QPS、P99、错误率（三个查询 JOIN）</span>
+<span class="c"># Query A: sum by (instance) (rate(http_requests_total[5m]))     → Value #A</span>
+<span class="c"># Query B: histogram_quantile(0.99, sum by (le,instance) (rate(..._bucket[5m])))</span>
+<span class="c"># Query C: sum by (instance) (rate(http_requests_total{status=~"5.."}[5m])) / sum by (instance) (rate(...[5m]))</span>
+
+<span class="c"># Transform 1: Join by field → Field: instance</span>
+<span class="c"># Transform 2: Organize fields → 重命名 "Value #A" 为 "QPS"，隐藏 Time</span>
+<span class="c"># 结果：一行一个实例，三列指标，还能加阈值着色</span>
+
+<span class="c"># 实战：Stat 面板显示"当前错误数"（Reduce: Last）</span>
+<span class="c"># Transform: Reduce → Mode: Last → Fields: 保留 Value，去掉 Time</span>
+<span class="c"># 面板类型选 Stat，配 thresholds 变色</span></pre>
+  <div class="callout warn">
+    <b>Transform 在浏览器里跑，大数据量会卡。</b>Join 两个各返回 5000 序列的查询，浏览器要算几万次字段匹配。<b>能在 PromQL 里算的（sum/rate/topk）优先在服务端算</b>，Transform 只做 JOIN、重命名、少量过滤这类轻量活。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>告警：Unified Alerting</h2></div>
+  <p class="lead">Grafana 8+ 的新告警系统，告警规则存在 Grafana 自己这里（或配置为 Grafana Alertmanager），与 Prometheus 的告警规则是<b>互补关系，不是替代关系</b>。</p>
+  <h3>Unified Alerting 核心概念</h3>
+  <table>
+    <tr><th style="width:150px">概念</th><th>说明</th></tr>
+    <tr><td><b>Alert rule</b></td><td>查询 + 条件（A/B 阈值）。可基于任何数据源（PromQL、SQL、Loki）</td></tr>
+    <tr><td><b>Condition</b></td><td>对查询结果求值：WHEN max() OF A IS ABOVE 90，支持多个条件链</td></tr>
+    <tr><td><b>Notification policy</b></td><td>路由树：匹配 label → 联系点（Contact point），支持分组等待/间隔</td></tr>
+    <tr><td><b>Contact point</b></td><td>通知渠道：Email、Slack、钉钉、飞书、Webhook、PagerDuty</td></tr>
+    <tr><td><b>Silence / Mute timing</b></td><td>静默规则 / 重复静默时间窗（如每晚维护窗口）</td></tr>
+  </table>
+  <pre><span class="c"># UI 路径：Alerting → Alert rules → New alert rule</span>
+<span class="c"># 1. 选查询（可多查询 A/B/C）</span>
+<span class="c">#    A: max(1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)</span>
+<span class="c"># 2. 设条件：WHEN max() OF A IS ABOVE 90</span>
+<span class="c"># 3. 设 pending period：5m（等价 Prometheus 的 for）</span>
+<span class="c"># 4. 加 label：severity=critical, team=infra</span>
+<span class="c"># 5. 配 notification policy 路由到对应 contact point</span>
+
+<span class="c"># 告警状态机：Normal → Pending（条件满足但未过 pending）→ Firing → Normal</span>
+<span class="c"># No data 行为可选：Keep last state / Alerting / Normal（防数据断流误判）</span></pre>
+  <h3>Grafana 告警 vs Prometheus 告警：怎么分工</h3>
+  <table>
+    <tr><th style="width:150px">维度</th><th>Prometheus rules</th><th>Grafana Unified Alerting</th></tr>
+    <tr><td><b>规则位置</b></td><td>Git 里的 YAML，版本清晰</td><td>Grafana 数据库/Provisioning 文件</td></tr>
+    <tr><td><b>recording rules</b></td><td><b>支持</b>，预计算降查询压力</td><td>不支持预计算</td></tr>
+    <tr><td><b>多数据源</b></td><td>只有 Prometheus 系</td><td><b>Prometheus/Loki/SQL/Elastic 统一告警</b></td></tr>
+    <tr><td><b>规则测试</b></td><td>promtool test rules 单测</td><td>UI 预览，CI 测试较弱</td></tr>
+    <tr><td><b>路由能力</b></td><td>Alertmanager 成熟（inhibit/silence 全）</td><td>策略树 + mute timing，够用但略简单</td></tr>
+    <tr><td><b>推荐用法</b></td><td><b>基础设施与 SLO 告警的主战场</b></td><td>业务面板旁挂的轻量告警、SQL 数据源告警</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>实践建议：</b>生产告警以 Prometheus rules + Alertmanager 为主（可测试、可 Git 管理、可抑制），Grafana Unified Alerting 用于两类补充：① 数据源不是 Prometheus 的（MySQL 慢查询、ES 集群健康）；② 仪表盘作者自助配置的轻量告警。<b>同一个告警不要两边都配</b>，否则恢复通知能收到四份。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>仪表盘设计原则</h2></div>
+  <p class="lead">仪表盘是给人看的。<b>目标读者不同，布局完全不同</b>：值班要秒级定位，开发要下钻细节，老板要一个数字。</p>
+  <h3>两套经典方法论</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>RED 方法（服务视角）</div><div class="cd"><b>R</b>ate 请求速率 · <b>E</b>rrors 错误率 · <b>D</b>uration 延迟分布。<br>每个微服务一个 RED 仪表盘，是 Google SRE 推荐的微服务监控最小集。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>USE 方法（资源视角）</div><div class="cd"><b>U</b>tilization 利用率 · <b>S</b>aturation 饱和度（队列） · <b>E</b>rrors 错误。<br>每个资源（CPU/内存/磁盘/网卡）一个 USE 仪表盘，基础设施组标配。</div></div>
+  </div>
+  <h3>可观测性布局：三层下钻</h3>
+  <div class="steps">
+    <div class="txt"><b>第一层 · 总览</b>：全集群健康度（核心服务 RED + 资源 USE），只放 6~8 个面板，值班 30 秒内看出"哪个服务有问题"</div>
+    <div class="txt"><b>第二层 · 服务下钻</b>：单服务的完整视图（实例列表、依赖拓扑、慢请求 Top、错误日志），开发排障主场</div>
+    <div class="txt"><b>第三层 · 明细</b>：Table/Logs 面板 + 数据链接跳到日志和 trace，"最后一公里"</div>
+  </div>
+  <pre><span class="c"># 布局纪律（24 列网格）</span>
+<span class="c"># 1. 首屏从左到右、从上到下，重要程度递减</span>
+<span class="c"># 2. Stat 面板放最上面一行（一眼看到核心数字）</span>
+<span class="c"># 3. 相关面板相邻：QPS、错误率、P99 放同一行（同一时间轴方便对比）</span>
+<span class="c"># 4. 单位统一：所有延迟用 ms、所有比率用 percent，别一个面板秒一个面板毫秒</span>
+<span class="c"># 5. 阈值线：给关键图表加 Threshold（如 SLO 的 99.9% 线），一眼看出是否达标</span>
+<span class="c"># 6. 图例精简：Legend {{instance}} 而不是默认的一长串 label</span>
+<span class="c"># 7. 时间范围默认 6h，别默认 30 天（rate 窗口在 30 天尺度上没意义）</span>
+<span class="c"># 8. 加 Dashboard link：总览 → 服务 → 实例，形成下钻闭环</span></pre>
+  <div class="callout warn">
+    <b>反模式清单：</b>① 一个仪表盘 50+ 个面板（拆成多个，用 link 串联）；② 每个指标一个面板（同量纲的合并）；③ 3D 饼图、彩虹渐变（数据可视化不是选美）；④ 标题写 "监控"（写清楚监控对象）；⑤ 没有 dashboard description（新成员看不懂每个面板的含义）。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Provisioning 与 GitOps</h2></div>
+  <p class="lead">在 UI 里点的仪表盘是"雪花"——独一无二、无法重建、丢失即事故。<b>Provisioning 把数据源、仪表盘、告警全部变成配置文件，进 Git，随 CI 部署。</b></p>
+  <h3>目录结构与配置</h3>
+  <pre><span class="c"># /etc/grafana/provisioning/ 下的三个目录</span>
+provisioning/
+├── datasources/
+│   └── prometheus.yml        <span class="c"># 数据源</span>
+├── dashboards/
+│   └── dashboards.yml        <span class="c"># 仪表盘 provider（从哪加载 JSON）</span>
+└── alerting/
+    ├── contact_points.yml    <span class="c"># 联系点</span>
+    └── policies.yml          <span class="c"># 通知策略树</span>
+
+<span class="c"># datasources/prometheus.yml</span>
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy                <span class="c"># 经 Grafana 后端代理（推荐）</span>
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+<span class="c"># dashboards/dashboards.yml</span>
+apiVersion: 1
+providers:
+  - name: 'infra-dashboards'     <span class="c"># 逻辑名</span>
+    orgId: 1
+    folder: 'Infrastructure'     <span class="c"># 仪表盘归属文件夹</span>
+    type: file
+    disableDeletion: false       <span class="c"># true 则 UI 删不掉，防误删</span>
+    updateIntervalSeconds: 30    <span class="c"># 每 30s 重读磁盘</span>
+    allowUiUpdates: false        <span class="c"># false = UI 改了不生效，强制 Git 单一事实源</span>
+    options:
+      path: /var/lib/grafana/dashboards   <span class="c"># 放仪表盘 JSON 的目录</span>
+      foldersFromFilesStructure: true     <span class="c"># 按子目录自动建文件夹</span></pre>
+  <h3>仪表盘 JSON 从哪来</h3>
+  <pre><span class="c"># 方式一：Share → Export → Save to file，把 UI 做的仪表盘存进 Git</span>
+<span class="c"># 注意：导出前把 Dashboard settings → General → id 清空（uid 保留作链接）</span>
+
+<span class="c"># 方式二：用代码生成（推荐，JSON 手没法维护）</span>
+<span class="c"># - Jsonnet / grafonnet：以代码定义面板，输出标准 JSON</span>
+<span class="c"># - Terraform provider grafana：data "grafana_dashboard" 生成</span>
+<span class="c"># - 社区资源：grafana.com/dashboards 直接下载编号仪表盘 JSON</span>
+
+<span class="c"># 方式三：kube-prometheus-stack 自带 Grafana dashboards（K8s 场景直接抄）</span>
+<span class="c"># https://github.com/prometheus-community/kube-prometheus-stack</span></pre>
+  <div class="callout ok">
+    <b>GitOps 工作流：</b>开发在 UI 调好仪表盘 → Export JSON → PR 进 Git → CI 校验（<span class="k">jq empty *.json</span> 查语法 + <span class="k">grafana-toolkit</span> 或脚本查 schema）→ 合并 → 部署工具同步 JSON 到 Grafana 的 provisioning 目录 → Grafana 热加载。<b>关键纪律：allowUiUpdates: false</b>，否则 UI 会成为第二个事实源，漂移不可避免。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">坑库</span><h2>九个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">变量下拉框是空的或依赖变量不刷新</div><div class="pd">子变量（instance 依赖 job）没设 Refresh = On dashboard load，初次打开时 $job 还是默认值，查询不到数据。<b>变量 Refresh 三档要理解：On dashboard load / On time range change / On variable change</b>，依赖链上的变量都要能触发刷新。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">时间窗口与 rate 窗口不匹配，曲线不平滑</div><div class="pd">时间范围选 30 天，查询写 <span class="k">rate(x[5m])</span> —— Prometheus 只回原始点，rate 窗口内样本不足，曲线出现锯齿假象。<b>rate 窗口 ≥ 4 倍采集间隔；大时间范围用 $__rate_interval 或查 recording rule</b>。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">高基数序列拖垮浏览器，面板转圈几分钟</div><div class="pd">查询返回几千条曲线，浏览器渲染 + JS 计算直接卡死。<b>服务端限制：topk(20, ...)、sum by 聚合、label filters</b>；面板端限制：Max data points 调小、曲线超过 20 条就拆面板。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">直接用 $__interval 写 rate，窗口太短出空值</div><div class="pd">$__interval 在大时间范围下可能大于采集间隔好几倍，也可能等于采集间隔本身。<b>rate 窗口一律用 $__rate_interval</b>（Grafana 自动取 max($__interval, 4×scrape)），这是官方推荐做法。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">容器里 URL 写 localhost，数据源连不上</div><div class="pd">Grafana 容器内 localhost 指向自己。用 compose 服务名或主机 IP。<b>Save &amp; test 显示 connection refused 时先查这个</b>。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">仪表盘全靠 UI 手点，服务器重装后全丢</div><div class="pd">没有 Provisioning、没有 Git 备份，仪表盘是单点资产。<b>至少把 dashboard JSON 导出进 Git</b>，配合 allowUiUpdates: false 防止漂移。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">面板 repeat 一个变量出来 100 个面板</div><div class="pd">变量有 100 个实例，repeat by instance 直接渲染 100 个面板，页面卡死。<b>repeat 控制在 20 个以内</b>，超出用 Table 面板展示，或引入变量筛选。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">时区混乱：服务器 UTC、团队在东八区</div><div class="pd">Grafana 默认浏览器时区，团队跨地域时同一张图对不齐。Dashboard settings → Timezone 显式设为团队所在时区；Prometheus 存储的是 UTC 时间戳，Grafana 只负责显示转换。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">刷新间隔太短 + 重查询，Prometheus 被打满</div><div class="pd">Dashboard refresh 5s、每面板 5 个查询、20 人同时看 = Prometheus QPS 爆炸。<b>refresh ≥ 30s</b>，重查询用 recording rule 预计算，首页仪表盘人数多时给数据源配 query caching。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 想在一个 Table 面板里同时展示每个实例的 QPS 和错误率（两个不同查询），应该用？</div>
+      <button class="opt">把两个查询写成一条 PromQL，用 or 连接</button>
+      <button class="opt">两个查询 + Join by field transform，按 instance 字段拼接</button>
+      <button class="opt">复制成两个 Table 面板上下摆放</button>
+      <div class="ans">正确答案：<b>Join by field</b>。两个查询各自返回带 instance 标签的结果，Transform 的 Join by field 按 instance 横向拼成一张表。or 连接的是序列不是字段；两个面板则失去了同行对比能力。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 写 rate() 时，Grafana 官方推荐的时间窗口变量是？</div>
+      <button class="opt">$__interval，它随面板宽度自动调整</button>
+      <button class="opt">$__range，它与当前时间范围一致</button>
+      <button class="opt">$__rate_interval，它保证至少覆盖 4 倍采集间隔</button>
+      <div class="ans">正确答案：<b>$__rate_interval</b>。它是 max($__interval, 4×scrape_interval)，专门为 rate 设计，避免窗口太短导致样本不足。$__interval 服务于图表下采样，$__range 是总时间范围。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 Grafana Unified Alerting 与 Prometheus 告警的关系，正确的是？</div>
+      <button class="opt">互补关系：Prometheus rules 适合 Git 管理和 recording rule，Grafana 适合多数据源统一告警</button>
+      <button class="opt">Grafana Unified Alerting 已完全取代 Prometheus 告警规则</button>
+      <button class="opt">两者不能同时使用，会互相冲突</button>
+      <div class="ans">正确答案：<b>互补</b>。Prometheus rules 有 Git 版本管理、promtool 单测、recording rule 预计算；Grafana 告警的优势是任何数据源（SQL/Loki）都能配、离仪表盘近。同一个告警两边都配会收到重复通知。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 一个面板要按 instance 变量重复渲染，但该变量有 200 个取值，最佳做法是？</div>
+      <button class="opt">直接 repeat，Grafana 会自动分页</button>
+      <button class="opt">不用 repeat，改用 Table 面板展示所有实例，或先用变量筛选缩小范围</button>
+      <button class="opt">把变量改成 Multi-value 就解决了</button>
+      <div class="ans">正确答案：<b>Table 或变量筛选</b>。repeat 200 个面板会让浏览器卡死，Grafana 也不会自动分页。经验红线是 repeat 不超过 20 个；需要看全量对比时，Table 面板一行一个实例才是正解。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. Heatmap 面板显示空白，最可能的原因是？</div>
+      <button class="opt">数据源配错了</button>
+      <button class="opt">单位没设置为 percent</button>
+      <button class="opt">查询的数据不是 histogram bucket 格式，Heatmap 需要 [bucket上限, 时间, 计数] 结构</button>
+      <div class="ans">正确答案：<b>数据格式不对</b>。Heatmap 需要直方图数据（_bucket 序列或原生直方图），喂普通 Gauge 序列会得到空白面板。这是新手最常误判为"面板坏了"的假象。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 防止 Grafana 仪表盘被 UI 随意改掉、保证 Git 是唯一事实源，应该配？</div>
+      <button class="opt">dashboards.yml provider 里设 allowUiUpdates: false 和 disableDeletion: true</button>
+      <button class="opt">给仪表盘设置只读角色，全员 viewer</button>
+      <button class="opt">把 Grafana 部署在只读文件系统上</button>
+      <div class="ans">正确答案：<b>allowUiUpdates: false</b>（UI 修改不持久化）+ disableDeletion: true（UI 删不掉）。全员 viewer 会挡住正常编辑需求；只读文件系统连 provisioning 都加载不了。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用操作路径速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>Configuration → Data sources → Add</code><span class="desc">添加数据源，Save &amp; test 验证连通</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Dashboard settings → Variables → New</code><span class="desc">新建模板变量，Refresh 按依赖链配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>面板 Edit → Transform → Join by field</code><span class="desc">多查询按字段拼接成表</span><button class="copy">复制</button></div>
+    <div class="crow"><code>面板 Edit → Data links</code><span class="desc">点击曲线跳转到日志/其他仪表盘</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Alerting → Alert rules → New</code><span class="desc">建统一告警，配 pending period 防抖</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Alerting → Notification policies</code><span class="desc">配路由树，label 匹配到联系点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Dashboard → Share → Export</code><span class="desc">导出 JSON 进 Git</span><button class="copy">复制</button></div>
+    <div class="crow"><code>/etc/grafana/provisioning/</code><span class="desc">数据源/仪表盘/告警的配置文件目录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grafana-cli admin reset-admin-password</code><span class="desc">忘记 admin 密码时重置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -u admin:pw localhost:3000/api/health</code><span class="desc">API 健康检查，脚本化巡检</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>Dashboard JSON 关键字段</h3>
+  <pre><span class="c"># 看懂导出的 JSON，是 GitOps 管理仪表盘的基本功</span>
+{
+  "uid": "api-overview",              <span class="c"># 稳定 ID，链接和告警引用它，别改</span>
+  "title": "API 服务总览",
+  "tags": ["api", "red"],
+  "timezone": "browser",              <span class="c"># 或 "utc" / "Asia/Shanghai"</span>
+  "refresh": "30s",
+  "templating": {                     <span class="c"># 变量定义数组</span>
+    "list": [{
+      "name": "job",
+      "type": "query",
+      "datasource": {"type": "prometheus", "uid": "prom-uid"},
+      "query": "label_values(up, job)",
+      "refresh": 2,                   <span class="c"># 1=load 2=time change 3=variable change</span>
+      "multi": true,
+      "includeAll": true
+    }]
+  },
+  "panels": [{                        <span class="c"># 新版本是扁平 panels + gridPos</span>
+    "id": 1,
+    "type": "timeseries",
+    "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+    "targets": [{
+      "expr": "sum by (instance) (rate(http_requests_total{job=~\"$job\"}[$__rate_interval]))",
+      "legendFormat": "{{instance}}"
+    }],
+    "fieldConfig": {
+      "defaults": {
+        "unit": "reqps",              <span class="c"># 单位：reqps/percent/bytes/ms/s</span>
+        "thresholds": {
+          "steps": [
+            {"color": "green"},
+            {"color": "yellow", "value": 70},
+            {"color": "red", "value": 90}
+          ]
+        }
+      }
+    }
+  }]
+}</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Data Source</b></td><td>Grafana 查询的后端：Prometheus、Loki、SQL 数据库等</td></tr>
+    <tr><td><b>Dashboard</b></td><td>面板的有序集合，本质是一份 JSON 文档</td></tr>
+    <tr><td><b>Panel</b></td><td>单个可视化单元，由查询 + 类型 + 配置构成</td></tr>
+    <tr><td><b>Template variable</b></td><td>仪表盘级参数，查询里用 $var 引用，实现交互筛选</td></tr>
+    <tr><td><b>Row</b></td><td>面板分组容器，可折叠、可按变量 repeat</td></tr>
+    <tr><td><b>Transform</b></td><td>查询返回后的浏览器端数据处理（JOIN/聚合/重命名）</td></tr>
+    <tr><td><b>Join by field</b></td><td>按共同字段横向拼接多个查询结果</td></tr>
+    <tr><td><b>Heatmap</b></td><td>热力图面板，需要 histogram bucket 数据</td></tr>
+    <tr><td><b>Unified Alerting</b></td><td>Grafana 8+ 的统一告警系统，9.0 起默认</td></tr>
+    <tr><td><b>Alert rule</b></td><td>查询 + 条件 + pending period 的告警定义</td></tr>
+    <tr><td><b>Contact point</b></td><td>通知渠道：Email/Slack/钉钉/Webhook 等</td></tr>
+    <tr><td><b>Notification policy</b></td><td>按 label 路由告警到联系点的策略树</td></tr>
+    <tr><td><b>Mute timing</b></td><td>周期性静默时间窗，如每晚维护窗口不告警</td></tr>
+    <tr><td><b>Provisioning</b></td><td>用 YAML/JSON 文件预配置 Grafana，替代手点 UI</td></tr>
+    <tr><td><b>Provider</b></td><td>dashboards.yml 里声明仪表盘 JSON 的加载来源</td></tr>
+    <tr><td><b>RED / USE</b></td><td>RED：Rate/Errors/Duration（服务）；USE：Utilization/Saturation/Errors（资源）</td></tr>
+    <tr><td><b>Annotation</b></td><td>在时间轴上打标记（发布、变更），解释曲线拐点</td></tr>
+    <tr><td><b>Playlist</b></td><td>多个仪表盘轮播，值班大屏场景</td></tr>
+    <tr><td><b>Folder</b></td><td>仪表盘分组与权限载体，可配 RBAC</td></tr>
+    <tr><td><b>Grafonnet / Terraform provider</b></td><td>用代码生成仪表盘 JSON 的两大工具链</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 Prometheus + node_exporter 数据源做四件事 —— ① 建一个带 job/instance 两个联动变量的仪表盘；② 用 Time series + Stat + Table 三种面板展示 QPS/错误率/P99，给 Stat 配阈值；③ 用两个查询 + Join by field 做一张实例对比表；④ 给仪表盘配 Data link 跳到日志；⑤ 把仪表盘 Export 成 JSON，写一个 dashboards.yml provider 让它 provisioning 加载。<br><br>
+    <b>之后值得单独学：</b>grafonnet 代码化仪表盘、Grafana RBAC 与 Folder 权限、多租户组织（Orgs）、场景注解（Scene 框架，Grafana 11 的新范式）、以及基于 SLO 的 Burn rate 仪表盘设计。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Grafana · 上线前务必检查：变量刷新、rate 窗口、面板数量、JSON 是否进 Git</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（面板选型）和模块 6（设计原则）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Grafana UI 里点。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边点：docker run -d -p 3000:3000 grafana/grafana，配 Prometheus 数据源';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

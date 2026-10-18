@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟上手 tmux</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 工程基础</span>
+    <h1>二十分钟上手 tmux</h1>
+    <p class="sub">tmux 解决的不是"分屏"，而是<b>会话与终端的解耦</b>。理解了 session / window / pane 这三层，断线重连、多任务并行、远程协作都变成同一个模型的不同用法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 层结构</span>
+      <span class="chip"><b>2</b> 种分屏</span>
+      <span class="chip"><b>9</b> 个踩坑点</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议直接在一个 SSH 会话里开 tmux 跟着敲 —— 中途故意断网，再重连看现场还在不在</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>装好、开一个、再退出</h2></div>
+  <pre><span class="c"># 安装</span>
+apt install tmux          <span class="c"># Debian / Ubuntu</span>
+yum install tmux          <span class="c"># RHEL / CentOS</span>
+brew install tmux         <span class="c"># macOS</span>
+
+<span class="c"># 版本：3.x 和 2.x 的部分默认键位、复制模式行为不同</span>
+tmux -V
+
+<span class="c"># 开一个命名会话（强烈建议总是命名）</span>
+tmux new -s work
+
+<span class="c"># 在 tmux 里：先按 Ctrl-b，松开，再按 d —— 这叫 detach</span>
+<span class="c"># 回到普通终端后，看会话还在不在</span>
+tmux ls
+
+<span class="c"># 重新接回去</span>
+tmux attach -t work
+
+<span class="c"># 彻底结束</span>
+tmux kill-session -t work</pre>
+  <div class="callout warn">
+    <b>先建立正确预期：tmux 保护的是"会话"，不是"机器"。</b><br>
+    服务器重启、tmux server 被 kill、磁盘写满导致进程被杀 —— 这些情况下会话一样会没。tmux 只保证<b>你的 SSH 连接断了、笔记本合盖了、Wi-Fi 切了</b>的时候，里面跑的进程还活着。<br>
+    真正要保命的任务，还得配 systemd、supervisor 或任务队列，别把 tmux 当进程守护用。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>为什么需要终端复用</h2></div>
+  <p class="lead">没有 tmux 的时候，一个 SSH 连接就是一个 shell。连接断了，shell 收到 SIGHUP，里面跑的东西跟着死。这是 Unix 终端几十年的默认行为。</p>
+  <table>
+    <tr><th style="width:170px">需求</th><th style="width:210px">没有 tmux</th><th>有 tmux</th></tr>
+    <tr><td><b>跑长任务</b></td><td>断网就中断；用 <span class="k">nohup</span> 能活，但输出只能重定向到文件，没法回去交互</td><td>进程挂在 tmux server 上，<b>断线不影响</b>，重连后原地继续</td></tr>
+    <tr><td><b>同时看多个东西</b></td><td>开多个 SSH 窗口，或者在本地开多个终端标签</td><td>一个连接里分屏，<b>还能同步操作多个 pane</b></td></tr>
+    <tr><td><b>远程协作</b></td><td>共享屏幕，延迟高、看不清</td><td>两个人 <span class="k">attach</span> 同一个会话，<b>各自独立的光标，同一份现场</b></td></tr>
+    <tr><td><b>保留上下文</b></td><td>重连后 cd 到哪、跑过什么、滚上去的日志，全没了</td><td>滚动缓冲、命令历史、目录、正在跑的前台进程，全在</td></tr>
+  </table>
+  <h4>和 nohup / screen 的对比</h4>
+  <table>
+    <tr><th style="width:120px">方案</th><th style="width:200px">能力</th><th>局限</th></tr>
+    <tr><td class="f">nohup cmd &amp;</td><td>忽略 SIGHUP，输出到 nohup.out</td><td><b>不能交互</b>，不能分屏，不能多人共享，进程管理靠 ps</td></tr>
+    <tr><td class="f">screen</td><td>会话复用、detach/attach</td><td>功能老、配置语法古怪、分屏弱、活跃度低</td></tr>
+    <tr><td class="f">tmux</td><td>会话 + 窗口 + 面板、复制模式、脚本化、多人共享</td><td>需要学前缀键；默认配置不算好看</td></tr>
+    <tr><td class="f">systemd service</td><td>开机自启、崩溃重启、日志进 journal</td><td><b>不是给人交互用的</b>，适合真正的后台服务</td></tr>
+  </table>
+  <div class="callout">
+    <b>一句话区分：</b>要"<b>人回来继续操作</b>"用 tmux；要"<b>机器自己保证一直跑</b>"用 systemd。前者是工作台，后者是生产线。很多团队用 tmux 跑生产任务，机器一重启就全没了 —— 这是用错了工具。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>三层模型：理解 tmux 的钥匙</h2></div>
+  <p class="lead">tmux 的所有命令都围绕三个层级。分不清这三层，就会出现"我明明建了新窗口，怎么找不到了"这类问题。</p>
+  <pre><span class="c"># 层级关系</span>
+
+<span class="b">tmux server</span>                        <span class="c"># 后台常驻进程，管理所有会话</span>
+│
+├── <span class="b">session</span> "work"                 <span class="c"># 一次工作现场，可被多个客户端 attach</span>
+│   ├── <span class="b">window</span> 0 "editor"          <span class="c"># 一个窗口 = 一屏，占满整个终端</span>
+│   │   ├── <span class="b">pane</span> 0  (vim)          <span class="c"># 窗口里切出来的一块</span>
+│   │   └── <span class="b">pane</span> 1  (shell)
+│   ├── <span class="b">window</span> 1 "server"
+│   │   ├── <span class="b">pane</span> 0  (npm run dev)
+│   │   └── <span class="b">pane</span> 1  (logs)
+│   └── <span class="b">window</span> 2 "db"
+│       └── <span class="b">pane</span> 0  (psql)
+│
+└── <span class="b">session</span> "debug"                <span class="c"># 另一个独立现场，窗口互不相干</span>
+    └── <span class="b">window</span> 0 "shell"</pre>
+  <table>
+    <tr><th style="width:110px">层级</th><th style="width:200px">是什么</th><th>什么时候用它</th></tr>
+    <tr><td><b>session</b></td><td>一个独立的工作现场，有自己的窗口集合、当前目录、环境变量</td><td><b>按项目 / 按任务分</b>：work、debug、deploy</td></tr>
+    <tr><td><b>window</b></td><td>占满整个终端的一屏，相当于浏览器的一个标签页</td><td><b>按角色分</b>：编辑、跑服务、看日志、数据库</td></tr>
+    <tr><td><b>pane</b></td><td>窗口内切分出来的一块，每个 pane 是一个独立的伪终端</td><td><b>需要并排对照时用</b>：左边改代码、右边看测试输出</td></tr>
+  </table>
+  <h4>三个容易混淆的对应关系</h4>
+  <ul>
+    <li><b>session 不是"连接"。</b>一个 session 可以被多个客户端同时 attach（多人协作），一个客户端也可以随时切到别的 session。<b>连接断了，session 还在。</b></li>
+    <li><b>window 不是"进程"。</b>一个 window 可以有很多 pane，每个 pane 里跑各自的进程。关掉 pane 里的 shell，pane 就消失；关掉 window，里面所有 pane 一起消失。</li>
+    <li><b>pane 不是"分屏布局"。</b>布局是 window 的属性（<span class="k">select-layout</span>），pane 是实际存在的终端。<b>换布局不会杀掉 pane</b>，只是重新排列。</li>
+  </ul>
+  <div class="callout ok">
+    <b>命名习惯决定你能不能用好 tmux：</b><br>
+    ① <b>session 按项目命名</b>：<span class="k">tmux new -s blog</span>、<span class="k">tmux new -s api</span>。别用默认的 0、1、2 —— 一周后你根本不知道哪个是哪个。<br>
+    ② <b>window 按角色命名</b>：<span class="k">edit</span>、<span class="k">run</span>、<span class="k">log</span>、<span class="k">db</span>。用 <span class="k">Ctrl-b ,</span> 改名。<br>
+    ③ pane 不用命名，但可以 <span class="k">Ctrl-b q</span> 显示编号，按数字直接跳。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>前缀键与核心操作</h2></div>
+  <p class="lead">tmux 的所有快捷键都是<b>两段式</b>：先按前缀键 <span class="k">Ctrl-b</span>，<b>松开</b>，再按命令键。这个设计是为了不和终端里的程序抢键位。</p>
+  <pre><span class="c"># 前缀键的按法（新手最常错的地方）</span>
+按住 Ctrl → 按一下 b → <span class="b">两个键都松开</span> → 再按命令键
+
+<span class="c"># 例：分屏</span>
+<span class="b">Ctrl-b</span> 松开 <span class="b">%</span>      <span class="c"># 左右分（vertical split，两个 pane 并排）</span>
+<span class="b">Ctrl-b</span> 松开 <span class="b">"</span>      <span class="c"># 上下分（horizontal split，一上一下）</span>
+
+<span class="c"># 记法：% 像一条竖线，所以是左右分；" 像两条横线，所以是上下分</span></pre>
+  <h4>最常用的十几个键</h4>
+  <table>
+    <tr><th style="width:140px">按键</th><th style="width:180px">作用</th><th>备注</th></tr>
+    <tr><td class="f">Ctrl-b ?</td><td>列出所有键位</td><td>忘了就按这个，比查文档快</td></tr>
+    <tr><td class="f">Ctrl-b d</td><td>detach，脱离会话</td><td><b>最重要的一键</b>。会话继续在后台跑</td></tr>
+    <tr><td class="f">Ctrl-b c</td><td>新建 window</td><td>create</td></tr>
+    <tr><td class="f">Ctrl-b ,</td><td>重命名当前 window</td><td>养成习惯，别留一堆 "bash"</td></tr>
+    <tr><td class="f">Ctrl-b n / p</td><td>下一个 / 上一个 window</td><td>next / previous</td></tr>
+    <tr><td class="f">Ctrl-b 0-9</td><td>跳到指定编号的 window</td><td>编号在状态栏能看到</td></tr>
+    <tr><td class="f">Ctrl-b w</td><td>列出所有 window 供选择</td><td>窗口多了比按 n 快</td></tr>
+    <tr><td class="f">Ctrl-b %</td><td>左右分屏</td><td>新 pane 在当前 pane 的右边</td></tr>
+    <tr><td class="f">Ctrl-b "</td><td>上下分屏</td><td>新 pane 在下方</td></tr>
+    <tr><td class="f">Ctrl-b o</td><td>循环切换 pane</td><td>两个 pane 时最顺手</td></tr>
+    <tr><td class="f">Ctrl-b 方向键</td><td>按方向切 pane</td><td>比 o 更精准</td></tr>
+    <tr><td class="f">Ctrl-b z</td><td>当前 pane 最大化 / 还原</td><td>zoom。临时看全屏，再按一次还原</td></tr>
+    <tr><td class="f">Ctrl-b x</td><td>关闭当前 pane</td><td>会问 y/n 确认</td></tr>
+    <tr><td class="f">Ctrl-b !</td><td>把当前 pane 拆成独立 window</td><td>break-pane，布局乱了时很好用</td></tr>
+    <tr><td class="f">Ctrl-b 空格</td><td>切换预设布局</td><td>even-horizontal / tiled / main-vertical 等</td></tr>
+    <tr><td class="f">Ctrl-b [</td><td>进入复制模式（可滚屏）</td><td>见模块 5</td></tr>
+    <tr><td class="f">Ctrl-b :</td><td>打开命令提示符</td><td>任何操作都有对应的命令形式</td></tr>
+  </table>
+  <h4>调整 pane 大小</h4>
+  <pre><span class="c"># 方法一：命令模式（精确，可重复）</span>
+<span class="b">Ctrl-b</span> : resize-pane -L 10      <span class="c"># 向左扩 10 列</span>
+<span class="b">Ctrl-b</span> : resize-pane -R 10
+<span class="b">Ctrl-b</span> : resize-pane -U 5
+<span class="b">Ctrl-b</span> : resize-pane -D 5
+
+<span class="c"># 方法二：按住前缀键 + 方向键（3.x 支持连续调整）</span>
+<span class="b">Ctrl-b</span> 然后按住 <span class="b">Ctrl</span> + 方向键
+
+<span class="c"># 方法三：直接选布局，让 tmux 帮你算</span>
+<span class="b">Ctrl-b</span> <span class="b">Alt-1</span> ~ <span class="b">Alt-5</span>     <span class="c"># 五种预设布局</span>
+<span class="b">Ctrl-b</span> : select-layout tiled
+
+<span class="c"># 平均分配</span>
+<span class="b">Ctrl-b</span> : select-layout even-horizontal
+<span class="b">Ctrl-b</span> : select-layout even-vertical</pre>
+  <div class="callout warn">
+    <b>前缀键按不出来？</b>三种常见原因：<br>
+    ① 在 tmux 里又开了 tmux（嵌套），<span class="k">Ctrl-b</span> 被内层吃掉了。按两次 <span class="k">Ctrl-b</span> 可以把一次字面量传给内层。<br>
+    ② 终端或 IDE 把 <span class="k">Ctrl-b</span> 绑走了（比如某些终端的"向上翻页"）。换前缀键，见模块 6。<br>
+    ③ 用了 <span class="k">screen</span> 键位模式（<span class="k">set -g prefix C-a</span> 但没 unset 旧的），两个前缀都在，容易混。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>会话管理：命名是第一步</h2></div>
+  <pre><span class="c"># 新建并命名</span>
+tmux new -s blog
+tmux new-session -s blog -c ~/code/blog     <span class="c"># 指定起始目录</span>
+tmux new -s blog -n editor                  <span class="c"># 同时命名第一个 window</span>
+
+<span class="c"># 列出所有会话</span>
+tmux ls
+<span class="c"># blog: 3 windows (created Sat Oct 17 10:12:03 2026) (attached)</span>
+<span class="c"># debug: 1 windows (created Sat Oct 17 09:40:11 2026)</span>
+
+<span class="c"># 接回去</span>
+tmux attach -t blog
+tmux a -t blog                <span class="c"># 简写</span>
+tmux attach -d -t blog        <span class="c"># 把其他客户端踢掉，自己独占</span>
+
+<span class="c"># 在 tmux 内部切换会话</span>
+<span class="b">Ctrl-b</span> s                     <span class="c"># 列出会话并选择</span>
+<span class="b">Ctrl-b</span> : switch-client -t debug
+
+<span class="c"># 重命名</span>
+tmux rename-session -t blog blog-old
+
+<span class="c"># 结束</span>
+tmux kill-session -t blog
+tmux kill-server              <span class="c"># 干掉所有会话（慎用）</span>
+
+<span class="c"># 退出所有客户端但保留会话</span>
+<span class="b">Ctrl-b</span> d</pre>
+  <h4>为什么命名这么重要</h4>
+  <table>
+    <tr><th style="width:150px">不命名</th><th>命名</th></tr>
+    <tr><td>一周后 <span class="k">tmux ls</span> 看到 <span class="k">0: 2 windows</span>、<span class="k">1: 5 windows</span>、<span class="k">2: 1 windows</span>，完全不知道哪个是哪个</td><td><span class="k">blog: 3 windows</span>、<span class="k">api: 4 windows</span>，一眼定位</td></tr>
+    <tr><td>脚本里只能靠编号，重启后编号可能变</td><td>脚本可以按名字幂等地创建 / 复用</td></tr>
+    <tr><td>多人协作时说不清"你 attach 到哪个"</td><td>"attach 到 deploy" 一句话说清</td></tr>
+  </table>
+  <pre><span class="c"># 幂等创建：存在就 attach，不存在就新建（写进 shell 函数最实用）</span>
+tmux new -A -s blog
+<span class="c"># -A = attach if exists, otherwise create</span>
+
+<span class="c"># 脚本里判断会话是否存在</span>
+if tmux has-session -t blog 2&gt;/dev/null; then
+  tmux attach -t blog
+else
+  tmux new -s blog
+fi
+
+<span class="c"># 一次性建好一套开发环境（见模块 7 的完整版）</span>
+tmux new -d -s dev
+tmux new-window -t dev -n edit
+tmux new-window -t dev -n run
+tmux attach -t dev</pre>
+  <div class="callout ok">
+    <b>推荐的会话划分方式：</b>一个项目一个 session，而不是一个任务一个 session。<br>
+    比如做后端，就 <span class="k">tmux new -s api</span>，里面开四个 window：<span class="k">edit</span>（编辑器）、<span class="k">run</span>（服务）、<span class="k">log</span>（tail 日志）、<span class="k">db</span>（数据库客户端）。<br>
+    这样"切项目"就是 <span class="k">Ctrl-b s</span> 换个 session，"切角色"就是 <span class="k">Ctrl-b 2</span> 换个 window。<b>两层各司其职，比开十个 SSH 窗口清楚得多。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>复制模式与滚屏</h2></div>
+  <p class="lead">tmux 有自己的滚动缓冲，鼠标滚轮在 tmux 里默认不生效（或者被鼠标模式接管）。要看历史输出，必须进<b>复制模式</b>。</p>
+  <pre><span class="c"># 进入复制模式</span>
+<span class="b">Ctrl-b</span> [
+
+<span class="c"># 默认是 emacs 键位；建议改成 vi（见模块 6）</span>
+<span class="b">Ctrl-u / Ctrl-d</span>     <span class="c"># 上 / 下翻半屏</span>
+<span class="b">Ctrl-b / Ctrl-f</span>     <span class="c"># 上 / 下翻整屏</span>
+<span class="b">g / G</span>                <span class="c"># 跳到缓冲区顶部 / 底部（vi 模式）</span>
+<span class="b">/pattern</span>             <span class="c"># 向上搜索，n / N 跳转</span>
+<span class="b">?pattern</span>             <span class="c"># 向下搜索</span>
+<span class="b">q</span> 或 <span class="b">Esc</span>            <span class="c"># 退出复制模式</span>
+
+<span class="c"># 选中并复制（vi 模式）</span>
+<span class="b">Space</span>                <span class="c"># 开始选择</span>
+移动光标              <span class="c"># 选择范围</span>
+<span class="b">Enter</span>                <span class="c"># 复制到 tmux 缓冲区并退出</span>
+<span class="b">Ctrl-b ]</span>             <span class="c"># 粘贴缓冲区内容</span></pre>
+  <h4>三种"剪贴板"别搞混</h4>
+  <table>
+    <tr><th style="width:170px">剪贴板</th><th style="width:190px">谁在用</th><th>怎么进 / 怎么出</th></tr>
+    <tr><td><b>tmux buffer</b></td><td>tmux 自己维护的缓冲区栈</td><td><span class="k">Ctrl-b ]</span> 粘贴；<span class="k">tmux list-buffers</span> 查看</td></tr>
+    <tr><td><b>系统剪贴板</b></td><td>你的桌面（Windows/macOS/Linux GUI）</td><td>复制模式下按 <span class="k">Enter</span> 不一定能进系统剪贴板，取决于配置和终端</td></tr>
+    <tr><td><b>终端自己的选区</b></td><td>终端模拟器（iTerm2、Windows Terminal）</td><td>按住 <span class="k">Shift</span> 拖动可以绕过 tmux 的鼠标捕获</td></tr>
+  </table>
+  <pre><span class="c"># 让 tmux 把复制的内容送到系统剪贴板（OSC 52）</span>
+<span class="c"># 需要终端支持 OSC 52（iTerm2、Windows Terminal、kitty、alacritty 等较新版本）</span>
+<span class="b">set -g set-clipboard on</span>
+
+<span class="c"># 某些终端需要显式开启，或者用 external 模式</span>
+<span class="b">set -g set-clipboard external</span>
+
+<span class="c"># 兼容方案：复制后手动导出（Linux 有 xclip 时）</span>
+tmux show-buffer | xclip -selection clipboard
+<span class="c"># macOS</span>
+tmux show-buffer | pbcopy
+
+<span class="c"># 把整个滚动缓冲区存成文件</span>
+tmux capture-pane -t 0 -p -S - &gt; ~/pane-history.txt
+<span class="c"># -S - 表示从缓冲区最开头开始</span>
+
+<span class="c"># 管理缓冲区</span>
+tmux list-buffers
+tmux save-buffer ~/clip.txt
+tmux delete-buffer -b 0</pre>
+  <div class="callout warn">
+    <b>版本差异会让人怀疑人生：</b>tmux 2.4 之前，复制模式的默认键位和现在不一样；2.4 之后引入了 <span class="k">mode-keys</span> 与更接近 vi 的行为；3.x 又调整了鼠标和 <span class="k">set-clipboard</span> 的处理。<br>
+    如果你照着某篇老教程按键没反应，先 <span class="k">tmux -V</span> 看版本，再看 <span class="k">Ctrl-b ?</span> 里<b>当前环境</b>的实际绑定 —— 以运行时为准，别以文章为准。
+  </div>
+  <h4>history-limit：滚多少行</h4>
+  <pre><span class="c"># 默认 2000 行，跑一次构建日志就冲没了</span>
+<span class="b">set -g history-limit 50000</span>
+
+<span class="c"># 注意：这个值只对"新建的 pane"生效</span>
+<span class="c"># 已经开着的 pane 不会追溯变大，需要重开</span>
+
+<span class="c"># 代价：每个 pane 都可能吃几十 MB 内存</span>
+<span class="c"># 50 个 pane × 50000 行 × 每行几百字节 ≈ 几百 MB，小机器要克制</span></pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>配置：二十行就够用</h2></div>
+  <p class="lead">配置文件是 <span class="k">~/.tmux.conf</span>。改完执行 <span class="k">tmux source-file ~/.tmux.conf</span>，或者 <span class="k">Ctrl-b :source-file ~/.tmux.conf</span>。</p>
+  <pre><span class="c"># ~/.tmux.conf —— 最小可用集</span>
+
+<span class="c"># ===== 前缀键：改成 Ctrl-a（手更顺，且不和 Ctrl-b 翻页冲突）=====</span>
+<span class="b">unbind</span> C-b
+<span class="b">set -g prefix</span> C-a
+<span class="b">bind</span> C-a send-prefix        <span class="c"># 连按两次 Ctrl-a 可以把一次传给内层程序</span>
+
+<span class="c"># ===== 基础行为 =====</span>
+<span class="b">set -g mouse on</span>                    <span class="c"># 鼠标选 pane、滚轮滚屏、拖动调大小</span>
+<span class="b">set -g base-index 1</span>                <span class="c"># window 从 1 开始编号（和键盘 1 对齐）</span>
+<span class="b">setw -g pane-base-index 1</span>          <span class="c"># pane 也从 1 开始</span>
+<span class="b">set -g renumber-windows on</span>         <span class="c"># 关掉中间窗口后自动补编号</span>
+<span class="b">set -g history-limit 50000</span>         <span class="c"># 滚动缓冲行数</span>
+<span class="b">set -g escape-time 10</span>              <span class="c"># 关键：默认 500ms，会让 Vim 的 Esc 明显延迟</span>
+<span class="b">set -g focus-events on</span>             <span class="c"># 让 vim 等程序知道 pane 失焦</span>
+<span class="b">set -g default-terminal "tmux-256color"</span>
+<span class="b">set -ga terminal-overrides ",*256col*:Tc"</span>   <span class="c"># 真彩色</span>
+
+<span class="c"># ===== 分屏：用更顺手的键，并且继承当前目录 =====</span>
+<span class="b">bind | split-window -h -c "#{pane_current_path}"</span>
+<span class="b">bind - split-window -v -c "#{pane_current_path}"</span>
+<span class="b">bind h select-pane -L</span>
+<span class="b">bind j select-pane -D</span>
+<span class="b">bind k select-pane -U</span>
+<span class="b">bind l select-pane -R</span>
+
+<span class="c"># ===== 复制模式用 vi 键位 =====</span>
+<span class="b">setw -g mode-keys vi</span>
+<span class="b">bind -T copy-mode-vi v send-keys -X begin-selection</span>
+<span class="b">bind -T copy-mode-vi y send-keys -X copy-selection-and-cancel</span>
+
+<span class="c"># ===== 状态栏 =====</span>
+<span class="b">set -g status-interval 5</span>
+<span class="b">set -g status-left "[#S] "</span>
+<span class="b">set -g status-right "%H:%M %d-%b"</span>
+<span class="b">set -g status-style "bg=#1f2430,fg=#c8d3f5"</span>
+<span class="b">set -g pane-border-style "fg=#3b4261"</span>
+<span class="b">set -g pane-active-border-style "fg=#82aaff"</span>
+
+<span class="c"># ===== 快捷键：重载配置 =====</span>
+<span class="b">bind r source-file ~/.tmux.conf \; display "config reloaded"</span>
+
+<span class="c"># ===== 从 tmux 里直接开新会话时，自动带上当前目录 =====</span>
+<span class="b">bind c new-window -c "#{pane_current_path}"</span></pre>
+  <table>
+    <tr><th style="width:200px">配置项</th><th>为什么值得改</th></tr>
+    <tr><td class="f">escape-time 10</td><td><b>最容易被忽略的一条。</b>默认 500ms 是为了区分"单独的 Esc"和"转义序列"，代价是 Vim 里按 Esc 后要等半秒才退出插入模式</td></tr>
+    <tr><td class="f">mouse on</td><td>能用鼠标选 pane、滚屏、拖边框。但会抢走终端的文本选择，需要按 Shift 绕过</td></tr>
+    <tr><td class="f">base-index 1</td><td>键盘上 1 在最左边，编号从 1 开始更符合直觉（默认从 0 开始）</td></tr>
+    <tr><td class="f">renumber-windows on</td><td>关掉 2 号窗口后，3 号自动变 2 号，编号永远连续</td></tr>
+    <tr><td class="f">pane_current_path</td><td>新分屏 / 新窗口直接落在当前目录，不用重新 cd</td></tr>
+    <tr><td class="f">default-terminal</td><td>决定 <span class="k">$TERM</span>，影响颜色和按键。设错会导致颜色发灰、Ctrl-方向键失灵</td></tr>
+    <tr><td class="f">status-interval</td><td>状态栏刷新间隔，默认 15 秒。放时钟的话会觉得"时间不动"</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>配置写错会导致 tmux 起不来。</b>如果改完 <span class="k">~/.tmux.conf</span> 后 <span class="k">tmux new</span> 直接报错退出，用这个方式跳过配置启动：<br>
+    <span class="k">tmux -f /dev/null new -s rescue</span><br>
+    然后在里面把配置改回去。<b>改配置前先备份</b>，或者用 <span class="k">tmux -f ~/.tmux.conf.new new -s test</span> 先验证。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>脚本化：一条命令拉起开发环境</h2></div>
+  <p class="lead">tmux 的每个操作都有命令行形式。这意味着你可以把"打开项目要做的五件事"写成一个脚本，一条命令搞定。</p>
+  <pre><span class="c"># 完整例子：一条命令建好 4 窗口 + 分屏的开发环境</span>
+<span class="b">#!/usr/bin/env bash</span>
+set -euo pipefail
+
+SESSION=blog
+DIR=~/code/blog
+
+<span class="c"># 已存在就直接接回去，避免 duplicate session 报错</span>
+if tmux has-session -t "$SESSION" 2&gt;/dev/null; then
+  exec tmux attach -t "$SESSION"
+fi
+
+<span class="c"># 第一个窗口：编辑器（后台创建，不立即 attach）</span>
+tmux new-session -d -s "$SESSION" -n edit -c "$DIR"
+tmux send-keys -t "$SESSION:edit" 'vim .' C-m
+
+<span class="c"># 第二个窗口：跑服务，右侧再分一个看日志</span>
+tmux new-window -t "$SESSION" -n run -c "$DIR"
+tmux send-keys -t "$SESSION:run" 'npm run dev' C-m
+tmux split-window -h -t "$SESSION:run" -c "$DIR"
+tmux send-keys -t "$SESSION:run.2" 'tail -f logs/app.log' C-m
+
+<span class="c"># 第三个窗口：数据库</span>
+tmux new-window -t "$SESSION" -n db -c "$DIR"
+tmux send-keys -t "$SESSION:db" 'psql blog_dev' C-m
+
+<span class="c"># 第四个窗口：一个空 shell，留给临时命令</span>
+tmux new-window -t "$SESSION" -n shell -c "$DIR"
+
+<span class="c"># 回到第一个窗口，调整布局</span>
+tmux select-window -t "$SESSION:edit"
+tmux select-layout -t "$SESSION:run" even-horizontal
+
+<span class="c"># 最后 attach</span>
+exec tmux attach -t "$SESSION"</pre>
+  <h4>脚本里常用的子命令</h4>
+  <table>
+    <tr><th style="width:230px">命令</th><th>作用</th></tr>
+    <tr><td class="f">new-session -d -s name</td><td>后台创建会话（<span class="k">-d</span> 不 attach）</td></tr>
+    <tr><td class="f">new-window -t s -n name</td><td>在指定会话里建窗口并命名</td></tr>
+    <tr><td class="f">split-window -h/-v -t s:w</td><td>水平 / 垂直分屏</td></tr>
+    <tr><td class="f">send-keys -t s:w.p 'cmd' C-m</td><td>向指定 pane 发送按键，<span class="k">C-m</span> 等于回车</td></tr>
+    <tr><td class="f">select-window / select-pane</td><td>切到指定窗口 / 面板</td></tr>
+    <tr><td class="f">select-layout tiled</td><td>套用预设布局</td></tr>
+    <tr><td class="f">has-session -t name</td><td>存在返回 0，不存在返回 1</td></tr>
+    <tr><td class="f">kill-session -t name</td><td>结束会话</td></tr>
+    <tr><td class="f">list-sessions -F "#{session_name}"</td><td>只输出会话名，方便脚本处理</td></tr>
+    <tr><td class="f">capture-pane -p -S -</td><td>把 pane 的全部缓冲输出到 stdout</td></tr>
+  </table>
+  <pre><span class="c"># 用 tmux 跑一个长任务，并等它结束（CI 场景）</span>
+tmux new-session -d -s build -c "$PWD"
+tmux send-keys -t build './build.sh; echo $? &gt; /tmp/build.exit' C-m
+
+<span class="c"># 轮询等待</span>
+while tmux has-session -t build 2&gt;/dev/null; do
+  sleep 5
+done
+cat /tmp/build.exit
+
+<span class="c"># 更优雅的同步机制：wait-for</span>
+tmux new-session -d -s job 'make test; tmux wait-for -S done'
+tmux wait-for done        <span class="c"># 阻塞，直到有人 -S 发信号</span>
+<span class="c"># 注意：wait-for 的 channel 名是全局的，别和别的脚本撞名</span>
+
+<span class="c"># 把 pane 的所有输出落盘（相当于 script 命令）</span>
+tmux pipe-pane -t build -o 'cat &gt;&gt; /tmp/build.log'</pre>
+  <div class="callout warn">
+    <b><span class="k">send-keys</span> 有两个坑：</b><br>
+    ① <b>时序。</b><span class="k">new-session -d</span> 返回时，shell 可能还没准备好接收输入。稳妥做法是在发送前 <span class="k">sleep 0.3</span>，或者发送一个无害命令探测。<br>
+    ② <b>引号。</b><span class="k">send-keys 'echo "hi"'</span> 里的引号会被 shell 先解释一层。复杂命令建议写进脚本文件，然后只发送 <span class="k">./script.sh</span>。<br>
+    另外 <span class="k">C-m</span> 是回车，<span class="k">C-c</span> 是中断，<span class="k">Escape</span> 要写成 <span class="k">Escape</span>（不是 <span class="k">Esc</span>）。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>与 SSH 配合：远程开发的标准工作流</h2></div>
+  <p class="lead">这是 tmux 最值钱的用法。核心只有一句话：<b>先连服务器，再进 tmux，所有工作都在 tmux 里做</b>。顺序反了，保护就失效了。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>本地 → 服务器：</b><span class="k">ssh deploy@10.0.0.5</span>。这一步建立的连接随时可能断，所以不要在这里直接跑长任务。</div></div>
+    <div class="step"><div class="txt"><b>服务器 → tmux：</b><span class="k">tmux new -A -s work</span>。存在就接回去，不存在就新建。之后所有命令都在 tmux 的 pane 里执行。</div></div>
+    <div class="step"><div class="txt"><b>网络断了：</b>SSH 断开，但 tmux server 还在，里面的进程继续跑。你的编辑器、构建、日志 tail 都活着。</div></div>
+    <div class="step"><div class="txt"><b>重新连上：</b>再 <span class="k">ssh</span> 一次，再 <span class="k">tmux attach -t work</span>。现场原样恢复，连光标位置和滚动历史都在。</div></div>
+    <div class="step"><div class="txt"><b>主动离开：</b>按 <span class="k">Ctrl-b d</span> detach，而不是 <span class="k">exit</span> 或关窗口。<span class="k">exit</span> 会结束 pane 里的 shell，如果那是最后一个 pane，会话就没了。</div></div>
+  </div>
+  <pre><span class="c"># 写进本地 ~/.ssh/config，连上就自动进 tmux</span>
+<span class="b">Host</span> dev
+  <span class="b">HostName</span> 10.0.0.5
+  <span class="b">User</span> deploy
+  <span class="b">RequestTTY</span> force
+  <span class="b">RemoteCommand</span> tmux new -A -s work
+<span class="c"># 这样 ssh dev 一条命令就到工作现场</span>
+
+<span class="c"># 如果不想自动进，但想快速接回</span>
+ssh dev -t 'tmux attach -t work || tmux new -s work'
+
+<span class="c"># 多人协作：两个人 attach 同一个会话</span>
+<span class="c"># A：tmux new -s pair</span>
+<span class="c"># B：ssh 上来后 tmux attach -t pair</span>
+<span class="c"># 两人看到同一份输出，各自有独立光标（不是屏幕共享）</span>
+<span class="c"># 注意：默认两人都能输入，想只读可以 attach -r</span>
+tmux attach -r -t pair        <span class="c"># 只读模式</span></pre>
+  <h4>tmux + SSH + mosh 的分工</h4>
+  <table>
+    <tr><th style="width:130px">层</th><th style="width:180px">解决什么</th><th>失效场景</th></tr>
+    <tr><td><b>SSH</b></td><td>加密传输、身份认证</td><td>网络切换、IP 变化、长时间空闲被 NAT 清理</td></tr>
+    <tr><td><b>mosh</b></td><td>UDP 传输、漫游、断线自动恢复、本地回显</td><td>不支持端口转发；需要放行 UDP</td></tr>
+    <tr><td><b>tmux</b></td><td>会话与终端解耦，进程不随连接死</td><td>服务器重启、tmux server 被杀</td></tr>
+  </table>
+  <pre><span class="c"># 最稳的远程开发组合</span>
+mosh deploy@10.0.0.5 -- tmux new -A -s work
+
+<span class="c"># 网络抖动由 mosh 扛，进程存活由 tmux 扛</span>
+<span class="c"># 即使 mosh 自己断了重连，tmux 里的现场也一直在</span>
+
+<span class="c"># 嵌套 tmux 时，内层的 prefix 要换掉，否则按键被外层吃掉</span>
+<span class="c"># 本地 tmux 用 C-a，远程 tmux 用 C-b，或者反过来</span>
+<span class="c"># 判断当前是否在 tmux 里：</span>
+echo $TMUX</pre>
+  <div class="callout ok">
+    <b>一条命令记住整个工作流：</b><span class="k">mosh host -- tmux new -A -s work</span>。<br>
+    它做了四件事：建立抗抖动的连接、恢复或创建会话、把 shell 放进会话、断线后可以原样回来。<b>把它做成 alias 或 SSH config，你就不需要再记别的了。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>九个真实踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 <span class="k">exit</span> 离开，而不是 detach</div><div class="pd"><span class="k">exit</span> 会结束 pane 里的 shell。如果那是最后一个 pane，window 关闭，session 也跟着结束。离开请按 <span class="k">Ctrl-b d</span>。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">在 tmux 里再开 tmux，前缀键失灵</div><div class="pd">内层把 <span class="k">Ctrl-b</span> 吃掉了。按两次 <span class="k">Ctrl-b</span> 可以穿透一层；长期方案是给内外层设不同的 prefix，或者用 <span class="k">$TMUX</span> 判断后禁止嵌套。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 <span class="k">history-limit</span> 调到几十万</div><div class="pd">每个 pane 都按上限预留缓冲，几十个 pane 就能吃掉几百 MB 到 GB 级内存。50000 行对绝大多数场景足够。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">没改 <span class="k">escape-time</span>，Vim 里 Esc 有明显延迟</div><div class="pd">默认 500ms 是为了区分单独 Esc 和转义序列。设成 10ms 后 Vim 手感立刻正常。这是"tmux 让 Vim 变卡"的最常见原因。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">开了 <span class="k">mouse on</span> 后选不中文字</div><div class="pd">鼠标事件被 tmux 捕获了。按住 <span class="k">Shift</span> 再拖动，可以绕过 tmux 直接用终端的选区。或者临时 <span class="k">Ctrl-b :set -g mouse off</span>。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">脚本里直接 <span class="k">tmux new -s name</span>，第二次运行报 duplicate session</div><div class="pd">用 <span class="k">tmux new -A -s name</span>，或者先 <span class="k">has-session</span> 判断。幂等是脚本的基本要求。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">复制模式下按 Enter 没进系统剪贴板</div><div class="pd">Enter 只把内容放进 tmux 的 buffer。要进系统剪贴板，需要 <span class="k">set-clipboard on</span> 且终端支持 OSC 52，或者用 <span class="k">tmux show-buffer | pbcopy/xclip</span>。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把 tmux 当进程守护用</div><div class="pd">服务器重启、OOM Killer、tmux server 被 kill，会话全没。需要开机自启和崩溃重启就用 systemd，tmux 只负责"人回来还能接着操作"。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">改了 <span class="k">.tmux.conf</span> 没生效</div><div class="pd">配置只在启动时读。要 <span class="k">tmux source-file ~/.tmux.conf</span>。另外 <span class="k">history-limit</span> 这类选项只对新建 pane 生效，老 pane 不会追溯。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. tmux 的三层结构中，<b>一个 window 里可以有多个</b>什么？</div>
+      <button class="opt">session</button>
+      <button class="opt">pane</button>
+      <button class="opt">server</button>
+      <div class="ans">正确答案：<b>pane</b>。层级是 server → session → window → pane。一个 session 有多个 window，一个 window 有多个 pane，反过来不成立。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 要离开 tmux 但让里面的任务继续跑，应该？</div>
+      <button class="opt">直接关掉终端窗口</button>
+      <button class="opt">在 shell 里输入 exit</button>
+      <button class="opt">按 Ctrl-b 然后按 d</button>
+      <div class="ans">正确答案：<b>Ctrl-b d</b>（detach）。<span class="k">exit</span> 会结束 shell，最后一个 pane 退出会导致会话结束。关终端窗口通常也能保活，但不如 detach 明确。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. <span class="k">Ctrl-b %</span> 和 <span class="k">Ctrl-b "</span> 分别是什么？</div>
+      <button class="opt">左右分屏、上下分屏</button>
+      <button class="opt">上下分屏、左右分屏</button>
+      <button class="opt">新建窗口、关闭窗口</button>
+      <div class="ans">正确答案：<b>左右分、上下分</b>。记法：<span class="k">%</span> 像一条竖线（竖着切），<span class="k">"</span> 像两条横线（横着切）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 为什么建议把 <span class="k">escape-time</span> 从默认的 500 改成 10？</div>
+      <button class="opt">减少内存占用</button>
+      <button class="opt">让 Vim 等程序收到 Esc 时不用等半秒，消除输入延迟</button>
+      <button class="opt">加快 tmux 启动速度</button>
+      <div class="ans">正确答案：<b>第二项</b>。默认值是为了区分"单独按 Esc"和"转义序列的开头"，代价是 Esc 要等超时。终端和程序都支持现代转义序列时，10ms 足够。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 脚本里要"存在就接回去，不存在就新建"，最简洁的写法是？</div>
+      <button class="opt">tmux new -s name</button>
+      <button class="opt">tmux attach -t name</button>
+      <button class="opt">tmux new -A -s name</button>
+      <div class="ans">正确答案：<b>tmux new -A -s name</b>。<span class="k">-A</span> 表示 attach if exists，否则创建。直接 <span class="k">new</span> 在会话已存在时会报 duplicate session。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 远程开发时，正确的顺序是？</div>
+      <button class="opt">先 ssh 上服务器，再进 tmux，所有工作都在 tmux 里做</button>
+      <button class="opt">先在本地开 tmux，再在里面 ssh 到服务器</button>
+      <button class="opt">两者等价，随便哪个先</button>
+      <div class="ans">正确答案：<b>第一项</b>。tmux 必须运行在<b>服务器</b>上，才能保证 SSH 断开时进程不被 SIGHUP 杀掉。本地 tmux 里跑 ssh，断线后 ssh 客户端本身还是会退出。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>tmux new -s name</code><span class="desc">新建命名会话</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux new -A -s name</code><span class="desc">存在就接回，不存在就新建</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux ls</code><span class="desc">列出所有会话</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux attach -t name</code><span class="desc">接回指定会话</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux attach -d -t name</code><span class="desc">踢掉其他客户端，独占会话</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux kill-session -t name</code><span class="desc">结束指定会话</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux has-session -t name</code><span class="desc">判断会话是否存在（脚本用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux new -d -s s -n w -c ~/proj</code><span class="desc">后台建会话，指定窗口名和目录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux split-window -h -c "#{pane_current_path}"</code><span class="desc">左右分屏并继承当前目录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux send-keys -t s:w 'cmd' C-m</code><span class="desc">向指定 pane 发送命令并回车</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux select-layout tiled</code><span class="desc">平铺布局</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux capture-pane -p -S -</code><span class="desc">导出 pane 的全部滚动缓冲</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux show-buffer | pbcopy</code><span class="desc">把 tmux 缓冲区送进系统剪贴板（macOS）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux source-file ~/.tmux.conf</code><span class="desc">重载配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux -f /dev/null new -s rescue</code><span class="desc">跳过配置启动，用于配置写坏时自救</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tmux wait-for -S done</code><span class="desc">发送同步信号（配合 wait-for done 阻塞）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>键位速查（默认前缀 Ctrl-b）</h3>
+  <table>
+    <tr><th style="width:150px">按键</th><th style="width:170px">作用</th><th>按键</th><th>作用</th></tr>
+    <tr><td class="f">d</td><td>detach</td><td class="f">c</td><td>新建 window</td></tr>
+    <tr><td class="f">,</td><td>重命名 window</td><td class="f">n / p</td><td>下 / 上一个 window</td></tr>
+    <tr><td class="f">%</td><td>左右分屏</td><td class="f">"</td><td>上下分屏</td></tr>
+    <tr><td class="f">o</td><td>循环切 pane</td><td class="f">方向键</td><td>按方向切 pane</td></tr>
+    <tr><td class="f">z</td><td>最大化 / 还原 pane</td><td class="f">x</td><td>关闭 pane</td></tr>
+    <tr><td class="f">!</td><td>pane 拆成 window</td><td class="f">空格</td><td>切换布局</td></tr>
+    <tr><td class="f">[</td><td>复制模式</td><td class="f">]</td><td>粘贴 buffer</td></tr>
+    <tr><td class="f">s</td><td>列出 / 切换 session</td><td class="f">$</td><td>重命名 session</td></tr>
+    <tr><td class="f">:</td><td>命令提示符</td><td class="f">?</td><td>列出所有键位</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>server</b></td><td>后台常驻进程，管理所有会话；一个用户通常只有一个</td></tr>
+    <tr><td><b>session</b></td><td>独立的工作现场，可被多个客户端同时 attach</td></tr>
+    <tr><td><b>window</b></td><td>占满终端的一屏，相当于标签页，内含多个 pane</td></tr>
+    <tr><td><b>pane</b></td><td>窗口内切分出的伪终端，每个跑独立进程</td></tr>
+    <tr><td><b>prefix</b></td><td>快捷键的前缀，默认 Ctrl-b，可改成 Ctrl-a</td></tr>
+    <tr><td><b>detach</b></td><td>客户端脱离会话，会话与进程继续在后台运行</td></tr>
+    <tr><td><b>attach</b></td><td>客户端接入已有会话，恢复现场</td></tr>
+    <tr><td><b>复制模式</b></td><td>冻结当前输出，允许用 vi/emacs 键位移动与选择</td></tr>
+    <tr><td><b>buffer</b></td><td>tmux 内部的剪贴板栈，与系统剪贴板是两回事</td></tr>
+    <tr><td><b>OSC 52</b></td><td>终端转义序列，允许程序把文本写进系统剪贴板</td></tr>
+    <tr><td><b>history-limit</b></td><td>每个 pane 保留的滚动行数，默认 2000</td></tr>
+    <tr><td><b>escape-time</b></td><td>tmux 等待 Esc 后续字符的时间，影响 Vim 手感</td></tr>
+    <tr><td><b>layout</b></td><td>pane 的排列方式，even-horizontal、tiled 等</td></tr>
+    <tr><td><b>zoom</b></td><td>把当前 pane 临时放大到整屏，再按一次还原</td></tr>
+    <tr><td><b>break-pane</b></td><td>把 pane 拆成独立 window，布局乱了时很好用</td></tr>
+    <tr><td><b>synchronize-panes</b></td><td>把输入同步发到所有 pane，批量操作多台机器时用，容易误操作</td></tr>
+    <tr><td><b>wait-for</b></td><td>tmux 提供的跨进程同步原语，用于脚本等待任务完成</td></tr>
+    <tr><td><b>mosh</b></td><td>基于 UDP 的移动 shell，抗断线与漫游，常与 tmux 搭配</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 开一个会话，分三个 pane（编辑 / 跑命令 / 看日志），全程不用鼠标；② 故意断网或合盖，重连后 <span class="k">attach</span> 看现场；③ 把模块 7 的脚本改成你自己项目的版本，一条命令拉起环境；④ 改 prefix 为 <span class="k">Ctrl-a</span>、<span class="k">escape-time 10</span>、开鼠标，感受差异；⑤ 两个人 attach 同一个会话，体验协作。<br><br>
+    <b>之后值得单独学：</b><span class="k">synchronize-panes</span> 批量运维、tmux 插件管理器（tpm）与状态栏美化、<span class="k">pipe-pane</span> 做会话录制，以及用 systemd 用户服务让 tmux 会话开机自启。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟上手 tmux · 先命名会话，再进 tmux，离开用 detach 不用 exit</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（三层模型）和模块 8（与 SSH 配合）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边按，前缀键要练成肌肉记忆。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议直接在一个 SSH 会话里开 tmux 跟着敲 —— 中途故意断网，再重连看现场还在不在';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

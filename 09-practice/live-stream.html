@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透直播系统架构</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 高密度版</span>
+    <h1>二十分钟学透直播系统架构</h1>
+    <p class="sub">直播的难点不在"把流推上去"，而在<b>低延迟、百万级并发分发、成本控制和分钟级容灾</b>。这篇讲端到端链路、四种协议的真实延迟账、CDN 分发机制、弹幕消息架构和带宽成本怎么算。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>5</b> 种协议延迟对比</span>
+      <span class="chip"><b>5</b> 档码率阶梯</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议装 OBS 和 ffmpeg，本地推一路流，用 VLC 拉流亲手测延迟。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>直播核心链路：从摄像头到屏幕</h2></div>
+  <p class="lead">一次直播经过五个环节，每一环都贡献延迟。先把链路背下来，后面所有优化都是针对其中某一环。</p>
+  <h3>链路全景</h3>
+  <pre><span class="c">① 主播端采集编码      ② 推流上行        ③ 服务端处理        ④ CDN 分发       ⑤ 播放器</span>
+摄像头 / OBS ────────&gt; 推流节点 ingest ────────&gt; 源站 + 转码集群 ────────&gt; 边缘节点 ────────&gt; 观众播放器
+  H.264 / AAC           RTMP 或 SRT           转码 / 时移 / 录制       HTTP-FLV / HLS    解码渲染</pre>
+  <h3>端到端延迟预算（以 720p、30fps 为例）</h3>
+  <table>
+    <tr><th style="width:150px">环节</th><th style="width:130px">耗时</th><th>说明</th></tr>
+    <tr><td><b>采集 + 编码</b></td><td>30~100 ms</td><td>OBS 用 x264 veryfast 或硬编（NVENC/QSV/VideoToolbox）。B 帧会增加延迟，直播一般关 B 帧</td></tr>
+    <tr><td><b>推流上行</b></td><td>80~500 ms</td><td>取决于主播网络 RTT 与抖动。跨网、4G/5G 弱网时显著变大，这是 RTMP/SRT 的重传代价</td></tr>
+    <tr><td><b>服务端处理</b></td><td>100~1000 ms</td><td>不转码只透传约 100 ms；走转码集群再加 300~1000 ms（解码 + 编码 + 推 CDN）</td></tr>
+    <tr><td><b>CDN 分发</b></td><td>50~300 ms</td><td>边缘命中时只算最后一跳；未命中回源则再加 200~500 ms</td></tr>
+    <tr><td><b>播放器缓冲</b></td><td>1000~2000 ms</td><td>为了抗抖动主动攒的数据。这是延迟的大头，也是可调节项</td></tr>
+    <tr><td><b>合计 HTTP-FLV</b></td><td class="f">1.5~4 s</td><td>PC 直播主流方案</td></tr>
+    <tr><td><b>合计 HLS</b></td><td class="f">6~10 s</td><td>分片机制导致，详见模块 2</td></tr>
+  </table>
+  <h3>一条真实的推流命令</h3>
+  <pre><span class="c"># ffmpeg 推一路 720p 直播流（参数逐项解释见下）</span>
+ffmpeg -re -i input.mp4 \
+  -c:v libx264 -preset veryfast -tune zerolatency \
+  -b:v 2500k -maxrate 2500k -bufsize 5000k \
+  -g 60 -keyint_min 60 -sc_threshold 0 \
+  -c:a aac -b:a 128k -ar 44100 \
+  -f flv rtmp://push.live.example.com/live/abc123</pre>
+  <table>
+    <tr><th style="width:210px">参数</th><th>作用</th></tr>
+    <tr><td class="f">-tune zerolatency</td><td>关闭 B 帧、重排等增加延迟的编码选项，延迟换画质</td></tr>
+    <tr><td class="f">-g 60 -keyint_min 60</td><td>GOP 固定 60 帧 = 2 秒（30fps）。服务端切片和转码都依赖规律的关键帧</td></tr>
+    <tr><td class="f">-sc_threshold 0</td><td>禁止场景切换时自动插入关键帧，避免 GOP 大小不均匀</td></tr>
+    <tr><td class="f">-bufsize 5000k</td><td>CBR 缓冲区，通常取 2 倍码率。太小会花屏，太大延迟高</td></tr>
+    <tr><td class="f">-re</td><td>按真实速度读文件，模拟直播（不加会瞬间推完）</td></tr>
+    <tr><td class="f">-f flv rtmp://...</td><td>以 FLV 封装走 RTMP 推流，1935 端口</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>OBS 里最容易错的一项：关键帧间隔。</b>必须设为 <b>2 秒（或 1 秒）</b>，不能选"自动"。HLS 切片、转码对齐、时移回放全都依赖 GOP 边界。OBS 默认不固定关键帧，会导致服务端切出的 ts 分片以非关键帧开头，播放端直接花屏。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>五种协议：延迟、封装与适用场景</h2></div>
+  <p class="lead">选协议就是选延迟。先看账，再讲故事。</p>
+  <table>
+    <tr><th style="width:110px">协议</th><th style="width:105px">典型延迟</th><th style="width:150px">承载方式</th><th>主要用途</th></tr>
+    <tr><td><b>RTMP</b></td><td>1~3 s</td><td>TCP 长连接（1935），FLV 消息块</td><td><b>推流</b>（主播 → 服务端）。Flash 已死，但推流生态仍是最广</td></tr>
+    <tr><td><b>HTTP-FLV</b></td><td>1~3 s</td><td>HTTP 长连接，顺序拉取 FLV tag</td><td><b>拉流</b>（PC 直播播放端主力，可完整走 CDN）</td></tr>
+    <tr><td><b>HLS</b></td><td>5~10 s<br>（LL-HLS ~2 s）</td><td>HTTP 短连接，m3u8 索引 + ts/fMP4 分片</td><td><b>拉流</b>（移动端、海量观众、Apple 生态唯一解）</td></tr>
+    <tr><td><b>WebRTC</b></td><td>200~500 ms</td><td>UDP，SRTP 加密，RTP 媒体包</td><td>连麦、超低延迟互动、云游戏</td></tr>
+    <tr><td><b>SRT</b></td><td>1~3 s</td><td>UDP + 应用层 ARQ 重传</td><td>弱网上行（户外直播、跨地区贡献）</td></tr>
+  </table>
+  <h3>HLS 为什么慢：看一个真实的 m3u8</h3>
+  <pre><span class="c"># stream.m3u8 实际内容</span>
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:2
+#EXT-X-MEDIA-SEQUENCE:1024
+#EXTINF:2.000,
+seg_1024.ts
+#EXTINF:2.000,
+seg_1025.ts
+#EXTINF:2.000,
+seg_1026.ts
+
+<span class="c"># 播放器逻辑：拿到列表时最后一片可能还没写完，通常要等"3 个分片"才起播</span>
+<span class="c"># 延迟 ≈ TARGETDURATION × 分片数 = 2s × 3 = 6s，再加网络与缓冲</span>
+
+<span class="c"># 降低延迟的三个旋钮：</span>
+<span class="b">hls_time 1</span>            <span class="c"># 分片时长 2s → 1s</span>
+<span class="b">hls_list_size 3</span>       <span class="c"># 列表只保留 3 片（不要留 10 片，那是时移回看用的）</span>
+<span class="b">#EXT-X-PART</span>          <span class="c"># LL-HLS：0.3s 的部分分片，可把延迟压到 2s 左右</span></pre>
+  <div class="callout">
+    <b>选型结论：</b>推流用 <b>RTMP</b>（兼容性最好）或 <b>SRT</b>（弱网优先）；PC 播放端用 <b>HTTP-FLV</b>；移动端和海量分发用 <b>HLS</b>；互动连麦用 <b>WebRTC</b>。<b>没有一种协议通吃全部场景</b>，成熟方案都是推 RTMP、播 HTTP-FLV/HLS 双协议、连麦 WebRTC 的混合体。
+  </div>
+  <div class="callout danger">
+    <b>RTMP 已经"推流专用化"。</b>浏览器不再支持 RTMP 播放（Flash 2020 年底被移除），任何"网页播 RTMP"的方案（如 flv.js）本质上都是把 FLV 流重新封装成 HTTP-FLV 播放。设计系统时不要假设播放端能直连 RTMP。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>CDN 与边缘节点</h2></div>
+  <p class="lead">直播 CDN 不是"缓存图片的 CDN"，它不做长期缓存，做的是<b>实时流的中转与就近分发</b>。理解层级和回源是排障的第一步。</p>
+  <h3>层级结构</h3>
+  <pre><span class="c">源站 origin ──&gt; 中心层 L1（省级） ──&gt; 边缘层 L2（地市级） ──&gt; 用户</span>
+<span class="c">直播流：  边缘未命中时逐级回源，命中率做到 95%+ 时回源压力可忽略</span>
+<span class="c">点播流：  边缘长期缓存，一次回源长期服务</span></pre>
+  <table>
+    <tr><th style="width:120px">概念</th><th>说明</th></tr>
+    <tr><td><b>回源 pull</b></td><td>边缘收到播放请求、本地没有该流时，向上级拉流并转发。直播常用，首次播放多 200~500 ms</td></tr>
+    <tr><td><b>预热 push</b></td><td>直播开始前把流主动推到各边缘节点。大直播开播前 5~10 分钟做，避免开播瞬间回源风暴</td></tr>
+    <tr><td><b>HTTPDNS</b></td><td>绕过 LocalDNS 做调度，防止域名劫持，同时支持按用户 IP 精准分配边缘节点</td></tr>
+    <tr><td><b>接入调度</b></td><td>客户端上报探测数据（连通率、下载速率、首屏时间），调度系统排序后下发最优节点 IP 列表</td></tr>
+    <tr><td><b>单飞回源</b></td><td>同一分片/流被多个用户同时请求时，只回源一次再复制分发（single-flight），防止回源打挂源站</td></tr>
+  </table>
+  <h3>首屏时间：直播的核心体验指标</h3>
+  <p>定义：从用户点击播放到看到<b>第一帧画面</b>的时间。业界参考值：HTTP-FLV &lt; 400 ms，HLS &lt; 1000 ms。</p>
+  <ul>
+    <li><b>预连接</b>：进入直播间就建立 TCP/TLS 连接，不等点击播放</li>
+    <li><b>预加载</b>：提前拉 m3u8 或 flv header，缓存首片</li>
+    <li><b>就近调度</b>：HTTPDNS + 质量探测，避免跨运营商绕行</li>
+    <li><b>边缘预热</b>：大直播提前推流到边缘，消除首次回源</li>
+    <li><b>GOP 缓存</b>：播放器从关键帧起播，第一个关键帧必须最快到达</li>
+  </ul>
+  <div class="callout warn">
+    <b>排障口诀："先看边缘命中率，再看源站水位。"</b>卡顿率先查用户接入节点是否就近（跨网必然卡），再查边缘命中率是否跌了（跌了说明回源链路或节点异常），最后查源站带宽和 CPU。这三个数在监控面板上都应该有。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>转码与多码率自适应</h2></div>
+  <p class="lead">观众网络千差万别，多码率是唯一解。转码集群是直播系统里最贵的计算资源，也是画质与成本的调节阀。</p>
+  <h3>码率阶梯（720p 源为例）</h3>
+  <table>
+    <tr><th style="width:90px">档位</th><th style="width:100px">分辨率</th><th style="width:70px">帧率</th><th style="width:110px">视频码率</th><th>音频码率</th></tr>
+    <tr><td><b>原画</b></td><td>1080p</td><td>30</td><td class="f">4000 kbps</td><td class="f">128 kbps</td></tr>
+    <tr><td><b>超清</b></td><td>720p</td><td>30</td><td class="f">2000 kbps</td><td class="f">128 kbps</td></tr>
+    <tr><td><b>高清</b></td><td>540p</td><td>30</td><td class="f">1200 kbps</td><td class="f">96 kbps</td></tr>
+    <tr><td><b>标清</b></td><td>480p</td><td>30</td><td class="f">800 kbps</td><td class="f">64 kbps</td></tr>
+    <tr><td><b>流畅</b></td><td>360p</td><td>30</td><td class="f">400 kbps</td><td class="f">64 kbps</td></tr>
+  </table>
+  <h3>转码架构要点</h3>
+  <ul>
+    <li><b>一路源、多路输出</b>：源流只解码一次，同时编码出 N 个档位。级联转码（转完再转）会累积延迟和画质损失，必须禁止</li>
+    <li><b>CPU vs GPU</b>：x264 CPU 编码单机约 10~20 路 720p；NVENC（T4/L4）约 30~60 路，延迟还低 100~200 ms。大平台转码全部 GPU 化</li>
+    <li><b>转码延迟</b>：收流 → 解码 → 缩放编码 → 推 CDN，单跳 300~1000 ms。这是端到端延迟里服务端能砍掉的部分</li>
+    <li><b>按需转码</b>：没有观众的档位不转。某档位连续 30 秒无拉流就停转，有请求再秒级恢复</li>
+    <li><b>GOP 对齐</b>：切片必须切在关键帧上，且各档位分片时长一致（如都是 2s），否则 ABR 切换时会花屏</li>
+  </ul>
+  <h3>播放端 ABR（自适应码率）逻辑</h3>
+  <pre><span class="c"># 简化的 ABR 决策（播放器每 2~3 个分片评估一次）</span>
+下载速率 estimated_bw = 最近 3 片实际下载字节数 / 下载耗时
+if estimated_bw &gt; 当前档位码率 × 1.5:  升档
+elif estimated_bw &lt; 当前档位码率 × 1.1:  降档
+else:                                    保持
+
+<span class="c"># 升级要保守（×1.5 才升），降级要果断（×1.1 就降）</span>
+<span class="c"># 抗抖动：buffer 水位低于 1s 时无条件降到最低档，先保流畅再保画质</span></pre>
+  <div class="callout ok">
+    <b>弱网策略优先级：流畅 &gt; 实时 &gt; 清晰。</b>卡顿是观众流失的第一原因，模糊只是体验降级。设计档位阶梯时，"流畅档 400 kbps" 必须保证 3G 网络也能拉得动，这是兜底不是装饰。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>连麦与互动：低延迟方案</h2></div>
+  <p class="lead">连麦是直播里延迟要求最高的场景：两个主播对话，超过 400 ms 就会出现"抢话"。唯一的选择是 WebRTC。</p>
+  <h3>WebRTC 为什么快</h3>
+  <table>
+    <tr><th style="width:150px">机制</th><th>作用</th></tr>
+    <tr><td><b>UDP 直传</b></td><td>不做 TCP 重传与拥塞窗口爬升，发出去就到。延迟预算约 1 个 RTT（同城 20~50 ms）</td></tr>
+    <tr><td><b>SRTP 加密</b></td><td>强制加密，密钥经 DTLS 握手交换</td></tr>
+    <tr><td><b>jitter buffer</b></td><td>播放端 50~200 ms 缓冲对抗网络抖动，是延迟的主要来源</td></tr>
+    <tr><td><b>NACK/FEC</b></td><td>丢包重传与前向纠错，弱网下保画质，代价是少量延迟</td></tr>
+  </table>
+  <h3>连麦时序（文字版）</h3>
+  <div class="steps">
+    <div class="txt"><b>观众发起申请</b> → 信令服务器转发到主播端（WebSocket 信令通道）</div>
+    <div class="txt"><b>主播同意</b> → 双方开始 ICE 协商（STUN 打洞、TURN 中继兜底）</div>
+    <div class="txt"><b>观众推 RTC 流</b> → SFU → 主播端播放；同时主播把自己的 RTC 流给观众</div>
+    <div class="txt"><b>画面合成</b> → 主播端或云端把"主播画面 + 连麦小窗"合成一路主流</div>
+    <div class="txt"><b>主流推流</b> → 转码 → CDN → 普通观众（仍有 2~4 s 延迟）</div>
+  </div>
+  <div class="callout danger">
+    <b>一个必须理解的延迟差：连麦双方之间是 200~400 ms，但普通观众看到连麦内容仍是 2~4 s。</b>因为观众走的是 CDN 分发链路。想让观众也低延迟，要么推 LL-HLS（约 2 s），要么让播放端也走 WebRTC（成本高 5~10 倍，只用于赛事、演唱会等超低延迟场景）。
+  </div>
+  <h3>SFU 与 MCU</h3>
+  <table>
+    <tr><th style="width:110px">模式</th><th style="width:200px">原理</th><th>适用</th></tr>
+    <tr><td><b>SFU</b><br>转发型</td><td>收到流不转码直接转发给房间内其他人</td><td>多人连麦（3~9 人）。上行带宽 O(N)，服务端几乎零 CPU</td></tr>
+    <tr><td><b>MCU</b><br>合流型</td><td>把多路流解码 + 解码混成一路再转发</td><td>大房间、下行带宽敏感的场景。CPU 成本高（软件混流每路约 1~2 核）</td></tr>
+    <tr><td><b>云端混流</b></td><td>GPU 集群做合成（布局、logo、字幕）</td><td>连麦 + 直播分发混合场景，合出的主流直接进转码链路</td></tr>
+  </table>
+  <h3>互动消息与媒体流分离</h3>
+  <p>点赞、礼物、弹幕、信令<b>全部走 WebSocket 消息通道</b>，不占用 RTC 带宽。原因：① 消息量小但突发高，走消息队列可削峰；② 消息可持久化、可补发；③ 媒体流一旦中断无法补，必须专线专用。两套通道完全解耦，任何一套出问题不拖垮另一套。</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>弹幕系统的消息架构</h2></div>
+  <p class="lead">弹幕是直播里 QPS 最高、长连接最多的系统。核心矛盾：一条弹幕只需广播给同房间的人，但网关机器是全局共享的。<b>解法是"按房间分区"。</b></p>
+  <h3>完整消息链路</h3>
+  <pre><span class="c">客户端 ──WebSocket──&gt; 接入网关 ──&gt; Kafka ──&gt; 广播 Worker ──&gt; 同组网关 ──&gt; 房间在线用户</span>
+<span class="c">                         │                   │</span>
+<span class="c">                     限流/鉴权          partition = room_id % 32</span>
+<span class="c">                     本地 seq 分配       保证同房间消息有序</span></pre>
+  <table>
+    <tr><th style="width:140px">组件</th><th>职责与关键参数</th></tr>
+    <tr><td><b>接入网关</b></td><td>维持 WebSocket 长连接。单机 5~10 万连接（每连接约 10~50 KB 内存），受文件描述符限制（ulimit 需调到 100 万+）</td></tr>
+    <tr><td><b>房间分区</b></td><td>room_id % N 决定由哪组网关服务。一条弹幕<b>只在同组内广播</b>，天然把热点房间隔离在单组内</td></tr>
+    <tr><td><b>消息队列</b></td><td>Kafka，按 room_id 分区，保证同房间有序；广播 Worker 消费后推给对应网关组</td></tr>
+    <tr><td><b>seq 机制</b></td><td>每房间一个自增 seq。客户端按 seq 检测乱序/丢包；断线重连时带 last_seq，服务端补发缺失消息</td></tr>
+    <tr><td><b>历史弹幕</b></td><td>进直播间先拉最近 50 条（Redis ZSet，score = seq），避免"进来几分钟没弹幕"</td></tr>
+  </table>
+  <h3>消息格式与真实参数</h3>
+  <pre><span class="c">// 一条弹幕的 JSON</span>
+{
+  <span class="b">"room_id"</span>: 100120,
+  <span class="b">"seq"</span>: 95271,
+  <span class="b">"uid"</span>: 88482391,
+  <span class="b">"type"</span>: <span class="g">"danmaku"</span>,        <span class="c">// danmaku / gift / like / enter</span>
+  <span class="b">"content"</span>: <span class="g">"主播这波操作可以"</span>,
+  <span class="b">"color"</span>: 16777215,
+  <span class="b">"ts"</span>: 1740000000
+}
+
+<span class="c">// 限流参数（业界常见值）</span>
+单用户发送：    1~2 条/秒（粉丝牌/会员可放宽到 5 条/秒）
+单房间上行：    1000~5000 条/秒，超出后丢弃非会员弹幕保核心消息
+下行合并：     网关侧攒 100 ms 批量下发，减少 syscall 与包量
+
+<span class="c">// 心跳与重连</span>
+ping 间隔 30~60 s，3 个周期未响应断开；客户端指数退避重连（1s/2s/4s…封顶 30s）</pre>
+  <h3>容量估算（给过程）</h3>
+  <pre><span class="c"># 假设：同时开播 10 万个房间，平均每房间 100 人在线</span>
+总长连接 = 10 万房间 × 100 人 = <span class="y">1000 万连接</span>
+网关数量 = 1000 万 ÷ 1 万连接/台 = <span class="y">1000 台网关</span>
+
+<span class="c"># 弹幕流量：</span>
+<span class="c"># 假设 20% 房间活跃，每活跃房间 50 条/秒，每条 200 字节</span>
+峰值消息量 = 10万 × 20% × 50 = <span class="y">100 万条/秒</span>
+带宽（仅下发）≈ 100万 × 200B = <span class="y">200 MB/s（1.6 Gbps）</span>
+<span class="c"># 结论：弹幕系统的瓶颈是"连接数"和"广播扇出"，不是带宽</span></pre>
+  <div class="callout warn">
+    <b>最大坑：网关无差别全局广播。</b>早期简易实现把每条弹幕推给所有网关，再让网关自己过滤房间，结果一个百万人在线的直播间能让全网关 CPU 打满。正确做法是<b>分区路由</b>：消息从产生那一刻起就只流向该房间所在的网关组。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>录制与回放</h2></div>
+  <p class="lead">录制是直播的副产品，但做不好会让"回放"变成投诉重灾区。核心要求：<b>旁路录制不抢资源、时间戳对齐墙钟、断流能补。</b></p>
+  <h3>旁路录制链路</h3>
+  <pre><span class="c">源站主流 ──&gt; 录制集群（旁路，不占直播分发链路）</span>
+              │
+              ├─&gt; ts 切片（6~10 s/片）
+              ├─&gt; 定时合并为 mp4
+              ├─&gt; 上传对象存储（S3 / OSS / COS）
+              └─&gt; 写入索引（room_id、开始时间、时长、URL）</pre>
+  <table>
+    <tr><th style="width:140px">要点</th><th>说明</th></tr>
+    <tr><td><b>旁路原则</b></td><td>从源站流复制一份录制，与转码、分发完全隔离。录制挂了不影响观看，这是硬要求</td></tr>
+    <tr><td><b>时间戳对齐</b></td><td>切片内 PTS 与墙钟（NTP 同步）对齐，否则回放进度条对不上"主播说的第几分钟"。ffmpeg 用 <span class="k">-copyts</span> 保留原始时间戳</td></tr>
+    <tr><td><b>断流补录</b></td><td>推流中断时录制进程标记空档，主播重推后继续录制，最终 mp4 里补黑帧或提示，不能丢文件</td></tr>
+    <tr><td><b>存储策略</b></td><td>mp4 存标准对象存储，设置生命周期规则（如 30 天转低频存储，1 年删除）。索引单独存数据库，支持按主播/时间检索</td></tr>
+  </table>
+  <h3>时移回看（timeshift）</h3>
+  <pre><span class="c"># 时移 = 把 HLS 窗口从"3 片"拉长到"10 分钟"</span>
+ffmpeg -i rtmp://origin/live/stream -c copy \
+  -hls_time 2 -hls_list_size 300 -hls_flags delete_segments+append_list \
+  stream.m3u8
+
+<span class="c"># hls_list_size 300 × 2s = 600s = 10 分钟窗口</span>
+<span class="c"># 观众拖动进度条时，播放器请求 MEDIA-SEQUENCE 更早的分片即可</span>
+<span class="c"># 代价：源站/边缘需缓存 10 分钟的 ts 分片，带宽与存储成本上升</span></pre>
+  <p>时移回看和完整回放的区别：时移只覆盖"最近 N 分钟"，边看边录；完整回放是录制合并后的 mp4/VOD，支持永久保存和倍速。两者常常同时提供。</p>
+  <div class="callout danger">
+    <b>录制事故第一名：时间戳没对齐。</b>表现是回放进度条走到某处，画面内容对不上；或者两个机位录的文件差几秒，剪辑时对不上轴。根因是录制服务器没做 NTP 同步、或切片时丢了 PTS。上线前必须核对：录制文件内部时间与墙钟误差 &lt; 500 ms。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>容灾与成本</h2></div>
+  <p class="lead">直播是实时业务，故障期每分每秒都是观众流失。容灾的核心是<b>自动化切换 + 短 m3u8 缓存</b>；成本的核心是<b>带宽就是命</b>。</p>
+  <h3>多 CDN 切换</h3>
+  <table>
+    <tr><th style="width:130px">机制</th><th>说明</th></tr>
+    <tr><td><b>主备域名</b></td><td>播放地址用主 CDN 域名，故障时播放器/调度系统切到备用域名（如 cdn-a / cdn-b 两家厂商）</td></tr>
+    <tr><td><b>播放端切换</b></td><td>连续 N 次加载失败（N 一般取 2~3）或卡顿率超阈值 → 自动切备用地址重试。N 太小会误切，太大切换慢</td></tr>
+    <tr><td><b>调度侧切换</b></td><td>调度系统综合各 CDN 质量探测数据主动下发切换指令，比播放端被动重试更快（秒级 vs 十秒级）</td></tr>
+    <tr><td><b>m3u8 缓存 TTL</b></td><td>CDN 上 m3u8 缓存必须设 1~2 s。设成 30 s 的话，切换域名后观众还在读旧节点的过期列表，表现为"切了但没生效"</td></tr>
+  </table>
+  <h3>主备流（双路上行）</h3>
+  <pre><span class="c">主播推两路流：主（cdn-a 链路）+ 备（cdn-b 链路），码率可不同（备路可降一档省带宽）</span>
+播放端默认拉主；主失败自动切备。
+成本：上行与分发带宽约 +60%（备路只推流，播放端平时不拉）。
+适用：S 级赛事、晚会、发布会。日常直播用多 CDN 单路即可。</pre>
+  <h3>成本账（这是直播架构师的必修课）</h3>
+  <pre><span class="c"># 场景：5 万并发观众，平均混合码率 1.5 Mbps，直播 4 小时</span>
+峰值带宽 = 50,000 × 1.5 Mbps = <span class="y">75 Gbps</span>
+单秒流量 = 75 Gbps ÷ 8 = <span class="y">9.375 GB/s</span>
+总流量   = 9.375 GB/s × 4 × 3600 s = <span class="y">135,000 GB ≈ 132 TB</span>
+
+<span class="c"># CDN 计费方式（国内主流）：</span>
+<span class="c"># ① 按 95th 峰值带宽（月结）——适合流量平稳，突发会被记高</span>
+<span class="c"># ② 按流量阶梯计费——适合日常直播，用得少付得少</span>
+<span class="c"># 以某云 95th 计费约 25 元/Mbps/天估算：</span>
+单场带宽成本 ≈ 75,000 Mbps × 25 元 × (4h/24h) ≈ <span class="y">31 万元/场</span>
+<span class="c"># 结论：带宽占直播总成本 70%+，转码算力约 10~15%，其余是存储与运维</span></pre>
+  <h3>降本手段</h3>
+  <ul>
+    <li><b>码率优化</b>：默认档位不要盲目 1080p。多数内容 720p 足够，带宽立省 50%</li>
+    <li><b>按需转码</b>：无人观看的档位停转，只保 1~2 个基础档</li>
+    <li><b>闲时降配</b>：非黄金时段缩容转码集群与边缘预热范围</li>
+    <li><b>P2P 分发</b>：观众之间互拉流量，大房间可省 30~50% 带宽，代价是客户端复杂度和上传占用</li>
+    <li><b>带宽封顶告警</b>：给每路流设带宽上限与日账单告警，防"一夜被刷爆"</li>
+  </ul>
+  <div class="callout ok">
+    <b>可用性目标怎么写：</b>直播核心链路（推流→播放）年可用性 99.99% = 全年停机不超过 52 分钟。事故 MTTR（恢复时间）目标 &lt; 5 分钟，靠多 CDN 自动切换达成；MTBF 靠源站/转码集群冗余达成。S 级直播还要做<b>全链路演练</b>：定期手动断一路 CDN，验证切换真的生效。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">拉流地址写死单 CDN 域名</div><div class="pd">该 CDN 出故障时播放端无路可走。必须接多 CDN + 播放端失败切换逻辑，且 m3u8 的 CDN 缓存 TTL 压到 1~2 s，否则切换不生效。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">OBS 关键帧设成"自动"</div><div class="pd">GOP 不均匀导致服务端切片切在非关键帧上，播放花屏、ABR 切换失败。OBS 里必须显式设 2 秒，ffmpeg 侧用 -g 60 -keyint_min 60 -sc_threshold 0。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只监控推流成功率，不监控播放卡顿</div><div class="pd">推流 100% 成功但观众全在卡顿的案例极其常见（边缘节点故障、回源拥塞）。必须监控播放侧指标：首屏时间、卡顿率、秒开率、各档位切换频次。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">转码级联</div><div class="pd">把已转码的流再送进转码集群，延迟累积、画质代代劣化。正确做法是源流只解码一次，并行输出全部档位；级联应在架构评审时明确禁止。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">弹幕网关无分区，全局广播</div><div class="pd">一条弹幕推给所有网关再本地过滤，热点房间打满全网关 CPU。必须按 room_id 分区路由，消息只在本组内扇出。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">软件混流不设上限</div><div class="pd">ffmpeg filter_complex 混流每路约 1~2 核 CPU，并发连麦一多就饱和，表现为连麦画面卡住但声音正常。混流集群要有限流和排队，并优先用 GPU。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">m3u8 在 CDN 上缓存时间过长</div><div class="pd">设了 30 s 缓存，切 CDN 后观众仍从旧节点读到过期分片列表，"切了没生效"。HLS 的 m3u8 缓存 TTL 必须是 1~2 s，ts 分片可以长缓存（内容不变）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">播放器 buffer 策略一刀切</div><div class="pd">起播 buffer 设 2 s，弱网用户永远在加载；设 10 s，延迟大到没法互动。正确做法是分级：起播小 buffer（1 s），稳定后按网络动态调整，buffer 低于 1 s 强制降档。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">带宽不设封顶与告警</div><div class="pd">被盗刷或配置错误时账单一夜翻十倍。必须给每路流设带宽上限、日流量告警、异常爬升自动通知；95th 计费的月份要盯预测值。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">录制时间戳未对齐墙钟</div><div class="pd">回放进度错乱、多机位对不上轴。录制服务器必须 NTP 同步，ffmpeg 用 -copyts 保留 PTS，上线前抽查录制文件内部时间与墙钟误差 &lt; 500 ms。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 下列协议中，端到端延迟最低的是？</div>
+      <button class="opt">HLS（m3u8 + ts 分片）</button>
+      <button class="opt">HTTP-FLV</button>
+      <button class="opt">WebRTC</button>
+      <div class="ans">正确答案：<b>WebRTC</b>（200~500 ms）。它走 UDP 不经过 TCP 拥塞控制和分片累积。HTTP-FLV 约 1~3 s，HLS 约 5~10 s（LL-HLS 可压到 2 s 左右）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. HLS 延迟大的主要原因是？</div>
+      <button class="opt">TCP 三次握手太慢</button>
+      <button class="opt">播放器要等够 3 个分片才起播，延迟 ≈ 分片时长 × 分片数</button>
+      <button class="opt">m3u8 文件太大下载慢</button>
+      <div class="ans">正确答案：<b>分片累积</b>。延迟 ≈ TARGETDURATION × 列表分片数，2 s × 3 = 6 s。降延迟手段：缩短分片时长（hls_time 1）、减少列表片数、或用 LL-HLS 的 EXT-X-PART 部分分片。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 相比 RTMP 拉流，HTTP-FLV 的核心优势是？</div>
+      <button class="opt">基于 HTTP，可完整复用 CDN 分发体系，且浏览器生态可用</button>
+      <button class="opt">延迟一定比 RTMP 低一个数量级</button>
+      <button class="opt">不需要播放器，浏览器直接支持</button>
+      <div class="ans">正确答案：<b>走 HTTP 可过 CDN</b>。延迟量级与 RTMP 相当（1~3 s），但 HTTP-FLV 能享受 CDN 的边缘分发、缓存和调度，且不再依赖 Flash（浏览器需 flv.js 等方案转封装）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 百万人在线的直播间发一条弹幕，正确的广播方式是？</div>
+      <button class="opt">推送给所有网关，由每个网关自己过滤房间</button>
+      <button class="opt">按 room_id 分区，消息只路由并广播给该房间所在的网关组</button>
+      <button class="opt">写入数据库，由各客户端轮询拉取</button>
+      <div class="ans">正确答案：<b>房间分区 + 组内广播</b>。无分区全局广播会让一个热点房间耗尽全网关 CPU；轮询拉取延迟不可接受。工程上还要叠加 seq 去重、100 ms 下行合并、单用户/单房间限流。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 多 CDN 切换已正确配置，但观众仍长时间卡顿不恢复。最可能的原因是？</div>
+      <button class="opt">备用 CDN 没开通</button>
+      <button class="opt">播放器 buffer 太小</button>
+      <button class="opt">m3u8 在 CDN 上的缓存 TTL 设得太长，切换后仍在读旧节点的过期列表</button>
+      <div class="ans">正确答案：<b>m3u8 缓存 TTL 过长</b>。HLS 的 m3u8 必须设 1~2 s 短缓存，ts 分片可长缓存。否则切换域名后观众拿到的还是旧节点分片列表，表现为"切换不生效"。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 一场 5 万并发、平均 1.5 Mbps、4 小时的直播，带宽成本的大头是什么？</div>
+      <button class="opt">CDN 分发带宽，约 75 Gbps 峰值 / 132 TB 总流量</button>
+      <button class="opt">转码集群的 GPU 算力</button>
+      <button class="opt">录制文件的对象存储</button>
+      <div class="ans">正确答案：<b>CDN 带宽</b>。5 万 × 1.5 Mbps = 75 Gbps，4 小时约 132 TB。带宽通常占直播总成本 70% 以上，转码算力约 10~15%。降本优先级：码率优化 &gt; 按需转码 &gt; P2P &gt; 闲时降配。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令与配置</h3>
+  <div class="cmds">
+    <div class="crow"><code>ffmpeg -re -i in.mp4 -c:v libx264 -preset veryfast -tune zerolatency -b:v 2500k -g 60 -sc_threshold 0 -f flv rtmp://host/app/key</code><span class="desc">标准低延迟推流命令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ffmpeg -i rtmp://origin/live/s -c copy -hls_time 2 -hls_list_size 3 stream.m3u8</code><span class="desc">HLS 切片（3 片 ≈ 6 s 延迟）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ffmpeg -i in.mp4 -c copy -hls_time 2 -hls_list_size 300 -copyts stream.m3u8</code><span class="desc">时移回看窗口 10 分钟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ffprobe -v error -show_entries stream=codec_name,width,height,r_frame_rate -of default=noprint_wrappers=1 s.flv</code><span class="desc">查看流的分辨率/帧率/编码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ffmpeg -i s.flv -c copy -movflags +faststart out.mp4</code><span class="desc">录制文件快速起播封装</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ulimit -n 1000000</code><span class="desc">长连接网关文件描述符上限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Kafka partition = room_id % 32</code><span class="desc">弹幕按房间分区，保证有序广播</span><button class="copy">复制</button></div>
+    <div class="crow"><code>OBS: 关键帧间隔 2s / CBR / x264 veryfast</code><span class="desc">主播端三件套设置</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键数值速记</h3>
+  <table>
+    <tr><th style="width:260px">项目</th><th>参考值</th></tr>
+    <tr><td class="f">GOP / 关键帧间隔</td><td>1~2 s（30fps 时 30~60 帧），必须固定</td></tr>
+    <tr><td class="f">HLS 延迟</td><td>TARGETDURATION × 列表片数，典型 2s × 3 = 6 s</td></tr>
+    <tr><td class="f">LL-HLS 延迟</td><td>约 2 s（EXT-X-PART 部分分片 0.3 s）</td></tr>
+    <tr><td class="f">WebRTC 延迟</td><td>200~500 ms（1 RTT + jitter buffer）</td></tr>
+    <tr><td class="f">m3u8 CDN 缓存 TTL</td><td>1~2 s（ts 分片可长缓存）</td></tr>
+    <tr><td class="f">单网关长连接数</td><td>5~10 万（需调 ulimit）</td></tr>
+    <tr><td class="f">弹幕单用户限流</td><td>1~2 条/秒（会员放宽到 5 条/秒）</td></tr>
+    <tr><td class="f">CDN 计费方式</td><td>95th 峰值带宽（月）或按流量阶梯</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:150px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>推流 / 拉流</b></td><td>主播把流推给服务端；观众从服务端拉流播放</td></tr>
+    <tr><td><b>RTMP</b></td><td>基于 TCP 的直播推流协议，1935 端口，Flash 时代遗产，现为推流主力</td></tr>
+    <tr><td><b>HTTP-FLV</b></td><td>把 FLV 流通过 HTTP 长连接顺序下发，延迟 1~3 s，可走 CDN</td></tr>
+    <tr><td><b>HLS</b></td><td>Apple 主导的 m3u8 + ts 分片协议，延迟 5~10 s，移动端主流</td></tr>
+    <tr><td><b>LL-HLS</b></td><td>低延迟 HLS，用 EXT-X-PART 部分分片把延迟压到约 2 s</td></tr>
+    <tr><td><b>WebRTC</b></td><td>基于 UDP/SRTP 的超低延迟实时通信，200~500 ms，用于连麦</td></tr>
+    <tr><td><b>SRT</b></td><td>UDP + 应用层重传的可靠传输协议，适合弱网推流</td></tr>
+    <tr><td><b>GOP / 关键帧</b></td><td>两个 I 帧之间的帧组。直播 GOP 固定 1~2 s，切片和转码都依赖它</td></tr>
+    <tr><td><b>ABR</b></td><td>自适应码率，播放端按网络速度在多个清晰度档位间切换</td></tr>
+    <tr><td><b>转码</b></td><td>解码源流后重新编码为多分辨率/多码率的档位</td></tr>
+    <tr><td><b>CDN</b></td><td>内容分发网络，直播场景下负责实时流的边缘中转与就近分发</td></tr>
+    <tr><td><b>边缘节点</b></td><td>离用户最近的 CDN 节点，直播延迟的最后一跳</td></tr>
+    <tr><td><b>回源</b></td><td>边缘未命中时向上级/源站拉取流。单飞回源可防止回源风暴</td></tr>
+    <tr><td><b>首屏时间</b></td><td>点击播放到看到第一帧的耗时，HTTP-FLV 目标 &lt; 400 ms</td></tr>
+    <tr><td><b>卡顿率</b></td><td>播放过程中卡顿时长占总时长的比例，核心体验指标</td></tr>
+    <tr><td><b>连麦</b></td><td>观众与主播实时音视频互动，走 WebRTC 低延迟链路</td></tr>
+    <tr><td><b>SFU / MCU</b></td><td>RTC 服务端转发型（省 CPU 费带宽）/ 合流型（省带宽费 CPU）</td></tr>
+    <tr><td><b>弹幕</b></td><td>叠加在视频上的实时评论，靠长连接网关 + 房间分区广播</td></tr>
+    <tr><td><b>时移回看</b></td><td>拖动进度条看最近 N 分钟直播，靠加长 HLS 分片窗口实现</td></tr>
+    <tr><td><b>95th 计费</b></td><td>按每月带宽第 95 百分位峰值计费，突发流量会被记高</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 本地用 ffmpeg 推一路测试流，分别用 VLC 以 HTTP-FLV 和 HLS 拉流，秒表实测两种协议的延迟差；② 改 OBS 关键帧间隔（自动 vs 2 s），推流后用 ffprobe 看 GOP 是否均匀；③ 用 ffmpeg 起一个多码率 HLS 输出，观察不同档位的分片；④ 估算一场你熟悉的直播的带宽账单，和上面模块 8 的方法对照。<br><br>
+    <b>之后值得单独学：</b>WebRTC 的 ICE/STUN/TURN 打洞细节、SRS / ZLMediaKit / mediasoup 的源码、大规模弹幕网关的分区与扩容策略、以及 P2P 分发在直播中的工程落地。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透直播系统架构 · 上线前检查：多 CDN 切换、GOP 固定 2 秒、播放侧卡顿监控</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（协议延迟）和模块 8（成本账）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 建议边看边用 ffmpeg 推一路本地流。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议装 OBS 和 ffmpeg，本地推一路流，用 VLC 拉流亲手测延迟。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

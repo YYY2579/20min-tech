@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透安全架构设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透安全架构设计</h1>
+    <p class="sub">安全的对手不是"黑客"，是<b>你的系统默认信任的一切</b>。这篇以架构师视角讲控制点怎么落地：四条原则、STRIDE 威胁建模、IAM 与数据安全、OWASP 到架构层的映射，以及合规要求怎么翻译成架构动作。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip">STRIDE <b>6</b> 类威胁</span>
+      <span class="chip">OWASP Top10 <b>10</b> 项映射</span>
+      <span class="chip"><b>10</b> 个安全坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">边看边数：你的服务之间调用，有几个是带认证的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>安全架构四原则</h2></div>
+  <p class="lead">原则不是口号，是遇到具体设计问题时给你答案的决策依据。每条原则都对应一类常见事故。</p>
+  <table>
+    <tr><th style="width:130px">原则</th><th style="width:260px">含义</th><th>架构落地</th></tr>
+    <tr><td><b>纵深防御</b><br>Defense in Depth</td><td>多层控制，单层失效不致命</td><td>网络层（WAF/DDoS）→ 网关层（认证/限流）→ 服务层（授权/校验）→ 数据层（加密/脱敏）→ 运维层（审计/堡垒机），每层都假设上一层可能被突破</td></tr>
+    <tr><td><b>最小权限</b><br>Least Privilege</td><td>每个主体只拿必需权限，且限期回收</td><td>服务账号按库授权；DB 用户禁止跨库；AK/SK 按操作粒度拆分；离职/转岗自动回收</td></tr>
+    <tr><td><b>默认安全</b><br>Secure by Default</td><td>安全是默认值，不是配置项</td><td>新服务默认开 TLS、默认无公网入口、默认拒绝；想开洞要显式申请，而不是默认全通</td></tr>
+    <tr><td><b>失败安全</b><br>Fail Safe / Fail Closed</td><td>出错时关闭通道，而不是敞开</td><td>鉴权服务挂了拒绝登录（而不是放行）；配置拉取失败用本地默认安全配置；熔断时走降级而不是裸奔</td></tr>
+  </table>
+  <h3>另外三条工程原则</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>零信任输入</div><div class="cd">不信任任何输入，包括"内网服务传来的"。反序列化、SQL 拼接、命令执行的入口全部按不可信数据处理。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>攻击面最小化</div><div class="cd">每多一个端口、端点、依赖、管理员入口，就多一分暴露。下线废弃接口，关掉不用的端口，删掉没人用的 AK。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>职责分离</div><div class="cd">开发不碰生产数据、运维不碰代码、DBA 不审自己的变更。敏感操作双人控制，关键权限分人持有。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>用原则裁决争论。</b>当"这个内部接口要不要做鉴权"吵不出结果时，默认安全 + 零信任输入直接给答案：要，而且默认就要。原则的价值就是把"每次重新论证"变成"按既定方针办"。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>威胁建模入门：STRIDE</h2></div>
+  <p class="lead">威胁建模（Threat Modeling）是在<b>设计阶段</b>系统化地找威胁，而不是上线后靠渗透测试撞运气。核心工具是 DFD（数据流图）+ STRIDE 清单，两小时能过一遍核心链路。</p>
+  <h3>STRIDE 六类威胁</h3>
+  <table>
+    <tr><th style="width:180px">威胁</th><th style="width:120px">违反的性质</th><th>典型场景与缓解</th></tr>
+    <tr><td><b>S 假冒</b><br>Spoofing</td><td>认证</td><td>伪造 token / 盗用 session。缓解：强认证、MFA、短期凭证</td></tr>
+    <tr><td><b>T 篡改</b><br>Tampering</td><td>完整性</td><td>改请求金额、改数据库记录。缓解：签名、参数化查询、审计日志</td></tr>
+    <tr><td><b>R 抵赖</b><br>Repudiation</td><td>不可否认</td><td>"我没操作过"。缓解：全操作审计日志、操作留痕带身份与时间</td></tr>
+    <tr><td><b>I 信息泄露</b><br>Information Disclosure</td><td>机密性</td><td>接口返回多余字段、日志打印敏感信息。缓解：字段级脱敏、最小返回</td></tr>
+    <tr><td><b>D 拒绝服务</b><br>Denial of Service</td><td>可用性</td><td>流量打满、慢请求占满连接。缓解：限流、熔断、容量冗余</td></tr>
+    <tr><td><b>E 提权</b><br>Elevation of Privilege</td><td>授权</td><td>普通用户访问管理接口、水平越权看别人订单。缓解：RBAC + 对象级授权</td></tr>
+  </table>
+  <h3>四步实战流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>画 DFD</b>：四个元素——外部实体（用户/第三方）、进程（服务）、数据存储（DB/缓存）、数据流（API 调用）。重点是标出<b>信任边界</b>（内网/外网、不同租户之间）。</div></div>
+    <div class="step"><div class="txt"><b>对每个元素套 STRIDE</b>：不是每个元素都中六枪，但每个元素都要过一遍清单，防止遗漏。</div></div>
+    <div class="step"><div class="txt"><b>风险矩阵排序</b>：影响 × 概率分成四象限，先处理"高影响 × 高概率"（通常是注入和越权）。</div></div>
+    <div class="step"><div class="txt"><b>处置并记录</b>：每个威胁三条出路——缓解（加控制）、转移（买保险/用云商能力）、接受（写明风险登记，责任人签字）。</div></div>
+  </div>
+  <h3>示例：下单接口的 STRIDE 分析（节选）</h3>
+  <table>
+    <tr><th style="width:150px">DFD 元素</th><th style="width:200px">威胁</th><th>处置</th></tr>
+    <tr><td>POST /api/orders</td><td>T：篡改金额参数</td><td>金额服务端重算，不信客户端传值</td></tr>
+    <tr><td>POST /api/orders</td><td>I：返回过多字段泄露他人信息</td><td>响应 DTO 白名单，禁止直接返回实体</td></tr>
+    <tr><td>GET /api/orders/{id}</td><td>E：改 id 看别人订单（IDOR）</td><td>服务端校验订单归属当前用户</td></tr>
+    <tr><td>用户 → 网关</td><td>S：伪造 JWT</td><td>短期 token + 签名校验 + 黑名单撤销</td></tr>
+    <tr><td>订单 DB</td><td>R：删库后不认账</td><td>binlog + 操作审计日志异地留存</td></tr>
+    <tr><td>短信网关</td><td>D：被打爆影响正常短信</td><td>按手机号限流 + 图形验证码</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>威胁建模的产出物是一页威胁清单</b>，不是几百页报告。清单随架构文档一起入库、一起评审。新功能上线前用同一套流程过一遍——这就是安全左移的最轻量形态。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>身份与访问管理 IAM</h2></div>
+  <p class="lead">IAM 四件事：<b>身份（你是谁）、认证（证明你是你）、授权（你能干什么）、审计（你干了什么）</b>。四件缺一件，前面三件都白做。</p>
+  <h3>RBAC vs ABAC</h3>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:250px">RBAC 基于角色</th><th>ABAC 基于属性</th></tr>
+    <tr><td><b>模型</b></td><td>用户 → 角色 → 权限，静态绑定</td><td>策略匹配属性：用户属性 + 资源属性 + 环境属性</td></tr>
+    <tr><td><b>例子</b></td><td>角色"财务"拥有"查看报表"权限</td><td>部门=财务 且 资源密级=内部 且 时间=09:00-18:00 且 地域=北京</td></tr>
+    <tr><td><b>优点</b></td><td>简单、直观、好管理</td><td>细粒度、灵活、能表达复杂策略</td></tr>
+    <tr><td><b>缺点</b></td><td>角色爆炸；无法表达动态条件</td><td>策略复杂、调试难、性能开销</td></tr>
+    <tr><td><b>适用</b></td><td>内部管理系统、权限不常变的场景</td><td>多租户 SaaS、强合规、动态授权场景</td></tr>
+  </table>
+  <p>工程实践：<b>主体 RBAC 打底（角色管理不爆炸），热点资源用 ABAC 补细粒度</b>。全 ABAC 的系统策略文件能长到没人敢改。</p>
+  <h3>凭证管理</h3>
+  <ul>
+    <li><b>JWT 双 token</b>：access token 15 分钟 + refresh token 7 天轮换。access 短到不需要复杂撤销机制；refresh 泄露可单独吊销。</li>
+    <li><b>OAuth2 / OIDC</b>：把"管密码"这件事外包给专业身份提供商；自建登录只在不接外网的内部系统考虑。</li>
+    <li><b>API Key 治理</b>：按调用方 + 用途一对一发，禁止共用；带速率限制；90 天强制轮换；泄露时可单发吊销。</li>
+  </ul>
+  <h3>零信任：不信任内网</h3>
+  <table>
+    <tr><th style="width:150px">控制</th><th>做法</th></tr>
+    <tr><td><b>服务身份</b></td><td>每个服务一个身份（mTLS 证书或 SPIFFE 工作负载身份），调用方身份可验证</td></tr>
+    <tr><td><b>东西向加密</b></td><td>服务间全部 mTLS，内网流量也加密，防嗅探与中间人</td></tr>
+    <tr><td><b>短期凭证</b></td><td>云上 STS 临时凭证 15 分钟级，不用长期 AK；凭证自动轮换</td></tr>
+    <tr><td><b>持续评估</b></td><td>每次访问都认证授权，不因"已在内网"免检；异常行为实时降权</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>认证服务的故障处理必须是 fail closed。</b>鉴权中间件异常时直接放行，等于把认证变成装饰品——攻击者只要想办法让你的鉴权服务超时（比如打满它的连接），就获得了全场通行证。正确做法：异常拒绝 + 告警，可用性靠副本和限流保证，不靠放行保证。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>数据安全：分级、加密、脱敏</h2></div>
+  <p class="lead">数据安全的第一步不是加密，是<b>知道自己有什么数据</b>。没有分级分类的加密等于给所有门上同样的锁——贵的浪费，薄的失守。</p>
+  <h3>数据分级示例</h3>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:180px">定义</th><th style="width:190px">加密要求</th><th>访问与审计</th></tr>
+    <tr><td><b>公开</b></td><td>已公开信息（商品介绍）</td><td>传输 TLS 即可</td><td>不限访问；不要求审计</td></tr>
+    <tr><td><b>内部</b></td><td>一般业务数据（订单记录）</td><td>传输 TLS + 磁盘加密</td><td>员工按需授权；登录审计</td></tr>
+    <tr><td><b>秘密</b></td><td>用户 PII、手机号、地址</td><td>传输 TLS + 存储加密 + 字段级加密</td><td>按需授权 + 全操作审计 + 脱敏展示</td></tr>
+    <tr><td><b>机密</b></td><td>支付凭证、鉴权密钥</td><td>字段级加密（KMS 管钥）+ 硬件加密机可选</td><td>双人控制 + 全操作告警 + 禁止导出</td></tr>
+  </table>
+  <h3>加密分层</h3>
+  <ul>
+    <li><b>传输加密</b>：TLS 1.2+（推荐 1.3），禁用 SSLv3 / TLS 1.0 / 1.1 和弱套件（RC4、DES）。证书用 ACME 协议自动续期，杜绝"证书过期导致全站故障"。</li>
+    <li><b>存储加密</b>：数据库 TDE + 磁盘加密防"硬盘被盗"；对象存储服务端加密防"备份泄露"。</li>
+    <li><b>字段级加密</b>：手机号、身份证用 AES-256-GCM 应用层加密——防的是 DBA 拖库、日志误打、备份外发。<b>注意：字段加密后该字段无法直接索引和模糊查询</b>，需要检索的字段用确定性加密或单独建哈希索引，两者都要在方案评审时想清楚。</li>
+  </ul>
+  <h3>KMS 与信封加密</h3>
+  <pre><span class="c"># 信封加密：数据密钥加密数据，主密钥加密数据密钥</span>
+1. 从 KMS 生成 DEK（数据密钥）—— KMS 返回明文 DEK + 密文 DEK
+2. 用明文 DEK 在本地加密业务数据
+3. 销毁明文 DEK，密文 DEK 与密文数据一起存储
+4. 解密时：把密文 DEK 交给 KMS 换回明文 DEK，本地解密
+
+<span class="c"># 好处：</span>
+<span class="c"># - 大批量数据加密不用每次调 KMS（本地加密，无网络开销）</span>
+<span class="c"># - 轮换 KEK 只需重新加密 DEK，不用重加密全库</span>
+<span class="c"># - 权限收敛在 KMS：谁能调 Decrypt，谁能解密数据</span></pre>
+  <h3>脱敏</h3>
+  <table>
+    <tr><th style="width:130px">场景</th><th>做法</th></tr>
+    <tr><td><b>展示脱敏</b></td><td>138****1234；前端按角色决定是否给全量（客服看全号、运营看掩码）</td></tr>
+    <tr><td><b>日志脱敏</b></td><td>日志框架配脱敏规则：手机号/身份证/token/密码字段正则替换后再落盘</td></tr>
+    <tr><td><b>测试数据脱敏</b></td><td>生产数据出库必须脱敏；需要保留格式的用 FPE（保格式加密），保留关联关系的用映射表</td></tr>
+    <tr><td><b>接口返回</b></td><td>响应 DTO 白名单；禁止把实体对象直接序列化返回（字段泄露的重灾区）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>密钥管理三条红线：</b>① 密钥不硬编码在代码、配置、镜像里——进 Git 就等于公开；② 密钥不进日志——日志的受众范围远大于密钥该有的范围；③ 用 KMS / Vault 统一管，带版本、带轮换、带审计。满足这三条，密钥泄露的爆炸半径才可控。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>应用安全控制点：OWASP 到架构层</h2></div>
+  <p class="lead">OWASP Top 10 是漏洞清单，架构师的活是把每条映射成<b>某个架构层上的控制点</b>——否则清单永远停留在安全团队的 PPT 里。</p>
+  <table>
+    <tr><th style="width:190px">OWASP Top 10（2021）</th><th style="width:140px">架构层控制点</th><th>具体措施</th></tr>
+    <tr><td><b>A01 失效的访问控制</b></td><td>网关 + 服务双层</td><td>统一鉴权网关；<b>对象级授权</b>（IDOR：查订单必须校验归属）；默认拒绝；管理接口独立分区</td></tr>
+    <tr><td><b>A02 加密失败</b></td><td>传输 + 存储</td><td>全链路 TLS 1.2+；KMS 信封加密；禁用 MD5/SHA1 于安全场景</td></tr>
+    <tr><td><b>A03 注入</b></td><td>服务层</td><td>参数化查询 / ORM；命令执行白名单；模板引擎自动转义；输入按白名单校验</td></tr>
+    <tr><td><b>A04 不安全设计</b></td><td>设计阶段</td><td>STRIDE 威胁建模进评审；用例安全评审；威胁清单入库</td></tr>
+    <tr><td><b>A05 安全配置错误</b></td><td>部署层</td><td>CIS 基线扫描；IaC 模板统一收口；默认口令强制修改；目录列表关闭</td></tr>
+    <tr><td><b>A06 脆弱组件</b></td><td>供应链</td><td>SCA 依赖扫描（已知 CVE）；SBOM 归档；补丁 SLA：严重 24h / 高危 7 天</td></tr>
+    <tr><td><b>A07 认证失败</b></td><td>IAM</td><td>MFA；登录限速 + 锁定；短期 token；禁止明文传输凭证</td></tr>
+    <tr><td><b>A08 数据完整性失败</b></td><td>供应链 / 更新</td><td>镜像签名验证（cosign）；更新通道加密 + 签名；CI/CD 权限最小化</td></tr>
+    <tr><td><b>A09 日志监控失败</b></td><td>运维</td><td>登录/越权/删改全记录；日志异地集中；异常行为告警（防"被拖库半年没人发现"）</td></tr>
+    <tr><td><b>A10 SSRF</b></td><td>服务层</td><td>出站白名单；屏蔽元数据地址（169.254.169.254）；禁止用户控制完整 URL</td></tr>
+  </table>
+  <h3>IDOR 越权：最小示例</h3>
+  <pre><span class="c">// 反例：只判断了"登录"，没判断"归属"</span>
+@GetMapping("/api/orders/{id}")
+public OrderVO get(@PathVariable Long id) {
+  return orderService.findById(id);   <span class="c">// 改 id 就能看任何人的订单</span>
+}
+
+<span class="c">// 正例：对象级授权，归属不符一律 404（不提示"存在但无权看"）</span>
+@GetMapping("/api/orders/{id}")
+public OrderVO get(@PathVariable Long id, @LoginUser Long userId) {
+  OrderVO order = orderService.findById(id);
+  if (!order.getUserId().equals(userId)) {
+    throw new NotFoundException();   <span class="c">// 404 而非 403，不泄露资源存在性</span>
+  }
+  return order;
+}</pre>
+  <div class="callout danger">
+    <b>控制点放错层 = 没放。</b>权限校验只写在前端按钮上，后端接口裸奔，一个 curl 就打穿。鉴权要么在网关统一做（横切关注点），要么在每个服务的方法级强制做，唯独不能只做在客户端。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>SDL 与合规落地</h2></div>
+  <p class="lead">安全开发生命周期（SDL）把安全活动嵌进研发流程；合规要求（等保、个保法）最终都要翻译成具体的架构动作，否则过检就是补材料。</p>
+  <h3>SDL 六阶段</h3>
+  <table>
+    <tr><th style="width:100px">阶段</th><th style="width:230px">安全活动</th><th>工具 / 产出</th></tr>
+    <tr><td><b>需求</b></td><td>安全需求入库：数据分级、合规范围、隐私影响评估</td><td>安全需求清单；PIA 报告</td></tr>
+    <tr><td><b>设计</b></td><td>威胁建模（STRIDE + DFD）、安全架构评审</td><td>威胁清单 + 处置记录</td></tr>
+    <tr><td><b>开发</b></td><td>安全编码规范；密钥扫描；依赖漏洞扫描</td><td>Semgrep / gitleaks / Trivy 进 CI，门禁阻断</td></tr>
+    <tr><td><b>测试</b></td><td>SAST 静态扫描 + DAST 动态扫描 + 渗透测试</td><td>SonarQube / OWASP ZAP / 人工渗透报告</td></tr>
+    <tr><td><b>发布</b></td><td>配置基线核查；SBOM 归档；镜像签名</td><td>配置核查单；签名镜像</td></tr>
+    <tr><td><b>运维</b></td><td>漏洞响应 SLA；补丁管理；安全事件响应</td><td>严重 24h / 高危 7 天 / 中危 30 天闭环</td></tr>
+  </table>
+  <h3>等保 2.0（三级）对架构的要求</h3>
+  <table>
+    <tr><th style="width:200px">合规要求</th><th>架构落地动作</th></tr>
+    <tr><td><b>安全通信网络</b></td><td>网络分区：DMZ / 应用区 / 数据区，区之间防火墙策略默认拒绝，只放行必要端口</td></tr>
+    <tr><td><b>传输加密</b></td><td>全链路 TLS 1.2+，含内部东西向流量；证书集中管理自动续期</td></tr>
+    <tr><td><b>安全区域边界</b></td><td>边界接入控制 + 入侵防范（WAF/IDS）；区域间访问需显式授权</td></tr>
+    <tr><td><b>安全审计</b></td><td>操作日志集中采集、异地留存 ≥ 6 个月、防篡改（只写存储）</td></tr>
+    <tr><td><b>集中管控</b></td><td>统一身份源（SSO）；运维操作走堡垒机；高危操作双人控制</td></tr>
+  </table>
+  <h3>个保法（PIPL）对架构的要求</h3>
+  <table>
+    <tr><th style="width:200px">合规要求</th><th>架构落地动作</th></tr>
+    <tr><td><b>最小必要</b></td><td>收集字段清单评审制：新增收集字段需说明必要性；能少收就不收</td></tr>
+    <tr><td><b>单独同意</b></td><td>同意管理服务：记录每项处理的同意/撤回时间戳；撤回可执行（停用数据）</td></tr>
+    <tr><td><b>可删除权</b></td><td>用户数据可定位、可删除——<b>包括备份</b>：逻辑删除 + 备份过期策略，不是只删主库</td></tr>
+    <tr><td><b>跨境传输</b></td><td>出境安全评估 / 标准合同；架构上数据分区存放，境内数据不出境集群</td></tr>
+    <tr><td><b>泄露通知</b></td><td>数据泄露 72 小时内通知监管与用户；架构支撑：影响面评估能力（知道哪些数据、涉及多少人）</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>合规的正确姿势是"一次设计，处处过检"。</b>按等保三级设计的分区、加密、审计，同时覆盖个保法的删除权与同意管理——两套要求底层是同一套控制。反过来，为过检补材料、过检后拆除的做法，既贵又假，一出事全暴露。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>十个真实的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">安全后补</div><div class="pd">上线前一周才找安全团队，补出一堆"紧急改造"，成本是设计期做的 5~10 倍。把威胁建模放进方案评审环节，两小时换两周返工。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">过度依赖 WAF</div><div class="pd">以为买了 WAF 就安全。WAF 防不住业务逻辑漏洞（越权、IDOR、重复提交）和 0day，它的规则库永远滞后于新攻击手法。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">密钥硬编码</div><div class="pd">代码里写死 API Key、数据库密码，一进 Git 历史永远删不干净。用 KMS/Vault + CI 密钥扫描（gitleaks/trufflehog），提交时自动拦截。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">日志泄露敏感信息</div><div class="pd">日志打印完整手机号、token、密码、身份证。日志的受众（运维、监控平台、日志厂商）远大于密钥该有的范围。日志框架统一配脱敏规则，落盘前替换。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">权限只在前端控制</div><div class="pd">按钮藏起来了，接口没鉴权，一个 curl 就越权。鉴权必须在网关或服务端强制，前端控制只是体验不是安全。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">内部流量裸奔</div><div class="pd">东西向无认证无加密，一个服务被攻破（或被员工利用）全网失守。服务间 mTLS + 服务身份，把内网当敌对环境。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">已知 CVE 不修</div><div class="pd">依赖组件爆高危漏洞，没人跟踪没人升级，直到被扫出来通报。SCA 扫描 + SBOM 清单 + 补丁 SLA（严重 24h / 高危 7 天）闭环。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">测试数据用生产真数据</div><div class="pd">"图省事"直接拷生产库到测试环境，测试库被拖库等于生产泄露。生产数据出库必须脱敏；需要格式保留用 FPE。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">鉴权服务故障时 fail open</div><div class="pd">鉴权中间件异常直接放行，攻击者打满鉴权服务就获得全场通行证。fail closed：异常拒绝 + 告警，可用性靠副本和限流保证。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">没有密钥轮换与泄露预案</div><div class="pd">密钥泄露后不知道怎么换、不敢换，只能重启了事。KMS 带版本支持轮换；泄露应急预案提前演练（吊销 → 轮换 → 审计 → 复盘）。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. STRIDE 中的 T（Tampering）指的是哪类威胁？</div>
+      <button class="opt">假冒身份</button>
+      <button class="opt">篡改数据或请求</button>
+      <button class="opt">拒绝服务</button>
+      <button class="opt">信息泄露</button>
+      <div class="ans">正确答案：<b>篡改</b>。典型场景是修改请求参数（如订单金额）、篡改数据库记录。对应控制：服务端重算关键值、参数化查询、全操作审计日志。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">2. 鉴权服务出现故障时，正确的架构行为是？</div>
+      <button class="opt">放行所有请求，保证业务不中断</button>
+      <button class="opt">返回 500 让前端重试直到恢复</button>
+      <button class="opt">切换成匿名模式，允许只读访问</button>
+      <button class="opt">拒绝请求（fail closed）并告警，可用性靠副本和限流保证</button>
+      <div class="ans">正确答案：<b>fail closed</b>。放行等于把认证变成装饰品——攻击者只要让鉴权服务超时就获得全场通行证。可用性问题用副本、限流、降级（只读也不该匿名）解决，不用安全换可用。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 用户改订单 ID 就能查看他人订单，这类漏洞的架构层防御是？</div>
+      <button class="opt">对象级授权：服务端校验资源归属，不匹配返回 404</button>
+      <button class="opt">前端把订单 ID 加密，让用户猜不到</button>
+      <button class="opt">接口加图形验证码</button>
+      <button class="opt">订单 ID 改用 UUID</button>
+      <div class="ans">正确答案：<b>对象级授权</b>。这就是 IDOR（不安全直接对象引用），OWASP A01。ID 用 UUID 只是增加猜测难度，不是防御；验证码防机器人不防越权。唯一正解是服务端每次校验资源归属。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于数据库密码等密钥的管理，正确的做法是？</div>
+      <button class="opt">写在代码常量里，改起来方便</button>
+      <button class="opt">放配置中心的明文配置项，运维统一保管</button>
+      <button class="opt">用 KMS / Vault 统一管理，支持版本、轮换、审计，代码里只存引用</button>
+      <button class="opt">放在镜像的环境变量里，反正镜像私有</button>
+      <div class="ans">正确答案：<b>KMS / Vault 统一管理</b>。代码常量会进 Git 历史；配置中心明文 = 谁能读配置谁就能拿密码；镜像环境变量对任何能拉到镜像的人可见。只有 KMS 模式满足权限收敛 + 轮换 + 审计三要素。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. RBAC 与 ABAC 的核心区别是？</div>
+      <button class="opt">RBAC 更安全，ABAC 不安全</button>
+      <button class="opt">RBAC 按角色静态授权，ABAC 按属性动态匹配策略</button>
+      <button class="opt">ABAC 只能用于数据库，RBAC 只能用于接口</button>
+      <button class="opt">两者只是叫法不同</button>
+      <div class="ans">正确答案：<b>角色静态 vs 属性动态</b>。RBAC：用户→角色→权限，简单但难表达"只有财务在工作时间能看报表"这类条件。ABAC 用属性策略表达细粒度动态授权，代价是策略复杂。实践是 RBAC 打底 + 热点资源 ABAC 补细粒度。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">6. 日志里打印了用户完整手机号和登录 token，违反了哪条原则/要求？</div>
+      <button class="opt">纵深防御</button>
+      <button class="opt">最小权限（针对用户账号）</button>
+      <button class="opt">零信任网络</button>
+      <button class="opt">数据脱敏与最小暴露原则</button>
+      <div class="ans">正确答案：<b>脱敏与最小暴露</b>。日志的受众（运维平台、监控系统、日志厂商）远大于手机号和 token 该有的可见范围。日志框架应在落盘前统一做正则脱敏，敏感字段一律掩码或丢弃。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令与工具</h3>
+  <div class="cmds">
+    <div class="crow"><code>gitleaks detect --source . -v</code><span class="desc">扫 Git 历史里的密钥泄露，进 CI 门禁</span><button class="copy">复制</button></div>
+    <div class="crow"><code>trivy image myapp:latest</code><span class="desc">扫镜像 OS 包 + 语言依赖的已知 CVE</span><button class="copy">复制</button></div>
+    <div class="crow"><code>semgrep scan --config auto</code><span class="desc">SAST 静态规则扫描危险代码模式</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker run -t owasp/zap2docker-stable zap-baseline.py -t URL</code><span class="desc">OWASP ZAP 基线动态扫描 Web 接口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nmap -sV -p- target</code><span class="desc">攻击面自查：暴露端口与服务版本</span><button class="copy">复制</button></div>
+    <div class="crow"><code>openssl s_client -connect host:443 -tls1_2</code><span class="desc">验证 TLS 版本与证书链，排查弱协议</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cosign verify myapp:latest</code><span class="desc">验证镜像签名，防供应链篡改</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get networkpolicy -A</code><span class="desc">查 K8s 网络策略是否默认拒绝（等保分区落地）</span><button class="copy">复制</button></div>
+  </div>
+  <h3>关键数字速记</h3>
+  <pre><span class="c"># 补丁响应 SLA（常见企业基线）</span>
+严重（CVSS 9.0+）   24 小时内修复或缓解
+高危（7.0-8.9）     7 天
+中危（4.0-6.9）     30 天
+低危                90 天或随版本
+
+<span class="c"># 凭证有效期参考</span>
+JWT access token      15 分钟
+JWT refresh token     7 天（可吊销）
+云 STS 临时凭证       15 分钟 ~ 1 小时
+API Key               90 天强制轮换
+数据库密码            90 天轮换 + 禁止共用
+
+<span class="c"># 留存要求</span>
+等保三级审计日志       ≥ 6 个月，异地防篡改
+个保法泄露通知         72 小时内通知监管与用户</pre>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>纵深防御</b></td><td>多层安全控制，单层失效不致命，每层假设上层已被突破</td></tr>
+    <tr><td><b>最小权限</b></td><td>每个主体只授予必需权限，并定期回收</td></tr>
+    <tr><td><b>默认安全</b></td><td>Secure by Default：安全配置是默认值，开洞需显式申请</td></tr>
+    <tr><td><b>失败安全</b></td><td>Fail Closed：出错时拒绝服务而非放行</td></tr>
+    <tr><td><b>威胁建模</b></td><td>设计阶段系统化识别威胁的活动，产出威胁清单</td></tr>
+    <tr><td><b>STRIDE</b></td><td>六类威胁分类：假冒/篡改/抵赖/泄露/拒绝服务/提权</td></tr>
+    <tr><td><b>DFD</b></td><td>数据流图：外部实体、进程、数据存储、数据流，标信任边界</td></tr>
+    <tr><td><b>攻击面</b></td><td>系统暴露给攻击者的所有入口总和：端口、端点、依赖、人</td></tr>
+    <tr><td><b>IAM</b></td><td>身份与访问管理：身份、认证、授权、审计四件事</td></tr>
+    <tr><td><b>RBAC</b></td><td>基于角色的访问控制：用户→角色→权限</td></tr>
+    <tr><td><b>ABAC</b></td><td>基于属性的访问控制：策略匹配用户/资源/环境属性</td></tr>
+    <tr><td><b>零信任</b></td><td>不区分内外网，每次访问先认证授权，默认不信任</td></tr>
+    <tr><td><b>mTLS</b></td><td>双向 TLS：客户端与服务端互验证书，用于东西向服务身份</td></tr>
+    <tr><td><b>IDOR</b></td><td>不安全直接对象引用：改 ID 越权访问他人资源，OWASP A01</td></tr>
+    <tr><td><b>KMS</b></td><td>密钥管理服务：管主密钥，提供加密/解密/轮换/审计能力</td></tr>
+    <tr><td><b>信封加密</b></td><td>DEK 加密数据、KEK 加密 DEK，兼顾性能与轮换</td></tr>
+    <tr><td><b>FPE</b></td><td>保格式加密：加密后仍保持原数据格式，用于测试数据脱敏</td></tr>
+    <tr><td><b>SDL</b></td><td>安全开发生命周期：需求到运维六阶段嵌入安全活动</td></tr>
+    <tr><td><b>SAST / DAST / SCA</b></td><td>静态代码扫描 / 动态运行时扫描 / 组件依赖漏洞扫描</td></tr>
+    <tr><td><b>SBOM</b></td><td>软件物料清单：组件级依赖台账，漏洞响应时定位影响面</td></tr>
+    <tr><td><b>等保 2.0</b></td><td>中国网络安全等级保护制度，三级覆盖上述分区/加密/审计要求</td></tr>
+    <tr><td><b>个保法 PIPL</b></td><td>个人信息保护法：最小必要、单独同意、可删除、跨境评估</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>本周就能做的三件事：</b>① 给 CI 加 gitleaks + trivy 两道扫描，门禁阻断高危；② 对核心服务做一次两小时 STRIDE 威胁建模，产出威胁清单进仓库；③ 查一遍服务的数据库账号权限，砍掉跨库和多余授权，密码统一进 KMS。<br><br>
+    <b>之后值得深入：</b>OAuth2/OIDC 授权码流细节、SPIFFE/SPIRE 工作负载身份、以及云原生安全（Pod 安全策略、Runtime 检测）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透安全架构设计 · 默认拒绝、最小权限、失败关闭——三句话顶半个安全体系</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（威胁建模）和模块 5（控制点映射）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边给自己的系统数一遍暴露面。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='边看边数：你的服务之间调用，有几个是带认证的？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

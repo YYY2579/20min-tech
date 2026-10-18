@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透内核追踪</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透内核追踪</h1>
+    <p class="sub">用户态工具只能看到系统调用的<b>边界</b>，看不到边界里面发生了什么。这篇讲清楚 ftrace、tracepoint、kprobe、perf、eBPF 各自的定位与开销，以及在生产上怎么用它们回答"到底慢在哪一行"。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>5</b> 种追踪机制</span>
+      <span class="chip"><b>5</b> 个 bpftrace 单行</span>
+      <span class="chip"><b>10</b> 个生产坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开一台 Linux 虚机（内核 5.4 以上），用 root 跟着敲 —— 这篇几乎所有命令都需要 root</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先把环境准备好</h2></div>
+  <p class="lead">内核追踪的坑有一半出在环境上：tracefs 没挂、权限不够、内核编译时关掉了某个选项。先花两分钟把这几件事确认掉。</p>
+  <pre><span class="c"># 1. 内核版本（eBPF 的很多特性有版本门槛）</span>
+uname -r
+
+<span class="c"># 2. 关键内核编译选项是否打开</span>
+grep -E 'CONFIG_(FTRACE|FUNCTION_TRACER|KPROBES|KPROBE_EVENTS|BPF|BPF_SYSCALL|DEBUG_FS)=' /boot/config-$(uname -r)
+
+<span class="c"># 3. tracefs 挂载点（现代内核已经独立挂载，不再依赖 debugfs）</span>
+mount | grep -E 'tracefs|debugfs'
+<span class="c"># 典型输出：tracefs on /sys/kernel/tracing type tracefs (rw,nosuid,nodev,noexec,relatime)</span>
+<span class="c"># 老内核只有：debugfs on /sys/kernel/debug type debugfs，此时路径是 /sys/kernel/debug/tracing</span>
+
+<span class="c"># 4. perf 是否可用</span>
+perf --version
+cat /proc/sys/kernel/perf_event_paranoid   <span class="c"># 2 = 默认，普通用户不能测内核事件</span>
+
+<span class="c"># 5. bpftrace 装了吗</span>
+bpftrace --version
+
+<span class="c"># 6. 确认你确实是 root</span>
+id -u    <span class="c"># 输出 0 才是</span></pre>
+  <div class="callout warn">
+    <b>两个路径要分清：</b>新内核（4.1+ 独立挂载 tracefs）用 <span class="k">/sys/kernel/tracing</span>；老内核用 <span class="k">/sys/kernel/debug/tracing</span>。两者内容完全一样，是同一个文件系统的两个挂载点。<br>
+    如果 <span class="k">/sys/kernel/tracing</span> 是空的，手动挂：<span class="k">mount -t tracefs nodev /sys/kernel/tracing</span>。容器里通常没有权限，需要 <span class="k">--privileged</span> 或 <span class="k">--pid=host</span> 加挂载。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>内核追踪解决什么问题</h2></div>
+  <p class="lead">用户态工具看到的世界是被裁剪过的。进程调用 <span class="k">read()</span>，在你的程序里是一行代码；在内核里是一串函数调用、若干次锁竞争、可能还有一次磁盘等待。工具只看得到"进去"和"出来"两个时间点。</p>
+  <h3>三类工具的分层</h3>
+  <table>
+    <tr><th style="width:150px">层次</th><th style="width:230px">代表工具</th><th>能看到什么 / 看不到什么</th></tr>
+    <tr><td><b>系统调用边界</b></td><td class="f">strace / ltrace</td><td>看得到：调了哪个 syscall、参数、返回值、耗时。<b>看不到</b>：这 200ms 花在内核的哪个函数里</td></tr>
+    <tr><td><b>采样与计数</b></td><td class="f">perf / top / vmstat</td><td>看得到：CPU 在哪个函数上、cache miss 多少、上下文切换多少次。<b>看不到</b>：单次请求的完整因果链</td></tr>
+    <tr><td><b>内核内部追踪</b></td><td class="f">ftrace / kprobe / eBPF</td><td>看得到：任意内核函数的入参、返回值、调用栈、耗时。<b>代价</b>：有开销，配错了能把机器拖死</td></tr>
+    <tr><td><b>快照式状态</b></td><td class="f">/proc / /sys</td><td>看得到：某一瞬间的计数器、队列长度。<b>看不到</b>：这个数字是怎么变成这样的</td></tr>
+  </table>
+  <h3>一个具体例子：read 为什么慢</h3>
+  <pre><span class="c"># 应用层看到的现象</span>
+$ strace -T -p 12345
+read(7, "....", 4096) = 4096 <span class="r">&lt;0.203451&gt;</span>
+<span class="c"># 这一行告诉你：read 花了 203 毫秒。然后呢？没有然后了。</span>
+
+<span class="c"># 这 203ms 可能的成因，strace 一个都答不了：</span>
+<span class="c">#   a) 数据不在 page cache，真的等了一次磁盘 IO</span>
+<span class="c">#   b) 文件在 NFS 上，等的是网络</span>
+<span class="c">#   c) 拿 inode 锁的时候被别的线程挡住了</span>
+<span class="c">#   d) 触发了内存回收（direct reclaim），在等 kswapd</span>
+<span class="c">#   e) cgroup 的 io.max 限流，请求在块层排队</span>
+<span class="c">#   f) 进程被调度出去了，CPU 让给了别人</span>
+
+<span class="c"># 用 ftrace 的 function_graph 看内部调用链（只追 vfs_read 一层）</span>
+cd /sys/kernel/tracing
+echo function_graph &gt; current_tracer
+echo vfs_read &gt; set_graph_function
+echo 1 &gt; tracing_on
+cat /proc/12345/comm          <span class="c"># 先确认进程还在</span>
+<span class="c"># ... 让应用再发一次请求 ...</span>
+echo 0 &gt; tracing_on
+cat trace | head -60</pre>
+  <p>典型的 function_graph 输出长这样，注意每行前面的<b>耗时（微秒）</b>和<b>缩进层级</b>，缩进就是调用深度：</p>
+  <pre><span class="c"># 字段：CPU | 任务-PID | 耗时 | 调用链</span>
+ 1) app-12345  |  <span class="r">1002.113 us</span>   |  } <span class="c">/* vfs_read */</span>
+ 1) app-12345  |               |    down_read() {
+ 1) app-12345  |  <span class="y">1.203 us</span>      |    }
+ 1) app-12345  |               |    filemap_read() {
+ 1) app-12345  |  <span class="r">998.002 us</span>     |      pagecache_get_page();
+ 1) app-12345  |  <span class="r">999.441 us</span>     |    }</pre>
+  <div class="callout ok">
+    <b>读法：</b>外层 <span class="k">vfs_read</span> 共 1002 微秒，其中 <span class="k">filemap_read</span> 占 999，而它里面 <span class="k">pagecache_get_page</span> 又占了 998 —— <b>时间几乎全在等 page cache 回盘</b>。反过来，如果时间分散在几十个短函数上，那是 CPU 密集型而非 IO 等待。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>ftrace：内核自带的追踪器</h2></div>
+  <p class="lead">ftrace 是内核里编译进去的追踪框架，<b>不需要装任何东西</b>，通过 tracefs 里的几个文件控制。它的定位是"低门槛、够用、开销可预期"。</p>
+  <h3>tracefs 里的核心文件</h3>
+  <table>
+    <tr><th style="width:230px">文件</th><th>作用</th></tr>
+    <tr><td class="f">available_tracers</td><td>当前内核支持哪些 tracer。典型值：<span class="k">nop function function_graph</span></td></tr>
+    <tr><td class="f">current_tracer</td><td>写入 tracer 名字即启用。写 <span class="k">nop</span> 关闭</td></tr>
+    <tr><td class="f">tracing_on</td><td>总开关。1 开 0 关。<b>关掉后 trace 文件内容还在，可以慢慢读</b></td></tr>
+    <tr><td class="f">trace</td><td>读它得到当前缓冲区快照。读操作本身会阻塞到读完</td></tr>
+    <tr><td class="f">trace_pipe</td><td>流式读取，读到就被消费掉。<b>适合边跑边看</b>，用 Ctrl-C 停</td></tr>
+    <tr><td class="f">set_ftrace_filter</td><td>只追踪哪些函数。支持通配符和 <span class="k">:mod:</span> 模块语法</td></tr>
+    <tr><td class="f">set_ftrace_pid</td><td>只追踪指定 PID。<b>最有效的降噪手段</b></td></tr>
+    <tr><td class="f">set_graph_function</td><td>function_graph 专用：从哪个函数开始画图</td></tr>
+    <tr><td class="f">max_graph_depth</td><td>function_graph 最大追踪深度，默认 0（不限）</td></tr>
+    <tr><td class="f">buffer_size_kb</td><td>每个 CPU 的环形缓冲区大小。默认很小（约 1.4MB/CPU）</td></tr>
+  </table>
+  <h3>function tracer：只看"谁被调了"</h3>
+  <pre><span class="c"># 追踪所有 openat 相关的函数（通配符）</span>
+cd /sys/kernel/tracing
+echo 0 &gt; tracing_on
+echo function &gt; current_tracer
+echo <span class="y">'*openat*'</span> &gt; set_ftrace_filter
+
+<span class="c"># 只关心某个进程</span>
+echo 12345 &gt; set_ftrace_pid
+
+echo 1 &gt; tracing_on
+sleep 2
+echo 0 &gt; tracing_on
+cat trace
+
+<span class="c"># 输出格式（不含耗时，只有调用顺序）：</span>
+<span class="c">#  bash-1234  [002] d...  1024.113: SyS_openat -&gt; 0xffffffff81234567</span>
+<span class="c">#  bash-1234  [002] d...  1024.115: do_sys_open -&gt; 0xffffffff81234678</span></pre>
+  <h3>function_graph：看"谁调谁、各花多久"</h3>
+  <pre><span class="c"># 完整配置流程（这是最常用的一套）</span>
+cd /sys/kernel/tracing
+echo 0 &gt; tracing_on
+
+<span class="c"># 1. 清空历史配置（上次的 filter 会残留，导致你以为没生效）</span>
+echo &gt; set_ftrace_filter; echo &gt; set_graph_function; echo &gt; set_ftrace_pid
+
+<span class="c"># 2. 选 tracer</span>
+echo function_graph &gt; current_tracer
+
+<span class="c"># 3. 限定入口函数（不限定就会追踪全内核，直接卡死）</span>
+echo vfs_read &gt; set_graph_function
+
+<span class="c"># 4. 限制深度，避免输出爆炸</span>
+echo 4 &gt; max_graph_depth
+
+<span class="c"># 5. 打开耗时显示（默认就开）</span>
+echo funcgraph-duration &gt; trace_options
+
+<span class="c"># 6. 只跟这个进程</span>
+echo $(pgrep -f myapp) &gt; set_ftrace_pid
+
+<span class="c"># 7. 开始，跑几秒，停止</span>
+echo 1 &gt; tracing_on
+sleep 3
+echo 0 &gt; tracing_on
+
+cat trace &gt; /tmp/graph.txt
+wc -l /tmp/graph.txt</pre>
+  <div class="callout warn">
+    <b>function_graph 是 ftrace 里最贵的一个。</b>它给每个被追踪函数的<b>入口和出口</b>都挂了一个回调，每次进出都要记录时间戳、写环形缓冲区。追全内核时开销可以到 <b>数倍到数十倍</b>，并且会严重扰动被测系统（本来 1ms 的操作变成 5ms，你测到的是追踪器的开销）。<br>
+    <b>生产上三条铁律：</b>① 必须设 <span class="k">set_graph_function</span> 或 <span class="k">set_ftrace_filter</span>，绝不追全部；② 必须设 <span class="k">set_ftrace_pid</span>；③ 只开几秒，抓完立刻 <span class="k">echo 0 &gt; tracing_on</span>。
+  </div>
+  
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>tracepoint 与 kprobe：静态探针 vs 动态探针</h2></div>
+  <p class="lead">这是内核追踪里最重要的一个取舍。选错了，要么拿不到数据，要么把机器搞崩。</p>
+  <h3>本质区别</h3>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:250px">tracepoint（静态）</th><th>kprobe（动态）</th></tr>
+    <tr><td><b>怎么来的</b></td><td>内核开发者在代码里<b>手动埋的点</b>，编译时就存在</td><td>运行时<b>往任意指令地址插一个断点</b>（x86 上是 int3，改一个字节）</td></tr>
+    <tr><td><b>稳定性</b></td><td><b>稳定 ABI</b>。字段名写在 <span class="k">format</span> 文件里，跨版本基本不变</td><td><b>不稳定</b>。函数可能被 inline、被改名、参数寄存器分配变了，脚本就废了</td></tr>
+    <tr><td><b>覆盖范围</b></td><td>只有开发者埋过的地方。约 1500~2000 个点</td><td><b>任意函数</b>，包括你自己写的模块</td></tr>
+    <tr><td><b>开销</b></td><td>低。静态跳转（static key）+ 一个函数调用</td><td>较高。每次命中触发一次异常陷入（trap），<b>百纳秒到微秒级</b></td></tr>
+    <tr><td><b>参数访问</b></td><td>按名字，<span class="k">args-&gt;filename</span></td><td>按寄存器，<span class="k">%di</span>、<span class="k">$arg1</span>，要懂 ABI</td></tr>
+  </table>
+  <h3>tracepoint：先看有什么，再看字段</h3>
+  <pre><span class="c"># 列出所有 tracepoint 分类</span>
+ls /sys/kernel/tracing/events/
+<span class="c"># block  cgroup  ext4  irq  kmem  net  sched  signal  sock  syscalls  tcp  ...</span>
+
+<span class="c"># 看某一类下有哪些点</span>
+ls /sys/kernel/tracing/events/syscalls/ | head -20
+<span class="c"># sys_enter_openat  sys_exit_openat  sys_enter_read  sys_exit_read ...</span>
+
+<span class="c"># 看某个点的字段定义（这个文件是理解 tracepoint 的钥匙）</span>
+cat /sys/kernel/tracing/events/sched/sched_switch/format</pre>
+  <p><span class="k">format</span> 文件明确告诉你每个字段叫什么、偏移多少、能不能打印成字符串：</p>
+  <pre>name: sched_switch
+ID: 314
+	field:char prev_comm[16];	offset:8;	size:16;	signed:1;
+	field:pid_t prev_pid;	offset:24;	size:4;	signed:1;
+	field:long prev_state;	offset:32;	size:8;	signed:1;
+	field:char next_comm[16];	offset:40;	size:16;	signed:1;</pre>
+  <pre><span class="c"># 启用某个 tracepoint（写 1 到 enable）</span>
+cd /sys/kernel/tracing
+echo 0 &gt; tracing_on
+echo 1 &gt; events/sched/sched_switch/enable
+echo 1 &gt; tracing_on
+sleep 1
+echo 0 &gt; tracing_on
+cat trace | head -20
+
+<span class="c"># 输出：</span>
+<span class="c">#  bash-1234 [002] d... 1024.113: sched_switch: prev_comm=bash prev_pid=1234 \</span>
+<span class="c">#    prev_prio=120 prev_state=S ==&gt; next_comm=sshd next_pid=5678 next_prio=120</span>
+
+<span class="c"># 关闭所有 tracepoint 的快捷方式</span>
+echo 0 &gt; events/enable</pre>
+  <h3>kprobe：往任意函数上插探针</h3>
+  <pre><span class="c"># 语法：p[:[组/]事件名] 函数 [参数...]</span>
+<span class="c"># 参数取值：%寄存器名 或 $arg1 $arg2 ...（按 ABI 顺序）</span>
+
+<span class="c"># 例 1：追 do_sys_open 的入参（x86_64：di=filename, si=flags, dx=mode）</span>
+echo <span class="y">'p:my_open do_sys_open filename=+0(%di):string flags=%si mode=%dx'</span> \
+  &gt; /sys/kernel/tracing/kprobe_events
+
+<span class="c"># 例 2：追返回值（kretprobe，用 r: 前缀）</span>
+echo <span class="y">'r:my_open_ret do_sys_open ret=$retval'</span> &gt;&gt; /sys/kernel/tracing/kprobe_events
+
+<span class="c"># 启用</span>
+echo 1 &gt; /sys/kernel/tracing/events/kprobes/my_open/enable
+cat /sys/kernel/tracing/trace_pipe
+
+<span class="c"># 删除（写完记得删，否则一直挂着）</span>
+echo <span class="y">'-:my_open'</span> &gt; /sys/kernel/tracing/kprobe_events
+<span class="c"># 或者全清</span>
+echo &gt; /sys/kernel/tracing/kprobe_events</pre>
+  <div class="callout danger">
+    <b>kprobe 的三个真实风险：</b><br>
+    ① <b>可能让系统卡死。</b>probe 到 <span class="k">schedule</span>、<span class="k">kmalloc</span> 这类极热路径，每次命中都是一次 int3 陷入，高 QPS 机器直接 CPU 100%。<br>
+    ② <b>有些函数不能 probe。</b>黑名单在 <span class="k">/sys/kernel/tracing/kprobe_blacklist</span>（含 <span class="k">do_exit</span> 等），硬来返回 <span class="k">EINVAL</span>；被 inline 的函数没有独立符号，报 <span class="k">No such file or directory</span>。<br>
+    ③ <b>参数是猜的。</b>5.4 和 6.1 上参数可能换寄存器，上生产前先在测试机验证 <span class="k">%di</span> 拿到的确实是你以为的值。
+  </div>
+  <h3>uprobe：追用户态函数</h3>
+  <pre><span class="c"># 语法：p:事件名 可执行文件:偏移量（或 :函数名）</span>
+echo <span class="y">'p:my_malloc /usr/lib/x86_64-linux-gnu/libc.so.6:malloc size=%di'</span> \
+  &gt; /sys/kernel/tracing/uprobe_events
+echo 1 &gt; /sys/kernel/tracing/events/uprobes/my_malloc/enable</pre>
+  <div class="callout">
+    <b>怎么选，一句话：</b>能用 tracepoint 就别用 kprobe。tracepoint 是内核维护的稳定接口，开销低、字段有名字、跨版本不坏。只有在 tracepoint 覆盖不到的地方（某个具体函数的内部状态）才动用 kprobe。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>perf 与内核事件</h2></div>
+  <p class="lead">perf 的定位是<b>采样 + 计数</b>，而不是"记录每一次调用"。它的开销和采样频率成正比，所以天然适合生产（<span class="k">-F 99</span> 意味着每秒每 CPU 只采 99 次）。</p>
+  <h3>perf list：先知道有什么事件</h3>
+  <pre><span class="c"># 全部事件几千条，一定要过滤</span>
+perf list | head -40
+perf list hardware      <span class="c"># cycles instructions cache-misses branch-misses</span>
+perf list software      <span class="c"># cpu-clock task-clock page-faults context-switches</span>
+perf list tracepoint | grep sched   <span class="c"># perf 能直接用所有 tracepoint</span></pre>
+  <h3>perf stat：只要数字，不要样本</h3>
+  <pre><span class="c"># 最基础：跑一个命令，看它花了多少周期、多少指令</span>
+perf stat ls
+
+<span class="c"># 输出关键行：</span>
+<span class="c">#   1,234,567      cycles</span>
+<span class="c">#   2,345,678      instructions              #    1.90  insn per cycle</span>
+<span class="c">#     123,456      cache-misses              #   12.34% of all cache refs</span>
+<span class="c">#      12,345      branch-misses             #    0.50% of all branches</span>
+
+<span class="c"># 同时看多个事件（-e 用逗号分隔）</span>
+perf stat -e cycles,instructions,cache-misses,context-switches -p 12345 sleep 5
+
+<span class="c"># 只看内核态 / 用户态；-A 按 CPU 分开统计</span>
+perf stat -e cycles:k -p 12345 sleep 5
+perf stat -A -e cycles sleep 1</pre>
+  <div class="callout">
+    <b>三个数字最有诊断价值：</b><span class="k">IPC</span> 小于 1 说明 CPU 在等内存或分支预测失败；<span class="k">cache-misses</span> 超过 10% 说明访存模式不友好；<span class="k">branch-misses</span> 超过 5% 说明分支预测器被打爆。
+  </div>
+  <h3>perf record：采样，然后看火焰图</h3>
+  <pre><span class="c"># 最常用的一条：以 99Hz 采样所有 CPU，采 10 秒，记录调用栈</span>
+perf record -F 99 -a -g -- sleep 10
+
+<span class="c"># 只采某个进程</span>
+perf record -F 99 -g -p 12345 -- sleep 10
+
+<span class="c"># 只采某个 tracepoint，并记录调用栈</span>
+perf record -e sched:sched_switch -g -a -- sleep 3
+
+<span class="c"># 用 dwarf 方式展开栈（更准，但文件大、慢）</span>
+perf record -F 99 -g --call-graph dwarf -p 12345 -- sleep 10
+
+<span class="c"># 看报告 / 非交互看前 20 个热点</span>
+perf report
+perf report --stdio --sort comm,dso,symbol | head -40
+
+<span class="c"># 生成火焰图</span>
+perf script &gt; out.perf
+./stackcollapse-perf.pl out.perf &gt; out.folded
+./flamegraph.pl out.folded &gt; flame.svg
+</pre>
+  <h3>perf_event_paranoid：为什么你被拒绝</h3>
+  <table>
+    <tr><th style="width:110px">取值</th><th>允许什么</th></tr>
+    <tr><td class="f">0 / -1</td><td>可以测内核事件（需 CAP_PERFMON 或 CAP_SYS_ADMIN）</td></tr>
+    <tr><td class="f">1</td><td>默认，可以测用户态，不能测内核</td></tr>
+    <tr><td class="f">2 / 3</td><td>只能测自己的进程 / 基本全禁</td></tr>
+  </table>
+  <pre><span class="c"># 临时放开（重启失效）</span>
+echo 1 &gt; /proc/sys/kernel/perf_event_paranoid
+
+<span class="c"># 永久</span>
+echo 'kernel.perf_event_paranoid = 1' &gt;&gt; /etc/sysctl.d/99-perf.conf
+sysctl -p /etc/sysctl.d/99-perf.conf</pre>
+  <div class="callout warn">
+    <b>容器里跑 perf 的常见错误：</b><span class="k">perf_event_open: Permission denied</span>。原因通常不是 paranoid，而是容器没给 <span class="k">--cap-add SYS_ADMIN</span>（或 <span class="k">PERFMON</span>），或者 seccomp 拦了 <span class="k">perf_event_open</span> 系统调用。另外容器里的 <span class="k">perf</span> 版本最好和宿主内核匹配，否则符号解析会出问题。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>eBPF 的加载与验证</h2></div>
+  <p class="lead">eBPF 之所以能在生产上用，核心原因是<b>内核在加载前会把你的程序静态检查一遍</b>。这解决了 ftrace/kprobe 时代最大的痛点：一段写错的脚本可能让内核崩溃（panic），而 eBPF 保证"最坏情况是拒绝加载"。</p>
+  <h3>加载流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>准备字节码。</b>写 C 或 bpftrace 脚本，clang 编译成 BPF 指令集（不是 x86 指令）。</div></div>
+    <div class="step"><div class="txt"><b>调用 bpf()。</b>命令 <span class="k">BPF_PROG_LOAD</span>，传入指令、程序类型（kprobe/tracepoint/xdp 等）和 license。</div></div>
+    <div class="step"><div class="txt"><b>验证器逐条走查。</b>模拟执行所有路径，检查寄存器类型、内存边界、循环是否有界。<b>可能耗时几十毫秒到几秒</b>。</div></div>
+    <div class="step"><div class="txt"><b>JIT 编译后挂载。</b>翻译成本机指令（<span class="k">bpf_jit_enable</span>），再通过 perf_event_open 或 <span class="k">bpf_link</span> 绑到探针上。</div></div>
+  </div>
+  <h3>验证器到底保证了什么</h3>
+  <table>
+    <tr><th style="width:170px">保证</th><th>具体含义</th></tr>
+    <tr><td><b>终止性</b></td><td>程序一定会结束。<b>不允许无界循环</b>。5.3 之前干脆禁止循环，之后允许但必须能被证明有界（如 <span class="k">for (i=0; i&lt;100; i++)</span>）</td></tr>
+    <tr><td><b>内存安全</b></td><td>每一次内存访问都要证明在合法范围内。访问 <span class="k">ctx</span> 的字段前要检查指针非空；访问 map 的值要先 <span class="k">bpf_map_lookup_elem</span> 并判空</td></tr>
+    <tr><td><b>不能任意读内核内存</b></td><td>直接解引用内核指针会被拒绝（"R1 invalid mem access"）。要用 <span class="k">bpf_probe_read_kernel()</span> 这类 helper，它会做安全检查</td></tr>
+    <tr><td><b>栈空间有限</b></td><td>BPF 程序栈只有 <b>512 字节</b>。大结构体必须放 map（per-CPU array）或用 <span class="k">bpf_probe_read</span> 分字段读</td></tr>
+    <tr><td><b>指令数上限</b></td><td>5.2 之前是 4096 条，之后是 <b>100 万条</b>（复杂度的上限，不是写多少都行）</td></tr>
+  </table>
+  <pre><span class="c"># 看验证器到底怎么拒绝你的（调试 eBPF 程序的第一手段）</span>
+bpftool prog load my_prog.o /sys/fs/bpf/my_prog
+
+<span class="c"># 典型报错：</span>
+<span class="c">#  invalid mem access 'inv'        —— 访问了未验证的指针</span>
+<span class="c">#  R0 invalid mem access 'map_value_or_null'  —— lookup 后没判空</span>
+<span class="c">#  back-edge from insn 42 to 18    —— 有环，5.3 之前不允许</span>
+<span class="c">#  BPF program is too large        —— 超过指令数上限</span>
+<span class="c">#  unknown func bpf_probe_read#4   —— helper 版本不匹配</span>
+
+<span class="c"># 看已加载的程序和 map</span>
+bpftool prog list
+bpftool map list
+bpftool prog show id 42</pre>
+  <div class="callout danger">
+    <b>验证器不是万能的，这是最容易被误解的一点。</b>它保证的是"<b>不会因为这段 BPF 代码让内核内存损坏或死循环</b>"，<b>不保证</b>：<br>
+    ① 你的逻辑是对的（读错了字段它管不了）；<br>
+    ② 你的程序开销可接受（一个每毫秒触发百万次的 kprobe，验证器照样放行）；<br>
+    ③ 不会干扰业务（你在 <span class="k">tcp_sendmsg</span> 里做复杂字符串处理，照样会拖慢网络）。<br>
+    <b>所以"eBPF 很安全"只对内核稳定性成立，对性能不成立。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>bpftrace 实战：五个能直接跑的单行脚本</h2></div>
+  <p class="lead">bpftrace 是 eBPF 的高层封装，语法接近 awk：<span class="k">探针 / 过滤条件 / { 动作 }</span>。它把"写 C + 编译 + 加载"压缩成了一行命令，是排查时最顺手的工具。</p>
+  <h3>语法骨架</h3>
+  <pre><span class="c"># 结构</span>
+探针类型:探针名 /过滤条件/ { 动作 }
+
+<span class="c"># 常用内置变量</span>
+comm      <span class="c"># 当前进程名（16 字节，可能被截断）</span>
+pid tid   <span class="c"># 进程号 / 线程号</span>
+nsecs     <span class="c"># 单调递增纳秒时间戳（算耗时全靠它）</span>
+args      <span class="c"># tracepoint 的结构化参数，如 args-&gt;filename</span>
+arg0..argN<span class="c"># kprobe 的位置参数</span>
+retval    <span class="c"># kretprobe 的返回值</span>
+curtask   <span class="c"># 当前 task_struct 指针</span>
+kstack    <span class="c"># 内核调用栈</span>
+ustack    <span class="c"># 用户态调用栈</span>
+
+<span class="c"># 常用聚合函数</span>
+count()  sum(x)  avg(x)  min(x)  max(x)  hist(x)  lhist(x,min,max,step)
+
+<span class="c"># 自定义 map 用 @ 开头，@ 后面为空表示匿名（打印时自动输出）</span>
+@start[tid] = nsecs
+@[comm] = count()</pre>
+
+  <h3>① 统计各进程的系统调用次数（找谁在疯狂 syscall）</h3>
+  <pre>bpftrace -e <span class="y">'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'</span>
+
+<span class="c"># 输出（每 1 秒刷新，Ctrl-C 结束打印最终结果）：</span>
+<span class="c"># @[node]: 128934</span>
+<span class="c"># @[nginx]: 4211</span>
+<span class="c"># @[bash]: 88</span>
+
+<span class="c"># 只看某个进程，并按 syscall 号分组</span>
+bpftrace -e <span class="y">'tracepoint:raw_syscalls:sys_enter /comm == "nginx"/ { @[args-&gt;id] = count(); }'</span></pre>
+
+  <h3>② 统计每个进程的系统调用总耗时（找慢在哪）</h3>
+  <pre>bpftrace -e <span class="y">'
+tracepoint:raw_syscalls:sys_enter { @start[tid] = nsecs; }
+tracepoint:raw_syscalls:sys_exit  /@start[tid]/
+{
+  $d = nsecs - @start[tid];
+  @us[comm] = sum($d / 1000);
+  delete(@start[tid]);
+}'</span>
+
+<span class="c"># @start[tid] 必须在 exit 里 delete，否则 map 无限增长</span>
+<span class="c"># 用 tid 不用 pid：同进程多线程会并发进入 syscall</span></pre>
+
+  <h3>③ 抓慢 IO：超过 10ms 的块设备请求</h3>
+  <pre>bpftrace -e <span class="y">'
+tracepoint:block:block_rq_issue
+{
+  @start[args-&gt;dev, args-&gt;sector] = nsecs;
+}
+tracepoint:block:block_rq_complete /@start[args-&gt;dev, args-&gt;sector]/
+{
+  $d = (nsecs - @start[args-&gt;dev, args-&gt;sector]) / 1000000;
+  if ($d &gt; 10) {
+    printf("%-16s %-6d %-8s %6dms sector=%d\n",
+           comm, pid, str(args-&gt;rwbs), $d, args-&gt;sector);
+  }
+  delete(@start[args-&gt;dev, args-&gt;sector]);
+}'</span>
+
+<span class="c"># 注意用 (dev, sector) 做 key，不是只用一个 —— 并发请求会互相覆盖</span>
+<span class="c"># 这条脚本能直接告诉你"哪个进程的哪次 IO 慢了多少毫秒"</span></pre>
+
+  <h3>④ 谁在 fork（找出进程爆炸的元凶）</h3>
+  <pre>bpftrace -e <span class="y">'
+tracepoint:sched:sched_process_fork
+{
+  printf("%-16s %-6d =&gt; %-16s %-6d\n",
+         comm, pid, str(args-&gt;child_comm), args-&gt;child_pid);
+}'</span>
+
+<span class="c"># 加个计数版，看谁 fork 最频繁</span>
+bpftrace -e <span class="y">'tracepoint:sched:sched_process_fork { @[comm] = count(); }'</span>
+
+<span class="c"># 如果看到大量 nginx => nginx 的 fork，通常是配置了错误的 worker 模型</span>
+<span class="c"># 如果是 cron => sh，那是定时任务在跑</span></pre>
+
+  <h3>⑤ 追踪某个内核函数的入参和耗时</h3>
+  <pre><span class="c"># 追 vfs_read：谁在读、读多少、花多久</span>
+bpftrace -e <span class="y">'
+kprobe:vfs_read
+{
+  @s[tid] = nsecs;
+  @file[tid] = arg0;
+}
+kretprobe:vfs_read /@s[tid]/
+{
+  $d = (nsecs - @s[tid]) / 1000;
+  if ($d &gt; 1000) {
+    printf("%-16s %6dus ret=%d\n", comm, $d, retval);
+  }
+  delete(@s[tid]);
+  delete(@file[tid]);
+}'</span>
+
+<span class="c"># 看调用栈，回答"谁在调用这个函数"</span>
+bpftrace -e <span class="y">'kprobe:vfs_read { @[kstack] = count(); }'</span></pre>
+
+  <div class="callout ok">
+    <b>调试 bpftrace 脚本的套路：</b><br>
+    ① 先用 <span class="k">bpftrace -l 'tracepoint:block:*'</span> 确认探针名存在；<br>
+    ② 用 <span class="k">bpftrace -lv 'tracepoint:block:block_rq_issue'</span> 列出这个探针有哪些字段（等价于读 format 文件）；<br>
+    ③ 先用 <span class="k">bpftrace -e 'probe { printf("hit\n"); }'</span> 确认能命中，再加逻辑；<br>
+    ④ 报 <span class="k">Unknown struct/union</span> 说明字段名写错了，回到第 ② 步。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>生产环境的开销控制</h2></div>
+  <p class="lead">这一节比前面所有技术细节都重要。追踪工具本身可以成为故障源——很多"排查过程中服务雪崩"的事故，都是因为开了不该开的东西。</p>
+  <h3>各机制的开销量级</h3>
+  <table>
+    <tr><th style="width:180px">机制</th><th style="width:150px">单次开销</th><th>什么时候会失控</th></tr>
+    <tr><td class="f">tracepoint</td><td>约 0.1~1 微秒</td><td>高频点（如 <span class="k">net:netif_receive_skb</span>）在 10Gbps 流量下每秒百万次</td></tr>
+    <tr><td class="f">kprobe</td><td>约 1~5 微秒（含 trap）</td><td>挂在 <span class="k">kmalloc</span>、<span class="k">schedule</span> 这类每秒千万次调用的函数上</td></tr>
+    <tr><td class="f">function tracer</td><td>约 0.5~2 微秒/函数</td><td>不设 filter，全内核追踪</td></tr>
+    <tr><td class="f">function_graph</td><td>约 2~10 微秒/函数</td><td><b>最容易失控</b>。追全内核时开销 5~50 倍</td></tr>
+    <tr><td class="f">perf record -F 99</td><td>CPU 占用约 1~3%</td><td>频率提到 <span class="k">-F 9999</span>，或开了 dwarf 展开栈</td></tr>
+  </table>
+  <h3>五条控制手段</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>采样而非全量</div><div class="cd">perf 用 <span class="k">-F 99</span> 而不是记录每一次。99 是经验值：能反映热点，又不至于失真（避免和 100Hz 的定时器共振）</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>过滤条件前置</div><div class="cd"><b>在探针里过滤，不要在用户态过滤。</b><span class="k">/comm == "nginx"/</span> 写在花括号前面，内核里就丢掉了不匹配的事件</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>限定 PID</div><div class="cd">ftrace 用 <span class="k">set_ftrace_pid</span>，bpftrace 用 <span class="k">/pid == 1234/</span>。这一条通常能把开销降一个数量级</div></div>
+    >
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>限制输出</div><div class="cd">printf 是最贵的操作之一（要格式化、要写 ringbuf）。<b>用聚合（hist/count）代替逐条打印</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>控制缓冲区</div><div class="cd">ftrace 的 <span class="k">buffer_size_kb</span> 太大吃内存，太小会丢事件（看到 LOST EVENTS 就调大）</div></div>
+  </div>
+  <h3>一个可以直接抄的生产排查模板</h3>
+  <pre><span class="c"># 场景：P99 从 20ms 涨到 800ms，怀疑是 IO</span>
+
+<span class="c"># 1. 先看整体，开销接近 0</span>
+iostat -xz 1 5        <span class="c"># %util / await / aqu-sz</span>
+
+<span class="c"># 2. 确认是不是这个进程（perf，1~3% 开销）</span>
+perf record -F 99 -g -p $(pgrep -f myapp) -- sleep 10
+perf report --stdio --sort symbol | head -30
+
+<span class="c"># 3. 确认是 IO 后，定位到具体请求（限时 15 秒）</span>
+timeout 15 bpftrace -e <span class="y">'
+tracepoint:block:block_rq_issue { @s[args-&gt;dev, args-&gt;sector] = nsecs; }
+tracepoint:block:block_rq_complete /@s[args-&gt;dev, args-&gt;sector]/
+{
+  @ms[comm] = hist((nsecs - @s[args-&gt;dev, args-&gt;sector]) / 1000000);
+  delete(@s[args-&gt;dev, args-&gt;sector]);
+}'</span>
+
+<span class="c"># 4. 确认是谁发起（追栈，只采 100 个样本）</span>
+timeout 10 bpftrace -e <span class="y">'
+kprobe:submit_bio /pid == $1/ { @[kstack] = count(); if (@n++ &gt; 100) { exit(); } }'</span>
+
+<span class="c"># 5. 收工，清理所有状态</span>
+echo 0 &gt; /sys/kernel/tracing/tracing_on
+echo nop &gt; /sys/kernel/tracing/current_tracer
+echo &gt; /sys/kernel/tracing/kprobe_events</pre>
+  <div class="callout danger">
+    <b>四条硬规则，请写进值班手册：</b><br>
+    ① <b>永远不要在生产上开无过滤的 function_graph。</b>它会追踪内核里每一个函数调用，几秒钟就能产生几个 G 的缓冲区数据，并把 CPU 打满。<br>
+    ② <b>不要在超过 32 核的机器上做 <span class="k">perf record -a</span> 而不限时。</b>每核一个采样流，写盘速度会很可观。<br>
+    ③ <b>bpftrace 的 map 必须有界。</b><span class="k">@[kstack] = count()</span> 在栈种类多的时候会吃光内存。加 <span class="k">if (@x++ &gt; 1000) { exit(); }</span> 兜底。<br>
+    ④ <b>排查完要清理。</b>kprobe 事件、tracepoint enable、tracing_on 都是"设置后一直生效"的状态，下次别人上来会看到一堆残留。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>四个典型排查场景</h2></div>
+  <p class="lead">前面讲的是工具，这一节讲"遇到问题该按什么顺序用"。四个问题的答案形状完全不同。</p>
+
+  <h3>场景一：这个函数谁在调用</h3>
+  <p>你从 perf 火焰图上看到一个可疑函数占了 30% CPU，想知道是哪条业务路径调过来的。</p>
+  <pre><span class="c"># 方案 A：perf 直接看调用链（最省事）</span>
+perf record -F 99 -g -p 12345 -- sleep 5
+perf report --stdio --sort symbol --call-graph
+
+<span class="c"># 方案 B：bpftrace 抓内核栈，聚合成计数（出现最多的栈就是主路径）</span>
+bpftrace -e <span class="y">'kprobe:my_suspect_func { @[kstack] = count(); }'</span>
+bpftrace -e <span class="y">'kprobe:my_suspect_func { @[kstack(1)] = count(); }'</span>  <span class="c"># 只要一层调用者</span>
+
+<span class="c"># 方案 C：ftrace 的 stacktrace 选项（不需要 bpftrace）</span>
+cd /sys/kernel/tracing
+echo 1 &gt; options/stacktrace
+echo function &gt; current_tracer
+echo my_suspect_func &gt; set_ftrace_filter
+echo 1 &gt; tracing_on; sleep 2; echo 0 &gt; tracing_on
+cat trace</pre>
+
+  <h3>场景二：IO 为什么慢</h3>
+  <p>IO 慢有五个层次的原因，必须逐层排除。顺序错了会浪费大量时间。</p>
+  <table>
+    <tr><th style="width:100px">层次</th><th style="width:200px">怎么判断</th><th>典型结论</th></tr>
+    <tr><td><b>文件系统</b></td><td>追 <span class="k">ext4_file_write_iter</span> 的耗时</td><td>journal 提交、目录锁竞争</td></tr>
+    <tr><td><b>块层</b></td><td>追 <span class="k">block_rq_issue</span> 到 <span class="k">block_rq_complete</span></td><td>排队时间 vs 实际传输时间</td></tr>
+    <tr><td><b>设备</b></td><td><span class="k">iostat</span> 的 <span class="k">%util</span>、<span class="k">smartctl</span></td><td>盘本身到极限了，或者盘要坏了</td></tr>
+  </table>
+  <pre><span class="c"># 区分"排队"和"传输"：这是块层追踪最有价值的信息</span>
+bpftrace -e <span class="y">'
+tracepoint:block:block_rq_issue
+{ @q[args-&gt;dev] = nsecs; }
+tracepoint:block:block_rq_complete /@q[args-&gt;dev]/
+{
+  @total_us[args-&gt;dev] = hist((nsecs - @q[args-&gt;dev]) / 1000);
+  delete(@q[args-&gt;dev]);
+}'</span>
+
+<span class="c"># 如果直方图集中在 0~2ms，说明设备响应正常，慢在排队（队列太深或限流）</span>
+<span class="c"># 如果集中在 50ms 以上，说明设备本身慢（机械盘寻道 / SSD 写放大 / 云盘限速）</span>
+
+<span class="c"># 队列深度一直很满 = 已饱和</span>
+iostat -x 1 3</pre>
+
+  <h3>场景三：进程为什么阻塞</h3>
+  <p><span class="k">ps</span> 的 <span class="k">STAT</span> 列能先做粗分类：<b>D</b> 在等 IO（不可中断，kill -9 无效）、<b>S</b> 在等事件或锁、<b>R</b> 在跑或排队、<b>Z</b> 僵尸。</p>
+  <pre><span class="c"># 零成本第一招：看内核栈（D 状态特别有效）</span>
+cat /proc/12345/stack
+<span class="c"># [&lt;0&gt;] io_schedule+0x3d/0x60</span>
+<span class="c"># [&lt;0&gt;] blk_mq_get_tag+0x11e/0x280   &lt;-- 在等块层 tag，队列满了</span>
+
+<span class="c"># 第二招：看等在哪个函数</span>
+ps -o pid,stat,wchan:30,comm -p 12345
+
+<span class="c"># 第三招：统计 off-CPU 时间分布</span>
+bpftrace -e <span class="y">'
+tracepoint:sched:sched_switch /args-&gt;prev_state &amp; 2/
+{ @off[args-&gt;prev_comm] = hist((nsecs - @on[args-&gt;prev_pid]) / 1000000); }
+tracepoint:sched:sched_wakeup { @on[args-&gt;pid] = nsecs; }'</span></pre>
+
+  <h3>场景四：内存是谁分配的</h3>
+  <pre><span class="c"># 按调用栈统计 kmalloc 分配量（只采 500 个样本）</span>
+bpftrace -e <span class="y">'
+tracepoint:kmem:kmalloc
+{ @bytes[kstack] = sum(args-&gt;bytes_alloc); if (@n++ &gt; 500) { exit(); } }'</span>
+
+<span class="c"># 先判断是内核内存还是用户内存</span>
+cat /proc/meminfo | grep -E 'Slab|SReclaimable|SUnreclaim'
+slabtop -o | head -20
+<span class="c"># Slab 大且 SUnreclaim 高 → 内核泄漏，追 kmalloc</span>
+<span class="c"># Slab 正常但 RSS 高 → 用户态泄漏，用 heaptrack / valgrind</span></pre>
+  <div class="callout">
+    <b>四个场景的共性：</b>都是"先用零成本工具定位层次，再上有成本的工具精确打击"。跳过第一步直接开 ftrace，是最常见的浪费时间方式。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个会浪费你半天的问题</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">开着 function_graph 忘了关</div><div class="pd">tracing_on 是持久状态，SSH 断开也不会自动关，机器会一直高开销直到有人发现。先写好 sleep &amp;&amp; echo 0 再开。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">filter 没清空，以为没生效</div><div class="pd">set_ftrace_filter 会保留上次的内容，两次实验叠加后你看到的是交集。每次实验前先 echo &gt; set_ftrace_filter 清空。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">在容器里找不到 /sys/kernel/tracing</div><div class="pd">容器默认不挂 tracefs。用 --privileged，或 nsenter 进宿主机 mount namespace 操作。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">kprobe 报 "No such file or directory"</div><div class="pd">两种可能：函数被 inline 了（没有独立符号，用 /proc/kallsyms 确认），或者函数名写错了（注意内核符号没有参数类型后缀）。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 %di 取参数，拿到一堆乱码</div><div class="pd">结构体传参或编译优化会改变寄存器分配。用 $arg1 更稳，先用 bpftrace 打印验证。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">bpftrace 的 map 无限增长把内存吃光</div><div class="pd">@start[tid] 这种 per-thread 的 map，如果 exit 探针没命中（比如进程被 kill -9），条目永远不删。加 exit() 兜底或定期清理。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">perf record 报 Permission denied</div><div class="pd">三层原因：perf_event_paranoid 太严、缺 CAP_PERFMON/CAP_SYS_ADMIN、容器 seccomp 拦了 perf_event_open。逐个排除，别一上来就改 sysctl。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">看到 LOST EVENTS 却以为是程序 bug</div><div class="pd">环形缓冲区满了在丢事件，说明你的追踪点触发频率远超缓冲区写入速度。调大 buffer_size_kb，或者加过滤条件减少事件量。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">eBPF 程序验证通过就以为没问题</div><div class="pd">验证器只保证内核不会因为这段代码崩溃，不保证开销可接受。一个挂在热路径上的 kprobe 照样能把 QPS 打下去一半。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">追了半天发现时间花在"被调度出去"上</div><div class="pd">函数内部耗时看着很长，但那是因为进程在中途被抢占了。对比 nsecs 差值和实际 CPU 时间（task-&gt;se.sum_exec_runtime），差很多就说明是调度问题而非函数慢。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. tracepoint 和 kprobe 最本质的区别是？</div>
+      <button class="opt">tracepoint 只能在内核态用，kprobe 也能追用户态</button>
+      <button class="opt">tracepoint 是内核预埋的稳定接口，kprobe 是运行时往任意地址插断点</button>
+      <button class="opt">kprobe 开销更低，所以生产上优先用 kprobe</button>
+      <div class="ans">正确答案：<b>静态预埋 vs 动态插桩</b>。tracepoint 字段名写在 format 文件里，是稳定 ABI；kprobe 运行时改指令插 int3，覆盖广但参数靠猜、跨版本易坏，开销也更高。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. function_graph 在生产上最大的风险是？</div>
+      <button class="opt">会修改内核代码，导致后续无法升级</button>
+      <button class="opt">只能追一个进程，用处不大</button>
+      <button class="opt">每次函数进出都要记录，追全内核时开销可达数十倍，能把机器拖垮</button>
+      <div class="ans">正确答案：<b>开销失控</b>。它给每个函数的入口和出口都挂回调，不设 filter 等于追踪所有函数调用。必须限定入口函数、PID 和时长。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. eBPF 验证器保证了下面哪一条？</div>
+      <button class="opt">程序一定会终止，且不会越界访问内存</button>
+      <button class="opt">程序的业务逻辑是正确的</button>
+      <button class="opt">程序的运行时开销足够低</button>
+      <div class="ans">正确答案：<b>终止性 + 内存安全</b>。验证器通过模拟所有路径，证明没有无界循环、没有非法内存访问。但它不管逻辑对不对，也不管开销大小 —— 一个每秒触发百万次的 kprobe 照样能通过验证。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. bpftrace 里统计 syscall 耗时，为什么要用 @start[tid] 而不是 @start[pid]？</div>
+      <button class="opt">因为 pid 在容器里不可靠</button>
+      <button class="opt">因为同一进程的多个线程会并发进入 syscall，用 pid 会互相覆盖</button>
+      <button class="opt">两者完全等价，只是习惯写法不同</button>
+      <div class="ans">正确答案：<b>线程并发会覆盖</b>。tid 是线程号，每个线程独立。如果用 pid，多线程程序里线程 A 进入时记录的时间会被线程 B 覆盖，算出来的耗时完全错乱。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 进程处于 D 状态（不可中断睡眠），最可能的原因是？</div>
+      <button class="opt">进程被 SIGSTOP 暂停了</button>
+      <button class="opt">进程在等一把用户态互斥锁</button>
+      <button class="opt">进程在等 IO 完成，且这个等待不可被信号打断</button>
+      <div class="ans">正确答案：<b>等 IO</b>。D 状态意味着内核在 io_schedule 里，通常杀不掉（kill -9 也无效）。用 cat /proc/PID/stack 看具体卡在哪个函数，常见的是 blk_mq_get_tag（块层队列满）或某个文件系统锁。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 想在生产上排查"哪个进程的哪次磁盘 IO 慢"，最合适的第一步是？</div>
+      <button class="opt">用 bpftrace 追 block_rq_issue 到 block_rq_complete 的差值，并加过滤条件</button>
+      <button class="opt">开 function_graph 追 vfs_read 的完整调用链</button>
+      <button class="opt">用 strace 挂到进程上，看每个 read 的耗时</button>
+      <div class="ans">正确答案：<b>块层 tracepoint + 过滤</b>。它直接给出"哪个请求慢了多少毫秒"，开销低且信息精确。function_graph 开销太大不适合生产；strace 只能看到 syscall 边界，无法区分排队和传输。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>ftrace 速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>echo function_graph &gt; current_tracer</code><span class="desc">切换到 function_graph</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo vfs_read &gt; set_graph_function</code><span class="desc">限定追踪入口函数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo 12345 &gt; set_ftrace_pid</code><span class="desc">只追踪指定进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo 4 &gt; max_graph_depth</code><span class="desc">限制调用深度，防止输出爆炸</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat trace_pipe</code><span class="desc">流式读取，读到即消费</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo nop &gt; current_tracer</code><span class="desc">关闭 tracer</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo 8192 &gt; buffer_size_kb</code><span class="desc">调大每 CPU 缓冲区（防丢事件）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat events/sched/sched_switch/format</code><span class="desc">看 tracepoint 的字段定义</span><button class="copy">复制</button></div>
+  </div>
+  <h3>perf 与 bpftrace 速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>perf stat -e cycles,instructions -p PID sleep 5</code><span class="desc">计数，看 IPC</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf record -F 99 -g -p PID -- sleep 10</code><span class="desc">采样并记录调用栈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf report --stdio --sort symbol</code><span class="desc">非交互查看热点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>bpftrace -l 'tracepoint:block:*'</code><span class="desc">列出可用探针</span><button class="copy">复制</button></div>
+    <div class="crow"><code>bpftrace -lv 'tracepoint:block:block_rq_issue'</code><span class="desc">列出探针的字段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>timeout 15 bpftrace -e '...'</code><span class="desc">强制限时，防止忘记关</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/PID/stack</code><span class="desc">看进程的内核栈（D 状态首选）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>tracefs</b></td><td>内核暴露追踪控制接口的虚拟文件系统，挂在 /sys/kernel/tracing</td></tr>
+    <tr><td><b>ftrace</b></td><td>内核内置的追踪框架，通过 tracefs 里的文件控制</td></tr>
+    <tr><td><b>tracer</b></td><td>ftrace 的工作模式，如 nop / function / function_graph</td></tr>
+    <tr><td><b>tracepoint</b></td><td>内核代码里预埋的静态探针，有稳定的字段定义</td></tr>
+    <tr><td><b>kprobe</b></td><td>运行时在任意内核函数地址插断点的动态探针</td></tr>
+    <tr><td><b>kretprobe</b></td><td>在函数返回时触发的探针，用于读返回值</td></tr>
+    <tr><td><b>uprobe</b></td><td>针对用户态程序函数的动态探针</td></tr>
+    <tr><td><b>eBPF</b></td><td>在内核里安全执行的小程序，加载前需通过验证器</td></tr>
+    <tr><td><b>验证器 verifier</b></td><td>静态检查 eBPF 程序终止性与内存安全的组件</td></tr>
+    <tr><td><b>helper 函数</b></td><td>内核提供给 eBPF 程序调用的白名单函数，如 bpf_probe_read_kernel</td></tr>
+    <tr><td><b>bpftrace</b></td><td>eBPF 的高层脚本语言，语法接近 awk</td></tr>
+    <tr><td><b>IPC</b></td><td>每周期执行指令数，低于 1 说明 CPU 在等</td></tr>
+    <tr><td><b>perf_event_paranoid</b></td><td>控制普通用户能用多少 perf 功能的 sysctl 开关</td></tr>
+    <tr><td><b>off-CPU 分析</b></td><td>统计进程不在 CPU 上运行的时间及原因，用于排查阻塞</td></tr>
+    <tr><td><b>D 状态</b></td><td>不可中断睡眠，通常在等 IO，kill -9 也杀不掉</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>找一台能折腾的 Linux 虚机做四件事 —— ① 用 function_graph 追一次 <span class="k">vfs_read</span>，看懂缩进和耗时；② 用 kprobe 追 <span class="k">do_sys_open</span> 的 filename，对比 <span class="k">%di</span> 和 <span class="k">$arg1</span>；③ 用 perf 采 10 秒生成火焰图；④ 把模块 6 的五个脚本全跑一遍。<br><br>
+    <b>之后值得单独学：</b>BCC 工具集（execsnoop、biolatency 这些现成工具）、eBPF 的 CO-RE（一次编译跨内核版本运行）、XDP 与 tc 在网络路径上的应用、以及 OpenTelemetry 的 eBPF 自动埋点方案。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透内核追踪 · 上线前务必确认：探针已清理、filter 已清空、tracing_on 已归零</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 7（开销控制）值得再读一遍 —— 那是唯一能防止你把生产搞挂的一节。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在虚机上敲，别只看不练。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开一台 Linux 虚机（内核 5.4 以上），用 root 跟着敲 —— 这篇几乎所有命令都需要 root';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

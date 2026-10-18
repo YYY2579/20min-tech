@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Harbor 镜像仓库</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 13 期 · DevOps 篇</span>
+    <h1>二十分钟学透 Harbor 镜像仓库</h1>
+    <p class="sub">镜像仓库不是"存镜像的网盘"。这篇讲 Harbor 的架构分工、RBAC、跨机房复制、Trivy 扫描、签名与 GC，以及<b>磁盘只增不减、tag 覆盖、拉取限流</b>这些生产事故怎么防。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>9</b> 个 Harbor 组件</span>
+      <span class="chip"><b>2</b> 种复制模式</span>
+      <span class="chip"><b>3</b> 方仓库对比</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 Harbor 跟着敲：docker login → tag → push，再删 tag 观察 GC</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>部署一个能练的 Harbor</h2></div>
+  <p class="lead">Harbor 官方提供在线/离线安装包（自带 docker compose 编排），一条流程即可拉起全部组件。版本号按你实际要用的稳定版替换。</p>
+  <pre><span class="c"># 1. 下载安装包（示例用 v2.11.0）</span>
+wget https://github.com/goharbor/harbor/releases/download/v2.11.0/harbor-online-installer-v2.11.0.tgz
+tar -xzf harbor-online-installer-v2.11.0.tgz
+cd harbor
+
+<span class="c"># 2. 生成自签证书（测试用；生产必须用受信任 CA 签发的证书）</span>
+mkdir -p /etc/harbor/ssl
+openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+  -keyout /etc/harbor/ssl/harbor.key \
+  -out /etc/harbor/ssl/harbor.crt \
+  -subj "/CN=harbor.internal.example.com" \
+  -addext "subjectAltName=DNS:harbor.internal.example.com"
+
+<span class="c"># 3. 生成配置并按需修改（保留策略、Trivy、jobservice 并发都在这里）</span>
+cp harbor.yml.tmpl harbor.yml
+vi harbor.yml
+
+<span class="c"># 4. 预处理 + 安装（--with-notary 可选，用于内容信任）</span>
+./prepare --with-trivy
+./install.sh
+
+<span class="c"># 5. 验证组件是否全部起来</span>
+docker compose ps        <span class="c"># 旧安装包用 docker-compose ps</span></pre>
+  <h4>harbor.yml 里最该改的几项</h4>
+  <pre>hostname: harbor.internal.example.com   <span class="c"># 必须与证书 CN/SAN 一致，客户端按此地址访问</span>
+
+https:
+  port: 443
+  certificate: /etc/harbor/ssl/harbor.crt
+  private_key: /etc/harbor/ssl/harbor.key
+
+harbor_admin_password: Harbor@2026       <span class="c"># 首次安装生效；登录后立即改密并换个人账号</span>
+
+database:
+  password: harbor_db_pass
+  max_idle_conns: 100                     <span class="c"># 默认 50；高并发 API 调用场景调大，缓解 too many clients</span>
+  max_open_conns: 900
+
+data_volume: /data/harbor                 <span class="c"># 镜像 blob、PG 数据、Trivy 缓存全在这里，必须是独立大容量盘</span>
+
+trivy:
+  ignore_unfixed: false                   <span class="c"># true = 不报告无补丁 CVE，降噪但会漏报</span>
+  timeout: 5m0s
+
+jobservice:
+  max_job_workers: 10                     <span class="c"># 复制/GC/扫描任务的并发 worker 数，按 CPU 调</span></pre>
+  <div class="callout warn">
+    <b>三个部署期就要定的事：</b>① <span class="k">data_volume</span> 必须是独立盘/块存储 —— 镜像 blob 动辄 TB 级，和系统盘混用迟早把系统写满；② 证书 CN 与 <span class="k">hostname</span> 不一致，客户端 push 会报证书错误；③ 默认管理员是 <span class="k">admin</span>，密码在配置文件里明文可见，生产必须接入 LDAP/OIDC 并禁用直接用 admin 干活。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>镜像仓库的角色与 Harbor 架构</h2></div>
+  <p class="lead">先把"为什么需要镜像仓库"讲清楚，再看 Harbor 内部怎么分工。镜像仓库承担四个角色：</p>
+  <table>
+    <tr><th style="width:150px">角色</th><th>干什么</th></tr>
+    <tr><td><b>构建产物库</b></td><td>CI 流水线的终点。每个可发布版本在这里有唯一、不可变的落点（tag + digest）</td></tr>
+    <tr><td><b>存储与分发</b></td><td>按 layer 增量存储，多节点 pull 时共享 layer 缓存，是集群发布速度的地基</td></tr>
+    <tr><td><b>统一入口</b></td><td>所有环境（测试/预发/生产）从同一处拉镜像，杜绝"我这能跑你那不能跑"</td></tr>
+    <tr><td><b>安全门禁</b></td><td>漏洞扫描、签名校验、准入控制都挂在这里，是软件供应链安全的第一道闸</td></tr>
+  </table>
+  <h3>Harbor 的组件分工</h3>
+  <table>
+    <tr><th style="width:130px">组件</th><th style="width:250px">职责</th><th>关键点</th></tr>
+    <tr><td><b>nginx</b><br>(proxy)</td><td>入口反向代理，TLS 终结与路由</td><td>所有客户端请求的第一跳；请求体大小默认不限制（大镜像 push 不会被 413 打断）</td></tr>
+    <tr><td><b>core</b></td><td>核心 API：项目、成员、配额、复制规则、扫描编排</td><td>业务逻辑都在这，多副本无状态，可水平扩展</td></tr>
+    <tr><td><b>registry</b></td><td>镜像存取本体（CNCF Distribution 实现），存 manifest 与 blob</td><td>它只认"引用关系"：<b>删 tag 只是删 manifest 引用，blob 文件还在</b></td></tr>
+    <tr><td><b>jobservice</b></td><td>异步任务队列：复制、GC、扫描、保留策略执行</td><td>重活都在后台跑，API 不阻塞；任务失败在这里查日志</td></tr>
+    <tr><td><b>portal</b></td><td>Web UI 前端</td><td>纯静态前端，所有操作最终都落到 core 的 REST API</td></tr>
+    <tr><td><b>database</b><br>(PostgreSQL)</td><td>元数据：项目、成员、复制规则、任务记录、审计</td><td><b>不存镜像 blob</b>；DB 损坏不等于镜像丢失，但元数据全丢</td></tr>
+    <tr><td><b>redis</b></td><td>jobservice 任务队列与运行时状态</td><td>丢了你正在排的任务，但不影响已存镜像</td></tr>
+    <tr><td><b>exporter</b></td><td>Prometheus 指标暴露</td><td>采集 Harbor 自身指标：API 延迟、任务队列长度等</td></tr>
+    <tr><td><b>trivy-adapter</b></td><td>漏洞扫描适配器（2.x 起内置 Trivy）</td><td>负责下载/更新 CVE 库并执行扫描；1.x 时代用的是 Clair</td></tr>
+    <tr><td><b>notary</b></td><td>内容信任/签名服务（Notary v1，DCT）</td><td>可选组件，装的时候带 <span class="k">--with-notary</span>；监听 4443 端口</td></tr>
+  </table>
+  <pre><span class="c"># 一次 docker push 在 Harbor 内部的流转：</span>
+docker push → nginx(443) → core（鉴权、配额检查、写元数据）→ registry（写 manifest + blob）
+                                                          ↘ jobservice（触发扫描/复制任务）</pre>
+  <div class="callout">
+    <b>记住这条链路，排错时按跳查：</b>push 报 401/403 → core 的认证与权限；报 quota exceeded → 项目配额；报 5xx 或连接断 → nginx/registry；任务卡住不动 → jobservice 日志（<span class="k">docker compose logs -f jobservice</span>）。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>项目、成员与 RBAC</h2></div>
+  <p class="lead">Harbor 的权限模型是"系统角色 + 项目角色"两层。镜像的最小管理单元是<b>项目（project）</b>，类似 GitLab 的 Group/Project 关系。</p>
+  <h3>项目角色权限矩阵</h3>
+  <table>
+    <tr><th style="width:130px">角色</th><th>拉取</th><th>推送</th><th>成员管理</th><th>项目配置</th></tr>
+    <tr><td><b>访客 Guest</b></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td></tr>
+    <tr><td><b>开发者 Developer</b></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+    <tr><td><b>维护者 Maintainer</b></td><td>✓</td><td>✓</td><td>✓</td><td>部分（扫描、保留策略）</td></tr>
+    <tr><td><b>项目管理员 Project Admin</b></td><td>✓</td><td>✓</td><td>✓</td><td>全部（含删除项目）</td></tr>
+  </table>
+  <p>系统级只有一个<b>系统管理员</b>：管所有项目、复制规则、系统级配置（扫描、CVE allowlist、GC）。<b>项目公开性</b>是独立开关：public 项目任何登录用户（甚至匿名）可拉取，private 项目仅成员可见。</p>
+  <pre><span class="c"># 创建项目（带 500GB 配额，单位字节）</span>
+curl -u "admin:Harbor@2026" -X POST "https://harbor.internal.example.com/api/v2.0/projects" \
+  -H "Content-Type: application/json" \
+  -d '{"project_name":"prod","metadata":{"public":"false"},"storage_limit":536870912000}'
+
+<span class="c"># 给 CI 创建机器人账号（机器人账号名格式：robot$&lt;项目&gt;+&lt;名称&gt;）</span>
+curl -u "admin:Harbor@2026" -X POST "https://harbor.internal.example.com/api/v2.0/robots" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "robot$prod+ci",
+    "level": "project",
+    "permissions": [{"kind":"project","namespace":"prod","access":[
+      {"resource":"repository","action":"push"},
+      {"resource":"repository","action":"pull"}]}],
+    "duration": 90
+  }'
+<span class="c"># 返回体里的 secret 只显示一次，立即存进密钥管理系统；duration 单位是天</span>
+
+<span class="c"># 用机器人账号调 API / 登录（注意 $ 在 shell 里要转义或整体加引号）</span>
+docker login harbor.internal.example.com -u 'robot$prod+ci' -p '&lt;返回的secret&gt;'
+curl -u 'robot$prod+ci:&lt;secret&gt;' "https://harbor.internal.example.com/api/v2.0/projects/prod/repositories"</pre>
+  <div class="callout ok">
+    <b>RBAC 实践三条：</b>① <b>CI/CD 一律用机器人账号</b>，按项目授权、可过期、可单独吊销，别共用 admin；② 人的账号走 <b>LDAP/OIDC 接入</b>，离职即在目录服务侧失效；③ <span class="k">library</span> 项目默认 public，别把敏感镜像推进去 —— 这是最常见的"以为私有其实公开"事故。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>推送、拉取与 tag 治理</h2></div>
+  <pre><span class="c"># 标准四步</span>
+docker login harbor.internal.example.com
+docker tag app:1.4.2 harbor.internal.example.com/prod/app:1.4.2
+docker push harbor.internal.example.com/prod/app:1.4.2
+
+<span class="c"># 按 digest 拉取 —— 拿到的是字节级确定的内容，不随 tag 变动</span>
+docker pull harbor.internal.example.com/prod/app@sha256:3f7b21c9e5a1...
+
+<span class="c"># HTTP 部署（只有测试环境这么干）：把地址加进 Docker 的白名单</span>
+<span class="c"># /etc/docker/daemon.json</span>
+{"insecure-registries": ["harbor.internal.example.com"]}
+systemctl restart docker</pre>
+  <h3>tag 治理：发布确定性的根基</h3>
+  <table>
+    <tr><th style="width:190px">实践</th><th>做法与理由</th></tr>
+    <tr><td><b>语义化版本 tag</b></td><td>推 <span class="k">v1.4.2</span> 而不是 <span class="k">latest</span>。latest 是"会动的指针"，回滚时你不知道它指向哪</td></tr>
+    <tr><td><b>digest 固定部署</b></td><td>K8s/Helm 里用 <span class="k">image: app@sha256:...</span>，杜绝"同 tag 不同内容"导致的不可复现发布</td></tr>
+    <tr><td><b>immutable tag 规则</b></td><td>项目 → Policy → Tag Immutability：匹配 <span class="k">v*</span> 的 tag 禁止覆盖推送。防止手滑把生产 tag 顶掉</td></tr>
+    <tr><td><b>build 号溯源</b></td><td>tag 里带构建号（如 <span class="k">v1.4.2-b20261017.3</span>），配合 label 记录 commit、流水线 ID</td></tr>
+    <tr><td><b>禁止跨环境复用 tag</b></td><td>同一份代码构建一次，逐环境晋升同一个 digest；不要每个环境重新构建各自打 tag</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>tag 覆盖是最隐蔽的发布事故：</b>tag <span class="k">v1.4.2</span> 被第二次推送后，老 digest 没有 tag 指向它，但文件还在。此时：① 用 tag 部署的节点拉到的是新内容，行为不一致；② 回滚到"v1.4.2"其实回不去旧版本。解法就是上表两条：<b>immutable tag + digest 部署</b>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>镜像复制：跨机房与跨云分发</h2></div>
+  <p class="lead">复制（Replication）是 Harbor 的内置能力，把镜像从一个 registry 同步到另一个，解决"跨机房拉取慢"和"多 registry 并存"两个问题。</p>
+  <table>
+    <tr><th style="width:150px">模式</th><th>触发方式</th><th>适用场景</th></tr>
+    <tr><td><b>push-based</b><br>推送模式</td><td>本地 push 成功后自动/定时推到远端</td><td>主动分发：总部仓库 → 各分支/边缘节点；镜像一出炉就送出去</td></tr>
+    <tr><td><b>pull-based</b><br>拉取模式</td><td>按 cron 计划从远端拉取</td><td>上游同步：Docker Hub/公司总部 → 本地仓库；离线环境的更新窗口</td></tr>
+  </table>
+  <h3>一条跨机房复制规则的真实配置</h3>
+  <pre><span class="c"># POST /api/v2.0/replication/policies</span>
+{
+  "name": "bj-to-sh",
+  "src_registry": {"id": 1},          <span class="c"># 源 registry：本 Harbor 的 registry 端点</span>
+  "dest_registry": {"id": 2},         <span class="c"># 目标：上海机房 Harbor（或 ACR/ECR，需先配好访问凭据）</span>
+  "filters": [
+    {"type": "repository", "value": "prod/**"},   <span class="c"># 只复制 prod 项目下的仓库</span>
+    {"type": "tag", "value": "v*,release-*"},     <span class="c"># 只放行版本 tag，拦住 latest 和临时 tag</span>
+    {"type": "label", "value": "ga"}              <span class="c"># 可选：只同步打了 ga 标签的镜像</span>
+  ],
+  "trigger": {
+    "type": "scheduled",
+    "schedule_param": {"type": "Daily", "hour": 2, "minute": 0}   <span class="c"># 每天 02:00，避开发布高峰</span>
+  },
+  "enabled": true
+}
+
+<span class="c"># 手动触发一次（不等计划）</span>
+curl -u "admin:Harbor@2026" -X POST "https://harbor/api/v2.0/replication/executions" \
+  -H "Content-Type: application/json" -d '{"policy_id":1}'
+
+<span class="c"># 查看执行历史与失败原因</span>
+curl -u "admin:Harbor@2026" "https://harbor/api/v2.0/replication/executions?policy_id=1"</pre>
+  <ul>
+    <li><b>增量传输：</b>复制按 layer 去重，已存在的 layer 不重传。首次全量 + 日常增量，带宽压力主要在首传和基础镜像大版本更新。</li>
+    <li><b>删除传播：</b>规则里可开"本地删除时同步删除远端资源"。不开则远端只增不减，存储会慢慢失控；开了就要接受误删会同步扩散的风险，<b>建议关闭并按保留策略治理</b>。</li>
+    <li><b>跨云目标：</b>目标为 ACR/ECR/Docker Hub 时，先在 Harbor 里注册对应 registry 端点并配好凭据；云厂商的 token 通常 12~24 小时过期，要有轮换机制，否则复制任务会在某天集体失败。</li>
+    <li><b>一致性：</b>复制是异步的，"源删了 tag 但任务还没跑完"的窗口里两边不一致。对发布顺序敏感的场景，以<b>源仓库的 digest 列表</b>为准做校验。</li>
+  </ul>
+  <div class="callout warn">
+    <b>跨机房分发的带宽账要提前算：</b>一个 1.2GB 的应用镜像，200 个节点首次拉取就是 240GB 流量。三条路：① 机房内预热（复制 + 节点定时拉一次）；② 基础镜像尽量小（alpine/distroless，多阶段构建）；③ 大规模集群用 P2P 分发（Dragonfly/Kraken）在节点间共享 layer，registry 带宽只是兜底。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>漏洞扫描：Trivy 与 CVE 库</h2></div>
+  <p class="lead">Harbor 2.x 内置 Trivy（1.x 时代是 Clair）。扫描对象是镜像里的 OS 包（dpkg/apk/rpm）和语言依赖（npm/pip/maven/go mod），对照 CVE 库输出漏洞清单。</p>
+  <table>
+    <tr><th style="width:180px">触发方式</th><th>说明</th></tr>
+    <tr><td><b>push 自动扫描</b></td><td>项目配置里打开"Scan on push"，每次推送自动扫，结果实时更新</td></tr>
+    <tr><td><b>手动扫描</b></td><td>UI 点扫描，或 <span class="k">POST /projects/{p}/repositories/{r}/artifacts/{ref}/scan</span></td></tr>
+    <tr><td><b>定时全量扫描</b></td><td>系统级计划任务周期重扫全部镜像 —— 因为新 CVE 每天在爆，旧镜像不动也有新漏洞</td></tr>
+  </table>
+  <pre><span class="c"># 本地用 Trivy CLI 复现 Harbor 的扫描（CI 门禁同款）</span>
+trivy image --severity HIGH,CRITICAL harbor.internal.example.com/prod/app@sha256:3f7b...
+
+<span class="c"># 作为 CI 门禁：发现 CRITICAL 直接失败（exit code 1）</span>
+trivy image --exit-code 1 --severity CRITICAL \
+  harbor.internal.example.com/prod/app@sha256:3f7b...
+
+<span class="c"># 只看"有补丁可修"的漏洞，过滤掉修不了的噪音</span>
+trivy image --ignore-unfixed --severity HIGH,CRITICAL ...</pre>
+  <h3>CVE 库的更新策略（离线环境重灾区）</h3>
+  <ul>
+    <li>Trivy 的漏洞库（trivy-db）默认从 GitHub 拉取，<b>每次扫描前检查更新</b>。内网/离线环境拉不到，扫描结果要么失败，要么停在某个旧版本 —— 表现为"新爆的 CVE 扫不出来"。</li>
+    <li>离线方案：一台有外网的机器定期 <span class="k">trivy image --download-db-only</span>，把库同步到内网 HTTP 服务，再通过 <span class="k">TRIVY_DB_REPOSITORY</span> 环境变量指向内网地址；扫描加 <span class="k">--skip-db-update</span> 用本地库。</li>
+    <li>Harbor 侧看 <b>trivy-adapter 容器日志</b>判断 DB 更新是否正常；系统配置里可配 <b>CVE allowlist</b>（2.5+）：对确认误报/暂不修复的 CVE 加过期时间的豁免，而不是简单忽略。</li>
+    <li>扫描会占 CPU（尤其首次解压大镜像），<span class="k">max_job_workers</span> 别设太大，否则扫描和复制互相排队。</li>
+  </ul>
+  <div class="callout">
+    <b>门禁分级建议：</b>CRITICAL 直接拦（有 RCE/提权的必须修）；HIGH 设豁免期（如 7 天内修不掉需负责人审批）；MEDIUM/LOW 只报告不拦截。全部一刀切拦截的结果就是大家学会改门禁 —— 门禁的信用比严格更重要。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>镜像签名与内容信任</h2></div>
+  <p class="lead">扫描回答"镜像有没有漏洞"，签名回答"这个镜像是不是可信方产的"。Harbor 原生集成 Notary（Docker Content Trust），同时生态里 cosign 签名产物也能作为 OCI artifact 存进 Harbor。</p>
+  <pre><span class="c"># ===== Notary / DCT（Harbor 原生）=====</span>
+<span class="c"># 部署时带 --with-notary，notary 服务监听 4443</span>
+export DOCKER_CONTENT_TRUST=1
+export DOCKER_CONTENT_TRUST_SERVER=https://harbor.internal.example.com:4443
+
+docker trust sign harbor.internal.example.com/prod/app:1.4.2     <span class="c"># 首次会生成签名密钥</span>
+docker trust inspect --pretty harbor.internal.example.com/prod/app:1.4.2
+docker trust revoke harbor.internal.example.com/prod/app:1.4.2   <span class="c"># 撤销签名</span>
+
+<span class="c"># ===== cosign（云原生事实标准，签名作为 OCI artifact 附加）=====</span>
+cosign generate-key-pair          <span class="c"># 生成 cosign.key / cosign.pub（私钥进 KMS）</span>
+cosign sign --key cosign.key \
+  harbor.internal.example.com/prod/app@sha256:3f7b21c9e5a1...
+cosign verify --key cosign.pub \
+  harbor.internal.example.com/prod/app@sha256:3f7b21c9e5a1...
+
+<span class="c"># keyless 模式（CI 里推荐）：OIDC 身份换 Fulcio 短期证书，签名写入 Rekor 透明日志</span>
+cosign sign harbor.internal.example.com/prod/app@sha256:3f7b21c9e5a1...
+cosign verify harbor.internal.example.com/prod/app@sha256:3f7b21c9e5a1... \
+  --certificate-identity-regexp='.*@example\.com' --certificate-oidc-issuer=https://accounts.google.com</pre>
+  <table>
+    <tr><th style="width:150px">方案</th><th>密钥形态</th><th>适用</th></tr>
+    <tr><td><b>Notary (DCT)</b></td><td>本地密钥对，托管在 Harbor Notary 服务</td><td>Docker 客户端生态，简单场景</td></tr>
+    <tr><td><b>cosign + KMS</b></td><td>私钥存云 KMS/HSM，不落开发机</td><td>发布平台集中签名，团队规模化管理</td></tr>
+    <tr><td><b>cosign keyless</b></td><td>无长期私钥，OIDC + 短期证书 + Rekor 日志</td><td>GitHub Actions/GitLab CI 等 SaaS 流水线</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>签名的价值在"验证端"：</b>光签不用等于没签。在 Kubernetes 侧配准入控制（Kyverno 的 <span class="k">verifyImages</span> 或 Ratify），只允许带有效签名的镜像落地，签名门禁才算闭环。私钥管理是签名体系的阿喀琉斯之踵 —— 私钥进 KMS/HSM，多人授权使用，单人不具备完整签名能力。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>GC、保留策略、配额与横向对比</h2></div>
+  <p class="lead">存储治理三件套：<b>保留策略</b>决定删哪些 tag，<b>GC</b>负责回收 blob，<b>配额</b>限制单个项目的天花板。</p>
+  <h3>GC 的真实工作流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>删 tag</b>：registry 删除 manifest 与 tag 的引用关系，<b>blob 文件原样留在磁盘上</b>。这是"删了 tag 空间不降"的第一层原因。</div></div>
+    <div class="step"><div class="txt"><b>执行 GC</b>：jobservice 清理已无引用的 manifest 记录，再调用 registry 的 garbage-collect 子命令，删除<b>引用计数为 0</b>的 blob 文件。</div></div>
+    <div class="step"><div class="txt"><b>确认释放</b>：共享 layer（基础镜像层被几十个镜像共用）只有全部 manifest 都不引用后才真正删除 —— 这是"跑了 GC 空间也不动"的常见原因。</div></div>
+  </div>
+  <pre><span class="c"># 配置 GC 计划（每天 04:00，1 个 worker）</span>
+curl -u "admin:Harbor@2026" -X PUT "https://harbor/api/v2.0/system/gc/schedule" \
+  -H "Content-Type: application/json" \
+  -d '{"schedule":{"type":"Daily","hour":4},"parameters":{"delete_untagged":false,"workers":1}}'
+
+<span class="c"># 立即执行一次 + 查看历史</span>
+curl -u "admin:Harbor@2026" -X POST "https://harbor/api/v2.0/system/gc"
+curl -u "admin:Harbor@2026" "https://harbor/api/v2.0/system/gc"
+
+<span class="c"># 空间没降时的排查：看 layer 还被谁引用</span>
+curl -u "admin:Harbor@2026" "https://harbor/api/v2.0/projects/prod/repositories/app/artifacts?with_tag=true&amp;page_size=100"</pre>
+  <h3>保留策略：让 tag 数量有上限</h3>
+  <pre><span class="c"># 项目级保留策略：保留最近推送的 10 个 + 最近 30 天的 + 永远保留的</span>
+curl -u "admin:Harbor@2026" -X POST "https://harbor/api/v2.0/projects/prod/retentions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "algorithm": "or",
+    "rules": [
+      {"disabled":false,"action":"retain","template":"latestPushedN","params":{"latestPushedN":10}},
+      {"disabled":false,"action":"retain","template":"nDaysSinceLastPush","params":{"nDaysSinceLastPush":30}},
+      {"disabled":false,"action":"retain","template":"always","params":{}}
+    ],
+    "trigger": {"kind":"Schedule","settings":{"cron":"0 0 3 * * *"}}
+  }'</pre>
+  <h3>三方仓库对比</h3>
+  <table>
+    <tr><th style="width:120px">维度</th><th style="width:200px">Harbor（自建）</th><th style="width:200px">Docker Hub</th><th>云厂商 ACR 等</th></tr>
+    <tr><td><b>匿名拉取限流</b></td><td>无（自己说了算）</td><td><b>100 次/6 小时</b>，登录免费用户 200 次/6 小时</td><td>按流量计费，一般不限次数</td></tr>
+    <tr><td><b>漏洞扫描</b></td><td>内置 Trivy</td><td>付费档</td><td>内置（云引擎）</td></tr>
+    <tr><td><b>跨地域复制</b></td><td>内置规则化复制</td><td>无（第三方工具）</td><td>企业版支持</td></tr>
+    <tr><td><b>签名/内容信任</b></td><td>Notary + cosign 生态</td><td>DCT（付费档）</td><td>镜像签名（企业版）</td></tr>
+    <tr><td><b>权限模型</b></td><td>项目级 RBAC + 机器人账号</td><td>组织/团队（付费）</td><td>RAM/STS 细粒度</td></tr>
+    <tr><td><b>数据位置</b></td><td>自己机房，合规可控</td><td>镜像在 Docker 公司</td><td>地域可选，需评估出境</td></tr>
+    <tr><td><b>成本</b></td><td>服务器 + 存储 + 运维人力</td><td>免费层限制多，私有仓库收费</td><td>按量/包年包月</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>Docker Hub 限流是真实的生产杀手：</b>多个集群共享一个 NAT 出口 IP 时，匿名拉取限额按 IP 算，200 节点同时拉基础镜像可能 6 小时内就被打满，表现是节点镜像拉取大面积超时。<b>基础镜像和所有业务镜像必须内网化</b>（Harbor pull-based 复制 Docker Hub 官方镜像），公网直连只当兜底。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">删了 tag 就以为磁盘空间会释放</div><div class="pd">删除只解除 manifest 引用，blob 文件原样还在；且被其他 tag 共享的 layer 不计入"可回收"。必须执行 GC，并确认没有 immutable tag / 保留策略仍在引用。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">GC 跑完 df 数值就是不降</div><div class="pd">三种常见原因：layer 仍被其他 manifest 引用（引用计数没归零）；删除的文件仍被进程持有句柄（lsof 查 registry/trivy 容器）；底层是 overlayfs/快照型存储，删除的是上层而数据在下层。data_volume 用独立块存储可绕开第三类。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">单个 layer 1GB+ 的巨型镜像</div><div class="pd">拉取慢、CI 节点缓存命中率低、每改一行代码也要重传一大层。解法：多阶段构建、按变动频率排序 Dockerfile 指令（不变的放前面）、基础镜像换 distroless/alpine、.dockerignore 排除无用文件。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用 latest 且允许覆盖 tag</div><div class="pd">部署拉到的内容不可复现，回滚时"回不去旧版本"。用语义化版本 tag + digest 固定部署，并开启 immutable tag 规则禁止 v* 被覆盖。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">不配保留策略，tag 无限堆积</div><div class="pd">CI 每次构建都推 tag，一年攒几千个 tag，存储只增不减。项目级配 retention（最近 N 个 + 最近 N 天），并加定时任务执行。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为配额管住了磁盘</div><div class="pd">项目配额只约束单项目维度，全局磁盘水位没人盯照样写满。配额之外必须对 data_volume 做容量监控 + 告警（80% 预警），并规划扩容/清理流程。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">离线环境 Trivy CVE 库不更新</div><div class="pd">内网拉不到漏洞库，扫描结果停在旧版或全 unknown，形成"扫过=安全"的错觉。配内网 DB mirror + 定期下载，监控 trivy-adapter 的 DB 更新时间，别用 --skip-db-update 一直跑旧库。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">CI 用 admin 账号登录 Harbor</div><div class="pd">权限过大、无有效期、无法按项目审计和单独吊销。给每条流水线建项目级机器人账号，设有效期，泄漏了单独 revoke 不影响其他流水线。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">HTTP 部署忘配 insecure-registries</div><div class="pd">docker push 报 "http: server gave HTTP response to HTTPS client"。要么配 daemon.json 白名单（仅限内网测试），要么正经上 HTTPS 证书。生产出现这个错误说明有人在绕过安全基线。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">复制规则不过滤 tag，全量同步</div><div class="pd">把 latest、临时 tag、失败构建的镜像也复制到异地，带宽爆炸且污染目标环境。filters 限定 repository + tag 模式，源端 tag 治理先做好，复制才有意义。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="0">
+      <div class="qt">1. Harbor 中 registry 组件的核心职责是？</div>
+      <button class="opt">直接存取镜像的 manifest 与 blob，是镜像存储的本体</button>
+      <button class="opt">管理项目成员和 RBAC 权限</button>
+      <button class="opt">执行异步的复制、GC、扫描任务</button>
+      <div class="ans">正确答案：<b>直接存取 manifest 与 blob</b>。项目管理是 core 的职责，异步任务是 jobservice 的职责，权限入口是 nginx + core。理解分工才能按跳排错：push 报错先看 nginx/core，任务不动看 jobservice。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 删除镜像 tag 后磁盘空间没有变化，正确处理是？</div>
+      <button class="opt">直接 rm -rf registry 存储目录里对应的 blob 文件</button>
+      <button class="opt">重启 Harbor 所有容器，让文件系统刷新</button>
+      <button class="opt">执行 GC，并确认没有其他 manifest 引用共享 layer</button>
+      <div class="ans">正确答案：<b>执行 GC 并确认引用关系</b>。删 tag 只是解除 manifest 引用；blob 要等 GC 清理且引用计数归零后才真正删除。手动删文件会让 registry 元数据与存储不一致，是更严重的事故。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. Docker Hub 匿名用户的拉取限制大约是？</div>
+      <button class="opt">1000 次/天</button>
+      <button class="opt">100 次/6 小时（按来源 IP 计）</button>
+      <button class="opt">完全不限，只有私有仓库才限流</button>
+      <div class="ans">正确答案：<b>100 次/6 小时，按 IP 计</b>。登录的免费用户是 200 次/6 小时。多集群共享 NAT 出口 IP 时很容易打满，所以基础镜像和业务镜像必须内网化，用 Harbor pull-based 复制 Docker Hub 官方镜像。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 防止生产镜像 tag 被同名推送覆盖，最有效的组合是？</div>
+      <button class="opt">给 tag 加描述，写清楚"不要覆盖"</button>
+      <button class="opt">每天手动备份 registry 存储目录</button>
+      <button class="opt">开启 immutable tag 规则 + 部署时用 digest 固定</button>
+      <div class="ans">正确答案：<b>immutable tag 规则 + digest 部署</b>。规则在服务端拒绝覆盖匹配模式的 tag，digest 让部署引用字节级确定的内容。两者结合才能既防手滑又防"同 tag 不同内容"。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 把总部的镜像分发到多个异地机房，最合适的机制是？</div>
+      <button class="opt">Harbor 复制规则（按 cron 计划 pull-based 拉取 + 过滤器）</button>
+      <button class="opt">在每个机房手工 docker save / load 拷贝</button>
+      <button class="opt">让各机房直接连总部 Harbor 拉取，不做任何中转</button>
+      <div class="ans">正确答案：<b>Harbor 复制规则</b>。复制按 layer 去重增量传输，带过滤器和计划触发，可审计可重试。手工 save/load 无法规模化；机房直连总部则每次发布都走跨区链路，发布速度被带宽绑架。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 内网隔离环境做镜像漏洞扫描，CVE 库的正确策略是？</div>
+      <button class="opt">扫描加 --skip-db-update，用容器里自带的初始库永久跑下去</button>
+      <button class="opt">用一台有外网的机器定期下载漏洞库，同步到内网 mirror，扫描指向内网库并监控更新</button>
+      <button class="opt">关掉扫描，内网没有外网攻击就不需要扫</button>
+      <div class="ans">正确答案：<b>内网 mirror + 定期同步 + 监控</b>。新 CVE 每天都在爆，旧库扫新漏洞等于没扫。--skip-db-update 配合一个永远不更新的库是最危险的组合：报告一片绿色，实际全是漏报。"内网无风险"也是错误假设，供应链和内部威胁都在射程内。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker login harbor.example.com</code><span class="desc">登录，优先用机器人账号</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker tag app:1.4.2 harbor.example.com/prod/app:1.4.2</code><span class="desc">打 tag 后推送</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker pull harbor.example.com/prod/app@sha256:3f7b...</code><span class="desc">按 digest 拉取，内容确定</span><button class="copy">复制</button></div>
+    <div class="crow"><code>./prepare --with-trivy &amp;&amp; ./install.sh</code><span class="desc">部署 Harbor（harbor.yml 先改好）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose ps / logs -f jobservice</code><span class="desc">看组件状态与任务日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2.0/projects</code><span class="desc">创建项目，可带 storage_limit 配额</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2.0/robots</code><span class="desc">创建机器人账号，secret 只显示一次</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2.0/replication/policies</code><span class="desc">创建复制规则，filters 限定范围</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2.0/replication/executions</code><span class="desc">手动触发一次复制</span><button class="copy">复制</button></div>
+    <div class="crow"><code>PUT /api/v2.0/system/gc/schedule</code><span class="desc">配置 GC 计划与参数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2.0/system/gc</code><span class="desc">立即执行一次 GC</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /projects/{p}/repositories/{r}/artifacts/{ref}/scan</code><span class="desc">手动触发单镜像扫描</span><button class="copy">复制</button></div>
+    <div class="crow"><code>trivy image --exit-code 1 --severity CRITICAL ...</code><span class="desc">CI 门禁：有 CRITICAL 即失败</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cosign sign / cosign verify --key cosign.pub</code><span class="desc">镜像签名与校验（用 digest）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>DOCKER_CONTENT_TRUST=1 docker trust sign</code><span class="desc">Notary/DCT 签名路径</span><button class="copy">复制</button></div>
+    <div class="crow"><code>{"insecure-registries":["harbor.example.com"]}</code><span class="desc">daemon.json 白名单，仅内网测试</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>harbor.yml 关键项</h3>
+  <pre><span class="c"># 部署与存储</span>
+hostname: harbor.example.com          <span class="c"># 与证书 CN/SAN 严格一致</span>
+data_volume: /data/harbor             <span class="c"># 独立大容量盘；生产建议接对象存储后端</span>
+
+<span class="c"># 数据库连接池（高并发 API 场景调大）</span>
+database:
+  max_idle_conns: 100
+  max_open_conns: 900
+
+<span class="c"># 扫描</span>
+trivy:
+  ignore_unfixed: false               <span class="c"># 是否只报告有补丁的 CVE</span>
+  timeout: 5m0s                       <span class="c"># 单镜像扫描超时，大镜像适当调大</span>
+
+<span class="c"># 任务并发</span>
+jobservice:
+  max_job_workers: 10                 <span class="c"># 复制/GC/扫描共享这个并发池</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Registry</b></td><td>镜像存取服务本体，只管 manifest 与 blob 的存储和引用关系</td></tr>
+    <tr><td><b>Project 项目</b></td><td>Harbor 的镜像管理与 RBAC 单元，public/private 决定匿名可见性</td></tr>
+    <tr><td><b>Robot Account</b></td><td>给 CI 用的项目级账号，格式 robot$项目+名称，可设有效期</td></tr>
+    <tr><td><b>Manifest</b></td><td>镜像的"清单文件"：记录 layer 列表、digest、平台信息</td></tr>
+    <tr><td><b>Blob</b></td><td>镜像的 layer 数据本体，多个镜像共享同一 blob 只存一份</td></tr>
+    <tr><td><b>Digest</b></td><td>内容的 SHA256 摘要，镜像的字节级唯一 ID</td></tr>
+    <tr><td><b>Tag</b></td><td>指向 digest 的可变指针，覆盖推送后指向就变了</td></tr>
+    <tr><td><b>Immutable Tag</b></td><td>项目级规则：匹配模式的 tag 禁止覆盖推送</td></tr>
+    <tr><td><b>Replication 复制</b></td><td>跨 registry 同步镜像，push-based 主动推、pull-based 计划拉</td></tr>
+    <tr><td><b>Retention 保留策略</b></td><td>按"最近 N 个/最近 N 天/永远保留"规则自动清理 tag</td></tr>
+    <tr><td><b>GC</b></td><td>垃圾回收：删除引用计数为 0 的 blob 文件，真正释放磁盘</td></tr>
+    <tr><td><b>Quota 配额</b></td><td>项目级存储上限（字节），超限拒绝推送</td></tr>
+    <tr><td><b>Trivy</b></td><td>Harbor 2.x 内置的漏洞扫描引擎，对照 CVE 库扫 OS 包与语言依赖</td></tr>
+    <tr><td><b>CVE</b></td><td>公开漏洞编号库，Trivy 的漏洞库需定期更新</td></tr>
+    <tr><td><b>Notary / DCT</b></td><td>Docker Content Trust 的签名体系，Harbor 原生集成</td></tr>
+    <tr><td><b>cosign</b></td><td>云原生镜像签名工具，签名作为 OCI artifact 存储，支持 keyless</td></tr>
+    <tr><td><b>SBOM</b></td><td>软件物料清单，记录镜像里所有组件及版本，漏洞响应时定位受影响面</td></tr>
+    <tr><td><b>镜像晋升</b></td><td>同一 digest 从测试环境逐级晋升到生产，不在各环境重复构建</td></tr>
+    <tr><td><b>限流</b></td><td>Docker Hub 按 IP 的拉取配额，匿名 100 次/6 小时</td></tr>
+    <tr><td><b>P2P 分发</b></td><td>节点间共享 layer 的分发方式（Dragonfly 等），降低 registry 带宽压力</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 Harbor，完成这五件事 —— ① 建 prod 项目 + 机器人账号，用 CI 脚本推一个带语义化 tag 的镜像；② 配 immutable tag 规则，然后试着覆盖推送，看它被拒；③ 配一条 pull-based 复制规则同步 Docker Hub 官方 nginx，带 tag 过滤器；④ 删掉镜像 tag，跑 GC，用 <span class="k">du -sh /data/harbor</span> 前后对比，并构造一个共享 layer 场景验证"引用不归零不释放"；⑤ 开 push 自动扫描，用 trivy CLI 复现结果并对一次 CRITICAL 漏洞做豁免。<br><br>
+    <b>之后值得单独学：</b>Harbor 高可用（多副本 + 外部 PostgreSQL + 对象存储）、与 K8s 准入控制联动的签名门禁（Kyverno）、以及 SBOM 生成与漏洞响应流程。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Harbor 镜像仓库 · 上线前务必检查：保留策略、immutable tag、机器人账号、磁盘水位</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（复制）和模块 7（GC 与配额）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 Harbor 跟着敲：docker login → tag → push，再删 tag 观察 GC';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

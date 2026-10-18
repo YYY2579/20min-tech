@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 WebAssembly</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 系统与平台系列 · 第 1 期 · 高密度版</span>
+    <h1>二十分钟学透 WebAssembly</h1>
+    <p class="sub">Wasm 不是"浏览器里的新 JS"，而是一门<b>可移植的二进制指令格式 + 沙箱执行环境</b>。这篇讲它的内存模型、四大工具链、宿主集成方式、真实落地场景，以及截至 2024/2025 的兼容现状与限制。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 大工具链对比</span>
+      <span class="chip"><b>4</b> 类落地场景</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边打开 Chrome DevTools 的 Sources 面板，找一个用了 wasm 的站点看看模块长什么样。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三十秒建立坐标</h2></div>
+  <p class="lead">在讲任何机制之前，先用三句话把 Wasm 放回应有的位置：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>它是编译目标，不是编程语言。</b>你不手写 wasm，你用 C/C++/Rust/Go/TS 写代码，编译成 .wasm 二进制。类似"JVM 字节码"，但标准化、跨语言、为 Web 设计</div></div>
+    <div class="step"><div class="txt"><b>它是沙箱，不是虚拟机。</b>没有进程、没有系统调用，一切能力（文件、网络、DOM）都必须由宿主显式注入。这个设计是从浏览器安全模型里长出来的</div></div>
+    <div class="step"><div class="txt"><b>它和 JS 是共生关系。</b>同一页面里两者共享内存、互相调用；DOM 操作仍然走 JS。Wasm 补的是"算得快"和"复用存量 C/C++"，不是"取代 JS"</div></div>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Wasm 是什么，不是什么</h2></div>
+  <h3>是什么</h3>
+  <table>
+    <tr><th style="width:220px">定位</th><th>说明</th></tr>
+    <tr><td><b>可移植编译目标</b></td><td>一份 .wasm 可以在浏览器、Node、wasmtime 等任何合规运行时上跑，架构无关、OS 无关</td></tr>
+    <tr><td><b>沙箱执行环境</b></td><td>默认没有任何能力：不能读文件、不能联网、不能碰 DOM。宿主给什么用什么（capability 式安全）</td></tr>
+    <tr><td><b>跨语言互操作格式</b></td><td>Rust 写的模块可以被 JS 调用，C 写的可以被 Python 调用——靠统一的二进制契约，不靠 FFI</td></tr>
+    <tr><td><b>标准化事实</b></td><td>核心规范 2019 年 12 月成为 W3C 推荐标准，与 HTML/CSS/JS 同列 Web 四大核心标准</td></tr>
+  </table>
+  <h3>不是什么</h3>
+  <table>
+    <tr><th style="width:220px">误区</th><th>现实</th></tr>
+    <tr><td><b>"Wasm 会取代 JS"</b></td><td>截至 2024/2025，Wasm 没有标准的 DOM API，页面操作必须经 JS 胶水。它是 JS 的算力搭档</td></tr>
+    <tr><td><b>"Wasm 是浏览器虚拟机"</b></td><td>它没有进程隔离、没有线程调度，和 Docker 那种"容器"不是一个概念。WASI 在往服务端走，但生态远未成熟</td></tr>
+    <tr><td><b>"Wasm 一定更快"</b></td><td>纯计算确实接近原生，但高频跨 JS 边界、传字符串、编组对象的场景，Wasm 可能比 JS 还慢</td></tr>
+    <tr><td><b>"什么语言都能编译"</b></td><td>有 GC 的语言长期只能整体打包自己的运行时；WasmGC 提案落地后才逐步改善（见模块 7）</td></tr>
+  </table>
+  <h3>标准演进时间线（截至 2024/2025 的稳妥口径）</h3>
+  <table>
+    <tr><th style="width:130px">时间</th><th style="width:220px">节点</th><th>意义</th></tr>
+    <tr><td>2015—2017</td><td>MVP 设计与发布</td><td>栈式虚拟机、线性内存、i32/i64/f32/f64 四种值类型，四大浏览器同年支持</td></tr>
+    <tr><td>2019.12</td><td>成为 W3C 推荐标准</td><td>核心规范冻结，向后兼容成为承诺</td></tr>
+    <tr><td>2020—2021</td><td>引用类型、多 Memory、SIMD 落地</td><td>能存 JS 对象引用（externref）、能开多个内存、向量指令进入实用</td></tr>
+    <tr><td>2022—2023</td><td>线程、异常处理提案推进</td><td>SharedArrayBuffer + Atomics 支持多线程；try/catch 跨越 wasm 边界</td></tr>
+    <tr><td>2023.10 起</td><td>WasmGC 进入稳定版浏览器</td><td>Chrome 119、Firefox 120 率先默认支持，Safari 于 2024 年末跟进——带 GC 的语言可直接编译</td></tr>
+    <tr><td>2024—2025</td><td>组件模型 / WASI 持续演进</td><td>跨语言接口描述（WIT）与工具链快速迭代，标准化尚未完成</td></tr>
+  </table>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>内存模型与 JS 的界限</h2></div>
+  <p class="lead">理解 Wasm 只需要记住两个核心概念：<b>线性内存</b>和 <b>Table</b>。其余一切都从这两样推导。</p>
+  <h3>线性内存（Linear Memory）</h3>
+  <ul>
+    <li>一段<b>连续的字节数组</b>，guest 代码用 32 位索引寻址——默认上限 4GiB（memory64 提案把索引扩到 64 位，截至 2024/2025 仍在推进、未默认）</li>
+    <li>JS 侧看到的就是一个 <b>ArrayBuffer</b>：<span class="k">new WebAssembly.Memory({initial:1, maximum:10})</span> 的单位是"页"，每页 64KiB</li>
+    <li>可以 <span class="k">memory.grow</span> 增长。<b>陷阱：增长后旧的 ArrayBuffer 会被 detach，所有已建的 TypedArray 视图全部失效</b>——这是新人最容易踩的坑</li>
+  </ul>
+  <h3>Table</h3>
+  <ul>
+    <li>一张<b>引用表</b>，存函数引用（funcref）或外部引用（externref，可存 JS 对象）</li>
+    <li>存在意义：<b>间接调用</b>。C/C++ 的函数指针、动态链接、C++ 虚表在 wasm 里都靠 Table 实现；没有 Table，这些代码无法编译</li>
+    <li>call_indirect 指令按索引调 Table 里的函数，运行时校验签名，这是沙箱安全的一部分</li>
+  </ul>
+  <h3>Wasm 里没有什么</h3>
+  <table>
+    <tr><th style="width:180px">没有的东西</th><th>怎么办</th></tr>
+    <tr><td>对象与 GC（MVP 时代）</td><td>WasmGC 提案落地后逐步支持（见模块 7）</td></tr>
+    <tr><td>字符串类型</td><td>字符串 = 线性内存里的字节 + (指针, 长度)，跨边界传递要手动编组</td></tr>
+    <tr><td>DOM / Web API</td><td>只能由宿主以 import 形式注入（通常是 JS 函数）</td></tr>
+    <tr><td>文件 / 网络 / 时钟</td><td>浏览器里没有；服务端靠 WASI 提供（见模块 4）</td></tr>
+  </table>
+  <h3>JS 侧直接读写线性内存</h3>
+  <pre><span class="c">// 实例化后，exports.memory 就是线性内存；上面套 TypedArray 即可零拷贝访问</span>
+<span class="b">const</span> { instance } = <span class="b">await</span> WebAssembly.instantiateStreaming(fetch(<span class="y">'module.wasm'</span>), imports);
+<span class="b">const</span> mem = <span class="b">new</span> Uint8Array(instance.exports.memory.buffer);
+
+mem[0] = 72; mem[1] = 73;              <span class="c">// 直接写 "HI" 进 wasm 内存</span>
+instance.exports.hello();              <span class="c">// C 侧读到这两个字节</span>
+
+<span class="c">// 陷阱演示：内存增长会 detach 旧 buffer</span>
+instance.exports.growMemory(1);        <span class="c">// memory.grow 1 页（64KiB）</span>
+mem[0];                                <span class="r">// undefined —— 旧视图已失效！</span>
+<span class="b">const</span> mem2 = <span class="b">new</span> Uint8Array(instance.exports.memory.buffer);  <span class="c">// 必须重新取</span>
+
+<span class="c">// 与 JS 共享大图片数据：把 pixels 写进线性内存，wasm 处理完再读回，全程零拷贝</span>
+<span class="b">const</span> ptr = instance.exports.alloc(pixels.length);
+<span class="b">new</span> Uint8Array(instance.exports.memory.buffer, ptr, pixels.length).set(pixels);
+instance.exports.process(ptr, pixels.length);</pre>
+  <div class="callout">
+    <b>一句话记住界限：</b>Wasm 和 JS <b>共享内存，但不共享对象模型</b>。数字可以高效互传；字符串、对象、DOM 节点都要走编组——这就是所有"Wasm 比 JS 慢"案例的根源。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>四大工具链对比</h2></div>
+  <table>
+    <tr><th style="width:120px">工具链</th><th style="width:90px">语言</th><th style="width:200px">原理与产物</th><th>适用与注意</th></tr>
+    <tr><td><b>Emscripten</b></td><td>C / C++</td><td>基于 LLVM，把 C/C++ 编成 wasm，同时生成 JS glue；模拟 POSIX（虚拟文件系统）、把 SDL/OpenGL 映射到 WebGL</td><td>移植存量 C/C++ 项目（游戏、音视频、CAD）的首选。产物体积偏大</td></tr>
+    <tr><td><b>Rust wasm-bindgen</b></td><td>Rust</td><td>rustc 编译到 wasm32-unknown-unknown；wasm-bindgen 读取产物、自动生成 JS/TS 绑定（#[wasm_bindgen] 宏标注导出项）</td><td>Rust 是 wasm 生态增长最快的语言；wasm-pack 一条命令产出可 import 的 ES module</td></tr>
+    <tr><td><b>TinyGo</b></td><td>Go 子集</td><td>基于 LLVM 的 Go 编译器，专为 wasm/嵌入式裁剪，产物体积显著小于官方 Go wasm 端口</td><td>适合体积敏感场景；反射和 goroutine 支持有限（截至 2024/2025 仍在演进），用前先验证你的 Go 代码用到的特性</td></tr>
+    <tr><td><b>AssemblyScript</b></td><td>TypeScript 语法</td><td>独立编译器（不走 LLVM），把 TS 的严格子集编译成 wasm，可以做到零 JS 依赖</td><td>Web 团队零新语言成本；类型系统受限（i32/f64 等，没有 JS 的对象语义）</td></tr>
+  </table>
+  <h3>Clang 直接编译（纯计算场景最干净）</h3>
+  <pre><span class="c"># 不需要 Emscripten 的 JS glue，直接产出裸 wasm</span>
+clang --target=wasm32 -O3 -nostdlib -Wl,--no-entry -Wl,--export-all -o calc.wasm calc.c
+
+<span class="c"># calc.c：一个纯函数，无外部依赖</span>
+<span class="b">int</span> fib(<span class="b">int</span> n) { <span class="b">return</span> n &lt; 2 ? n : fib(n-1) + fib(n-2); }
+
+<span class="c"># 产物几十字节，instantiate 后 exports.fib 直接可调</span></pre>
+  <h3>Rust + wasm-bindgen</h3>
+  <pre><span class="b">use</span> wasm_bindgen::prelude::*;
+
+<span class="c">// 被 #[wasm_bindgen] 标注的函数会自动生成 JS 绑定</span>
+<span class="b">#[wasm_bindgen]</span>
+<span class="b">pub fn</span> fib(n: u32) -&gt; u32 {
+    (0..n).fold((0, 1), |(a, b), _| (b, a + b)).0
+}
+
+<span class="b">#[wasm_bindgen]</span>
+<span class="b">pub struct</span> Counter { value: u32 }
+
+<span class="b">#[wasm_bindgen]</span>
+<span class="b">impl</span> Counter {
+    <span class="b">#[wasm_bindgen(constructor)]</span>
+    <span class="b">pub fn</span> new() -&gt; Counter { Counter { value: 0 } }
+    <span class="b">pub fn</span> tick(&amp;<span class="b">mut self</span>) -&gt; u32 { <span class="b">self</span>.value += 1; <span class="b">self</span>.value }
+}</pre>
+  <pre><span class="c"># 构建并生成 JS/TS 绑定</span>
+wasm-pack build --target web     <span class="c"># 产出 pkg/：.wasm + .js + .d.ts</span>
+
+<span class="c">// 前端使用与普通 ES module 无异</span>
+<span class="b">import</span> init, { fib, Counter } <span class="b">from</span> <span class="y">'./pkg/module.js'</span>;
+<span class="b">await</span> init();                    <span class="c">// 加载 + 实例化</span>
+console.log(fib(40));           <span class="c">// 102334155</span></pre>
+  <h3>AssemblyScript</h3>
+  <pre><span class="c">// index.ts：TS 语法，但类型只剩 wasm 原生类型，没有 JS 的对象魔法</span>
+<span class="b">export function</span> add(a: i32, b: i32): i32 { <span class="b">return</span> a + b; }
+
+<span class="c"># 编译</span>
+asc index.ts -o index.wasm --optimize</pre>
+  <h3>Emscripten</h3>
+  <pre><span class="c"># emcc：C/C++ → .wasm + .js glue</span>
+emcc hello.c -o hello.js -s WASM=1 -O3
+
+<span class="c"># -s 系列选项控制模拟环境：</span>
+<span class="c"># -s FORCE_FILESYSTEM=1    挂载虚拟文件系统</span>
+<span class="c"># -s USE_WEBGL2=1          OpenGL ES → WebGL2</span>
+<span class="c"># -s ALLOW_MEMORY_GROWTH=1  允许内存增长（注意 JS 侧视图失效问题）</span></pre>
+  <div class="callout warn">
+    <b>工具链选择的真实标准：</b>① 团队已经会什么语言；② 需要操作 DOM/Web API 吗（需要 JS glue 就走 wasm-bindgen 或 Emscripten）；③ 体积预算（TinyGo/AssemblyScript 通常比 Emscripten 产物小）。<b>别为"Rust 火"把一个成熟的 C 滤镜库重写一遍</b>——迁移成本远超收益。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>宿主集成：Web API 与 WASI</h2></div>
+  <h3>浏览器侧：加载与实例化的标准流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>fetch 模块</b>：服务器必须返回 <span class="k">Content-Type: application/wasm</span>，否则流式编译被拒绝</div></div>
+    <div class="step"><div class="txt"><b>编译</b>：<span class="k">instantiateStreaming()</span> 边下载边编译（推荐）；或手动 <span class="k">new WebAssembly.Module(bytes)</span>（可缓存复用）</div></div>
+    <div class="step"><div class="txt"><b>实例化</b>：<span class="k">new WebAssembly.Instance(module, imports)</span>，把宿主函数/内存注入 guest</div></div>
+    <div class="step"><div class="txt"><b>调用</b>：通过 <span class="k">instance.exports</span> 调导出函数；guest 则通过 imports 回调宿主——这就是"沙箱注能力"的形态</div></div>
+  </div>
+  <pre><span class="c">// 方式一：流式编译（推荐，省一次完整往返）</span>
+<span class="b">const</span> { instance } = <span class="b">await</span> WebAssembly.instantiateStreaming(
+    fetch(<span class="y">'/calc.wasm'</span>),
+    {   <span class="c">// imports：guest 通过这些名字调用 JS</span>
+        env: {
+            console_log: (ptr, len) =&gt; {
+                <span class="b">const</span> bytes = <span class="b">new</span> Uint8Array(memory.buffer, ptr, len);
+                console.log(<span class="b">new</span> TextDecoder().decode(bytes));
+            }
+        }
+    }
+);
+console.log(instance.exports.fib(40));
+
+<span class="c">// 方式二：手动 compile + instantiate（要缓存 Module、或自己拿 bytes 时用）</span>
+<span class="b">const</span> bytes = <span class="b">await</span> (fetch(<span class="y">'/calc.wasm'</span>)).arrayBuffer();
+<span class="b">const</span> mod = <span class="b">new</span> WebAssembly.Module(bytes);        <span class="c">// 编译一次</span>
+<span class="b">const</span> inst1 = <span class="b">new</span> WebAssembly.Instance(mod, imports);  <span class="c">// 实例化多次</span>
+
+<span class="c">// 多线程场景：内存标记为 shared，JS 侧用 SharedArrayBuffer 视图</span>
+<span class="b">const</span> memory = <span class="b">new</span> WebAssembly.Memory({ initial: 1, maximum: 10, shared: <span class="b">true</span> });</pre>
+  <div class="callout warn">
+    <b>instantiateStreaming 的两个前提：</b>① 浏览器支持（现代浏览器均支持）；② 响应的 MIME 是 <span class="k">application/wasm</span>——Nginx/CDN 配错类型时报错信息很含糊（"Failed to instantiate module"），先查响应头再怀疑代码。
+  </div>
+  <h3>非浏览器：WASI 与组件模型</h3>
+  <table>
+    <tr><th style="width:150px">概念</th><th>说明</th></tr>
+    <tr><td><b>WASI</b></td><td>WebAssembly System Interface：给 wasm 提供文件、时钟、随机数、stdio 的标准接口，让 wasm 跑在浏览器之外</td></tr>
+    <tr><td><b>preview1</b></td><td>当前事实版本，各运行时（wasmtime、Wasmmer 等）基本实现；preview2 及以后版本迭代较快，兼容性碎片化是现状</td></tr>
+    <tr><td><b>组件模型</b><br>(Component Model)</td><td>2022 年后的新方向：用 WIT 描述接口，wit-bindgen 自动生成各语言绑定，取代手写 imports/exports 编号；截至 2024/2025 标准化与工具链仍在快速演进</td></tr>
+    <tr><td><b>典型运行时</b></td><td>wasmtime、Wasmmer（通用）；Node 提供 WASI 实验支持；Deno 原生支持；Envoy 等代理用 proxy-wasm 这个专用 ABI</td></tr>
+  </table>
+  <pre><span class="c"># 用 wasmtime 直接跑一个 WASI 模块（Rust 编译）</span>
+rustup target add wasm32-wasip1
+cargo build --target wasm32-wasip1
+wasmtime target/wasm32-wasip1/debug/myapp.wasm   <span class="c"># 像跑可执行文件一样跑</span></pre>
+  <div class="callout">
+    <b>工程判断：</b>浏览器外用 wasm，优先看具体平台的支持成熟度（边缘平台、代理插件、Serverless 冷启动是当前最成熟的三个方向），而不是把 WASI 当"第二个 Docker"想象——通用服务器场景的生态截至 2024/2025 还不足以支撑核心业务。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>真实应用场景</h2></div>
+  <p class="lead">Wasm 的价值在四个方向被反复验证。共同点：<b>要么复用存量 C/C++ 资产，要么需要沙箱隔离，要么对冷启动敏感</b>。</p>
+  <table>
+    <tr><th style="width:150px">场景</th><th style="width:220px">为什么用 wasm</th><th>代表</th></tr>
+    <tr><td><b>前端重计算</b></td><td>图像处理、编解码、加密、压缩、科学计算，把 C/C++ 库直接搬进页面，免去重写和 JS 性能税</td><td>Squoosh（MozJPEG/WebP 编解码）、ffmpeg.wasm、hash-wasm、各类压缩/解压库</td></tr>
+    <tr><td><b>大型桌面软件 Web 化</b></td><td>数十年积累的 C++ 代码无法重写，用 Emscripten 整体移植到浏览器</td><td>AutoCAD Web（2018，把约 30 年历史的 C++ 代码库经 wasm 运行）、Photoshop Web 版（2021 公开测试，官方称大量核心代码经 Emscripten 移植）、Figma（2017 年起公开描述用 wasm + WebGL 实现接近原生的设计工具）</td></tr>
+    <tr><td><b>插件沙箱</b></td><td>第三方代码必须在宿主进程里跑，但不能信任——wasm 的 capability 设计天然限制它能碰什么</td><td>Envoy/Istio 的 proxy-wasm 网络过滤器、Shopify Functions 等平台的定制逻辑运行时</td></tr>
+    <tr><td><b>Serverless 冷启动</b></td><td>模块小、实例化毫秒级，不需要 JVM 那样的运行时预热</td><td>Cloudflare Workers（V8 isolate + wasm 模块，冷启动毫秒级）、Fastly Compute@Edge 等边缘平台</td></tr>
+  </table>
+  <h3>场景一：把编解码器搬进浏览器</h3>
+  <pre><span class="c">// 典型分工：wasm 负责算，JS 负责搬运和 DOM</span>
+<span class="b">const</span> { instance } = <span class="b">await</span> WebAssembly.instantiateStreaming(fetch(<span class="y">'/mozjpeg.wasm'</span>), {});
+<span class="b">const</span> ex = instance.exports;
+
+<span class="c">// 1. 图片字节写进线性内存（JS 侧零拷贝）</span>
+<span class="b">const</span> inPtr = ex.alloc(jpegBytes.length);
+<span class="b">new</span> Uint8Array(ex.memory.buffer, inPtr, jpegBytes.length).set(jpegBytes);
+
+<span class="c">// 2. 一次调用完成整张图的编码，循环留在 wasm 内</span>
+<span class="b">const</span> outPtr = ex.encode(inPtr, jpegBytes.length, <span class="c">/*quality*/</span> 75);
+
+<span class="c">// 3. 取回结果，交给 &lt;img&gt; 或 canvas</span>
+<span class="b">const</span> outLen = ex.encodedLength();
+<span class="b">const</span> out = <span class="b">new</span> Uint8Array(ex.memory.buffer, outPtr, outLen);
+<span class="b">const</span> blob = <span class="b">new</span> Blob([out], { type: <span class="y">'image/jpeg'</span> });
+img.src = URL.createObjectURL(blob);</pre>
+  <h3>场景二：代理插件沙箱（proxy-wasm 形态）</h3>
+  <pre><span class="c">// Envoy 的 Wasm 过滤器：用 Rust 写，编译成 wasm，由代理进程加载</span>
+<span class="c">// guest 只能通过 host 注入的 ABI（proxy_* 系列函数）获取请求头、调用外部服务</span>
+<span class="c">// 拿不到文件系统、起不了线程、连不了任意 socket —— 隔离是默认状态</span>
+
+<span class="c">// 对比：如果允许跑原生 .so 插件，一个野指针就能让整个代理进程崩溃</span></pre>
+  <h3>场景三：边缘冷启动的量级感知</h3>
+  <table>
+    <tr><th style="width:200px">运行时形态</th><th style="width:170px">冷启动量级</th><th>说明</th></tr>
+    <tr><td>wasm 模块（几十 KB~MB）</td><td>毫秒级</td><td>编译 + 实例化，与模块大小成正比</td></tr>
+    <tr><td>V8 isolate + wasm</td><td>毫秒级</td><td>Cloudflare Workers 的形态，无容器启动开销</td></tr>
+    <tr><td>容器（Docker/OCI）</td><td>数十到数百毫秒起</td><td>镜像拉取、命名空间创建</td></tr>
+    <tr><td>JVM 应用（无 AOT）</td><td>秒级</td><td>类加载 + JIT 预热；GraalVM Native Image 可改善但要改造反射用法</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>选型口诀：</b>页面里要"算得重" → wasm；桌面软件要"上 Web" → wasm；第三方代码要"进进程" → wasm 沙箱；边缘函数要"起得快" → wasm/isolate。四个都不占 → 先用 JS，别为技术时髦买单。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>性能特征</h2></div>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:200px">特征</th><th>工程含义</th></tr>
+    <tr><td><b>启动</b></td><td>模块小、instantiateStreaming 边下边编译；无运行时预热</td><td>首屏和 Serverless 冷启动的巨大优势，是 wasm 最硬的卖点</td></tr>
+    <tr><td><b>执行</b></td><td>接近原生。V8 用 Liftoff 基线编译快速起跑，热函数升到 TurboFan 优化 tier</td><td>数值计算型负载通常达到原生的大部分性能；指针追逐、边界检查类负载折扣明显</td></tr>
+    <tr><td><b>互操作</b></td><td>每次跨 JS↔wasm 边界都有参数检查与编组开销</td><td>高频小调用会比 JS 慢；正确姿势是把循环留在 wasm 内</td></tr>
+    <tr><td><b>字符串</b></td><td>wasm 没有 string 类型，传递 = 写内存 + 传 (指针, 长度)</td><td>逐条传字符串是经典性能错误；应整批写入一次</td></tr>
+  </table>
+  <h3>错误姿势 vs 正确姿势</h3>
+  <pre><span class="c">// 慢：一百万次跨边界调用，每次还有参数装箱</span>
+<span class="b">for</span> (<span class="b">let</span> i = 0; i &lt; 1_000_000; i++) {
+    ex.processPixel(i, pixels[i]);        <span class="c">// 边界开销 * 1,000,000</span>
+}
+
+<span class="c">// 快：把整个缓冲区地址交给 wasm，循环留在 wasm 里，只跨一次边界</span>
+<span class="b">const</span> ptr = ex.alloc(pixels.length);
+<span class="b">new</span> Uint8Array(ex.memory.buffer, ptr, pixels.length).set(pixels);   <span class="c">// 零拷贝写入</span>
+ex.processAll(ptr, pixels.length);        <span class="c">// 一次调用</span></pre>
+  <h3>优化清单</h3>
+  <div class="cmds">
+    <div class="crow"><code>-O3 / -Oz</code><span class="desc">发布用 -Oz 压体积；计算热点用 -O3</span><button class="copy">复制</button></div>
+    <div class="crow"><code>wasm-opt（Binaryen）</code><span class="desc">后处理：删除死代码、合并、缩小二进制</span><button class="copy">复制</button></div>
+    <div class="crow"><code>strip debug 段</code><span class="desc">DWARF 只留在内部环境，生产不带</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Brotli 传输</code><span class="desc">.wasm 压缩率很高，CDN 开 Brotli</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SIMD</code><span class="desc">成熟特性，向量化计算有数倍提升；需特性检测</span><button class="copy">复制</button></div>
+    <div class="crow"><code>减少边界穿越</code><span class="desc">批处理、零拷贝共享内存、字符串整批传递</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>一个反直觉的结论：</b>"把整个应用都用 wasm 重写"几乎总是更慢——DOM 操作绕不过 JS，每次交互都要跨边界。<b>wasm 的正确形态是页面里的一个高性能算子</b>，周围仍是 JS 的天下。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>当前限制与兼容策略（截至 2024/2025）</h2></div>
+  <table>
+    <tr><th style="width:130px">限制</th><th style="width:260px">现状</th><th>应对</th></tr>
+    <tr><td><b>GC 支持</b></td><td>WasmGC 提案 2023 年 10 月起进入 Chrome/Firefox 稳定版，Safari 于 2024 年末跟进；带 GC 的语言（Java/Kotlin/Dart）可少带运行时，但生态仍在早期</td><td>需要时先做特性检测；生产核心链路等工具链更成熟</td></tr>
+    <tr><td><b>DOM 访问</b></td><td>无标准 DOM API，一切页面操作经 JS 胶水</td><td>用 wasm-bindgen 的 web-sys 或 Emscripten 的 HTML5 封装，别手写裸边界</td></tr>
+    <tr><td><b>调试</b></td><td>DevTools 支持 wasm 调试（配 DWARF 可映射 C++/Rust 源码），但变量求值、源码映射、性能剖析体验弱于 JS</td><td>内部环境保留调试信息；生产 strip</td></tr>
+    <tr><td><b>兼容性</b></td><td>核心 API 各浏览器覆盖率已很高；SIMD、线程、WasmGC 等新特性落地时间不一（移动端旧系统尤其慢）</td><td>特性检测 + 降级路径，别让一小部分设备白屏</td></tr>
+    <tr><td><b>内存上限</b></td><td>32 位线性内存默认 4GiB 顶；memory64 提案推进中，未默认</td><td>大对象分块处理；及时 free，观察长跑内存曲线</td></tr>
+    <tr><td><b>库生态</b></td><td>每个 C/C++/Rust 库的 wasm 适配靠各自维护，质量参差；构建系统兼容性是常见坑</td><td>优先选官方声明支持 wasm 的库；否则先小规模验证再扩大</td></tr>
+  </table>
+  <h3>兼容策略：特性检测 + 降级</h3>
+  <pre><span class="c">// wasm-feature-detect（GoogleChrome 实验室库）：上线前的安全检查表</span>
+<span class="b">import</span> { simd, threads, gc } <span class="b">from</span> <span class="y">'wasm-feature-detect'</span>;
+
+<span class="b">const</span> [hasSimd, hasThreads, hasGC] = <span class="b">await</span> Promise.all([simd(), threads(), gc()]);
+
+<span class="b">let</span> moduleUrl = <span class="y">'/calc.wasm'</span>;
+<span class="b">if</span> (hasSimd)      moduleUrl = <span class="y">'/calc-simd.wasm'</span>;   <span class="c">// 有 SIMD 就上向量化版本</span>
+<span class="b">if</span> (!hasSimd &amp;&amp; !supportsCoreWasm()) moduleUrl = <span class="b">null</span>;  <span class="c">// 连核心都不支持：走 JS 兜底</span>
+
+<span class="c">// 兜底路径必须真实存在且被测试过 —— "不支持就白屏"等于没做兼容</span>
+
+<span class="c">// 线程特性的前提：服务器发 COOP/COEP 头，页面才能拿到 SharedArrayBuffer</span>
+<span class="c">// Cross-Origin-Opener-Policy: same-origin</span>
+<span class="c">// Cross-Origin-Embedder-Policy: require-corp</span></pre>
+  <div class="callout danger">
+    <b>三条截至 2024/2025 的稳妥结论：</b>① <b>WasmGC 已可用但不普及</b>——Chrome/Edge/Firefox 稳定版默认支持，Safari 2024 年末才跟进，低端 Android 和旧系统要按"没有"设计；② <b>组件模型是方向不是现在</b>——生产使用前确认你的平台工具链版本；③ <b>核心 API 可以放心用</b>——真正要检测的是 SIMD、线程、GC 这些后 MVP 特性。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 wasm 当 JS 替代品重写整个应用</div><div class="pd">DOM 绕不开 JS，每个交互都跨边界，整体更慢更复杂。wasm 的正确定位是页面里的高性能算子。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">高频跨边界调用 + 逐条传字符串</div><div class="pd">一百万次 processPixel(i, v) 比 JS 还慢。把循环留在 wasm 内，整批数据一次传入，只跨一次边界。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">memory.grow 后继续用旧 TypedArray 视图</div><div class="pd">增长会 detach 旧 ArrayBuffer，旧视图读写全部静默失效（读到 undefined）。每次 grow 后必须重新取 buffer。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">服务器没配 application/wasm，instantiateStreaming 失败</div><div class="pd">报错信息含糊，先查响应头的 Content-Type。Nginx 的 mime.types 通常已含，但对象存储/CDN 常配错。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">不检测 SIMD/线程/WasmGC 直接上线</div><div class="pd">旧设备上模块加载即失败，页面白屏。用 wasm-feature-detect 做检测，并提供真实测试过的 JS 降级路径。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">生产环境发布带 DWARF 的 debug 产物</div><div class="pd">调试段能让产物体积翻数倍。DWARF 只进内部环境，生产用 strip 后的版本 + Brotli 传输。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">以为 wasm 能直接操作 DOM/Canvas</div><div class="pd">它连 document 是什么都不知道。所有页面交互都要写成 JS import 函数注入给 guest，这层胶水要提前规划。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">忽视 COOP/COEP，多线程特性悄悄失效</div><div class="pd">SharedArrayBuffer 只在跨域隔离页面可用，缺响应头时线程版模块起不来。这两个头还会影响第三方资源嵌入，改动前全站回归。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">高估 WASI 成熟度，核心服务乱上</div><div class="pd">截至 2024/2025 WASI preview 版本迭代快、兼容性碎片化。生产使用前确认目标运行时的版本支持，别把 preview 当稳定契约。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">大对象进线性内存不做预算</div><div class="pd">反复 alloc 不 free，内存涨到上限后 grow 失败、模块直接 trap。把内存当显存管理：分配有主、释放有主、长跑监控。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 关于 wasm 与 DOM，哪个说法正确？</div>
+      <button class="opt">wasm 可以直接调用 document.querySelector</button>
+      <button class="opt">截至 2024/2025 没有标准 DOM API，页面操作必须经 JS 互操作</button>
+      <button class="opt">wasm 通过 WASI 访问 DOM</button>
+      <div class="ans">正确答案：<b>必须经 JS 互操作</b>。WASI 解决的是文件/时钟/随机数这类系统接口，不覆盖浏览器页面 API。wasm 模块里调 DOM 的常见做法是把 JS 函数作为 import 注入（wasm-bindgen/web-sys 自动生成这层胶水）。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. JS 侧访问 wasm 的线性内存，正确方式是？</div>
+      <button class="opt">在 exports.memory.buffer 上建 TypedArray 视图直接读写</button>
+      <button class="opt">调用 wasm 导出的 readMemory(offset) 函数</button>
+      <button class="opt">通过 localStorage 中转</button>
+      <div class="ans">正确答案：<b>直接套 TypedArray 视图</b>。线性内存对 JS 就是一个 ArrayBuffer，零拷贝共享。注意 memory.grow 会 detach 旧 buffer，旧视图全部失效，必须重新取。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. WebAssembly.instantiateStreaming 的前提条件是？</div>
+      <button class="opt">页面必须开启 Service Worker</button>
+      <button class="opt">wasm 模块必须小于 4KB</button>
+      <button class="opt">浏览器支持流式编译，且响应 Content-Type 为 application/wasm</button>
+      <div class="ans">正确答案：<b>流式编译支持 + 正确的 MIME</b>。instantiateStreaming 边下载边编译，省一次往返；MIME 配错时报错含糊（"Failed to instantiate"），先查响应头。模块大小没有限制。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. wasm 中 Table 的主要作用是什么？</div>
+      <button class="opt">存储全局变量</button>
+      <button class="opt">存函数引用/外部引用，支持间接调用（call_indirect）</button>
+      <button class="opt">给字符串编址</button>
+      <div class="ans">正确答案：<b>函数引用表，支持间接调用</b>。C/C++ 的函数指针、虚函数表、动态链接在 wasm 里都依赖 Table；call_indirect 运行时校验签名，这也是沙箱安全的一环。引用类型提案后 externref 还能存 JS 对象引用。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 要把一个存量 C++ 游戏移植到浏览器，首选工具链是？</div>
+      <button class="opt">Emscripten</button>
+      <button class="opt">AssemblyScript</button>
+      <button class="opt">TinyGo</button>
+      <div class="ans">正确答案：<b>Emscripten</b>。它基于 LLVM，模拟 POSIX 环境（虚拟文件系统）、把 OpenGL/SDL 映射到 WebGL/WebAudio，是 C/C++ 存量项目进浏览器的事实标准。AssemblyScript 面向 TS 团队，TinyGo 面向 Go，都重写不了 C++ 存量。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. WasmGC 提案的意义是？</div>
+      <button class="opt">让 wasm 能直接读写 DOM</button>
+      <button class="opt">把线性内存扩展到 64 位寻址</button>
+      <button class="opt">让带 GC 的语言（Java/Kotlin/Dart 等）直接编译到 wasm，无需自带运行时</button>
+      <div class="ans">正确答案：<b>让带 GC 的语言直接编译</b>。此前 Java/Kotlin 等语言要把整套 GC 运行时编进模块，体积大、与宿主交互差；WasmGC 提供虚拟机内置 GC 后这类语言可以轻量编译。截至 2024/2025 它已进入 Chrome/Firefox 稳定版、Safari 2024 年末跟进，但生态仍在早期。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景选工具链</h3>
+  <div class="cmds">
+    <div class="crow"><code>存量 C/C++ 上 Web</code><span class="desc">Emscripten，吃透 -s 系列选项</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Rust 模块给 JS 用</code><span class="desc">wasm-pack + wasm-bindgen，target web</span><button class="copy">复制</button></div>
+    <div class="crow"><code>纯计算函数</code><span class="desc">clang --target=wasm32 直接编，最干净最小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>TS 团队零新语言</code><span class="desc">AssemblyScript，注意类型受限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Go 项目、体积敏感</code><span class="desc">TinyGo，先验证 goroutine/反射用量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>命令行工具分发</code><span class="desc">wasm32-wasip1 + wasmtime</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>常用命令与 API</h3>
+  <div class="cmds">
+    <div class="crow"><code>WebAssembly.instantiateStreaming(fetch(url), imports)</code><span class="desc">边下边编译（需 application/wasm）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>new WebAssembly.Module(bytes)</code><span class="desc">手动编译，可缓存复用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>new WebAssembly.Memory({initial, maximum, shared})</code><span class="desc">创建线性内存；shared 用于多线程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>new WebAssembly.Table({element, initial})</code><span class="desc">创建引用表（funcref/externref）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>wasm-pack build --target web</code><span class="desc">Rust → 可直接 import 的 ES module</span><button class="copy">复制</button></div>
+    <div class="crow"><code>emcc app.c -o app.js -s WASM=1 -O3</code><span class="desc">Emscripten 编译并生成 JS glue</span><button class="copy">复制</button></div>
+    <div class="crow"><code>wasm-opt -Oz in.wasm -o out.wasm</code><span class="desc">Binaryen 后处理，压缩体积</span><button class="copy">复制</button></div>
+    <div class="crow"><code>wasmtime app.wasm</code><span class="desc">跑 WASI 模块</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>线性内存</b></td><td>guest 的连续字节数组，32 位寻址默认上限 4GiB；JS 侧就是 ArrayBuffer</td></tr>
+    <tr><td><b>Table</b></td><td>存函数引用/外部引用的表，支持 call_indirect 间接调用</td></tr>
+    <tr><td><b>引用类型</b></td><td>externref 等可存宿主对象引用的 wasm 类型，MVP 之后的扩展</td></tr>
+    <tr><td><b>Memory64</b></td><td>把线性内存寻址扩展到 64 位的提案，截至 2024/2025 未默认</td></tr>
+    <tr><td><b>SIMD</b></td><td>128 位向量指令，计算密集场景数倍提升，需特性检测</td></tr>
+    <tr><td><b>WasmGC</b></td><td>虚拟机内置 GC 提案，2023 年秋起进入主流浏览器稳定版</td></tr>
+    <tr><td><b>WASI</b></td><td>WebAssembly 系统接口，提供文件/时钟/随机数等宿主能力</td></tr>
+    <tr><td><b>preview1 / preview2</b></td><td>WASI 的版本代号，preview1 是当前事实版本，后续迭代快</td></tr>
+    <tr><td><b>组件模型</b></td><td>用 WIT 描述接口、自动生成跨语言绑定的新方向，演进中</td></tr>
+    <tr><td><b>WIT</b></td><td>组件模型的接口描述语言，wit-bindgen 据此生成绑定</td></tr>
+    <tr><td><b>wasm-bindgen</b></td><td>Rust 与 JS 之间的高层绑定生成器，自动处理类型映射</td></tr>
+    <tr><td><b>Emscripten</b></td><td>C/C++ → wasm 的工具链，模拟 POSIX 并映射图形音频 API</td></tr>
+    <tr><td><b>TinyGo</b></td><td>面向 wasm/嵌入式的 Go 编译器子集，产物体积小</td></tr>
+    <tr><td><b>AssemblyScript</b></td><td>把 TypeScript 严格子集编译为 wasm 的独立编译器</td></tr>
+    <tr><td><b>Binaryen</b></td><td>wasm 后处理工具集，提供 wasm-opt 优化与压缩</td></tr>
+    <tr><td><b>instantiateStreaming</b></td><td>边下载边编译的实例化 API，要求正确 MIME</td></tr>
+    <tr><td><b>SharedArrayBuffer</b></td><td>可共享的 ArrayBuffer，多线程 wasm 的前提，需 COOP/COEP</td></tr>
+    <tr><td><b>proxy-wasm</b></td><td>Envoy 等代理的 wasm 插件 ABI，隔离执行第三方过滤逻辑</td></tr>
+    <tr><td><b>Liftoff / TurboFan</b></td><td>V8 里 wasm 的基线编译器与优化编译器，两级分层</td></tr>
+    <tr><td><b>host / guest</b></td><td>宿主（浏览器/runtime）与客户（wasm 模块）；能力由 host 单向注入</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 clang --target=wasm32 编译一个 fib 函数，在浏览器里 instantiateStreaming 并调用，对比与 JS 版的耗时；② 亲手复现 memory.grow 后旧视图失效的坑，再写正确的重新取 buffer 版本；③ 用 wasm-feature-detect 给你的模块加 SIMD 检测与降级路径；④ 读一个 Emscripten 项目的产物结构，数数 glue 代码占比。<br><br>
+    <b>之后值得单独学：</b>WasmGC 上层的语言生态（Kotlin/Wasm、Dart to wasm）、组件模型与 wit-bindgen 的实践、wasmtime 嵌入宿主程序的 C API、以及 wasm 在区块链智能合约上的历史角色。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 WebAssembly · 它是页面里的高性能算子，不是 JS 的掘墓人</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（内存模型）和模块 6（性能特征）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照你项目里的重计算模块。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边打开 Chrome DevTools 的 Sources 面板，找一个用了 wasm 的站点看看模块长什么样。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

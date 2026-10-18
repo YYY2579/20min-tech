@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Service Mesh</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 第 6 期 · 高密度版</span>
+    <h1>二十分钟学透 Service Mesh</h1>
+    <p class="sub">Service Mesh 是微服务领域争议最大的技术。本篇不教你怎么装 Istio（下期 06-devops 专讲），只回答一个问题：<b>你的团队到底需不需要它</b>。以架构决策框架为主。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">决策框架 + 成本账</span>
+      <span class="chip">Sidecar vs SDK vs eBPF</span>
+      <span class="chip"><b>9</b> 个落地坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边对照自己的组织：服务数、语言栈、团队规模，最后用模块 6 的决策树得出结论。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>Sidecar 模式的本质</h2></div>
+  <p class="lead">Service Mesh 的核心创新只有一个架构决策：<b>把服务间通信的功能从应用进程里拿出来，放进一个同部署单元的独立进程——Sidecar。</b></p>
+  <pre><span class="c"># 传统微服务：通信能力编译进每个服务</span>
+┌─────────────────────────┐
+│  订单服务 Pod            │
+│  ┌───────────────────┐  │
+│  │ 业务进程           │  │
+│  │  业务逻辑          │  │
+│  │  + 服务发现        │  │  ← SDK 里：每种语言各写一遍
+│  │  + 熔断限流        │  │  ← Java 用 Sentinel，Go 用 go-micro，行为不一致
+│  │  + 重试/超时       │  │
+│  │  + mTLS 加密       │  │  ← 改密码学逻辑要发版所有服务
+│  │  + 监控埋点        │  │
+│  └───────────────────┘  │
+└─────────────────────────┘
+
+<span class="c"># Service Mesh：通信能力剥离到 Sidecar</span>
+┌─────────────────────────┐
+│  订单服务 Pod            │
+│  ┌───────────────────┐  │
+│  │ 业务进程           │  │
+│  │  纯业务逻辑        │  │  ← 只发普通的 HTTP/gRPC
+│  └─────────┬─────────┘  │
+│            │ localhost   │
+│  ┌─────────▼─────────┐  │
+│  │ Envoy Sidecar     │  │  ← 代理所有出入流量
+│  │  流量治理/安全/可观测│  │  ← 语言无关，升级不动业务
+│  └─────────┬─────────┘  │
+└────────────┼────────────┘
+             │ 服务间流量（mTLS + 遥测）
+┌────────────▼────────────┐
+│  库存服务 Pod（同样结构） │
+└─────────────────────────┘</pre>
+  <table>
+    <tr><th style="width:200px">维度</th><th>SDK 模式</th><th>Sidecar 模式</th></tr>
+    <tr><td><b>语言支持</b></td><td>每种语言一套 SDK，功能永远有差距</td><td>一套代理全语言生效，天然一致</td></tr>
+    <tr><td><b>升级</b></td><td>改 SDK → 所有服务重新发版</td><td>升级 sidecar 镜像，业务零改动</td></tr>
+    <tr><td><b>性能</b></td><td>进程内调用，损耗 ~0</td><td>多一跳 localhost，P99 +1~3ms</td></tr>
+    <tr><td><b>资源</b></td><td>业务进程内存里</td><td>每 Pod 多一个容器（~50~100MB）</td></tr>
+    <tr><td><b>故障排查</b></td><td>一个进程一个栈，日志在一起</td><td>两个进程，排查要跨进程关联 trace</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一句话本质：Service Mesh 是“把 Spring Cloud 那套通信中间件从应用里搬到基础设施层”。</b>它没有发明新能力（熔断、限流、mTLS 十年前就有），它改变的是<b>这些能力属于谁</b>——从应用团队的基础设施代码，变成平台团队控制的独立层。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Mesh 解决什么问题（真问题清单）</h2></div>
+  <p class="lead">Mesh 的价值按场景分三档，只有第一档是普遍成立的：</p>
+  <h4>第一档：语言无关的基础设施统一（最强理由）</h4>
+  <ul>
+    <li><b>多语言栈组织：</b>Java + Go + Python + Node 并存，SDK 维护 N 套且行为漂移（Java 的熔断阈值和 Go 的不一样，出事故时行为不可预测）</li>
+    <li><b>mTLS 全网加密：</b>零信任安全要求下，服务间流量全加密。<b>用 SDK 改所有服务的 TLS 是数月工程，Mesh 是配置</b>。金融/合规场景的硬需求</li>
+    <li><b>统一可观测：</b>黄金指标（延迟/流量/错误/饱和度）对所有服务自动生效，不依赖各团队自觉埋点</li>
+  </ul>
+  <h4>第二档：高级流量治理</h4>
+  <table>
+    <tr><th style="width:190px">能力</th><th>Mesh 做法</th><th>不用 Mesh 的替代</th></tr>
+    <tr><td>金丝雀/蓝绿发布</td><td>按权重/header 分流（VirtualService）</td><td>Ingress 层分流、DNS 切流、双部署 + LB 权重</td></tr>
+    <tr><td>故障注入</td><td>按百分比注入延迟/abort</td><td>ChaosBlade 等混沌工具直接打 Pod</td></tr>
+    <tr><td>流量镜像</td><td>复制线上流量到影子服务</td><td>TCPCopy/GoReplay 在入口复制</td></tr>
+    <tr><td>跨集群/混合云路由</td><td>多集群流量策略统一声明</td><td>全局 DNS/GSLB</td></tr>
+  </table>
+  <h4>第三档：被高估的“解耦业务与运维”</h4>
+  <div class="callout warn">
+    “业务团队专注业务，平台团队专注 Mesh”听起来很美，实际是<b>把简单的事情变复杂了</b>：熔断策略该配多少？超时时间谁定？出事故时是 Sidecar 的问题还是业务的问题？——<b>沟通成本没有消失，只是从代码评审会转移到了 Mesh 配置评审会。</b>而且团队需要同时懂 Envoy 配置、K8s、控制平面运维，技能要求反而更高。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Mesh 的代价： latency 与资源账</h2></div>
+  <p class="lead">上 Mesh 前必须算清三笔账：延迟、资源、复杂度。</p>
+  <h4>延迟账（每次服务间调用多花多少）</h4>
+  <table>
+    <tr><th style="width:220px">路径段</th><th style="width:150px">耗时</th><th>说明</th></tr>
+    <tr><td>业务 → 本地 Sidecar</td><td>~0.05ms</td><td>localhost 回环，可忽略</td></tr>
+    <tr><td>Sidecar 代理处理（出）</td><td>~0.2~0.5ms</td><td>Envoy filter 链、TLS 终止、统计</td></tr>
+    <tr><td>Sidecar → Sidecar 网络</td><td>正常网络 RTT</td><td>同机房 ~0.5ms，跨 AZ ~2ms</td></tr>
+    <tr><td>mTLS 握手（有连接复用时零成本）</td><td>~2~5ms/新连接</td><td>Envoy 默认复用，握手只在建连时</td></tr>
+    <tr><td><b>合计增量（稳态）</b></td><td><b>~0.5~1.5ms/跳</b></td><td>一次调用穿 2 个 sidecar ≈ +1~3ms</td></tr>
+  </table>
+  <pre><span class="c"># 端到端影响算例：订单服务 → 库存服务 → 价格服务（2 跳）</span>
+<span class="c"># 无 Mesh：P99 = 30ms（库存）+ 20ms（价格）= 50ms</span>
+<span class="c"># 有 Mesh：50 + 2 跳 × 1.5ms ≈ 53ms → P99 涨 6%</span>
+
+<span class="c"># 什么场景这 1.5ms 是致命的？</span>
+<span class="c"># ✗ 高频短调用：风控系统每秒调 50 次规则引擎，每跳 +1.5ms → 总 RT +75ms，不可接受</span>
+<span class="c"># ✗ 深调用链：10 跳的聚合接口 → +15ms，且每跳都有 sidecar 故障概率</span>
+<span class="c"># ✓ CRUD 型微服务：单跳 RT 50ms 起，+1.5ms 无感</span>
+<span class="c"># ✓ 本来就慢的下游（外部 API）：sidecar 开销被淹没</span></pre>
+  <h4>资源账（每个 Pod 的固定税）</h4>
+  <table>
+    <tr><th style="width:220px">项目</th><th style="width:150px">Envoy 典型值</th><th>说明</th></tr>
+    <tr><td>Sidecar 内存</td><td>50~100MB</td><td>连接数越多越高；500 并发连接可达 150MB</td></tr>
+    <tr><td>Sidecar CPU</td><td>0.1~0.3 核</td><td>每千请求约 0.1 核，TLS 加密更贵</td></tr>
+    <tr><td>Init 容器（iptables 初始化）</td><td>启动 +0.5s</td><td>每个 Pod 启动多一个容器</td></tr>
+    <tr><td>istiod 控制平面</td><td>集群级 1~2 核 + 1GB</td><td>按服务数线性增长，千级服务要 HA 部署</td></tr>
+    <tr><td><b>100 个 Pod 的账</b></td><td><b>+5~10GB 内存 + 10~30 核 CPU</b></td><td>相当于 2~3 个业务 Pod 的成本，换 N 套 SDK 的维护费</td></tr>
+  </table>
+  <h4>复杂度账</h4>
+  <ul>
+    <li><b>新增控制平面：</b>istiod / Linkerd 控制面本身是高可用组件，它的故障 = 全网流量策略失效</li>
+    <li><b>两套配置体系：</b>K8s 的 Ingress/NetworkPolicy + Mesh 的 Gateway/VirtualService，概念重叠职责不清</li>
+    <li><b>排障链路变长：</b>“接口 502”要依次查：业务日志 → sidecar access log → Envoy 配置 → istiod 分发状态。新人排查成本翻倍</li>
+    <li><b>版本兼容矩阵：</b>Istio 版本 × K8s 版本 × Envoy 版本，升级是季度工程</li>
+  </ul>
+  <div class="callout danger">
+    <b>一个流传甚广的教训：</b>某团队 20 个 Java 服务，为了“统一技术栈”上 Istio，结果 P99 涨 2ms、Pod 内存涨 60MB、排障变难，最后悄悄回退成 Ingress + Spring Cloud Gateway。<b>如果所有服务都是 Java 且已经有成熟的 SDK 体系，Mesh 解决的是一个你不太痛的问题，却收你三份税。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>路线之争：Sidecar vs SDK vs eBPF</h2></div>
+  <table>
+    <tr><th style="width:150px">路线</th><th style="width:220px">代表</th><th>优势</th><th>劣势</th></tr>
+    <tr><td><b>SDK 库</b></td><td>Spring Cloud、Dubbo、gRPC 拦截器</td><td>零额外跳数、进程内性能最好、生态成熟</td><td>多语言重复建设、升级要发版、版本碎片化</td></tr>
+    <tr><td><b>Sidecar 代理</b></td><td>Istio/Envoy、Linkerd2</td><td>语言无关、升级不动业务、策略集中</td><td>+1~3ms/跳、Pod 资源税、排障链路长</td></tr>
+    <tr><td><b>eBPF 内核态</b></td><td>Cilium Service Mesh（无 sidecar 模式）、Merbridge</td><td>无 Sidecar 资源税、无额外跳数（内核转发）</td><td>需内核 ≥ 4.19/5.x；L7 策略支持有限；可编程性受内核 API 约束</td></tr>
+    <tr><td><b>Node 级代理</b></td><td>DaemonSet 部署的共享代理</td><td>比 per-Pod sidecar 省资源</td><td>单点集中风险；节点故障影响面大</td></tr>
+  </table>
+  <h4>eBPF 路线为什么值得关注</h4>
+  <pre><span class="c"># Cilium 的 eBPF Service Mesh：把 Sidecar 的活挪进内核</span>
+<span class="c"># 传统 sidecar：app → iptables 劫持 → Envoy 用户态 → 网络</span>
+<span class="c"># eBPF 方案：app → socket eBPF 程序 → 网络（策略执行在内核态）</span>
+
+<span class="c"># 收益（Cilium 官方口径，实测环境而异）：</span>
+<span class="c"># - 无 sidecar 容器：省掉每 Pod 50~100MB + 0.2 核</span>
+<span class="c"># - 延迟：路径更短，L3/L4 转发比 iptables+Envoy 快数倍</span>
+<span class="c"># - 可观测：内核态采集，无需改应用</span>
+
+<span class="c"># 当前的现实边界：</span>
+<span class="c"># - L7 策略（HTTP 重试/超时/按 header 分流）仍在演进，Envoy 生态更全</span>
+<span class="c"># - 需要较新内核（建议 5.10+，部分特性 6.x），老机器/Windows 节点无缘</span>
+<span class="c"># - 调试工具链年轻，出问题时能查文档和案例更少</span></pre>
+  <div class="callout ok">
+    <b>路线选择建议：</b>① K8s 且多语言 + 要高级 L7 治理 → <b>Istio sidecar</b>（生态最全）；② 追求轻量、以 L3/L4 + mTLS 为主 → <b>Linkerd2</b>（Rust 写的轻量 proxy，资源税只有 Envoy 的一半）；③ 内核够新、想零 sidecar 开销 → <b>Cilium eBPF</b>（未来方向，接受功能缺口）；④ 单语言技术栈（全 Java/全 Go）→ <b>先别上 Mesh，用好 SDK</b>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>主流方案对比</h2></div>
+  <table>
+    <tr><th style="width:130px">方案</th><th style="width:110px">数据平面</th><th style="width:150px">资源税（每 Pod）</th><th>定位与适用</th></tr>
+    <tr><td><b>Istio</b></td><td>Envoy（C++）</td><td>~100MB + 0.3 核</td><td>功能最全（流量/安全/可观测/多集群），生态和文档最好，代价是复杂度最高。企业默认选项</td></tr>
+    <tr><td><b>Linkerd2</b></td><td>Linkerd2-proxy（Rust）</td><td>~30MB + 0.1 核</td><td>轻量、快、简单，专注核心场景（mTLS + 黄金指标 + 重试）。不要 Envoy 的复杂度就用它</td></tr>
+    <tr><td><b>Envoy（裸用）</td><td>Envoy</td><td>同 Istio 数据面</td><td>不是完整 Mesh，是数据平面。自己写控制面（xDS 配置）或用 API 网关形态</td></tr>
+    <tr><td><b>AWS App Mesh</b></td><td>Envoy</td><td>同 Envoy</td><td>托管控制面（AWS 运维），与 CloudWatch/X-Ray 深度集成。<b>2026 年注意：AWS 已宣布 App Mesh 停止支持，新项目不建议选</b></td></tr>
+    <tr><td><b>Cilium Mesh</b></td><td>eBPF（可混合 Envoy）</td><td>~0（内核态）</td><td>无 sidecar 路线代表，兼 CNI + 网络策略 + Mesh 于一体，K8s 网络栈大一统方向</td></tr>
+    <tr><td><b>云厂商托管</b></td><td>Envoy</td><td>同 Envoy</td><td>阿里云 ASM、腾讯云 TCM、GKE Anthos Service Mesh。控制面托管，省运维，但版本跟随厂商节奏</td></tr>
+  </table>
+  <h4>选型对照</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>要功能全 + 有平台团队</div><div class="cd">Istio。虚拟服务/目标规则/网关/多集群/授权策略全家桶，文档和案例最多，值得投入专职 1~2 人运维。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>要轻量 + 快速见效</div><div class="cd">Linkerd2。一小时装完，自动 mTLS + 黄金指标 + 重试，配置是 K8s CRD 几行搞定。功能克制是优点。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>内核新 + 厌恶资源税</div><div class="cd">Cilium Service Mesh。已经在用 Cilium CNI 的话顺理成章；注意 L7 能力边界和老节点兼容。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>全托管不想运维</div><div class="cd">云厂商托管 Mesh（ASM/TCM）。控制面厂商管，但升级节奏、定制能力受厂商约束，锁定风险要评估。</div></div>
+  </div>
+  <h4>量化对比（公开基准与厂商口径参考）</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:170px">Istio + Envoy</th><th style="width:170px">Linkerd2</th><th>Cilium eBPF</th></tr>
+    <tr><td>P99 延迟增量（单跳）</td><td>~1.5~2.5ms</td><td>~0.8~1.5ms（Rust 代理更轻）</td><td>~0.2~0.5ms（内核态转发）</td></tr>
+    <tr><td>每 Pod 内存税</td><td>~100~150MB</td><td>~30~50MB</td><td>近零（内核共享）</td></tr>
+    <tr><td>每 Pod CPU 税（千 QPS）</td><td>~0.2~0.3 核</td><td>~0.05~0.1 核</td><td>~0.01~0.05 核</td></tr>
+    <tr><td>L7 策略成熟度</td><td>最全（重试/超时/分流/故障注入/镜像）</td><td>核心集（重试/超时/分流）</td><td>L3/L4 全，L7 演进中</td></tr>
+    <tr><td>内核版本要求</td><td>无特殊要求</td><td>无特殊要求</td><td>建议 5.10+，部分特性需 6.x</td></tr>
+    <tr><td>上手难度</td><td>高（CRD 多、概念多）</td><td>低（一天可跑通）</td><td>中（要理解内核网络栈）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>数字怎么用：</b>以上是公开基准和厂商口径的量级参考，<b>不同硬件、连接数、payload 大小下差异很大，只用于选型排序，不能写进容量规划。</b>真正的数字要用你自己的负载在观察模式量出来——这也是四阶段路径里阶段 1 的核心任务。
+  </div>
+  <div class="callout warn">
+    <b>选型前必须验证的三件事：</b>① 你的 K8s 版本和内核版本满足要求吗（Istio 版本兼容矩阵很严格）？② 团队有人能看懂 Envoy access log 和 istioctl 输出吗（排障刚需）？③ 有灰度回退方案吗（按 namespace 渐进注入，出问题能整体摘除 sidecar）？三个都 yes 再启动 POC。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>适用场景判断与渐进式采用路径</h2></div>
+  <h4>什么时候 Mesh 是划算的（满足 2 条以上再认真考虑）</h4>
+  <table>
+    <tr><th style="width:240px">条件</th><th>为什么</th></tr>
+    <tr><td>≥ 3 种语言的服务栈</td><td>SDK 重复建设和行为漂移的痛点真实存在</td></tr>
+    <tr><td>≥ 20 个服务、≥ 3 个团队</td><td>规模到了“治理”开始产生收益的临界点</td></tr>
+    <tr><td>合规要求 mTLS/零信任</td><td>这是 Mesh 最硬的刚需，SDK 改造以季度计</td></tr>
+    <tr><td>发布频率高、要精细流量控制</td><td>金丝雀/镜像/故障注入用起来很香</td></tr>
+    <tr><td>已有 K8s 且有平台团队</td><td>Mesh 是 K8s 生态的自然延伸，运维有人接盘</td></tr>
+    <tr><td>RT 预算宽松（单跳 &gt; 20ms）</td><td>+1.5ms 无感，不触碰性能红线</td></tr>
+  </table>
+  <h4>什么时候不划算</h4>
+  <ul>
+    <li><b>单语言栈（全 Java/全 Go）且 &lt; 10 个服务</b>——SDK 一套就够，Mesh 是三倍税换不来三倍收益</li>
+    <li><b>延迟敏感链路（高频短调用、深链）</b>——每跳 1.5ms 是净损失</li>
+    <li><b>没有专职平台运维</b>——控制平面故障时全网策略瘫痪，没人接盘就是灾难</li>
+    <li><b>强监管环境要求流量路径完全自主可控</b>——多一层商用/开源代理增加审计面</li>
+  </ul>
+  <h4>渐进式采用路径（四阶段）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>阶段 0（基线）：</b>不上 Mesh。先把服务间调用的可观测性补齐（trace/metrics/logs 三件套），超时重试策略在 SDK/Gateway 层统一。多数团队到这就够了。</div></div>
+    <div class="step"><div class="txt"><b>阶段 1（观察模式）：</b>Mesh 只做可观测。注入 sidecar 但策略全放行，只收集黄金指标和 trace。验证性能损耗和排障链路，<b>不动任何流量</b>。跑 2~4 周。</div></div>
+    <div class="step"><div class="txt"><b>阶段 2（边缘接入）：</b>从 ingress gateway 开始用 Mesh，管南北流量（金丝雀发布按权重分流）。东西流量仍走原路径。此时已拿到发布红利。</div></div>
+    <div class="step"><div class="txt"><b>阶段 3（按 namespace 灰度）：</b>东西流量逐 namespace 开启 mTLS + 重试/超时策略。先非核心（内部工具），再核心（交易）。每步验证：RT 变化、错误率、资源水位。<b>保留一键摘除 sidecar 的回退能力</b>。</div></div>
+  </div>
+  <pre><span class="c"># 渐进式采用的 K8s 操作骨架（以 Istio 为例，命令简化示意）</span>
+
+<span class="c"># 1. 只给特定 namespace 打标签，才注入 sidecar（默认全局不注入）</span>
+kubectl label namespace internal-tools istio-injection=enabled
+
+<span class="c"># 2. 观察模式下不放任何 VirtualService，sidecar 只透传 + 上报遥测</span>
+kubectl -n internal-tools get pods          <span class="c"># 确认每个 Pod 有 2/2 READY（业务 + sidecar）</span>
+istioctl proxy-config log product-svc-xxx  <span class="c"># 看 sidecar 实际生效的配置</span>
+
+<span class="c"># 3. 灰度时按百分比分流（5% 到新版本）</span>
+<span class="c">#    VirtualService: http.route.destination.subset 权重 5 / 95</span>
+
+<span class="c"># 4. 回退：摘掉标签，Pod 重启后回到无 sidecar 状态</span>
+kubectl label namespace internal-tools istio-injection-       <span class="c"># 删除标签即回退</span>
+
+<span class="c"># 5. 全程监控三个数：RT 增量、sidecar 资源水位、控制平面健康</span>
+kubectl top pods -n istio-system            <span class="c"># istiod 本身别被打挂</span></pre>
+  <div class="callout danger">
+    <b>最常见的失败姿势：全集群一次性开启自动注入。</b>某天全上线，结果一批老服务（用了非法 header、大 payload、长连接）被 Envoy 拦截，全网故障且回退要滚动重启所有 Pod。<b>永远按 namespace 灰度，永远保留摘除能力，永远先在测试环境把最老的服务跑一遍。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>决策框架：你的团队该不该上 Mesh</h2></div>
+  <p class="lead">按顺序回答这 6 个问题，任何一题答“否”就停在当前阶段：</p>
+  <table>
+    <tr><th style="width:60px">#</th><th style="width:280px">问题</th><th>是 → 继续</th><th>否 →</th></tr>
+    <tr><td><b>1</b></td><td>服务间调用的可观测性（trace + 黄金指标）已经建立了吗？</td><td>问题 2</td><td>先补可观测。这是 Mesh 收益的大头，且有更轻的实现</td></tr>
+    <tr><td><b>2</b></td><td>有 ≥ 2 种生产语言，或合规强制 mTLS 吗？</td><td>问题 3</td><td>单语言无合规需求 → 不上 Mesh，SDK 够了</td></tr>
+    <tr><td><b>3</b></td><td>核心链路单跳 RT 有 20ms 以上余量吗？</td><td>问题 4</td><td>高频短调用 → 不上，或只对慢链路用</td></tr>
+    <tr><td><b>4</b></td><td>有（或愿意招）1 名以上能全职运维控制平面的人吗？</td><td>问题 5</td><td>没人的话，用托管 Mesh 或继续 SDK</td></tr>
+    <tr><td><b>5</b></td><td>团队能接受排障链路从 1 个进程变成 3 个组件吗？</td><td>问题 6</td><td>先在测试环境跑一个月再回答</td></tr>
+    <tr><td><b>6</b></td><td>有按 namespace 灰度 + 一键回退的发布流程吗？</td><td><b>上，从阶段 1 开始</b></td><td>先建灰度能力，否则别动生产</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一个务实的折中：只用 Mesh 的“可观测 + mTLS”，不碰高级流量治理。</b>多数团队 80% 的 Mesh 收益来自自动 trace 和零代码加密；而复杂分流策略用 Ingress/Gateway 更直接。功能用得越少，税交得越值。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>九个落地坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">全集群一次性开启自动注入</div><div class="pd">老服务的非法 header、超大 payload、长连接被 Envoy 拦截，全网故障。必须按 namespace 灰度，保留摘除标签的回退路径。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">忽略延迟税，直接上核心交易链路</div><div class="pd">高频短调用链路每跳 +1.5ms，深链累计 +15ms，P99 直接突破 SLO。先在观察模式量出真实增量再扩。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">资源预算没把 sidecar 税算进去</div><div class="pd">每 Pod +100MB 内存 +0.3 核，100 Pod 就是 10GB/30 核，容量规划按业务 Pod 算导致节点 OOM。资源请求要和 LimitGuard 一起配。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">istiod 单点无 HA</div><div class="pd">控制平面挂了，新配置不下发、新 Pod 无 sidecar，但存量流量一般还能跑（数据平面自治）——恰好让人放松警惕，直到下次发布全乱。istiod 必须多副本 + PDB。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">排障时忘了 sidecar 这一层</div><div class="pd">接口 502 查半天业务日志，实际是 Envoy 因 upstream 连接数超限拒绝。istioctl proxy-config 和 access log 必须进排障 SOP。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">两套流量入口概念重叠</div><div class="pd">Ingress-Nginx + Istio Gateway + 应用 Gateway 三层，谁管 TLS 终止、谁管限流说不清。先定边界：外部流量只进 Mesh Gateway，内部 LB 全部下线。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">mTLS 开了但没设授权策略</div><div class="pd">以为加密就是安全，实际任何 Pod 都能调任何服务。PeerAuthentication 之外必须配 AuthorizationPolicy（谁可以访问哪个路径）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">升级 Istio 不做金丝雀</div><div class="pd">小版本跳跃导致 CRD 不兼容、VirtualService 行为变化。控制平面按 revision 金丝雀升级，数据平面滚动跟随。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">为了 Mesh 而 Mesh</div><div class="pd">20 个 Java 服务、1 个团队、无合规需求，上了全套 Istio，最后 P99 涨 2ms、内存涨 60MB、排障变难，悄悄回退。先过模块 6 的决策树再动手。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. Service Mesh 相比 SDK 模式，最根本的架构差异是？</div>
+      <button class="opt">Mesh 的熔断限流算法更先进</button>
+      <button class="opt">Mesh 不需要服务发现，直接用 DNS</button>
+      <button class="opt">通信治理能力从应用进程移到独立 Sidecar 代理，与语言解耦</button>
+      <div class="ans">正确答案：<b>能力归属的迁移</b>。Mesh 没有发明新功能（熔断/mTLS/重试 SDK 都有），它把这些功能从“每种语言一套的应用库”变成“基础设施层的独立代理”，换取语言无关和集中管控。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 关于 Sidecar 带来的延迟，哪个判断是对的？</div>
+      <button class="opt">没有额外开销，localhost 通信是零成本</button>
+      <button class="opt">稳态下每跳约 +0.5~1.5ms，mTLS 握手只在建连时发生，连接复用后零成本</button>
+      <button class="opt">每次请求都要做一次完整 TLS 握手，至少 +5ms</button>
+      <div class="ans">正确答案：<b>稳态每跳 +0.5~1.5ms，握手只在建连</b>。Envoy 默认复用 upstream 连接，握手成本被摊薄到可忽略。但“可忽略”是对 50ms 级的业务调用而言——高频短调用链上它会累积成显著开销。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 一个团队 15 个服务全是 Java，已有 Sentinel + Spring Cloud Gateway，无合规要求。最合理的做法是？</div>
+      <button class="opt">先不上 Mesh，补全可观测性，等出现多语言或合规需求再评估</button>
+      <button class="opt">立刻上 Istio，统一治理能力是大势所趋</button>
+      <button class="opt">上 Linkerd2，因为它最轻量所以零成本</button>
+      <div class="ans">正确答案：<b>先不上</b>。单语言 + 成熟 SDK + 无 mTLS 刚需，Mesh 的三个最大收益（语言无关、零代码加密、统一可观测）都不痛，却要交延迟税、资源税、复杂度税。Mesh 不是“落后与否”的问题，是投入产出问题。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. eBPF 路线的 Service Mesh（如 Cilium）相比 Envoy Sidecar 的核心优势是？</div>
+      <button class="opt">支持更丰富的 L7 流量策略</button>
+      <button class="opt">可以在任意老版本内核上运行</button>
+      <button class="opt">策略在内核态执行，省掉每 Pod 的 sidecar 资源税和额外跳数</button>
+      <div class="ans">正确答案：<b>无 sidecar 开销</b>。eBPF 把转发和策略执行放进内核，不需要 per-Pod 代理容器。代价是需要较新内核（建议 5.10+），且 L7 策略生态还不如 Envoy 成熟。这是权衡而非全面胜出。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 采用 Mesh 最安全的推进方式是？</div>
+      <button class="opt">全集群开启自动注入，一次性切换后统一排查问题</button>
+      <button class="opt">观察模式（只收遥测不动流量）→ 边缘 Gateway → 按 namespace 灰度，每步保留回退能力</button>
+      <button class="opt">先在核心交易链路全量开启，验证最大价值</button>
+      <div class="ans">正确答案：<b>四阶段渐进 + 可回退</b>。先零风险地量出性能损耗和排障链路变化，再从边缘和低风险 namespace 开始，每一步验证 RT/错误率/资源。全量开启是教科书级事故姿势。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 Mesh 控制平面（如 istiod）的故障影响，正确的是？</div>
+      <button class="opt">存量流量通常还能跑（数据平面自治），但新配置不下发、新 Pod 注入异常，且容易被忽视</button>
+      <button class="opt">控制平面一挂，所有服务间通信立即全部中断</button>
+      <button class="opt">控制平面完全无状态，挂了自动恢复零影响</button>
+      <div class="ans">正确答案：<b>存量自治但新鲜不了</b>。Envoy 缓存了已下发的配置，存量连接继续按旧策略跑——这恰恰是最危险的：故障隐蔽，直到下次发布或扩容才爆雷。istiod 必须 HA + PDB + 监控告警。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>Mesh 决策速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>≥3 种语言 / 合规 mTLS</code><span class="desc">Mesh 最强刚需场景，可以启动评估</span><button class="copy">复制</button></div>
+    <div class="crow"><code>单语言 + 成熟 SDK</code><span class="desc">不上。Mesh 的收益你不太痛，税一分不少</span><button class="copy">复制</button></div>
+    <div class="crow"><code>高频短调用 / 深链路</code><span class="desc">每跳 +1.5ms 是净损失，只给慢链路用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>无专职平台运维</code><span class="desc">选托管 Mesh 或留在 SDK，别自养控制平面</span><button class="copy">复制</button></div>
+    <div class="crow"><code>只想要可观测 + 加密</code><span class="desc">务实组合：Mesh 开观察模式 + mTLS，高级治理交给 Gateway</span><button class="copy">复制</button></div>
+    <div class="crow"><code>资源税预算</code><span class="desc">每 Pod 约 100MB + 0.3 核（Envoy）；Linkerd 约 30MB + 0.1 核；eBPF 近零</span><button class="copy">复制</button></div>
+    <div class="crow"><code>推进纪律</code><span class="desc">观察 → 边缘 → 按 namespace 灰度 → 核心，每步可回退</span><button class="copy">复制</button></div>
+    <div class="crow"><code>必配项</code><span class="desc">istiod HA + PDB、AuthorizationPolicy、资源 Request/Limit、revision 金丝雀升级</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Service Mesh</b></td><td>专治服务间通信的基础设施层，数据平面代理 + 控制平面组成</td></tr>
+    <tr><td><b>Sidecar</b></td><td>与业务容器同 Pod 部署的代理容器，劫持出入流量做治理</td></tr>
+    <tr><td><b>数据平面</b></td><td>实际转发流量的代理层（Envoy / Linkerd2-proxy）</td></tr>
+    <tr><td><b>控制平面</b></td><td>下发配置与策略的管理层（istiod / Linkerd controller）</td></tr>
+    <tr><td><b>Envoy</b></td><td>Lyft 开源的高性能 C++ 代理，Istio/Linkerd 之外也广泛用作网关</td></tr>
+    <tr><td><b>xDS</b></td><td>Envoy 的动态配置 API（EDS/CDS/RDS/SDS 等），控制面通过它推送配置</td></tr>
+    <tr><td><b>Istio</b></td><td>功能最全的开源 Mesh，Envoy 数据面 + istiod 控制面</td></tr>
+    <tr><td><b>Linkerd2</b></td><td>轻量级 Mesh，Rust 写的代理，资源税约为 Envoy 的一半</td></tr>
+    <tr><td><b>Cilium</b></td><td>基于 eBPF 的 CNI + 网络策略 + 无 sidecar Mesh 方案</td></tr>
+    <tr><td><b>eBPF</b></td><td>Linux 内核可编程技术，Mesh 中用于内核态执行策略与转发</td></tr>
+    <tr><td><b>mTLS</b></td><td>双向 TLS，服务间互相验证身份并加密，零信任的基础</td></tr>
+    <tr><td><b>VirtualService</b></td><td>Istio 的流量路由规则：权重、超时、重试、header 匹配</td></tr>
+    <tr><td><b>DestinationRule</b></td><td>Istio 中定义目标服务的策略：负载均衡、连接池、离群点检测</td></tr>
+    <tr><td><b>PeerAuthentication</b></td><td>Istio 中控制 mTLS 模式的策略（严格/宽容）</td></tr>
+    <tr><td><b>AuthorizationPolicy</b></td><td>Istio 的 L4/L7 授权：谁能访问哪个服务的哪些路径</td></tr>
+    <tr><td><b>Gateway</b></td><td>Mesh 管理南北向流量的入口组件，替代部分 Ingress 职责</td></tr>
+    <tr><td><b>istioctl</b></td><td>Istio 排障 CLI，proxy-config 系列命令是定位流量问题的核心工具</td></tr>
+    <tr><td><b>观察模式</b></td><td>注入 sidecar 但只采集遥测、不做任何策略拦截的低风险起步阶段</td></tr>
+    <tr><td><b>数据平面自治</b></td><td>控制平面故障时存量流量按缓存配置继续运行的特性</td></tr>
+    <tr><td><b>离群点检测</b></td><td>Envoy 自动剔除连续故障的上游实例的机制</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用模块 6 的决策树给你所在的组织打分，写下结论和理由；② 如果决定 POC，按四阶段路径在测试集群装 Linkerd2 或 Istio，先跑两周观察模式，记录 RT 增量和资源水位；③ 把最老的服务（协议最不规范那个）放进 POC 名单，它的问题就是你的问题；④ 练习 istioctl proxy-config 和 Envoy access log 的读法——排障能力决定 Mesh 的上限。<br><br>
+    <b>之后值得单独学：</b>Istio 实操安装与流量规则（下期 06-devops 专讲）、Envoy filter 机制、eBPF 可观测性（Cilium Hubble）、以及多集群 Mesh 的东西向流量设计。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Service Mesh · 先过决策树，再谈装不装；灰度推进，保留回退</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（代价三笔账）和模块 6（决策树）是本文核心，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 拿模块 6 的决策树给你的团队打分。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边对照自己的组织：服务数、语言栈、团队规模，最后用模块 6 的决策树得出结论。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 InfluxDB</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 12 期 · 高密度版</span>
+    <h1>二十分钟学透 InfluxDB</h1>
+    <p class="sub">时序数据库不难，难在<b> cardinality 不炸、查询带 range、bucket 不乱建</b>。这篇讲时序数据的本质、InfluxDB 2.x 的 bucket/token 模型、行协议、Flux，以及和 Prometheus 怎么选。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>1</b> 套行协议</span>
+      <span class="chip"><b>2</b> 代查询语言</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 InfluxDB 跟着敲：docker run -d -p 8086:8086 influxdb:2.7</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起 InfluxDB 2.x</span>
+docker run -d --name influx -p 8086:8086 influxdb:2.7
+
+<span class="c"># 首次访问 http://localhost:8086 会引导初始化：</span>
+<span class="c"># 填 Organization、Initial Bucket、用户名密码 —— 这些概念见模块 2</span>
+
+<span class="c"># 官方 CLI（2.x 的核心入口，1.x 是 influx 命令的子命令风格）</span>
+docker exec -it influx influx setup \
+  --username admin --password admin123456 \
+  --org myorg --bucket mybucket --retention 0 --force
+
+<span class="c"># 之后所有操作都用 influx 命令 + token</span>
+docker exec -it influx influx config ls
+docker exec -it influx influx bucket ls
+docker exec -it influx influx write -b mybucket -o myorg --precision s "m,k=v f=1"</pre>
+  <div class="callout warn">
+    <b>版本说明：</b>InfluxDB 有 <b>1.x / 2.x</b> 两代并行的产品线，2.x 是现在的新装默认，但 1.8 仍长期维护且国内存量不少。1.8 同时支持 InfluxQL 和 Flux，是迁移的桥梁。<b>本文以 2.x 为主线</b>，差异在模块 7 专门对比。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>时序数据：它到底特殊在哪</h2></div>
+  <p class="lead">指标、监控、IoT、日志时间戳 —— 这类数据的访问模式和交易数据完全不同，所有时序数据库的设计都是围着下面四个特征转的。</p>
+  <table>
+    <tr><th style="width:170px">特征</th><th>对存储引擎的要求</th></tr>
+    <tr><td><b>写多读少</b></td><td>写入远高于读取（一台机器每秒几十万点很常见）。优化追加写，<b>不优化更新</b>（时序数据几乎不更新）</td></tr>
+    <tr><td><b>时间戳驱动</b></td><td>数据按时间严格有序到达，时间就是天然主索引。查询几乎必带时间范围</td></tr>
+    <tr><td><b>时间范围读 + 降采样</b></td><td>"最近一小时每秒均值"是标准查询模式。原始点密集存储，<b>按窗口预聚合</b>（downsample）成粗粒度长期保留</td></tr>
+    <tr><td><b>生命周期强</b></td><td>原始数据 7~30 天，降采样数据留 1 年，汇总再留 3 年。<b>TTL 不是可选项，是核心机制</b></td></tr>
+  </table>
+  <h4>时序 vs 关系型</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:230px">MySQL / PostgreSQL</th><th>时序数据库</th></tr>
+    <tr><td><b>主键</b></td><td>业务 ID（随机分布）</td><td>（序列标识 + 时间戳），时间单调</td></tr>
+    <tr><td><b>写入</b></td><td>随机位置插入，维护 B+ 树</td><td>顺序追加，LSM 结构天然契合</td></tr>
+    <tr><td><b>压缩</b></td><td>通用压缩</td><td>针对时间戳和指标值特化压缩（delta-of-delta、gorilla），典型 <b>10:1 ~ 100:1</b></td></tr>
+    <tr><td><b>查询</b></td><td>点查、事务</td><td>范围扫、聚合、降采样</td></tr>
+    <tr><td><b>更新</b></td><td>核心能力</td><td>基本不支持（迟到数据靠写新时间点）</td></tr>
+  </table>
+  <div class="callout">
+    <b>选型第一问：数据带不带时间戳？</b>带 → 时序库（InfluxDB/TDengine/Prometheus）；不带 → 关系型。第二问：<b>要不要多维度灵活聚合？</b>要 → InfluxDB；只要采集+告警+生态 → Prometheus。第三问：<b>数据量是否超单机？</b>超 → 看分布式方案。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>InfluxDB 2.x 架构：bucket、org 与 token</h2></div>
+  <p class="lead">2.x 把 1.x 的"database + retention policy + user"体系换成了"bucket + organization + token"，<b>上手第一件事就是建立这套心智模型</b>。</p>
+  <table>
+    <tr><th style="width:150px">概念</th><th>解释</th></tr>
+    <tr><td><b>Organization（org）</b></td><td>组织/租户单位，所有资源挂在 org 下。多团队用多 org 隔离</td></tr>
+    <tr><td><b>Bucket</b></td><td><b>数据容器 = 1.x 的 database + retention policy 合体</b>。写入和查询都按 bucket 指定，每个 bucket 有自己的保留期</td></tr>
+    <tr><td><b>Token</b></td><td>API 密钥，<b>1.x 的 user/password 在 API 层的替代</b>。有四种权限：operator / all-access / read-write / read。读写分离就发两个 token</td></tr>
+    <tr><td><b>Measurement</b></td><td>类似表名。一个 bucket 内多个 measurement 共存（cpu、mem、disk）</td></tr>
+    <tr><td><b>Series</b></td><td>measurement + tag 集合 + field 的唯一组合。series 数量 = 高基数问题的核心指标（模块 6）</td></tr>
+  </table>
+  <h4>存储引擎 TSM</h4>
+  <ul>
+    <li><b>TSM（Time-Structured Merge Tree）</b>：LSM 树的时序变体。数据先写 <b>WAL</b>（崩溃恢复），再进内存 <b>Cache</b>，满后压缩成不可变的 <b>TSM File</b> 落盘</li>
+    <li>TSM File 内按 series 聚合并压缩：时间戳用 delta-of-delta、浮点用 Gorilla XOR 压缩，<b>压缩比通常 10:1 以上</b></li>
+    <li>后台 compaction 把小 TSM 合并成大 TSM，同 LSM 思路</li>
+    <li><b>TSI（Time Series Index）</b>：1.6+ 引入的倒排式序列索引，替代早期的 in-memory index。<b>它让高基数不再必然炸内存，但也解释了 cardinality 依然关键</b> —— 索引本身也吃磁盘和内存</li>
+  </ul>
+  <pre><span class="c"># bucket 的日常操作（CLI）</span>
+influx bucket create -n sensors -o myorg -r 30d       <span class="c"># 建 bucket，保留 30 天</span>
+influx bucket ls                                       <span class="c"># 列出所有 bucket</span>
+influx bucket update -i &lt;id&gt; -r 7d                       <span class="c"># 改保留期</span>
+
+<span class="c"># token 最小权限实践：采集端只给写 token，看板只给读 token</span>
+influx auth create -o myorg --write-bucket sensors -d "collector-write"
+influx auth create -o myorg --read-bucket sensors -d "grafana-read"
+
+<span class="c"># HTTP API 直接写（生产最常见的路径）</span>
+curl -i -XPOST "http://localhost:8086/api/v2/write?org=myorg&amp;bucket=sensors&amp;precision=ns" \
+  --header "Authorization: Token my-token" \
+  --data-binary "temperature,location=room1 value=22.5 1729161600000000000"</pre>
+  <div class="callout warn">
+    <b>2.x 的认证设计有个大坑：</b>HTTP API <b>必须带 token</b>，且 <span class="k">?org=</span> 参数和 token 里的 org 要对应。新手最常见的 401 不是密码错，是漏了 org 参数或用了 operator token 之外的错误 scope。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>行协议 Line Protocol</h2></div>
+  <p class="lead">InfluxDB 的写入格式只有一种：一行一条数据。<b>格式错了服务端会静默丢数据或报 400，是新手第一大坑。</b></p>
+  <pre><span class="c"># 语法：measurement,tag_key=tag_value field_key=field_value timestamp</span>
+<span class="c">#        逗号分隔 tag    空格分隔 field   空格后是纳秒时间戳（可省略=服务端时间）</span>
+
+<span class="c"># 完整示例</span>
+weather,location=us-midwest,season=summer temperature=82,humidity=71i 1465839830100400200
+
+<span class="c"># 拆解：</span>
+<span class="c"># weather        → measurement（表名）</span>
+<span class="c"># location,season → 两个 tag，逗号分隔，全部是 string</span>
+<span class="c"># temperature=82  → float 字段（不加后缀默认 float）</span>
+<span class="c"># humidity=71i    → 整数字段（i 后缀）</span>
+<span class="c"># 1465839830100400200 → 纳秒时间戳</span>
+
+<span class="c"># 字段类型后缀表</span>
+<span class="c"># 82        float   82i  integer   true  boolean</span>
+<span class="c"># "hello"   string（必须加双引号）   1465839830100400200 本身不带后缀</span>
+
+<span class="c"># 字符串值含空格/逗号/等号必须转义，不能加引号糊弄</span>
+weather,location=us\,midwest msg="hello\ world" 1465839830100400200
+
+<span class="c"># 精度：precision 参数支持 ns / us / ms / s，默认 ns</span>
+curl -XPOST "http://localhost:8086/api/v2/write?org=myorg&amp;bucket=b&amp;precision=ms" --data-binary "..."</pre>
+  <h4>tag 和 field 的区别（1.x 时代叫 tag / field，至今没变）</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>Tag</th><th>Field</th></tr>
+    <tr><td><b>类型</b></td><td>只能是 string</td><td>float / integer / boolean / string</td></tr>
+    <tr><td><b>索引</b></td><td><b>建索引</b>，按 tag 过滤/分组极快</td><td>不建索引，过滤要全扫</td></tr>
+    <tr><td><b>用途</b></td><td>维度：host、region、service、sensor_id</td><td>指标值：temperature、latency、count</td></tr>
+    <tr><td><b>数量</b></td><td>低基数（几十到几千个不同值）</td><td>随意</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>"把 user_id 当 tag" 是 InfluxDB 头号事故。</b>tag 建索引，100 万个 user_id 就是 100 万个 series，TSI 索引和查询性能双爆（模块 6 详述）。<b>判断标准：这个字段的 distinct 值会不会超一万？</b>会 → 放 field；不会 → 放 tag。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Flux 查询语言基础</h2></div>
+  <p class="lead">Flux 是 2.x 的默认查询语言，用管道（<span class="k">|&gt;</span>）把操作串起来。<b>它和 SQL 的思维差别很大：先选数据流，再逐级变换。</b></p>
+  <pre><span class="c"># Flux 的"Hello World"：最近一小时 room1 的温度</span>
+from(bucket: "sensors")
+  |&gt; range(start: -1h)
+  |&gt; filter(fn: (r) =&gt; r._measurement == "weather")
+  |&gt; filter(fn: (r) =&gt; r.location == "room1")
+  |&gt; filter(fn: (r) =&gt; r._field == "temperature")
+  |&gt; yield(name: "mean")
+
+<span class="c"># 五个核心函数</span>
+<span class="c"># from(bucket)      指定数据源</span>
+<span class="c"># range(start/stop) 时间窗口，Flux 里必须显式给！</span>
+<span class="c"># filter(fn)        按 record 过滤（r._measurement / r.tag / r._field）</span>
+<span class="c"># aggregateWindow   按时间窗口聚合（降采样的核心）</span>
+<span class="c"># yield()           输出，可多次 yield 出多张结果表</span>
+
+<span class="c"># 降采样：每 5 分钟一个均值点</span>
+from(bucket: "sensors")
+  |&gt; range(start: -7d)
+  |&gt; filter(fn: (r) =&gt; r._measurement == "weather" and r._field == "temperature")
+  |&gt; aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+
+<span class="c"># 按维度分组统计：每个 location 的小时均值</span>
+from(bucket: "sensors")
+  |&gt; range(start: -24h)
+  |&gt; filter(fn: (r) =&gt; r._measurement == "weather")
+  |&gt; aggregateWindow(every: 1h, fn: mean, column: "_value", timeSrc: "_stop")
+  |&gt; group(columns: ["location"])
+  |&gt; yield(name: "per_location")</pre>
+  <h4>Flux 常用算子速查</h4>
+  <table>
+    <tr><th style="width:200px">算子</th><th>作用</th></tr>
+    <tr><td class="f">aggregateWindow(every, fn)</td><td>时间窗口聚合：mean/sum/max/min/count/last</td></tr>
+    <tr><td class="f">group(columns)</td><td>按列分组，把多 tag 拆成多张结果表</td></tr>
+    <tr><td class="f">map(fn)</td><td>对每行做变换，如单位换算、打标签</td></tr>
+    <tr><td class="f">join()</td><td>关联两个数据流（性能敏感，慎用）</td></tr>
+    <tr><td class="f">pivot()</td><td>行转列：把 _field 变成列名，Grafana 常用</td></tr>
+    <tr><td class="f">sum() / count()</td><td>全局聚合，返回单值</td></tr>
+    <tr><td class="f">top() / bottom()</td><td>取前 N / 后 N，如 CPU 最高的 5 台机器</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>Flux 第一大坑：不写 range()。</b>没有时间边界的 Flux 查询会尝试扫描 bucket 全部历史数据，直接超时或拖垮实例。<b>所有 from() 后面第一件事就是 range()</b>，而且 start 尽量用相对时间（-1h）而不是绝对时间戳。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>保留策略与降采样</h2></div>
+  <p class="lead">时序数据的成本不在写入，在<b>无限期保留</b>。InfluxDB 的答案是多级 bucket + task 自动降采样。</p>
+  <h4>保留策略（Retention）</h4>
+  <table>
+    <tr><th style="width:170px">层级</th><th style="width:220px">典型配置</th><th>用途</th></tr>
+    <tr><td><b>原始 bucket</b></td><td>保留 7~30 天</td><td>明细排查、故障定位</td></tr>
+    <tr><td><b>降采样 bucket</b></td><td>保留 1 年（1 分钟粒度）</td><td>看板趋势、容量规划</td></tr>
+    <tr><td><b>汇总 bucket</b></td><td>保留 5 年+（1 小时粒度）</td><td>年度报表、同比分析</td></tr>
+  </table>
+  <pre><span class="c"># 1.x 保留策略语法（存量系统会见到）</span>
+CREATE RETENTION POLICY "seven_days" ON mydb DURATION 7d REPLICATION 1
+CREATE RETENTION POLICY "one_year" ON mydb DURATION 52w REPLICATION 1 DEFAULT
+
+<span class="c"># 2.x 就是 bucket retention，无需单独概念</span>
+influx bucket create -n metrics_raw -o myorg -r 7d
+influx bucket create -n metrics_1m -o myorg -r 365d
+influx bucket create -n metrics_1h -o myorg -r 1825d</pre>
+  <h4>降采样 Task：Flux 的定时任务</h4>
+  <pre><span class="c"># 把原始数据聚合成 1 分钟粒度，写进降采样 bucket</span>
+<span class="c"># 创建方式：influx task create -f task.flux</span>
+option task = {
+  name: "downsample_1m",
+  every: 1m,
+  offset: 10s
+}
+
+raw = from(bucket: "metrics_raw")
+  |&gt; range(start: -2m)                    <span class="c"># 每 1m 跑一次，处理上两分钟的数据</span>
+  |&gt; filter(fn: (r) =&gt; r._measurement == "cpu")
+
+aggregated = raw
+  |&gt; aggregateWindow(every: 1m, fn: mean)
+  |&gt; map(fn: (r) =&gt; ({ r with _measurement: "cpu_1m" }))
+
+aggregated
+  |&gt; to(bucket: "metrics_1m", org: "myorg")
+
+<span class="c"># 管理 task</span>
+influx task ls
+influx task run retry -i &lt;task-id&gt;          <span class="c"># 补跑历史数据</span>
+influx task log -i &lt;task-id&gt;                <span class="c"># 看执行日志，排查没数据的原因</span></pre>
+  <div class="callout ok">
+    <b>降采样的黄金法则：</b>原始数据保留 ≤30 天，趋势数据 1 年，汇总数据 5 年。<b>一套三级 bucket 能把存储成本压到 1/10</b>。判断某查询要不要建汇总层很简单：如果它每天被看 100 次以上，聚合逻辑就该固化下来，而不是每次查询现算。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>高基数：series cardinality 爆炸</h2></div>
+  <p class="lead">InfluxDB 的一切性能问题，最后几乎都能追溯到 <b>series 数量</b>。这是时序数据库的第一性原理：<b>series 数是内存和索引的硬成本</b>。</p>
+  <h4>什么是 series</h4>
+  <ul>
+    <li><b>series = measurement + tag 集合 + field</b> 的唯一组合。<span class="k">cpu,host=h1 usage=1.0</span> 和 <span class="k">cpu,host=h2 usage=1.0</span> 是两条 series</li>
+    <li>每个 series 在 TSI 索引里有一条记录，<b>series 总数直接决定索引体积</b>。100 万 series 和 100 个 series 的查询开销天差地别</li>
+    <li>官方经验：单 bucket 控制在 <b>百万级 series</b> 以内是舒适区；超过就要开始拆分 bucket 或重新设计 tag</li>
+  </ul>
+  <h4>基数爆炸的标准配方</h4>
+  <table>
+    <tr><th style="width:220px">错误设计</th><th>后果</th></tr>
+    <tr><td class="f">cpu,user_id=100001 usage=55</td><td>100 万用户 = 100 万 series，索引直接爆</td></tr>
+    <tr><td class="f">api,request_id=abc-123 latency=12</td><td>每条请求一个 series，请求量即 series 量</td></tr>
+    <tr><td class="f">sensor,uuid=&lt;随机&gt; temp=22</td><td>设备每次重连换 UUID，series 无限增长</td></tr>
+    <tr><td class="f">log,container_id=&lt;12位哈希&gt; lines=42</td><td>容器重建即新 series，K8s 场景一天几十万</td></tr>
+  </table>
+  <pre><span class="c"># 排查 cardinality：1.x</span>
+SHOW SERIES CARDINALITY
+SHOW CARDINALITY ON mydb                            <span class="c"># 按 measurement 统计</span>
+
+<span class="c"># 2.x：通过 _internal bucket 或 API 看索引统计</span>
+from(bucket: "_internal")
+  |&gt; range(start: -1h)
+  |&gt; filter(fn: (r) =&gt; r._measurement == "boltdb_stats" or r._measurement == "tsm1_engine")
+
+<span class="c"># CLI 方式（2.7 起有 cardinality 子命令族）</span>
+influx v1 cardinality                                <span class="c"># v1 兼容接口的 cardinality 查询</span>
+
+<span class="c"># 自救三板斧</span>
+<span class="c"># 1. 高基数 tag 降级为 field（放弃按它过滤，换查询模式）</span>
+<span class="c"># 2. 高基数 tag 哈希/取模收敛：trace_id → trace_id % 1000 作为 tag</span>
+<span class="c"># 3. 高基数维度不进 InfluxDB：明细进日志系统，指标只留聚合维度</span></pre>
+  <div class="callout danger">
+    <b>一个真实的性能曲线：</b>10 万 series 时查询 10ms；100 万 series 时同样查询变 500ms+；1000 万 series 时索引开始疯狂吃内存，实例随时可能 OOM。<b>cardinality 不是"以后再说"的问题，是 schema 设计第一天就定死的问题</b> —— 改 schema 要迁历史数据。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>1.x 与 2.x 的差异</h2></div>
+  <p class="lead">两代产品数据模型和 API 完全不兼容，但 1.8 提供兼容层。<b>国内大量存量系统还在 1.x，迁移方案必须懂。</b></p>
+  <table>
+    <tr><th style="width:160px">概念</th><th style="width:230px">1.x</th><th>2.x</th></tr>
+    <tr><td><b>数据容器</b></td><td>database + retention policy（RP 是 database 内的子概念）</td><td><b>bucket</b>（RP 合并进 bucket 的 retention 设置）</td></tr>
+    <tr><td><b>查询语言</b></td><td>InfluxQL（类 SQL）为主，1.8 起支持 Flux</td><td><b>Flux</b> 为主（UI 默认），InfluxQL 通过 dbrp 映射保留</td></tr>
+    <tr><td><b>认证</b></td><td>user/password，写权限按 database</td><td><b>organization + token</b>（API key），权限按 bucket scope</td></tr>
+    <tr><td><b>管理界面</b></td><td>仅数据浏览，配置靠 HTTP API / influxd 命令</td><td>完整 UI：bucket、token、task、dashboard、alert 全可视化</td></tr>
+    <tr><td><b>客户端</b></td><td>influxdb-java / go 等语言 client</td><td>influxdb-client-*（新 SDK）+ v1 兼容 API</td></tr>
+    <tr><td><b>订阅</b></td><td>Kapacitor 链路</td><td>task + checks + notification endpoints（内置）</td></tr>
+  </table>
+  <h4>InfluxQL vs Flux 同一查询</h4>
+  <pre><span class="c"># InfluxQL（1.x，类 SQL 思维）</span>
+SELECT mean("value") FROM "cpu" WHERE "host" = 'h1' AND time &gt; now() - 1h GROUP BY time(5m)
+
+<span class="c"># Flux（2.x，管道思维）</span>
+from(bucket: "mydb/autogen")
+  |&gt; range(start: -1h)
+  |&gt; filter(fn: (r) =&gt; r._measurement == "cpu" and r.host == "h1")
+  |&gt; aggregateWindow(every: 5m, fn: mean)</pre>
+  <h4>迁移路径（1.8 → 2.x 不停机）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>1.8 作为跳板</b>：升级存量到 1.8（同时支持 InfluxQL 和 Flux，客户端无感）</div></div>
+    <div class="step"><div class="txt"><b>双写</b>：采集端同时写 1.8 和新 2.x，校验数据一致性（重点核对时间戳精度和字段类型）</div></div>
+    <div class="step"><div class="txt"><b>建 dbrp 映射</b>：2.x 上执行 <span class="k">influx v1 dbrp create</span>，把 bucket 映射成 1.x 的 database+RP，老客户端直连 2.x</div></div>
+    <div class="step"><div class="txt"><b>切流量</b>：读流量先切 Grafana datasource，写流量灰度切采集端，1.8 缩容为备份</div></div>
+  </div>
+  <pre><span class="c"># dbrp：让 InfluxQL 老客户端无缝访问 2.x 的关键映射</span>
+influx v1 dbrp create \
+  --db mydb --rp autogen \
+  --bucket-id &lt;bucket-uuid&gt; \
+  --org myorg --token my-token
+
+<span class="c"># 老客户端配置不变，把 URL 从 1.8:8086 指向 2.x:8086 即可</span>
+<span class="c"># url = "http://influxdb2:8086"  database = "mydb"  retention-policy = "autogen"</span></pre>
+  <div class="callout warn">
+    <b>新装默认 2.x，但 2.x OSS 有几个缩水要知道：</b>① 不支持集群（多节点高可用只有 InfluxDB Enterprise / Cloud 有）；② 无内置 RBAC 细粒度（token 是粗粒度 scope）；③ 部分 2.x 早期 bug 在 2.7.x 才稳定。<b>单机百万 series 以内，OSS 完全够用</b>；要集群就评估 TDengine、VictoriaMetrics 或商业版。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>与 Prometheus 的选型对比</h2></div>
+  <p class="lead">两个都是监控时序库，但设计哲学几乎相反：<b>Prometheus 是 pull + 拉取生态，InfluxDB 是 push + 通用存储</b>。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:240px">Prometheus</th><th>InfluxDB</th></tr>
+    <tr><td><b>采集模型</b></td><td><b>Pull 拉取</b>：定期 scrape 目标 /metrics，服务发现驱动</td><td><b>Push 推送</b>：Telegraf / 客户端主动写，网关设备友好</td></tr>
+    <tr><td><b>查询语言</b></td><td>PromQL（函数式，为告警规则设计）</td><td>Flux / InfluxQL（通用分析导向）</td></tr>
+    <tr><td><b>数据模型</b></td><td>metric + label（与 tag 同义），同样受高基数困扰</td><td>measurement + tag + field</td></tr>
+    <tr><td><b>存储</b></td><td>本地 TSDB（WAL + block），单机 2 周典型保留</td><td>TSM 引擎，保留策略灵活（bucket 级）</td></tr>
+    <tr><td><b>水平扩展</b></td><td>OSS 单机；扩展靠 Thanos / Cortex / VictoriaMetrics</td><td>OSS 单机；扩展靠 Enterprise 集群</td></tr>
+    <tr><td><b>告警</b></td><td><b>原生 PromQL 告警规则 + Alertmanager</b>，生态最成熟</td><td>checks + notification（2.x），或 Kapacitor</td></tr>
+    <tr><td><b>生态位</b></td><td>K8s / 云原生监控事实标准</td><td>IoT / DevOps / 业务指标通用指标库</td></tr>
+  </table>
+  <h4>选型决策树</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>跑在 K8s 上、要 Pod 自动发现、要现成告警</b> → Prometheus（+ Alertmanager + Grafana），这是云原生默认答案</div></div>
+    <div class="step"><div class="txt"><b>设备在 NAT 后、防火墙内、只能主动上报</b> → InfluxDB push 模型天然合适，Prometheus pull 得改 Pushgateway（不推荐）</div></div>
+    <div class="step"><div class="txt"><b>指标要长期保留 + 多级降采样 + 业务维度关联分析</b> → InfluxDB（Flux 的 join/pivot 比 PromQL 灵活）</div></div>
+    <div class="step"><div class="txt"><b>高基数是大头（百万 label 组合）</b> → 两个都危险，认真做 schema 收敛，或评估 VictoriaMetrics（对高基数更友好）</div></div>
+    <div class="step"><div class="txt"><b>已有 Prometheus 想要长期存储</b> → remote_write 到 Thanos/VictoriaMetrics/InfluxDB，不要推倒重来</div></div>
+  </div>
+  <pre><span class="c"># 混合架构常见姿势：Prometheus 负责实时告警，InfluxDB 负责长期归档</span>
+<span class="c"># prometheus.yml</span>
+remote_write:
+  - url: "http://influxdb:8086/api/v1/prom/write?org=myorg&amp;bucket=metrics"
+    bearer_token: my-token
+<span class="c"># Prometheus 的数据按 /api/v1/prom/write 兼容协议直接进 InfluxDB bucket</span>
+<span class="c"># 注意：prometheus 的 __name__ 变成 measurement，label 变 tag —— cardinality 原样搬过来</span></pre>
+  <div class="callout ok">
+    <b>一句话选型：</b>云原生 K8s 监控选 <b>Prometheus</b>（拉取 + 告警 + 服务发现是降维打击）；IoT / 业务指标 / 长期分析选 <b>InfluxDB</b>（推送 + 灵活保留 + Flux 分析）；大规模高基数两个 OSS 都别硬扛，上 VictoriaMetrics 或商业方案。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把高基数 ID 当 tag（user_id、trace_id、UUID）</div><div class="pd">series 数量随用户量线性爆炸，TSI 索引膨胀、查询变慢、实例 OOM。判断标准：distinct 值会不会超一万。会 → 放 field 或收敛精度。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">Flux 查询不写 range()</div><div class="pd">没有时间边界 = 扫描 bucket 全部历史，查询超时或拖垮实例。from() 后第一件事永远是 range(start: -1h) 这类相对窗口。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">bucket 不设保留期，数据无限增长</div><div class="pd">磁盘早晚写满，且查询时间范围越大越慢。原始 7~30 天 + 降采样 1 年 + 汇总 5 年，三级 bucket 是标准解法。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">时间戳精度混乱</div><div class="pd">客户端发毫秒、服务端按纳秒解释，数据落到 1970 年或查询永远 range 不到。统一 precision 参数，行协议时间戳自己算好。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">field 类型后期变更</div><div class="pd">同一 measurement 的同一 field，昨天是 float 今天是 string，InfluxDB 直接报 field type conflict，写入失败。schema 一开始就定死。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">所有服务共用一个 all-access token</div><div class="pd">采集端拿到全权 token，误操作能删 bucket。采集端发 write-scope token，看板发 read-scope token，按最小权限拆。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">1.x 迁 2.x 直接停机切换</div><div class="pd">数据模型不兼容，客户端 SDK 不兼容，直接切必然大面积报错。走 1.8 双写 + dbrp 映射的灰度路径。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">降采样 task 的 every 和 range 不匹配</div><div class="pd">task 每 1m 跑但 range 只取 -30s，边界数据被反复漏采；或窗口重叠导致重复点。every 和 range 留重叠余量，range 覆盖上一个周期。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 InfluxDB 当日志/事件存储</div><div class="pd">每条请求写一行带十几个 field 的明细，写入吞吐直接崩。明细进日志系统（ES/Loki），InfluxDB 只放聚合后的指标。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">小批量高频 HTTP 写入</div><div class="pd">每条数据一个 POST，HTTP 开销主导，吞吐上不去。攒批 5000 行 / 5~10MB 一次，或上 Telegraf 自动攒批 + gzip。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 集群查询越来越慢、内存持续上涨，最可能的根因是？</div>
+      <button class="opt">磁盘 IO 打满</button>
+      <button class="opt">tag 用了高基数 ID（如 user_id），series cardinality 爆炸</button>
+      <button class="opt">bucket 保留期设得太短</button>
+      <div class="ans">正确答案：<b>高基数 tag 导致 series 爆炸</b>。series = measurement + tag 集合 + field 的唯一组合，每个 series 都在 TSI 索引里有记录。100 万 series 和 100 个 series 的查询开销差几个量级，且索引常驻内存。保留期太短只会省内存，不会让查询变慢。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 下面哪行是合法的 Line Protocol？</div>
+      <button class="opt">cpu host=h1 usage=55.0 1729161600</button>
+      <button class="opt">cpu,host=h1 usage=55.0 1729161600</button>
+      <button class="opt">cpu,host=h1,usage=55.0 1729161600</button>
+      <div class="ans">正确答案：<b>cpu,host=h1 usage=55.0 1729161600</b>。tag 在 measurement 后用逗号连接且必须是 string，field 用空格分隔，时间戳可省略（默认服务端纳秒时间）。usage=55.0 是 field 不是 tag，不能放在逗号段里。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. Flux 查询的正确起手式是？</div>
+      <button class="opt">from(bucket: "b") |&gt; range(start: -1h) |&gt; filter(...)</button>
+      <button class="opt">from(bucket: "b") |&gt; filter(...) |&gt; range(start: -1h)</button>
+      <button class="opt">先 filter 全表再 range，逻辑一样</button>
+      <div class="ans">正确答案：<b>from 后立即 range</b>。range 给数据流加时间边界，Flux 引擎据此裁剪要读的 TSM block。顺序写反虽然语法合法，但过滤在全量数据上做，性能差一个量级；完全不给 range 会扫描全部历史直接超时。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. InfluxDB 2.x 的 bucket 相当于 1.x 的什么？</div>
+      <button class="opt">只相当于 database</button>
+      <button class="opt">database + retention policy 的合体</button>
+      <button class="opt">只相当于 retention policy</button>
+      <div class="ans">正确答案：<b>database + RP 合体</b>。1.x 里一个 database 下挂多个 RP 分别设保留期；2.x 取消 RP 概念，保留期直接是 bucket 的属性。需要不同保留期的数据就建多个 bucket，而不是一个 bucket 多个 RP。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. tag 和 field 的核心区别是？</div>
+      <button class="opt">tag 存数字，field 存字符串</button>
+      <button class="opt">没有区别，只是写法不同</button>
+      <button class="opt">tag 建索引、按它过滤分组快、只限 string；field 是值本身、不建索引、支持多类型</button>
+      <div class="ans">正确答案：<b>tag 建索引且只能是 string</b>。按 tag 过滤/分组走 TSI 索引，百万 series 内毫秒级；field 过滤要扫数据。所以维度放 tag、指标值放 field，且 tag 必须低基数 —— 高基数放 tag 就是 series 爆炸。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 与 Prometheus 相比，InfluxDB 的典型优势场景是？</div>
+      <button class="opt">设备在 NAT/防火墙后只能主动上报、或需要长期保留和多级降采样</button>
+      <button class="opt">K8s Pod 自动服务发现和告警规则</button>
+      <button class="opt">Pull 模型和 /metrics 端点生态</button>
+      <div class="ans">正确答案：<b>推送模型 + 灵活保留</b>。Prometheus 是 pull + 服务发现 + Alertmanager，K8s 场景是事实标准；InfluxDB 的 push 模型对 NAT 后设备友好，bucket retention + Flux task 降采样适合长期指标归档。高基数场景两个 OSS 都要收敛 schema。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>influx bucket create -n b -o org -r 7d</code><span class="desc">建 bucket 并设保留期</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influx write -b b -o org -p s "m,t=v f=1"</code><span class="desc">CLI 写一行行协议数据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influx query 'from(bucket:"b") |&gt; range(start: -1h)'</code><span class="desc">CLI 直接跑 Flux</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2/write?org=&amp;bucket=&amp;precision=</code><span class="desc">HTTP 写入端点，必须带 token</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /api/v2/query</code><span class="desc">HTTP 查询端点，body 是 Flux + Accept: csv</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influx auth create --read-bucket b --write-bucket b</code><span class="desc">建最小权限 token</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influx task create -f task.flux</code><span class="desc">建降采样定时任务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influx task log -i &lt;id&gt;</code><span class="desc">看 task 执行日志，排查没数据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influx v1 dbrp create --db d --rp autogen --bucket-id id</code><span class="desc">1.x 客户端兼容映射</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW SERIES CARDINALITY</code><span class="desc">1.x 查 series 基数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>from(bucket:"_internal") |&gt; range(start: -1h)</code><span class="desc">2.x 看内部运行指标</span><button class="copy">复制</button></div>
+    <div class="crow"><code>influxd inspect report-logs</code><span class="desc">诊断日志，官方排障入口</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置与 schema 检查清单</h3>
+  <pre><span class="c"># influxd 配置（config.yaml）里最该盯的</span>
+query-concurrency: 0               <span class="c"># 0 = 按 CPU 核数自动，默认即可</span>
+query-memory-bytes: 0              <span class="c"># 单查询内存上限，0 = 不限（生产建议设上限）</span>
+storage-cache-max-memory-size: 1GB <span class="c"># WAL cache 上限</span>
+storage-cache-snapshot-memory-size: 25MB
+compact-full-write-cold-duration: 4h   <span class="c"># 冷 bucket 全量压缩间隔</span>
+
+<span class="c"># schema 设计检查清单（上线前逐条过）</span>
+<span class="c"># 1. 每个 tag 的 distinct 值估算过吗？（红线：单 tag 不超 1 万）</span>
+<span class="c"># 2. measurement 划分粒度合理吗？（一台设备一个 measurement = 反模式）</span>
+<span class="c"># 3. field 类型定死了吗？会变更的字段放进 metadata 而不是 value</span>
+<span class="c"># 4. 三级 bucket（原始/1m/1h）建好了吗？降采样 task 跑起来了吗？</span>
+<span class="c"># 5. 采集端攒批 + gzip 开了吗？时间戳精度统一了吗？</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>时序数据</b></td><td>带时间戳、按时间追加、写多读少的指标类数据</td></tr>
+    <tr><td><b>Series 序列</b></td><td>measurement + tag 集合 + field 的唯一组合，cardinality 的计量单位</td></tr>
+    <tr><td><b>Series Cardinality</b></td><td>series 总数，直接决定索引内存和查询性能的第一指标</td></tr>
+    <tr><td><b>TSM</b></td><td>Time-Structured Merge Tree，InfluxDB 的 LSM 变体存储引擎</td></tr>
+    <tr><td><b>TSI</b></td><td>Time Series Index，1.6+ 的序列倒排索引，替代早期 in-memory 索引</td></tr>
+    <tr><td><b>WAL</b></td><td>预写日志，崩溃恢复用，落盘后数据才进 cache</td></tr>
+    <tr><td><b>Bucket</b></td><td>2.x 的数据容器 = 1.x 的 database + retention policy</td></tr>
+    <tr><td><b>Organization</b></td><td>2.x 的组织/租户单位，资源隔离边界</td></tr>
+    <tr><td><b>Token</b></td><td>2.x 的 API 密钥，权限按 bucket scope 细分（read/write/all-access）</td></tr>
+    <tr><td><b>Measurement</b></td><td>类似表名的数据分组，如 cpu、mem</td></tr>
+    <tr><td><b>Tag</b></td><td>索引化的 string 维度，必须低基数，过滤分组都靠它</td></tr>
+    <tr><td><b>Field</b></td><td>指标值本身，不建索引，支持 float/int/bool/string</td></tr>
+    <tr><td><b>Line Protocol</b></td><td>行协议：measurement,tags fields timestamp 的文本写入格式</td></tr>
+    <tr><td><b>Retention Policy</b></td><td>保留策略，1.x 概念，2.x 并入 bucket 的 retention 属性</td></tr>
+    <tr><td><b>Downsampling</b></td><td>降采样：按窗口预聚合成粗粒度数据长期保留</td></tr>
+    <tr><td><b>Flux</b></td><td>2.x 默认查询语言，管道式（|&gt;）数据流变换</td></tr>
+    <tr><td><b>InfluxQL</b></td><td>1.x 查询语言，类 SQL，1.8/2.x 通过 dbrp 兼容</td></tr>
+    <tr><td><b>Task</b></td><td>Flux 定时任务，用于降采样、清洗、告警检查</td></tr>
+    <tr><td><b>Telegraf</b></td><td>官方采集 agent，插件式 input/output，自动攒批</td></tr>
+    <tr><td><b>dbrp</b></td><td>database-retention-policy 映射，2.x 兼容 1.x 客户端的机制</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 InfluxDB 2.7，完成这五件事 —— ① 用行协议写三台机器的 cpu 数据（host 做 tag），在 UI 里用 Flux 查最近一小时；② 建 raw/1m/1h 三个 bucket，写一个降采样 task 并验证数据流转；③ 故意写一个 user_id tag 灌 10 万 series，对比查询耗时，再改写成 field 重测；④ 建一个 write-scope 和一个 read-scope token，分别用 curl 验证权限差异；⑤ 如果有 1.8 环境，配一次 dbrp 映射让老客户端直连 2.x。<br><br>
+    <b>之后值得单独学：</b>Telegraf 插件体系与采集架构、Grafana 变量与 Flux 模板化、InfluxDB Enterprise 集群版、以及高基数场景下的 VictoriaMetrics 备选方案。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 InfluxDB · 上线前务必检查：tag 基数、bucket 保留期、查询都带 range()</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 6（高基数）和模块 8（与 Prometheus 选型）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 influx CLI 或 UI 里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 InfluxDB 跟着敲：docker run -d -p 8086:8086 influxdb:2.7';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

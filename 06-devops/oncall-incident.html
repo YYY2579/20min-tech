@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 on-call 与故障管理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 on-call 与故障管理</h1>
+    <p class="sub">技术能力决定你<b>能不能修好</b>，on-call 体系决定你<b>多快止损、多快恢复、会不会再犯</b>。这篇讲排班设计、SEV 分级、响应流程、MTTR 度量、无责复盘，以及四个公开大厂故障的教训。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>SEV1-4</b> 分级响应</span>
+      <span class="chip"><b>4</b> 个真实故障案例</span>
+      <span class="chip"><b>10</b> 个组织坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议对着你团队的排班表读：本周轮到你，先看模块 3 和模块 5</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一次完整值班长什么样</h2></div>
+  <pre><span class="c"># 一次 SEV2 的真实时间线（PagerDuty 类工具）</span>
+02:17  告警触发：api 5xx 率 &gt; 5%，持续 3 分钟
+02:19  primary ack（2 分钟，达标）→ 拉桥接会议 + 通知 secondary 旁听
+02:22  初步判断：上游支付回调大面积超时，影响下单（SEV2）
+02:25  状态页公告："支付功能部分受损，工程师处理中"（首次通报）
+02:38  定位：某依赖方证书轮换后我方未刷新连接池，旧连接全挂
+02:41  止损：摘除故障连接池 + 重启 12 个 Pod，5xx 开始回落
+02:55  服务恢复，更新状态页
+09:30  交接：写初步时间线进事故文档
+次日    无责复盘 → 3 个 action item（证书自动刷新、连接池重试、监控补盲）</pre>
+  <p>注意三个被制度固定下来的动作：<b>ack 有时限</b>（没人认领的告警会自动升级）、<b>通报有时限</b>（SEV2 起 5 分钟内必须告知受影响方）、<b>复盘有时限</b>（48 小时内启动）。这三条时限就是 on-call 制度的骨架，后面模块逐一展开。</p>
+  <div class="callout warn">
+    <b>边界说明：</b>同目录 <span class="k">sre-practice.html</span> 讲 SLO/错误预算/SLI 设计，本篇讲<b>人与流程</b>；监控告警怎么配看 <span class="k">prometheus.html</span>，本篇假设告警已经存在、研究它怎么被响应。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>on-call 制度设计：排班是一门科学</h2></div>
+  <h3>轮值模型：primary + secondary</h3>
+  <p>每个时段<b>两个人</b>在责任链上：<b>primary</b>（主响应，拿 pager）和 <b>secondary</b>（备份，primary 失联或超时未 ack 时接手）。这不是冗余浪费 —— 一个人在高铁上、手机没电、睡死过去，任何一个都比"反正他会处理"便宜一万倍。</p>
+  <table>
+    <tr><th style="width:170px">参数</th><th>业界常见实践</th></tr>
+    <tr><td><b>轮换周期</b></td><td>一周。短了上下文建立成本高，长了 burnout 风险大</td></tr>
+    <tr><td><b>团队规模</b></td><td>至少 6 人才能做到"每 6 周值一次"；少于 4 人应考虑团队合并或减少服务</td></tr>
+    <tr><td><b>跟随期</b></td><td>新人前两轮做 shadow（跟着 primary 但不担责），第三轮才独立上</td></tr>
+    <tr><td><b>交接</b></td><td>书面交接：未闭环事故、进行中变更、已知定时任务、临时配置</td></tr>
+  </table>
+  <h3>被反复验证的设计原则</h3>
+  <ul>
+    <li><b>on-call 是所有人的义务，不是"谁闲谁上"</b>。只让愿意的人上，半年内这拨人就会流失；只让新手练手，服务质量没有底线。</li>
+    <li><b>补偿要显式</b>：夜间唤醒按次计加班/调休，值班日安排后续补休。隐形的"奉献"不可持续，倦怠（burnout）是 on-call 团队第一大流失原因。</li>
+    <li><b>禁止单人长期背锅</b>：连续被同一服务吵醒的人，要给他授权和预算去消噪 —— 告警降噪是 primary 的职责，不是额外负担。</li>
+    <li><b>值班文档先行</b>：排班表、escalation policy、runbook 索引放在显眼处。凌晨 3 点找不到人的 escalation 电话等于没有。</li>
+  </ul>
+  <div class="callout danger">
+    <b>反模式：</b>"他很熟这个系统，让他一直值"。结果是他休假时没人能接，系统知识锁在一个人的脑子里。<b>bus factor = 1 的服务不该上线</b>。轮换本身就是知识扩散机制。
+  </div>
+  <h3>排班与交接的落地形态</h3>
+  <pre><span class="c"># 一张最小可用排班表（6 人团队，周轮换）</span>
+周次   primary   secondary   shadow（新人）
+W23   张伟       李娜        王晨
+W24   李娜       王晨        张伟
+W25   王晨       张伟        李娜
+
+<span class="c"># 交接清单（每周一交给下一棒，缺一项不交班）</span>
+1. 未闭环事故：进行中的 + 本周新开的 + action item 到期日
+2. 计划内变更：本周要发的版本、维护窗口、定时任务
+3. 已知问题：带病运行的模块、临时兜底开关、降级配置
+4. 待办跟进：等外部依赖回复的事项、待验证的修复</pre>
+  <p>交接清单的价值在<b>第三周才开始显现</b>：primary 会越来越少地收到"上个班埋的雷"。工具上 PagerDuty/OpsGenie/飞书值班都支持排班与自动升级，自研也可以很薄 —— <b>真正难的是让交接内容具体</b>，"一切正常"四个字等于没交接。</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>SEV 分级与响应时限</h2></div>
+  <p>分级的目的是<b>让每个人在 10 秒内知道该用多大力气</b>。分级看影响面，不看技术原因 —— 根因再复杂，用户没感知就是低级别；根因是空格打错，全站挂了也是 SEV1。</p>
+  <table>
+    <tr><th style="width:86px">级别</th><th style="width:220px">定义</th><th style="width:150px">响应要求</th><th>升级与通报</th></tr>
+    <tr><td><b>SEV1</b></td><td>核心业务全站不可用，或数据丢失/资损风险</td><td>5 分钟内 ack，立即建 bridge</td><td>15 分钟未恢复升级到总监/VP，状态页通报</td></tr>
+    <tr><td><b>SEV2</b></td><td>核心功能受损，或大比例用户受影响</td><td>15 分钟内 ack，建 bridge</td><td>30 分钟未定位升级；5 分钟内首次通报</td></tr>
+    <tr><td><b>SEV3</b></td><td>非核心功能受损，有 workaround</td><td>30 分钟内 ack，单人处理</td><td>当班解决不了升级 SEV2 评审</td></tr>
+    <tr><td><b>SEV4</b></td><td>体验问题、提示不清、外观缺陷</td><td>工作时间处理，<b>不 paging</b></td><td>进 backlog，不打扰任何人</td></tr>
+  </table>
+  <h3>告警等级 → 动作的映射</h3>
+  <ul>
+    <li><b>page（打电话/强推）</b>：只留给 SEV1/SEV2 且需要人立刻介入的。非工作时间只有 SEV1/2 能 page。</li>
+    <li><b>ticket/邮件/IM</b>：SEV3/4 走异步通道，上班再看。</li>
+    <li><b>升级路径（escalation policy）</b>：5 分钟未 ack → secondary；10 分钟 → 团队 TL；30 分钟 → 部门负责人。<b>未 ack 不是失联证明，只是该叫下一个人了</b>。</li>
+  </ul>
+  <div class="callout warn">
+    <b>分级最大的敌人是"就高不就低"的人情 SEV。</b>怕担责就报 SEV1，一周之后全员对 SEV1 脱敏，真事故来了也没人跑。纠偏机制：复盘时回看分级是否准确，报高了不批评但要在文档里记一笔，让数据说话。
+  </div>
+  <h3>定级时的三个判断题（30 秒内完成）</h3>
+  <ol>
+    <li><b>收入/数据在流血吗？</b>（资损、数据丢失、核心交易中断）→ 是即 SEV1，不用再看第二题</li>
+    <li><b>有 workaround 吗？</b>用户能否换路径完成核心任务？能 → 最多 SEV2，不能 → SEV1/2 看影响比例</li>
+    <li><b>影响比例与时窗？</b>夜间低峰期 5% 用户受影响，多数团队定 SEV2/3；同样的比例发生在白天大促就是 SEV1。<b>级别 = 影响 × 时窗，不是根因严重度</b></li>
+  </ol>
+  <p>定级与<b>错误预算</b>联动（详见 sre-practice.html）：一次 SEV1 通常意味着当月 SLO 预算已经烧穿，后续变更要收紧，团队有理由暂停需求先还技术债 —— 这是分级制度从"响应工具"升级为"优先级武器"的关键一步。</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>响应流程：从告警到止损的标准链路</h2></div>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>ack 并计时：</b>ack 的意义是"我接单了"，响应时钟从此刻开始。ack 不等于在修，只是责任人上线</div></div>
+    <div class="step"><div class="txt"><b>评估定级：</b>10 秒回答三个问题 —— 影响哪些业务？多少用户？还在恶化吗？定 SEV 并决定要不要拉人</div></div>
+    <div class="step"><div class="txt"><b>先沟通后动手：</b>SEV1/2 立即拉 bridge + 状态页通报。别在动手前浪费 10 分钟，也别修了 20 分钟客户还蒙在鼓里</div></div>
+    <div class="step"><div class="txt"><b>止损优先：</b>回滚、摘流、降级、扩容 —— 先用最小代价止住恶化，根因定位可以慢慢来。<b>恢复是目标，归因是复盘的目标</b></div></div>
+    <div class="step"><div class="txt"><b>一次只改一个变量：</b>每一步操作记进事故日志。同时改三处然后恢复了，你永远不知道是哪处起效、哪处埋雷</div></div>
+    <div class="step"><div class="txt"><b>验证与观察：</b>恢复后用监控确认指标回落，观察 15-30 分钟防反复，再宣布关闭</div></div>
+    <div class="step"><div class="txt"><b>升级不丢人：</b>超过升级时限就叫援手。硬扛 4 小时才叫人，是值班文化里最贵的坏习惯</div></div>
+  </div>
+  <h3>IC：大事故需要一个"不修代码的人"</h3>
+  <p>SEV1 中所有人本能地去修东西，于是没人看全局、没人同步信息。引入 <b>Incident Commander</b>：他<b>不碰键盘修系统</b>，只做三件事 —— 分配任务、维护时间线、控制沟通节奏（每 30 分钟向 bridge 同步一次状态）。值班经验少的人也可以当好 IC，这反而让新人快速建立系统全景视角。</p>
+  <div class="callout ok">
+    <b>止损三板斧（按代价从小到大）：</b>① <b>回滚</b> —— 最近有变更就先回滚，一半以上的故障是变更引起的；② <b>降级/摘流</b> —— 关非核心功能、把故障实例摘出负载；③ <b>扩容/重启</b> —— 资源型问题的临时缓解。三板斧都无效再进定位阶段，同时升级。
+  </div>
+  <h3>SEV1 现场的四个角色</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>IC（指挥官）</div><div class="cd">不碰键盘。分配任务、维护时间线、拍板止损动作。一个人只能有一个 IC，且不兼任动手角色。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>Scribe（记录员）</div><div class="cd">专职记录时间线与决策。复盘质量的上限由记录决定 —— 没人记得 40 分钟前谁改了什么。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>Ops（操作员）</div><div class="cd">执行止损与修复，只接 IC 分配的具体任务，不自行扩大战场。每次操作前报备。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>Comms（沟通）</div><div class="cd">对内同步、对外状态页、通知客服与受影响业务方。把 IC 从复制粘贴里解放出来。</div></div>
+  </div>
+  <p>小事故（SEV2 以下）一个人身兼多职很正常，但<b>IC 和动手的人必须分开</b>这条底线不能破 —— 否则一定会出现"全组修了 20 分钟，没人同步进展"的经典场面。</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>MTTR / MTBF：度量与告警疲劳</h2></div>
+  <p>"恢复要多久"是个被滥用的词，先拆开：</p>
+  <table>
+    <tr><th style="width:130px">指标</th><th style="width:250px">度量区间</th><th>优化手段</th></tr>
+    <tr><td><b>MTTA</b></td><td>告警触发 → 人 ack</td><td>合理分级、escalation policy、告警信噪比</td></tr>
+    <tr><td><b>MTTI</b></td><td>故障发生 → 团队意识到</td><td>监控覆盖、合成拨测、更快更准的告警规则</td></tr>
+    <tr><td><b>MTTR</b></td><td>定位 → 恢复（口径最混乱，见下）</td><td>runbook、一键止损、预案演练</td></tr>
+    <tr><td><b>MTBF</b></td><td>两次故障之间的平均间隔</td><td>变更管控、混沌工程、容量治理</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>MTTR 口径陷阱：</b>同一个缩写被四种团队理解成四种东西 —— Mean Time To <b>Reply</b>（响应）/ <b>Repair</b>（修复）/ <b>Recover</b>（恢复）/ <b>Resolve</b>（关闭事故单）。对外汇报前先对齐口径，否则"我们 MTTR 20 分钟"在不同 PPT 里能差出一小时。工程上建议<b>分别报 MTTA 和 MTTF→恢复时间</b>，不混用。
+  </div>
+  <h3>on-call 健康度指标（比 MTTR 更该看的）</h3>
+  <ul>
+    <li><b>页内唤醒次数</b>：每周 &gt; 2 次就危险，每周 &gt; 5 次该停接新需求先消噪。人不是 7×24 系统。</li>
+    <li><b>非工作时间告警占比</b>：&gt; 30% 说明分级和阈值有问题，大量 SEV3 在深夜被当成 page 发出。</li>
+    <li><b>ack 时间分布</b>：P50/P95 双看，P95 差说明值班覆盖有盲区（有人在睡觉，有人在通勤）。</li>
+    <li><b>误报率（noise ratio）</b>：ack 后 15 分钟内自愈或无需处理的告警比例，&gt; 20% 就该下线的规则立刻下线。</li>
+  </ul>
+  <div class="callout warn">
+    <b>告警疲劳的死亡螺旋：</b>告警多 → 人开始无视 → 漏掉真告警 → 故障拖长 → 更多告警。破局点只有一个：<b>把"删除/静默一条告警"当正经工作排进 sprint</b>，并规定"任何规则连续误报 3 次，owner 必须整改"。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>应急工具包：runbook、预案与沟通</h2></div>
+  <h3>runbook 的五要素</h3>
+  <p>好的 runbook 是凌晨 3 点能照着执行的，五要素缺一不可：</p>
+  <ol>
+    <li><b>症状与影响面</b>：看到什么告警/现象，影响谁 —— 用来确认"是不是这篇"</li>
+    <li><b>第一步</b>：永远是一个具体的、低风险的命令或检查（"kubectl get pods -n x"），不是一个判断题</li>
+    <li><b>常见根因分支</b>：按历史频率排序，每个根因配"确认方法 → 处置动作"</li>
+    <li><b>止损优先通道</b>：先回滚/降级/摘流，再排查 —— 明确写出"不确定就先做 X"</li>
+    <li><b>升级路径</b>：谁、什么电话、什么时候必须升级</li>
+  </ol>
+  <pre><span class="c"># runbook 模板示例（支付回调超时）</span>
+<span class="b">症状</span>：告警 pay-callback-timeout；用户表现 = 下单后 10 分钟无结果
+<span class="b">第一步</span>：kubectl -n pay logs -l app=pay --tail=50 | grep -i timeout
+<span class="b">分支 A（最常见，60%）</span>：上游证书过期 → 处置：刷新 secret + rollout restart
+<span class="b">分支 B</span>：连接池耗尽 → 处置：扩容 2 副本 + 观察 GC
+<span class="b">止损</span>：不确定就先重启 pay  Deployment（无状态，秒级恢复）
+<span class="b">升级</span>：20 分钟未恢复 → 呼 TL（值班表有电话）</pre>
+  <h3>预案与降级开关</h3>
+  <p>把"应急动作"变成产品能力，而不是临场聪明：<b>feature flag 降级</b>（一键关推荐/关评论）、<b>限流与排队</b>（保核心接口）、<b>只读模式</b>（写挂了保读）、<b>静态兜底页</b>。这些开关要在<b>平时</b>就建设好，并每季度 game day 演练一次 —— 没演练过的预案约等于不存在。</p>
+  <h3>沟通模板</h3>
+  <div class="cmds">
+    <div class="crow"><code>【SEV2】支付功能受损 · 影响：15% 下单失败 · 状态：定位中 · 下次同步：30 分钟内</code><span class="desc">bridge 里每 30 分钟一条，没进展也说"仍在定位"</span><button class="copy">复制</button></div>
+    <div class="crow"><code>状态页：我们正在处理支付相关问题，部分用户下单可能失败，您的资金安全不受影响。</code><span class="desc">对外只讲影响和安抚，不讲内部根因</span><button class="copy">复制</button></div>
+    <div class="crow"><code>已恢复：支付功能已恢复，此前失败的订单可重新提交。我们将发布故障复盘。</code><span class="desc">恢复通报 + 复盘承诺，收口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>升级：SEV1，影响全站下单，已升级至 XX（TL），预计 15 分钟内给出下一步结论。</code><span class="desc">升级时同步：谁接手、为什么升级、下一次同步时间</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>沟通纪律三条：</b>① <b>没进展也要同步</b>，"仍在定位"是合法状态，沉默不是；② <b>时间用 UTC 或明确时区</b>，跨区团队的时间线不允许出现"凌晨"这种相对词；③ <b>对外的每句话都假设会被截图传播</b> —— 不承诺没把握的恢复时间（ETA 只在有可靠依据时给出）。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>复盘方法论：无责、有时限、有闭环</h2></div>
+  <p>复盘（postmortem）的目的不是追责，是<b>让组织不再犯同一个错</b>。三个支柱：</p>
+  <ul>
+    <li><b>无责（blameless）</b>：对事不对人。"他删了数据库"是事实陈述，"他粗心"是归因废物 —— 因为换个人在同样的凌晨、同样的上下文、同样的工具里，大概率同样删。要问的是：<b>什么系统设计让这个错误变得容易犯、难以发现、后果严重？</b></li>
+    <li><b>有时限</b>：SEV1/2 在 48 小时内启动，5 个工作日内出初稿。拖过一周，记忆就美化/扭曲了。</li>
+    <li><b>有闭环</b>：action item 必须进 backlog，有 owner、有 deadline、有验收标准。复盘会的结束以"action item 录入完成"为标志，不是"会议结束"。</li>
+  </ul>
+  <h3>文档结构（按此顺序写）</h3>
+  <ol>
+    <li><b>摘要</b>：三句话说清何时、影响谁、多久恢复、根因一句话</li>
+    <li><b>时间线</b>：检测 → 响应 → 定位 → 止损 → 恢复，标出每个环节的耗时和卡点</li>
+    <li><b>根因</b>：5 Whys 挖到系统性因素（流程缺失/监控盲区/设计缺陷），不停在"某行代码写错"</li>
+    <li><b>影响因素</b>：人（疲劳/知识缺口）、流程（审批/交接）、技术（监控/回滚能力）、组织（排班/优先级）</li>
+    <li><b>Action items</b>：分 P0/P1/P2，每条对应一个失败环节</li>
+    <li><b>运气成分</b>：如实写"如果 X 没发生会更糟吗" —— 这是下次改进的输入</li>
+  </ol>
+  <div class="callout ok">
+    <b>复盘质量的试金石：</b>把文档给客户和受影响团队的同事看，他们应该感受到"这家公司搞懂了问题并且在改"，而不是"看完更不敢用他们了"。GitLab 2017 数据库事故后公开的那份复盘，至今是业界范本 —— 连"备份恢复方案从未演练"这种家丑都写进去了。
+  </div>
+  <h3>5 Whys 示例：从表象挖到系统</h3>
+  <pre><span class="c"># 事故：大促期间订单接口超时率飙升至 40%</span>
+为什么超时？      → 订单库连接池耗尽，请求排队
+为什么池耗尽？    → 慢 SQL 占着连接不释放（平均 8 秒）
+为什么有慢 SQL？  → 缺索引，全表扫描 800 万行
+为什么缺索引？    → 上月新上的查询功能没走索引评审
+为什么不评审？    → 变更 checklist 只覆盖了 DDL，不含 DML/索引影响
+<b>根因（系统层）：</b>变更评审范围定义过窄 —— 修复动作是扩大 checklist + CI 加索引检查，
+而不是"处罚写慢 SQL 的人"</pre>
+  <p>注意 5 Whys 的两个纪律：<b>每一层都要有证据</b>（日志/监控/配置截图，不靠回忆）；<b>挖到"人"就停</b>（粗心、疏忽、没看文档），继续往下挖一层到"什么系统让这个错误容易犯"，那才是能修的东西。</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>四个公开故障，四种教训</h2></div>
+  <table>
+    <tr><th style="width:150px">案例</th><th style="width:110px">时长</th><th style="width:190px">根因</th><th>核心教训</th></tr>
+    <tr><td><b>Facebook 全球中断</b>（2021-10）</td><td>约 6.5 小时</td><td>维护命令意外断开骨干网，DNS 依赖该网络随之瘫痪，审计工具也失效</td><td>变更影响面分析、恢复工具自身可用性、审计系统独立性</td></tr>
+    <tr><td><b>Fastly 全球中断</b>（2021-11）</td><td>约 47 分钟</td><td>一个客户的合法配置触发 CDN 软件未发现的缺陷，全球 85% 流量报错</td><td>配置即代码的爆炸半径、单一供应商集中风险</td></tr>
+    <tr><td><b>AWS S3 中断</b>（2017-02）</td><td>约 4 小时</td><td>运维调试命令比预期移除了更多服务器，索引子系统无法快速重建</td><td>变更管控（命令审核/限速）、子系统容量冗余</td></tr>
+    <tr><td><b>GitLab 数据库误删</b>（2017-01）</td><td>约 6 小时，部分数据永久丢失</td><td>运维深夜排查攻击时误删生产数据目录，五种备份机制均慢或失效</td><td>备份恢复必须演练、疲劳操作、分层止损</td></tr>
+  </table>
+  <h3>逐个看他们做对了/做错了什么</h3>
+  <p><b>Facebook（2021-10-04）：</b>一条例行维护命令让骨干网路由器断开，连锁导致 DNS 不可用 —— 而 DNS 是恢复流程自身的依赖，恢复团队只能去机房物理操作，一栋栋楼跑。审计系统同时故障，导致前期定位缓慢。教训不是"别发错命令"，而是：<b>变更工具要有 blast-radius 预估和二次确认，恢复路径不能依赖被恢复的对象，审计系统要独立于生产链路</b>。</p>
+  <p><b>Fastly（2021-11-16）：</b>15:49 UTC 起全球大面积 503。根因是一位客户推送的<b>完全合法</b>的配置，触发了 Fastly CDN 软件里一个潜伏多年的缺陷。15 分钟内禁用了该客户的配置，全球流量恢复 —— 这是止损速度的正面教材；但它暴露了更深的问题：<b>客户数据可以打垮平台核心路径</b>，多 CDN 的团队当天几乎无感，单 CDN 的团队跟着瘫痪。<b>应急不只靠自己快，也靠架构上没有单点集中。</b></p>
+  <p><b>AWS S3（2017-02-28）：</b>US-EAST-1 的 S3 中断约 4 小时，半个互联网跟着抖（大量服务的状态页、图片、告警都挂在上面）。根因是运维在执行一个计费子系统调试命令时，<b>实际删除的服务器比预期多得多</b>，索引子系统被清空后重建极慢。教训：<b>涉及批量删除的命令必须带 dry-run、限量、二次确认</b>；子系统重建速度要作为容量指标度量。</p>
+  <p><b>GitLab（2017-01-31）：</b>运维在深夜排查攻击流量时误删了生产数据库目录。这个案例最珍贵的部分是它的复盘：五种备份机制里，备份慢、同步有延迟、pg 流复制已被中断、磁盘快照对空目录无效 —— <b>"我们以为有备份"和"我们验证过能恢复"之间隔着一次演练</b>。最终约 6 小时数据永久丢失，靠 issue 数据手工重建找回部分。教训清单：深夜高危操作要双人复核；备份恢复要定期真演；要接受"丢数据"并提前设计业务侧补偿。</p>
+  <div class="callout danger">
+    <b>四个案例的共同点：</b>根因都是"小操作、大后果"，而且<b>四个团队的止损都不慢</b>。真正拉开差距的是恢复时间和复盘质量 —— Facebook 的 DNS 自依赖、AWS 的删除命令、GitLab 的备份盲区，在各自复盘中都转化成了行业级的改进。你的团队离这种故障只差一个没演练过的预案。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个组织坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">单 primary 无替补，一次病假成事故</div><div class="pd">primary 失联时 escalation 链条断裂，告警静默。值班必须成对（primary + secondary），并每季度测试一次 escalation 电话是否打得通。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">告警不分级，凌晨被 P3 叫醒</div><div class="pd">非工作时间只允许 SEV1/2 page。其余走 IM/ticket。被 SEV3 吵醒三次的人，第四次会关掉整个告警应用 —— 这是告警疲劳的标准剧本。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">不 ack 先排查，一查 20 分钟</div><div class="pd">ack 是"我接单了"的信号，响应时钟和 escalation 都以它为准。正确顺序：ack → 定级 → 评估 → 动手。别让系统以为没人管。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">事故中同时改三处，恢复了不知为何</div><div class="pd">并行操作让因果归因失效，还互相污染。一次只改一个变量并记录时间点，恢复不了就回退到上一个已知状态。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">复盘开成批斗大会，下次没人说话</div><div class="pd">"谁值谁背锅"的文化一形成，事故立刻转入地下：不报、瞒报、大事化小。无责复盘要落到机制上：会前声明、主持人控场、记录里禁止出现对人的评价。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">action item 散会即消失，同故障三个月后再来</div><div class="pd">复盘的价值全在闭环。action item 进 backlog、有 owner 有 deadline，团队级指标看"action item 按期关闭率"，低于 70% 说明复盘在走过场。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">runbook 写完不验证，应急时命令早过时</div><div class="pd">镜像 tag 换了、集群迁了、工具下线了，runbook 还在原地。每个 runbook 归属到服务 owner，每季度 game day 抽查执行，过期的直接标记失效。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">沟通靠私聊，信息锁在三个人脑子里</div><div class="pd">SEV1/2 必须在 bridge（会议/群）里同步，每 30 分钟一次，哪怕内容是"仍在定位"。信息只在小群里流动，等于管理层和客户被蒙在鼓里。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 MTTR 当绩效指标压</div><div class="pd">度量什么就得到什么（古德哈特定律）。压 MTTR 得到的是"快速宣布恢复"和瞒报。MTTR 应该用于改进系统，不该进入个人考核。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">硬扛四小时才升级，怕"显得不行"</div><div class="pd">扛到体面尽失才叫人，是值班文化里最贵的坏习惯。制度上要明确：超过升级时限必须升级，且升级不记录为负面事件；提前升级反而值得在复盘里表扬。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. SEV2 故障正在处理，30 分钟过去还没定位。按制度应该？</div>
+      <button class="opt">继续查，SEV2 不严重，天亮再说</button>
+      <button class="opt">触发升级（TL/更资深的人加入），同时保持 bridge 每 30 分钟同步一次进展</button>
+      <button class="opt">先宣布恢复再说，避免升级引起恐慌</button>
+      <div class="ans">正确答案：<b>按时限升级 + 保持沟通</b>。升级时限是流程硬约束，升级不是承认失败，是把更大火力调上来。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 关于 ack 的正确理解是？</div>
+      <button class="opt">表示"我接单了，响应责任在我"，响应时钟和 escalation 都从这一刻起算</button>
+      <button class="opt">表示问题已经定位，接下来只等修复</button>
+      <button class="opt">ack 只是给监控系统面子，实际可以点完继续睡</button>
+      <div class="ans">正确答案：<b>ack = 认领责任</b>。ack 之后 escalation 停止计时，所以对 primary 是保护，对组织是信号。修没修好是另一回事。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. 告警 02:17 触发，值班人 02:19 确认，03:05 定位根因，03:41 完成修复。哪个指标度量的是 02:17 → 03:05 这一段？</div>
+      <button class="opt">MTTA（平均确认时间）</button>
+      <button class="opt">MTBF（平均无故障间隔）</button>
+      <button class="opt">MTTI（平均识别时间，故障发生到团队意识到并开始定位）</button>
+      <div class="ans">正确答案：<b>MTTI</b>。02:17→02:19 是 MTTA；03:05→03:41 是修复段。MTTR 口径混乱（Reply/Repair/Recover/Resolve），对外汇报前先对齐定义。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 一次故障中工程师在深夜误删了生产目录。无责复盘应该怎么写根因？</div>
+      <button class="opt">该工程师缺乏安全意识，需加强培训</button>
+      <button class="opt">高危删除操作缺少 dry-run/限量/双人复核，备份恢复从未演练，深夜疲劳放大了失误概率</button>
+      <button class="opt">删除命令设计得不合理，应删除所有 rm -rf 相关工具</button>
+      <div class="ans">正确答案：<b>写系统缺陷，不写人品</b>。换个人在同样的凌晨、同样的上下文、同样的工具里大概率同样犯错。要改的是让错误难以发生、易于发现、后果有限的系统。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 止损三板斧按代价从低到高的正确顺序是？</div>
+      <button class="opt">回滚 → 降级/摘流 → 扩容/重启</button>
+      <button class="opt">先定位根因，定位后一次性彻底修复</button>
+      <button class="opt">扩容 → 重启 → 回滚</button>
+      <div class="ans">正确答案：<b>先回滚</b>。一半以上故障由变更引起，回滚是成本最低的止损；恢复是响应阶段的目标，归因是复盘阶段的目标。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 判断一个团队 on-call 健康度，最该先看的指标是？</div>
+      <button class="opt">团队 MTTR 的年度平均数</button>
+      <button class="opt">告警规则的总数</button>
+      <button class="opt">页内唤醒次数、非工作时间告警占比、ack 时间 P95、误报率</button>
+      <div class="ans">正确答案：<b>唤醒与噪声指标</b>。每周 page &gt; 2 次就该消噪，误报率 &gt; 20% 的规则立刻下线。MTTR 平均数会掩盖一切问题，且容易诱发瞒报。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>值班响应 Checklist（建议贴工位）</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>0-1 分钟</b>：ack → 判断影响面 → 定 SEV → 决定是否拉人</div></div>
+    <div class="step"><div class="txt"><b>1-5 分钟</b>：SEV1/2 建 bridge、发状态页、通知 secondary；打开事故文档记录时间线</div></div>
+    <div class="step"><div class="txt"><b>5-30 分钟</b>：三板斧止损（回滚/降级/扩容），一次只改一个变量，每 30 分钟同步一次</div></div>
+    <div class="step"><div class="txt"><b>恢复后</b>：观察 15-30 分钟 → 宣布关闭 → 48 小时内启动复盘 → action item 进 backlog</div></div>
+  </div>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>on-call</b></td><td>轮值待命机制：非工作时间响应生产告警与故障</td></tr>
+    <tr><td><b>primary / secondary</b></td><td>主响应/备份响应，escalation 链上相邻两级</td></tr>
+    <tr><td><b>shadow（跟随期）</b></td><td>新人不担责地跟随 primary 值班，建立上下文</td></tr>
+    <tr><td><b>paging</b></td><td>强打扰告警（电话/强推送），只留给需要人立刻介入的事件</td></tr>
+    <tr><td><b>ack</b></td><td>确认认领告警，响应计时与 escalation 的起点</td></tr>
+    <tr><td><b>escalation</b></td><td>按时限未响应/未解决时向上一级升级，是流程不是失败</td></tr>
+    <tr><td><b>SEV1-4</b></td><td>事故严重级别，按影响面分级，决定响应力度与通报要求</td></tr>
+    <tr><td><b>SLA / SLO</b></td><td>对外服务承诺 / 内部目标，错误预算消耗驱动优先级</td></tr>
+    <tr><td><b>bridge（桥接会议）</b></td><td>事故期间的指挥沟通频道，IC 主导，定时同步</td></tr>
+    <tr><td><b>Incident Commander</b></td><td>不修系统只管全局的人：分配任务、维护时间线、控制节奏</td></tr>
+    <tr><td><b>runbook</b></td><td>可照着执行的应急手册：症状、第一步、分支、止损、升级</td></tr>
+    <tr><td><b>playbook（预案）</b></td><td>针对特定故障的处置方案，如降级开关、限流、只读模式</td></tr>
+    <tr><td><b>game day</b></td><td>故障演练：故意在生产/预发注入故障，验证预案与监控</td></tr>
+    <tr><td><b>postmortem</b></td><td>复盘文档：时间线、根因、影响因素、action items</td></tr>
+    <tr><td><b>blameless</b></td><td>无责复盘原则：对系统提问，不对人定罪</td></tr>
+    <tr><td><b>action item</b></td><td>复盘的改进项，必须有 owner、deadline 和验收标准</td></tr>
+    <tr><td><b>MTTA / MTTI / MTTR / MTBF</b></td><td>确认/识别/恢复/无故障间隔时间，MTTR 口径需先对齐</td></tr>
+    <tr><td><b>告警疲劳</b></td><td>噪声告警训练人无视告警的死亡螺旋，靠降噪与分级破解</td></tr>
+    <tr><td><b>状态页 status page</b></td><td>对外服务状态公示，SEV1/2 的通报渠道与信任资产</td></tr>
+    <tr><td><b>bus factor</b></td><td>能独立处理某个服务故障的最少人数，=1 是重大风险</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>做三件事 —— ① 对照模块 2 给你团队现在的告警规则逐一标级，把深夜还能 page 的 SEV3 改成异步；② 挑一个高频告警，按模块 5 的五要素写一页 runbook，下次值班时照着执行并记录卡点；③ 组织一次 SEV2 级别的 game day，用模块 6 的结构写一份复盘。<br><br>
+    <b>之后值得单独学：</b>SLO 与错误预算的定量设计（见 sre-practice.html）、混沌工程注入手法、以及 On-Call 工具链（PagerDuty/OpsGenie/自研）的 escalation 编排细节。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 on-call 与故障管理 · ack 要快，升级要早，复盘要无责</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（响应流程）和模块 6（无责复盘）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照你团队的排班表。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议对着你团队的排班表读：本周轮到你，先看模块 3 和模块 5';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

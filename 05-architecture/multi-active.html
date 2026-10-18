@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透多活与容灾架构</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 12 期 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透多活与容灾架构</h1>
+    <p class="sub">多活不是"多部署几个机房"就完事。这篇讲清楚<b>同城双活 / 异地多活 / 单元化</b>的真实差别、数据同步怎么解决冲突、切流回切怎么做不翻车，以及自增 ID、时钟漂移、双向同步回环这几个经典坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 种部署形态</span>
+      <span class="chip"><b>6</b> 级容灾分级</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议先想清楚你自己系统的 RTO/RPO 要求，再对照模块 1 的等级表。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先统一两个指标的语言</h2></div>
+  <p class="lead">多活讨论里 90% 的争吵，源于 RTO 和 RPO 没对齐。先记住这两个定义，全文都建立在这上面。</p>
+  <table>
+    <tr><th style="width:110px">指标</th><th style="width:230px">含义</th><th>业务翻译</th></tr>
+    <tr><td><b>RTO</b><br>Recovery Time Objective</td><td>从故障发生到<b>业务恢复可用</b>允许的最长时间</td><td>"最多能忍多久不能下单"</td></tr>
+    <tr><td><b>RPO</b><br>Recovery Point Objective</td><td>故障后恢复到的数据时间点，即<b>能容忍丢多少数据</b></td><td>"最多能丢多少钱的订单"</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>RPO=0 的含义：</b>数据零丢失。技术上要求<b>同步复制</b>（每笔事务必须等对端确认才提交），而光速决定了跨城同步每笔事务要多等 25ms 以上，写吞吐直接被打下来。<b>RPO=0 只适合同城，异地多活的 RPO 通常是秒级。</b>这是物理限制，不是工程能力问题。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>容灾等级：GB/T 20988-2007 六级</h2></div>
+  <p class="lead">国家标准《信息安全技术 信息系统灾难恢复规范》（GB/T 20988-2007）把容灾能力分成 6 级。金融、支付类系统通常要求第 5 级以上，普通业务系统第 3~4 级足够。</p>
+  <table>
+    <tr><th style="width:80px">等级</th><th style="width:150px">RTO 要求</th><th style="width:150px">RPO 要求</th><th>典型方案</th></tr>
+    <tr><td><b>第 1 级</b></td><td>2 天以上</td><td>1 天 ~ 7 天</td><td>备份介质异地存放，无热备场地。灾难后基本靠重新搭环境</td></tr>
+    <tr><td><b>第 2 级</b></td><td>24 小时以上</td><td>1 天 ~ 7 天</td><td>备份介质异地 + 备用场地、硬件到位</td></tr>
+    <tr><td><b>第 3 级</b></td><td>12 小时以上</td><td>数小时 ~ 1 天</td><td>电子链路传输备份数据，部分关键设备热备</td></tr>
+    <tr><td><b>第 4 级</b></td><td>数小时 ~ 2 天</td><td>数小时 ~ 1 天</td><td>数据库定时复制，应用双机/集群，定时数据同步</td></tr>
+    <tr><td><b>第 5 级</b></td><td><b>分钟级</b></td><td>0 ~ 30 分钟</td><td>实时数据复制，应用双活就绪，可自动/半自动切换</td></tr>
+    <tr><td><b>第 6 级</b></td><td><b>分钟级</b></td><td><b>0（零丢失）</b></td><td>同步复制 + 双活自动切换，切换过程数据不丢</td></tr>
+  </table>
+  <h4>等级不是越高越好</h4>
+  <ul>
+    <li><b>成本跳变点在第 5 级</b>：进入第 5 级意味着应用要能双活运行（无状态化改造、数据实时同步、流量调度），投入比第 4 级高一个数量级。</li>
+    <li><b>第 6 级（RPO=0）+ 异地 = 矛盾</b>：同步复制跨 1000km，每笔事务多 25~40ms，核心交易链路吞吐可能下降 5~10 倍。银行核心系统用第 6 级，但都是<b>同城</b>双活 + 异地灾备。</li>
+    <li><b>先定业务指标，再定技术等级</b>。没有业务共识的容灾目标等于没有目标：问清楚"中断 1 小时损失多少、丢 1 小时数据损失多少"，再选等级。</li>
+  </ul>
+  <div class="callout">
+    <b>常见组合：</b>同城双活（RPO≈0、RTO 分钟级，覆盖机房级故障）+ 异地灾备（RPO 分钟级、RTO 小时级，覆盖城市级故障）= 业界主流的<b>两地三中心</b>。城市级全实时多活（三地五中心）只有头部电商、支付、运营商玩得动。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>四种部署形态对比</h2></div>
+  <table>
+    <tr><th style="width:130px">形态</th><th style="width:120px">覆盖故障域</th><th style="width:110px">跨活 RTT</th><th style="width:90px">RPO</th><th>特点与适用</th></tr>
+    <tr><td><b>同城双活</b></td><td>机房级</td><td>1~5ms</td><td>≈0</td><td>数据库同步复制，两边同时服务。城市级故障（光缆挖断、停电）会同时挂两边，<b>不防城市级灾难</b></td></tr>
+    <tr><td><b>两地三中心</b></td><td>机房 + 城市</td><td>25~40ms（同城活间）</td><td>秒级~分钟级</td><td>同城双活 + 异地灾备（异步复制）。<b>当前最主流</b>，成本与能力的平衡点</td></tr>
+    <tr><td><b>异地多活<br>（三地五中心）</b></td><td>城市级</td><td>25~40ms</td><td>秒级</td><td>多个城市同时服务，需单元化 + 流量调度 + 冲突避免设计。<b>复杂度最高</b>，架构改动侵入所有业务</td></tr>
+    <tr><td><b>异地冷备<br>暖备</b></td><td>城市级</td><td>—</td><td>分钟~小时级</td><td>灾备中心平时不接流量，故障时拉起。便宜、简单，RTO 小时级。中小系统的务实选择</td></tr>
+  </table>
+  <h4>关键认知</h4>
+  <ul>
+    <li><b>同城双活是"机房级"容灾，不是"多活"的全部。</b>把两个机房部署在同一城市，光缆同时挖断就全完——所以同城双活之上必须有异地灾备兜底。</li>
+    <li><b>异地多活的核心难点从来不是"多部署一份"，而是"两边都能写"。</b>一旦只有一个活能写，就退化成了"主备"，多活的收益（城市级故障下业务不中断）也就不存在。</li>
+    <li><b>距离是物理约束</b>：北京-上海直线距离约 1000km，光在光纤中速度约 20 万 km/s，往返理论 10ms，实际路由和交换设备叠加后通常 25~40ms。广州-深圳同城约 1~3ms。跨太平洋 120ms+，<b>跨洋多活等于让用户每次下单多等一个心跳</b>，基本不可行。</li>
+  </ul>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>单元化架构（Set 化）</h2></div>
+  <p class="lead">单元化是异地多活的落地形态：把用户按维度切成 N 份，每份（一个 <b>Set</b>）是一个自包含的"小系统"，一个用户的全部流量在同一个 Set 内闭环。</p>
+  <h4>一个 Set 里有什么</h4>
+  <pre><span class="c"># 每个 Set 是完整的技术栈，独立自治：</span>
+接入层   nginx / gateway      <span class="c"># 只服务本单元用户</span>
+应用层   biz-app              <span class="c"># 无状态，按单元部署</span>
+缓存层   Redis 集群           <span class="c"># 单元内缓存，不跨单元读</span>
+数据层   MySQL 分片            <span class="c"># 按 user_id 分库，本单元分片可写，其余为只读副本</span>
+
+<span class="c"># 全局流量走向（三地五中心示例）：</span>
+DNS / GSLB  ──按用户路由──▶  城市A-Set1 / Set2 / Set3
+                            城市B-Set4 / Set5
+                            城市C-中心Set（全局数据、跨单元查询）</pre>
+  <h4>路由规则</h4>
+  <table>
+    <tr><th style="width:130px">方式</th><th style="width:220px">做法</th><th>优缺点</th></tr>
+    <tr><td><b>取模路由</b></td><td class="f">set_id = user_id % N</td><td>简单，但扩容 N 变化时大部分用户要迁移</td></tr>
+    <tr><td><b>路由表</b></td><td class="f">uid → set_id 映射存配置中心</td><td>灵活，切流/迁移改表即可，<b>生产常用</b>。需保证路由表全局一致</td></tr>
+    <tr><td><b>分段路由</b></td><td>按 UID 尾号灰度（尾号 0-9 → Set1）</td><td>适合切流灰度：先切 10% 用户，观察无问题再放全量</td></tr>
+  </table>
+  <h4>单元化三条铁律</h4>
+  <ol>
+    <li><b>封闭性</b>：一个用户的主要业务（读写）必须在同一个 Set 完成，跨单元调用只允许读且要走中心单元或只读副本。封闭率要做到 90% 以上，否则多活的延迟优势会被跨活调用吃掉。</li>
+    <li><b>写唯一</b>：任意一份数据全局只有一个 Set 能写，其他 Set 持有只读副本。<b>这是避免双向同步冲突的根本手段</b>——没有写写冲突，同步就只剩单向复制。</li>
+    <li><b>中心单元</b>：全局共享数据（商品目录、配置、用户基础资料）由中心 Set 统一写、各 Set 订阅变更。中心 Set 是逻辑概念，可跨城市部署保证自身高可用。</li>
+  </ol>
+  <div class="callout ok">
+    <b>单元化的收益：</b>① 跨活 RTT 从 25~40ms 降回同城的 1~5ms，用户无感知；② 故障域缩小到 1/N 用户，一个 Set 挂了只影响一小片；③ 数据分片天然并行，容量随单元数水平扩展。<br>
+    <b>代价：</b>单元间数据访问受限（不能随便 join 别人的库）、用户迁移要搬数据、架构复杂度显著上升。日活和团队规模不够时不要上。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>数据同步：binlog、DTS 与冲突解决</h2></div>
+  <p class="lead">多活的数据层同步，主流做法是<b>基于数据库 binlog 的异步复制</b>，而不是业务双写。</p>
+  <h4>同步链路（MySQL 生态）</h4>
+  <pre><span class="c"># 源库 MySQL ──binlog──▶ Canal/Debezium ──▶ MQ(Kafka/RocketMQ) ──▶ 消费端 ──▶ 目标库</span>
+
+<span class="c"># Canal：伪装成 MySQL slave，向主库发送 dump 协议拉取 binlog</span>
+<span class="c">#   → 解析成行级变更（RowData），投递给 MQ，由消费端回放到对端</span>
+<span class="c"># Debezium：Kafka Connect 生态，Red Hat 开源，同样读 binlog，直接对接 Kafka</span>
+<span class="c"># DTS：阿里云数据传输服务，托管版同步/迁移/订阅，支持双向</span>
+
+<span class="c"># 监控同步延迟（源库执行）</span>
+<span class="b">SHOW SLAVE STATUS</span>\G     <span class="c"># 看 Seconds_Behind_Master（异步复制的滞后秒数）</span>
+<span class="c"># Canal 侧看位点差：源库 binlog position 与 Canal 已解析 position 的差值</span></pre>
+  <h4>为什么不用业务双写</h4>
+  <ul>
+    <li>双写 = 两个库的写入顺序无法保证一致，对端失败还要考虑补偿，代码侵入每个写路径。</li>
+    <li>binlog 同步与业务解耦：业务代码零改动，对端挂了消息在 MQ 里堆积，恢复后自动追平。</li>
+    <li>binlog 天然保序（同表同行变更顺序一致），消费端单分区单线程即可保序。</li>
+  </ul>
+  <h4>双向同步与冲突解决</h4>
+  <p>两个活都能写同一份数据时，必须回答"冲突了听谁的"。策略按优先级排列：</p>
+  <table>
+    <tr><th style="width:150px">策略</th><th style="width:260px">做法</th><th>适用与风险</th></tr>
+    <tr><td><b>唯一写原则</b></td><td>按分片/维度保证一份数据只有一个写来源（单元化的基础）</td><td><b>首选</b>。从设计上消灭冲突，而不是解决冲突</td></tr>
+    <tr><td><b>增量合并</b></td><td>可加性字段（库存、余额、计数）同步增量而非绝对值：A 活 -1、B 活 -1 → 合并为 -2</td><td>适合计数器类。<b>要求同步的是操作不是结果</b>，实现上要把 UPDATE 解析为 delta</td></tr>
+    <tr><td><b>最后写入优先<br>LWW</b></td><td>每条记录带版本时间戳，冲突时取时间戳大的</td><td>简单但依赖<b>全局时钟同步</b>。NTP 抖动 100ms 就可能把新数据判成旧的</td></tr>
+    <tr><td><b>业务规则合并</b></td><td>按业务语义合并（如状态机只允许 PAID→SHIPPED 合法迁移）</td><td>最可靠但要为每类冲突写规则，成本高。金融常用</td></tr>
+    <tr><td><b>人工介入</b></td><td>冲突记录进死信表，报警 + 人工处理</td><td>兜底。冲突率必须低到人工可处理（&lt; 10 条/天）</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>回环（loop）问题：</b>A 的变更同步到 B 后，B 的同步链路可能把这条变更<b>再推回 A</b>，A 再推回 B……无限循环，两边 CPU 打满、MQ 堆积。解法：同步链路带上<b>来源实例标识</b>（source DB ID / 同步任务 ID），消费端丢弃"来源是自己"的消息；或保证 A→B 与 B→A 使用不同的 MQ 集群/链路，物理上不互通。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>流量调度：GSLB、DNS 与就近接入</h2></div>
+  <table>
+    <tr><th style="width:120px">手段</th><th style="width:180px">粒度与生效速度</th><th>适用与坑</th></tr>
+    <tr><td><b>DNS 智能解析</b></td><td>粗。受 TTL 缓存影响，切换生效 5 分钟 ~ 数小时</td><td>按来源 IP 归属地/运营商返回不同城市入口 IP。<b>只能做第一跳调度</b>，切流演练前必须先确认各地 TTL 设置（建议提前调低到 60s 以下）</td></tr>
+    <tr><td><b>GSLB</b><br>全局负载均衡</td><td>细。秒级生效，可按 UID、按比例灰度</td><td>基于健康检查结果和调度策略分配流量，支持按尾号灰度切流。<b>切流主力</b>。本身要高可用（多节点集群，否则单点）</td></tr>
+    <tr><td><b>Anycast</b></td><td>细，但不可控</td><td>多个城市宣告同一 IP，BGP 路由就近到达。<b>适合无状态接入层</b>；路由波动会把用户"瞬移"到另一城市，长连接全断，有状态服务慎用</td></tr>
+  </table>
+  <h4>健康检查：摘除与恢复</h4>
+  <pre><span class="c"># 主动探测：GSLB 定期请求各城市入口的 /health</span>
+<span class="c">#   /health 要查真实依赖（DB ping、缓存 ping、核心接口探活），不能只返回 200</span>
+
+<span class="c"># 被动探测：统计真实请求的错误率/超时率</span>
+<span class="c">#   错误率 &gt; 50% 持续 30 秒 → 摘除；错误率 &lt; 5% 持续 2 分钟 → 恢复</span>
+
+<span class="c"># 关键：摘除阈值与恢复阈值必须不同（滞回 hysteresis），防止网络抖动时反复摘除-恢复</span></pre>
+  <div class="callout warn">
+    <b>健康检查误判是二次事故的常见源头：</b>一次网络抖动摘除了健康节点，流量涌向对端，把对端也压垮（级联雪崩）。防护：① 探测要有多节点交叉验证，不能单探测点说了算；② 摘除前要求连续 N 次失败；③ 恢复时先放 5% 流量观察（半开探测）；④ 各城市保留最小应急容量（至少能扛平时 50% 流量）。
+  </div>
+  <h4>就近接入的真实边界</h4>
+  <ul>
+    <li>就近接入只对<b>接入层</b>有意义。用户被调度到北京活后，他写的所有数据也必须留在北京 Set（否则跨活访问立刻产生延迟）。</li>
+    <li>用户漫游：上海用户出差到北京，DNS 把他调度到北京活，但他的数据在 Set-A。<b>解法是路由表按 user_id 而非 IP 定位</b>——接入层根据登录态里的 UID 反查路由表，再代理到正确的 Set。</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>多活数据一致性六原则</h2></div>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>按用户维度路由</div><div class="cd">一个用户的主要流程（读写）在同一个 Set 内闭环。这是多活一致性的<b>地基</b>，其他原则都建立在它上面</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>避免跨活事务</div><div class="cd">跨城市 2PC 每笔事务等 25~40ms，吞吐暴跌。改成本地事务 + 异步消息（Saga/最终一致），对账兜底</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>全局数据走中心</div><div class="cd">配置、商品目录等全局数据由中心单元统一写，各单元订阅，允许秒级延迟。各单元<b>不许直接写全局表</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>缓存与库同单元</div><div class="cd">Redis 与本地 MySQL 放同一 Set，禁止跨活读缓存（缓存同步的延迟比数据库同步更难控）</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>分布式 ID 分段</div><div class="cd">各单元用发号器/Snowflake 变种，分配<b>不同 worker id 段</b>，禁止各自 AUTO_INCREMENT（冲突经典来源）</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>接受读己之写受限</div><div class="cd">用户切城市后几秒内可能读到旧数据。产品层要接受"最终一致"，或提供"刷新强制读主"按钮</div></div>
+  </div>
+  <h4>跨活调用先探测再调用</h4>
+  <pre><span class="c"># 客户端 RPC 框架隐式传参：入口从登录态取 user_id，路由到本 Set 的服务</span>
+<span class="c"># 跨 Set 调用（如看他人公开信息）流程：</span>
+1. 本地 Set 只读副本查询      <span class="c"># 优先，延迟 1~5ms，数据可能有秒级延迟</span>
+2. 副本没有 → 中心单元查询    <span class="c"># 次选，延迟 10~30ms</span>
+3. 必须实时 → 直连对方 Set    <span class="c"># 最后手段，延迟 25~40ms，且对方故障会传导</span>
+
+<span class="c"># 铁律：同步调用链上不允许超过 1 次跨 Set 调用</span>
+<span class="c"># 链路 A→B→C 三次跨活 = 100ms+ 起步，故障概率按乘法叠加</span></pre>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>切流、回切与脑裂防护</h2></div>
+  <h4>切流流程（以 A 活故障、切到 B 活为例）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>前置检查：</b>B 活容量已扩容到平时的 1.5 倍以上；数据同步延迟为 0 或已知；依赖服务（支付、消息）健康。容量不够就切 = 把故障放大</div></div>
+    <div class="step"><div class="txt"><b>入口切流：</b>GSLB/DNS 把 A 的用户路由切到 B。按 UID 尾号灰度：1% → 10% → 50% → 100%，每档观察 5~10 分钟错误率和延迟</div></div>
+    <div class="step"><div class="txt"><b>停写 A：</b>A 的应用层打开"只读开关"（禁写），数据库切只读账号。<b>注意：定时任务、消息消费者、补偿脚本也必须停</b>——它们是最常被漏掉的写来源</div></div>
+    <div class="step"><div class="txt"><b>等待 drain：</b>存量请求处理完（长连接优雅退出，通常 30~60 秒），确认 A 无新写入后再动数据层</div></div>
+    <div class="step"><div class="txt"><b>验证：</b>B 的错误率、核心接口成功率、数据位点对账（抽样比对 A/B 关键表行数与关键字段）</div></div>
+    <div class="step"><div class="txt"><b>修复 A 与回切：</b>A 修复后同样灰度回切。<b>回切前先双向比对数据</b>，冲突按预设规则合并，否则回切瞬间双向同步会爆发大量冲突</div></div>
+  </div>
+  <h4>脑裂：定义、检测与防护</h4>
+  <table>
+    <tr><th style="width:110px">层面</th><th style="width:250px">检测手段</th><th>防护手段</th></tr>
+    <tr><td><b>网络层</b></td><td>心跳超时</td><td>心跳本身检测不了脑裂（分区两边都认为对方死了），<b>必须引入第三方仲裁</b></td></tr>
+    <tr><td><b>仲裁层</b></td><td>ZooKeeper / etcd 的 quorum（多数派）</td><td>3 或 5 节点集群，分区后少数派侧自动放弃主身份。<b>2 节点做不到仲裁，至少 3</b></td></tr>
+    <tr><td><b>数据库层</b></td><td>MySQL Group Replication 单主模式（Paxos 多数派选主）</td><td>多数派不可达时自动只读，<b>从协议上杜绝双主</b>。双主同步架构天然有脑裂风险，慎用</td></tr>
+    <tr><td><b>应用层</b></td><td>全局开关（配置中心）</td><td><b>fencing（隔离）</b>：检测到分区后，旧主自动降级为只读（关闭写入口）。切流铁律：<b>先停写旧活，再放行新活</b>，两活永远不允许同时可写</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>没有演练过的切流方案等于没有方案。</b>混沌工程实践：定期随机杀单元、断网、制造数据延迟，验证：① 切流耗时在 RTO 内；② 回切不丢数据；③ 监控和告警真的能发现。<b>只演练"切过去"不演练"切回来"是最常见失误</b>——回切更脏（冲突合并、双写追平），失败就是二次事故。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">两活各自 AUTO_INCREMENT，主键冲突</div><div class="pd">两个活的库都设了自增起始值，同步后大量主键冲突，同步链路中断、数据追不平。必须用发号器/Snowflake 变种，每单元分配不同 worker id 段，从根上取消自增。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">时钟漂移导致 LWW 冲突解决误判</div><div class="pd">用时间戳比大小解决冲突，但两台机器 NTP 偏移 200ms，新的数据被判定为旧的，直接被覆盖丢失。跨活机器必须统一 NTP 源并监控偏移，或干脆不用 LWW。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">双向同步回环</div><div class="pd">A→B 同步的变更被 B→A 链路原样推回，无限循环，MQ 堆积、CPU 打满。同步链路必须带来源实例标识，消费端过滤"来源是自己"的消息。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">把跨活同步延迟当成 bug 查半天</div><div class="pd">用户在上海活下的单，在北京活查不到——其实是同步延迟 1~3 秒。要么把读路由回原单元（按 UID 路由），要么产品层接受最终一致并给"强制读主"入口。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">切流只切了流量，没停写</div><div class="pd">GSLB 切走了入口流量，但旧活的应用还在跑、定时任务还在写、消息消费者还在消费，旧主库继续写入导致两边数据分叉。停写必须是全链路：应用开关 + 数据库只读账号 + 定时任务 + 消费者。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">回切前不做数据比对，冲突集中爆发</div><div class="pd">旧活停写期间仍有遗漏的写来源（补偿任务、手工修数据），回切后双向同步瞬间涌入大量冲突记录，追平要几小时甚至引发数据错误。回切流程必须包含双向比对 + 冲突预合并。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">健康检查误判引发级联雪崩</div><div class="pd">一次网络抖动摘除了健康节点，流量涌向对端把对端压垮，最后全站不可用。探测要多节点交叉验证、摘除要连续失败 N 次、恢复要半开探测、每城保留最小应急容量。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">RPO=0 做成跨城</div><div class="pd">同步复制跨 1000km，每笔事务多等 25~40ms，核心交易吞吐下降一个数量级，最后被迫回退异步，RPO 目标形同虚设。RPO=0 只适合同城（RTT 1~5ms）。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">同步延迟没有监控</div><div class="pd">同步落后 50 万条没人发现，切流时数据缺一大块，业务直接错账。位点差/Seconds_Behind_Master/消费滞后必须配告警（如超过 10 秒即告警、超过 60 秒打电话）。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">只演练切过去，没演练切回来</div><div class="pd">切流演练很成功，回切时冲突合并失败、数据对不上，灾变成了二次事故。回切（冲突、双写追平、灰度放量）比切流更脏，必须纳入定期演练并记录耗时。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 业务方说"我们的系统 RPO=0"，这在跨城异地多活架构下意味着？</div>
+      <button class="opt">可以做到，只要同步链路够快</button>
+      <button class="opt">物理上几乎不可行，RPO=0 需要同步复制，跨城每笔事务多等 25ms+，写吞吐会崩塌</button>
+      <button class="opt">意味着 RTO 也为 0</button>
+      <div class="ans">正确答案：<b>物理上几乎不可行</b>。RPO=0 要求每笔事务等对端确认才提交（同步复制）。同城 RTT 1~5ms 可以承受，跨城 25~40ms 会让写吞吐下降一个数量级。跨城多活的 RPO 通常是秒级，用异步复制 + 监控延迟来保障。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 异地多活中两个活都可能写同一行数据，最可靠的冲突避免手段是？</div>
+      <button class="opt">用最后写入优先（LWW），取时间戳大的</button>
+      <button class="opt">给数据加分布式锁，谁抢到谁写</button>
+      <button class="opt">唯一写原则：按分片/维度保证一份数据全局只有一个 Set 可写</button>
+      <div class="ans">正确答案：<b>唯一写原则</b>。从设计上消灭冲突远比解决冲突可靠。LWW 依赖全局时钟（NTP 抖动会误判），分布式锁跨城加锁延迟高且自身可用性差。单元化按 user_id 分片，让每片只有一个写来源，其余持有只读副本。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 用 Anycast 做接入层调度的最大风险是？</div>
+      <button class="opt">配置太复杂，小团队玩不转</button>
+      <button class="opt">BGP 路由波动会把用户"瞬移"到另一城市，长连接中断，有状态服务受影响</button>
+      <button class="opt">Anycast 不支持 HTTPS</button>
+      <div class="ans">正确答案：<b>路由波动导致连接瞬移</b>。Anycast 靠 BGP 宣告相同 IP 实现就近到达，但网络抖动或策略变化会让流量瞬间换路径，用户的 TCP 长连接全部断连。它适合无状态的接入层（如 DNS、静态资源），有状态服务要谨慎。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 双向同步出现"数据无限循环、两边 CPU 打满、MQ 持续堆积"，最可能的原因是？</div>
+      <button class="opt">MQ 分区数不够</button>
+      <button class="opt">数据库主键冲突导致消费失败重试</button>
+      <button class="opt">同步链路未过滤来源，A 同步给 B 的变更又被 B→A 链路推了回来（回环）</button>
+      <div class="ans">正确答案：<b>回环</b>。A→B 的变更被 B 的同步链路当成新变更再推回 A，形成死循环。解法：同步消息带来源实例标识，消费端丢弃"来源是自己"的消息；或让两个方向的同步走物理隔离的不同链路。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 切流时最关键、也最常被遗漏的动作是？</div>
+      <button class="opt">在 GSLB 上把流量切到对端，切得越快越好</button>
+      <button class="opt">全链路停写旧活：应用禁写开关、数据库只读账号、定时任务、消息消费者全部停掉，等 drain 完成再动数据层</button>
+      <button class="opt">先把旧活的服务器关机</button>
+      <div class="ans">正确答案：<b>全链路停写 + drain</b>。只切入口流量而漏掉定时任务、补偿脚本、消息消费者，旧库会继续写入，两边数据分叉，且分叉点极难排查。另外切流前要确认对端容量已扩容（通常 1.5 倍）且同步延迟为 0。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于脑裂防护，下面哪个说法是对的？</div>
+      <button class="opt">心跳超时只能发现故障，要引入第三方仲裁（quorum）和隔离（fencing）才能防脑裂</button>
+      <button class="opt">把心跳间隔调短到 1 秒就能防止脑裂</button>
+      <button class="opt">脑裂只在数据库层存在，应用层不存在脑裂问题</button>
+      <div class="ans">正确答案：<b>需要第三方仲裁 + 隔离</b>。网络分区时两边都会认为对方死了，心跳本身无法区分"对方宕了"和"链路断了"。要用 ZooKeeper/etcd 的多数派（至少 3 节点）或 MySQL Group Replication 的 Paxos 选主，并配合 fencing：旧主自动降级只读。2 节点集群无法仲裁。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>切流检查清单（按顺序打勾）</h3>
+  <div class="cmds">
+    <div class="crow"><code>对端容量 ≥ 1.5x 平时流量</code><span class="desc">容量不够就切 = 放大故障</span><button class="copy">复制</button></div>
+    <div class="crow"><code>数据同步延迟 = 0</code><span class="desc">Seconds_Behind_Master / 位点差确认追平</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GSLB 按 UID 尾号灰度 1%→10%→50%→100%</code><span class="desc">每档观察 5~10 分钟错误率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>应用禁写开关 + DB 只读账号</code><span class="desc">双保险，防止漏停写</span><button class="copy">复制</button></div>
+    <div class="crow"><code>定时任务 / 消息消费者 / 补偿脚本全停</code><span class="desc">最常被漏掉的写来源</span><button class="copy">复制</button></div>
+    <div class="crow"><code>drain 30~60s，确认无新写入</code><span class="desc">存量长连接优雅退出</span><button class="copy">复制</button></div>
+    <div class="crow"><code>对端验证 + 关键表抽样对账</code><span class="desc">行数、关键字段、金额合计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>回切前双向比对 + 冲突预合并</code><span class="desc">回切比切流更脏</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键监控指标与告警阈值</h3>
+  <table>
+    <tr><th style="width:210px">指标</th><th style="width:180px">告警阈值（示例）</th><th>说明</th></tr>
+    <tr><td class="f">Seconds_Behind_Master</td><td>&gt; 10s 告警，&gt; 60s 电话</td><td>主从滞后秒数，切流前必须为 0</td></tr>
+    <tr><td class="f">binlog 位点差</td><td>&gt; 10000 条告警</td><td>Canal/DTS 消费滞后，比秒数更敏感</td></tr>
+    <tr><td class="f">入口错误率</td><td>&gt; 1% 持续 1 分钟</td><td>切流灰度每档必看</td></tr>
+    <tr><td class="f">NTP 偏移 offset</td><td>&gt; 100ms 告警</td><td>防 LWW 误判，跨活机器必配</td></tr>
+    <tr><td class="f">跨活调用 P99 延迟</td><td>&gt; 80ms 告警</td><td>同城应 1~5ms，异常升高说明路由错了</td></tr>
+    <tr><td class="f">健康检查成功率</td><td>&lt; 99% 持续 30s 摘除</td><td>配合半开探测恢复，防抖动</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>RTO</b></td><td>恢复时间目标，业务允许中断的最长时间</td></tr>
+    <tr><td><b>RPO</b></td><td>恢复点目标，允许丢失的数据时间范围</td></tr>
+    <tr><td><b>同步复制</b></td><td>事务必须等对端确认才提交，RPO 可为 0，但延迟受光速限制</td></tr>
+    <tr><td><b>异步复制</b></td><td>本地提交后异步传给对端，RPO 秒级，性能影响小</td></tr>
+    <tr><td><b>同城双活</b></td><td>同城市两个机房同时服务，覆盖机房级故障，RTT 1~5ms</td></tr>
+    <tr><td><b>两地三中心</b></td><td>同城双活 + 异地灾备，最主流的容灾形态</td></tr>
+    <tr><td><b>异地多活</b></td><td>多个城市同时服务，覆盖城市级故障，需单元化支撑</td></tr>
+    <tr><td><b>单元化 / Set 化</b></td><td>把用户按维度分到自包含的 Set，流量在 Set 内闭环</td></tr>
+    <tr><td><b>封闭单元</b></td><td>一个用户的读写都在同一 Set 内完成，封闭率要求 90%+</td></tr>
+    <tr><td><b>中心单元</b></td><td>负责全局共享数据（配置、商品目录）的统一写入与分发</td></tr>
+    <tr><td><b>GSLB</b></td><td>全局负载均衡，基于健康检查和调度策略分配跨地域流量</td></tr>
+    <tr><td><b>Anycast</b></td><td>多地宣告同一 IP、BGP 就近到达，适合无状态接入层</td></tr>
+    <tr><td><b>binlog</b></td><td>MySQL 的变更日志，是数据同步链路的数据源</td></tr>
+    <tr><td><b>Canal</b></td><td>阿里开源，伪装 MySQL slave 解析 binlog 并投递 MQ</td></tr>
+    <tr><td><b>Debezium</b></td><td>Red Hat 开源的 CDC 平台，基于 Kafka Connect 捕获变更</td></tr>
+    <tr><td><b>DTS</b></td><td>数据传输服务（云厂商托管版同步/迁移/订阅）</td></tr>
+    <tr><td><b>双向同步</b></td><td>两边都可写、互相同步，必须解决冲突与回环</td></tr>
+    <tr><td><b>LWW</b></td><td>最后写入优先，按时间戳取大值，依赖时钟同步</td></tr>
+    <tr><td><b>脑裂</b></td><td>网络分区后出现两个主，同时写入导致数据分叉</td></tr>
+    <tr><td><b>fencing / 隔离</b></td><td>分区后自动把旧主降级只读，从机制上阻止双写</td></tr>
+    <tr><td><b>切流 / 回切</b></td><td>把流量从一活切到另一活 / 修复后切回来，回切更易出事故</td></tr>
+    <tr><td><b>drain</b></td><td>停写后等待存量请求处理完再动数据层的过程</td></tr>
+    <tr><td><b>读己之写</b></td><td>用户写完后立刻能读到自己的写入，跨活同步延迟下难保证</td></tr>
+    <tr><td><b>滞回 hysteresis</b></td><td>摘除阈值高于恢复阈值，防止节点在边界反复抖动</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用两台虚拟机 + MySQL 主从搭一个最小多活实验：① Canal 同步一张表到对端，制造一次"两活同时写"观察主键冲突；② 给同步消息加来源标识，验证回环消失；③ 写一份切流 Runbook（检查清单），从头到尾演练一遍并记录耗时；④ 手动制造 30 秒同步延迟，观察监控是否告警。<br><br>
+    <b>之后值得单独学：</b>MySQL Group Replication 与 MGR 单主模式、Saga 分布式事务与对账体系、混沌工程平台（ChaosBlade 等）、以及云厂商 GSLB 的调度策略细节。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透多活与容灾架构 · 切流前默念：容量、同步延迟、全链路停写、回切比对</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（单元化）和模块 7（切流与脑裂）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照自己系统的 RTO/RPO 要求。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议先想清楚你自己系统的 RTO/RPO 要求，再对照模块 1 的等级表。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

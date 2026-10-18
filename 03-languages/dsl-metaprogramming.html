@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 DSL 与元编程</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 编程语言系列 · 第 2 期 · 高密度版</span>
+    <h1>二十分钟学透 DSL 与元编程</h1>
+    <p class="sub">DSL 和元编程是同一件事的两面：<b>让代码去写代码，让专业的人用专业的语法工作</b>。这篇讲外部与内部 DSL 的分界、五种宏系统对比、代码生成的工程纪律、反射的账单、Python 装饰器与元类，以及 Lua 嵌入的真实案例。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>5</b> 种宏机制对比</span>
+      <span class="chip"><b>4</b> 类代码生成实战</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边数一数：你手头的项目里已经"埋伏"着几种 DSL？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先认清楚：你每天都在用 DSL</h2></div>
+  <p class="lead">DSL（Domain Specific Language，领域特定语言）不是新潮玩意，它就在你眼皮底下：</p>
+  <div class="cmds">
+    <div class="crow"><code>SQL</code><span class="desc">查询领域的 DSL，几乎所有后端都在写</span><button class="copy">复制</button></div>
+    <div class="crow"><code>正则表达式</code><span class="desc">文本匹配领域的 DSL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CSS 选择器</code><span class="desc">文档样式领域的 DSL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Dockerfile / docker-compose.yml</code><span class="desc">部署领域的 DSL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Makefile / GitHub Actions YAML</code><span class="desc">构建与 CI 领域的 DSL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>protobuf / OpenAPI 定义</code><span class="desc">接口描述领域的 DSL（IDL）</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout">
+    <b>本篇的核心问题：</b>什么时候该造一个新的 DSL，什么时候用普通函数库就够了？以及，如果决定要"让代码生成代码"，五种主流机制各有什么代价？
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>外部 DSL vs 内部 DSL</h2></div>
+  <p class="lead">分界线只有一条：<b>是否需要独立的解析器</b>。需要，就是外部 DSL；寄生在宿主语言的语法里，就是内部 DSL。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:250px">外部 DSL</th><th>内部 DSL</th></tr>
+    <tr><td><b>典型代表</b></td><td>SQL、正则、protobuf、Nginx 配置、Lua 配置表</td><td>Java Stream 链式、jOOQ、Rust Builder、Kotlin 块结构、Ruby Rake</td></tr>
+    <tr><td><b>解析器</b></td><td>需要：词法 → 语法 → 语义分析（ANTLR、Pest、手写递归下降）</td><td>不需要，复用宿主语言的解析器</td></tr>
+    <tr><td><b>IDE 支持</b></td><td>弱。要单独做语法高亮、补全、错误检查</td><td>强。直接继承宿主语言的全部工具链</td></tr>
+    <tr><td><b>表达力上限</b></td><td>高。可以设计完全贴合领域的语法</td><td>受宿主语言语法约束，拗不过来的部分只能放弃</td></tr>
+    <tr><td><b>错误提示</b></td><td>可以精确到领域概念（"字段 X 缺少类型"）</td><td>报错是宿主语言的类型错误，领域信息丢失</td></tr>
+    <tr><td><b>跨语言</b></td><td>可以，一份定义多语言消费（protobuf 的卖点）</td><td>不行，和宿主语言绑死</td></tr>
+    <tr><td><b>成本</b></td><td>高。解析器 + 工具链 + 版本演进全要自己养</td><td>低。一个库的体量</td></tr>
+  </table>
+  <h3>内部 DSL 的三种形态</h3>
+  <h4>① 链式 Fluent API —— 读起来像句子</h4>
+  <pre><span class="c">// Java Stream / jOOQ 风格：方法名连起来就是 DSL</span>
+List&lt;String&gt; names = users.stream()
+    .filter(u -&gt; u.getAge() &gt;= 18)
+    .map(User::getName)
+    .sorted()
+    .collect(Collectors.toList());
+
+<span class="c">// jOOQ：SQL 变成 Java 代码，编译期就能查出字段错误</span>
+Result&lt;Record1&lt;String&gt;&gt; r = dsl.select(USERS.NAME)
+    .from(USERS)
+    .where(USERS.AGE.ge(18))
+    .fetch();</pre>
+  <h4>② Builder —— 参数多、可选多时的标准解</h4>
+  <pre><span class="c">// Rust 的 Builder 惯用法（consuming builder）</span>
+<span class="b">let</span> server = ServerBuilder::new()
+    .bind(<span class="y">"0.0.0.0:8080"</span>)
+    .workers(8)
+    .timeout(Duration::from_secs(30))
+    .build()?;   <span class="c">// 构造时做校验，缺必填项编译不过</span>
+
+<span class="c">// 对比：Go 没有默认参数，多字段结构体常用函数式选项</span>
+srv := NewServer(
+    WithAddr(<span class="y">":8080"</span>),
+    WithWorkers(8),
+    WithTimeout(30*time.Second),
+)</pre>
+  <h4>③ 块结构 DSL —— 用闭包模拟关键字</h4>
+  <pre><span class="c">// Kotlin：Gradle Kotlin DSL / Ktor 路由，靠尾随 lambda 造出"关键字"</span>
+http {
+    route(<span class="y">"/api"</span>) {
+        get(<span class="y">"/users"</span>) { call.respond(userService.list()) }
+        post(<span class="y">"/users"</span>) { call.respond(userService.create(call.receive())) }
+    }
+}
+
+<span class="c">// Ruby：Rakefile，块 + 无括号方法调用读起来像配置语言</span>
+task <span class="y">:default</span> =&gt; [<span class="y">:test</span>]
+task <span class="y">:test</span> <span class="b">do</span>
+  sh <span class="y">"go test ./..."</span>
+<span class="b">end</span></pre>
+  <div class="callout warn">
+    <b>判断口诀：</b>用户是程序员吗？是 → 内部 DSL（白嫖 IDE）。用户是业务/策划/运维吗？是 → 外部 DSL（语法自己定，但要养解析器）。用户还没有出现？→ 别造，先用配置格式。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>五种宏 / 编译期生成机制对比</h2></div>
+  <p class="lead">宏的本质是<b>编译期执行的一段代码，输入是语法树，输出是语法树</b>。五种机制的差别在于：操作的是文本还是语法树，以及工具链帮不帮你。</p>
+  <table>
+    <tr><th style="width:150px">机制</th><th style="width:90px">阶段</th><th style="width:170px">操作对象</th><th>表达力与主要坑</th></tr>
+    <tr><td><b>Lisp 系宏</b><br>(defmacro)</td><td>编译期</td><td>S 表达式<br>（代码即数据）</td><td>表达力最强，可任意变换语法树。坑：卫生性（变量捕获）、可读性差</td></tr>
+    <tr><td><b>Rust 声明宏</b><br>(macro_rules!)</td><td>编译期</td><td>token 流<br>（模式匹配式）</td><td>中等表达力，写重复结构很快。坑：递归深度限制、错误信息指向宏内部</td></tr>
+    <tr><td><b>Rust 过程宏</b><br>(derive/属性/类函数)</td><td>编译期</td><td>TokenStream<br>（可解析为 AST）</td><td>强，能做任意代码变换（#[derive]、#[tokio::main]）。坑：编译变慢、依赖生态分裂</td></tr>
+    <tr><td><b>C/C++ 预处理器</b></td><td>编译前</td><td>纯文本<br>（无语义感知）</td><td>最弱。坑：无作用域、难调试。X-Macro 是用补丁补漏的经典技巧</td></tr>
+    <tr><td><b>C# Source Generator</b></td><td>编译期</td><td>Roslyn 语法树</td><td>强，可读可遍历的 API。坑：增量编译缓存行为、生成代码的调试体验</td></tr>
+    <tr><td><b>Java 注解处理器</b><br>(APT / KSP)</td><td>编译期</td><td>javax.lang.model 元素</td><td>中等，生成 Java/Kotlin 代码。坑：元素级 API 啰嗦、KSP 需单独维护一套</td></tr>
+  </table>
+  <h3>Lisp 宏：代码即数据</h3>
+  <pre><span class="c">;; Clojure：unless 在标准库里不存在，十行代码自己造</span>
+(<span class="b">defmacro</span> unless [cond &amp; body]
+  `(if ~cond nil (do ~@body)))    <span class="c">;; 反引号模板，~ 是插值，~@ 是展开列表</span>
+
+<span class="c">;; (unless false (println "hi")) 展开为：</span>
+<span class="c">;; (if false nil (do (println "hi")))</span>
+<span class="c">;; 输入和输出都是 S 表达式 —— 语法树直接就是数据结构</span>
+
+<span class="c">;; 卫生性问题示例：宏内部引入的 x 捕获了调用方的 x</span>
+(<span class="b">defmacro</span> bad [x] `(let [x 1] (+ x ~x)))   <span class="c">;; 两个 x 撞车，Racket 用 syntax-rules 解决</span></pre>
+  <h3>Rust 两种宏</h3>
+  <pre><span class="c">// 声明宏：模式匹配 token，vec! 的真实实现（简化）</span>
+<span class="b">macro_rules!</span> my_vec {
+    ( $( $x:expr ),* $(,)? ) =&gt; {
+        {
+            <span class="b">let mut</span> v = Vec::new();
+            $( v.push($x); )*      <span class="c">// $(...)* 对每个匹配的 token 重复</span>
+            v
+        }
+    };
+}
+<span class="b">let</span> nums = my_vec![1, 2, 3];      <span class="c">// 展开成三段 push</span>
+
+<span class="c">// 过程宏：读 AST 生成代码，库作者用得最多</span>
+<span class="b">use proc_macro::TokenStream;</span>
+
+<span class="c">// 三种过程宏：</span>
+<span class="c">// #[derive(MyTrait)]      —— 给结构体/枚举自动实现 trait</span>
+<span class="c">// #[my_attribute]         —— 替换/包裹被标注的 item</span>
+<span class="c">// my_proc_macro!(...)     —— 类函数宏，输入任意 token</span>
+
+<span class="b">pub fn</span> my_derive(input: TokenStream) -&gt; TokenStream {
+    <span class="b">let</span> ast: DeriveInput = syn::parse(input).unwrap();  <span class="c">// syn 解析语法树</span>
+    <span class="b">let</span> name = &amp;ast.ident;                        <span class="c">// 取出结构体名</span>
+    quote::quote! {                               <span class="c">// quote 生成代码</span>
+        <span class="b">impl</span> MyTrait <span class="b">for</span> #name {
+            <span class="b">fn</span> describe(&amp;<span class="b">self</span>) -&gt; String { stringify!(#name).to_string() }
+        }
+    }.into()
+}</pre>
+  <h3>C 预处理器与 X-Macro：没有循环就用文件重复</h3>
+  <pre><span class="c">/* colors.def —— 纯数据，故意没有 include guard，可以被反复包含 */</span>
+X(RED,   <span class="y">"#FF0000"</span>)
+X(GREEN, <span class="y">"#00FF00"</span>)
+X(BLUE,  <span class="y">"#0000FF"</span>)
+
+<span class="c">/* 用法一：生成枚举。## 是 token 粘贴运算符 */</span>
+<span class="b">#define</span> X(name, hex) COLOR_##name,
+<span class="b">enum</span> Color {
+<span class="b">#include</span> <span class="y">"colors.def"</span>
+};
+<span class="b">#undef</span> X
+
+<span class="c">/* 用法二：同一个文件换个 X 定义，再生成一张字符串表 */</span>
+<span class="b">#define</span> X(name, hex) hex,
+<span class="b">const char</span>* color_hex[] = {
+<span class="b">#include</span> <span class="y">"colors.def"</span>
+};
+<span class="b">#undef</span> X</pre>
+  <div class="callout ok">
+    <b>X-Macro 的思想至今活着：</b>"数据只写一份，按需生成不同形态"。现代等价物是代码生成器（protoc、sqlc）——把 .def 文件换成 .proto / .sql，把预处理器换成正式生成器。
+  </div>
+  <h3>C# Source Generator 与 Java 注解处理器</h3>
+  <pre><span class="c">// C#：实现 IIncrementalGenerator，编译期扫语法树生成 .cs 文件</span>
+[Generator]
+<span class="b">public class</span> DtoGenerator : IIncrementalGenerator {
+    <span class="b">public void</span> Initialize(IncrementalGeneratorInitializationContext ctx) {
+        <span class="c">// 找到所有标注了 [GenerateDto] 的类，生成对应的 DTO 源码</span>
+    }
+}
+
+<span class="c">// Java：继承 AbstractProcessor，在 process() 里用 Filer 写源文件</span>
+@SupportedAnnotationTypes(<span class="y">"com.example.GenerateBuilder"</span>)
+<span class="b">public class</span> BuilderProcessor <span class="b">extends</span> AbstractProcessor {
+    @Override <span class="b">public boolean</span> process(Set&lt;? extends TypeElement&gt; annos, RoundEnvironment env) {
+        <span class="c">// 遍历被注解的类，拼 Java 源码字符串，用 filer.createSourceFile() 输出</span>
+        <span class="b">return false</span>;   <span class="c">// false = 不占用这些注解，别的处理器还能看到</span>
+    }
+}
+
+<span class="c">// Kotlin 生态用 KSP（Kotlin Symbol Processing）替代 APT：</span>
+<span class="c">// 不用生成 Java 桩类，速度快一截，但与 APT 是两套 API，库要各维护一份</span></pre>
+  <div class="callout warn">
+    <b>选型决策树：</b>① 只是消灭重复样板 → 函数 + 泛型；② 需要实现 trait/接口的派生 → derive 宏 / Source Generator；③ 需要新语法关键字 → 外部 DSL 或过程宏；④ 性能关键路径上做特化 → 编译期生成。业务逻辑别用宏——宏里的错误信息会让调用者想辞职。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>代码生成实战：protoc、OpenAPI、ORM</h2></div>
+  <p class="lead">代码生成的正确用法是<b>跨边界的契约翻译</b>：一份定义，多语言消费，边界上不出错。</p>
+  <h3>① protobuf：IDL 驱动，跨语言 RPC 的标配</h3>
+  <pre><span class="c">// order.proto —— proto3 语法</span>
+syntax = <span class="y">"proto3"</span>;
+package shop;
+option go_package = <span class="y">"example.com/shop/pb;pb"</span>;
+
+message Order {
+    string id = 1;
+    repeated LineItem items = 2;      <span class="c">// repeated = 可变长数组</span>
+    OrderStatus status = 3;
+    int64 created_at = 4;             <span class="c">// 字段编号即线上契约，永不复用</span>
+}
+message LineItem { string sku = 1; int32 qty = 2; }
+enum OrderStatus { PENDING = 0; PAID = 1; SHIPPED = 2; }
+
+service OrderService {
+    rpc GetOrder(GetOrderRequest) returns (Order);
+}</pre>
+  <pre><span class="c"># 生成 Go 结构体 + gRPC 客户端/服务端桩代码</span>
+protoc --go_out=. --go-grpc_out=. order.proto
+
+<span class="c"># 生成 Python</span>
+protoc --python_out=. order.proto
+
+<span class="c"># 生成 TypeScript（protobuf-es 等插件）</span>
+protoc --es_out=. order.proto</pre>
+  <h3>② OpenAPI Generator：REST 契约 → 客户端与服务端骨架</h3>
+  <pre><span class="c"># openapi.yaml 定义接口 → 生成类型安全的 client，前后端并行开发</span>
+openapi-generator-cli generate -i openapi.yaml -g typescript-axios -o src/client
+openapi-generator-cli generate -i openapi.yaml -g spring        -o server
+
+<span class="c"># 纪律：生成物放独立目录/包，CI 校验 git diff，防止有人手改生成文件</span></pre>
+  <h3>③ ORM 实体生成：从 SQL 出发反向生成</h3>
+  <pre><span class="c">-- sqlc：schema.sql + queries.sql → 类型安全的 Go 代码，无反射 ORM</span>
+<span class="c">-- queries.sql</span>
+<span class="c">-- name: GetOrder :one</span>
+SELECT * FROM orders WHERE id = $1;
+
+<span class="c">-- name: ListOrders :many</span>
+SELECT * FROM orders WHERE created_at &gt; $1 ORDER BY created_at DESC LIMIT $2;</pre>
+  <pre><span class="c"># 一条命令，读 schema + queries，生成 models.go 和 querier.go</span>
+sqlc generate
+
+<span class="c"># 生成的代码长这样（类型全对齐，SQL 写错编译期就报）</span>
+<span class="b">func</span> (q *Queries) GetOrder(ctx context.Context, id <span class="b">string</span>) (Order, <span class="b">error</span>) { ... }
+<span class="b">type</span> Order <span class="b">struct</span> {
+    ID        <span class="b">string</span>
+    Status    OrderStatus
+    CreatedAt time.Time
+}</pre>
+  <h3>生成方式对比</h3>
+  <table>
+    <tr><th style="width:150px">方式</th><th style="width:140px">输入</th><th style="width:170px">输出</th><th>适用与代价</th></tr>
+    <tr><td><b>protobuf</b></td><td>.proto 文件</td><td>多语言 POJO/struct + RPC 桩</td><td>跨语言 RPC、存储格式。代价：二进制不可读、schema 演进要守规矩</td></tr>
+    <tr><td><b>OpenAPI Generator</b></td><td>openapi.yaml</td><td>client / server 骨架</td><td>REST 契约先行。代价：生成的 server 往往只是骨架，业务逻辑仍手写</td></tr>
+    <tr><td><b>sqlc</b></td><td>.sql 文件</td><td>类型安全数据访问层</td><td>拒绝反射 ORM 的团队。代价：复杂动态 SQL 支持弱</td></tr>
+    <tr><td><b>模板引擎</b><br>(Jinja/StringTemplate)</td><td>模板 + 数据</td><td>任意代码</td><td>定制化最强。代价：模板代码无类型检查，是最差的代码生成形态</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>生成代码的四条纪律：</b>① <b>生成器版本锁定进 CI</b>，protoc 换个插件版本产物就可能 diff 一片；② 提交前跑生成并检查 <span class="k">git diff</span>，防止"手改了生成文件"下次被静默覆盖；③ 生成文件加标准头 <span class="k">// Code generated by protoc. DO NOT EDIT.</span>——Go 工具链会识别并跳过部分 lint；④ <b>生成物必须 boring</b>，追求"聪明的生成"是灾难开端。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>反射的代价与替代</h2></div>
+  <p class="lead">反射让程序在运行时读写类型信息。它是很多框架的基石，也是一笔被低估的账单。</p>
+  <h3>账单明细</h3>
+  <table>
+    <tr><th style="width:150px">代价</th><th>说明</th></tr>
+    <tr><td><b>编译期检查归零</b></td><td>方法名是字符串，拼错编译不报，运行时 NoSuchMethodException</td></tr>
+    <tr><td><b>性能损失</b></td><td>Method.invoke 有参数检查和访问检查，JIT 难以内联；热路径上比直接调用慢数倍</td></tr>
+    <tr><td><b>模块化破坏</b></td><td>JDK 9 模块化（JPMS）之后，对 JDK 内部类的反射可能抛 InaccessibleObjectException</td></tr>
+    <tr><td><b>重构失效</b></td><td>IDE 的"查找引用"、"安全重命名"对反射调用无能为力，改字段名 = 埋雷</td></tr>
+    <tr><td><b>可读性下降</b></td><td>"字符串驱动"的控制流无法静态追踪，新人读代码像考古</td></tr>
+  </table>
+  <pre><span class="c">// 反射调用：字符串拼方法名，慢，且拼错运行期才炸</span>
+Method m = obj.getClass().getMethod(<span class="y">"calcPrica"</span>, double.class);  <span class="c">// 拼写错误！</span>
+m.invoke(obj, 99.0);   <span class="r">// NoSuchMethodException: calcPrica —— 上线后某个深夜</span>
+
+<span class="c">// 直接调用：编译期检查，JIT 可内联</span>
+obj.calcPrice(99.0);</pre>
+  <h3>替代方案的阶梯</h3>
+  <table>
+    <tr><th style="width:160px">方案</th><th style="width:140px">检查时机</th><th style="width:130px">相对性能</th><th>典型场景</th></tr>
+    <tr><td><b>直接调用</b></td><td>编译期</td><td>1x</td><td>常规代码</td></tr>
+    <tr><td><b>MethodHandle</b></td><td>编译期（部分场景）</td><td>接近直接调用</td><td>LambdaMetafactory、 invokedynamic 底层</td></tr>
+    <tr><td><b>编译期生成</b></td><td>编译期</td><td>1x</td><td>序列化、DI、ORM 映射——生成专用适配代码</td></tr>
+    <tr><td><b>反射</b></td><td>运行期</td><td>数倍~十倍级</td><td>框架的通用逻辑，不得不动态时</td></tr>
+    <tr><td><b>字符串 Eval</b></td><td>运行期</td><td>最差</td><td>配置里塞代码，万不得已不要用</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>序列化框架的代际更替就是这条阶梯的实证：</b>Java 的 Jackson 默认走反射，kotlinx.serialization 用编译器插件在编译期生成序列化代码；Go 用 struct tag + 编译期生成（如 easyjson）；Rust 用 serde derive 在编译期生成。共同趋势：<b>反射方案在让位给编译期生成</b>。
+  </div>
+  <div class="callout warn">
+    <b>反射不是不能用，而是要有边界：</b>框架底层用反射（一次编写，全员受益）没问题；业务代码里每个模块都"getMethod + cast"就是在给后人埋雷。判断标准：这段动态代码，一年后还有人敢改吗？
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>Python 装饰器与元类</h2></div>
+  <p class="lead">Python 把"运行期改写代码"做成了语言的一等公民：装饰器改函数，元类改类。</p>
+  <h3>装饰器 = 语法糖</h3>
+  <pre><span class="c"># @dec 完全等价于 func = dec(func)，导入时执行一次，不是每次调用</span>
+<span class="b">import</span> functools, time
+
+<span class="b">def</span> timed(func):                       <span class="c"># 计时装饰器</span>
+    @functools.wraps(func)              <span class="c"># 保留 __name__/__doc__，否则日志和调试全乱</span>
+    <span class="b">def</span> wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        <span class="b">try</span>:
+            <span class="b">return</span> func(*args, **kwargs)
+        <span class="b">finally</span>:
+            print(f<span class="y">"{func.__name__} took {time.perf_counter()-start:.3f}s"</span>)
+    <span class="b">return</span> wrapper
+
+<span class="b">def</span> retry(times=3):                    <span class="c"># 带参数装饰器：三层嵌套</span>
+    <span class="b">def</span> deco(func):
+        @functools.wraps(func)
+        <span class="b">def</span> wrapper(*a, **kw):
+            <span class="b">for</span> i <span class="b">in</span> range(times):
+                <span class="b">try</span>: <span class="b">return</span> func(*a, **kw)
+                <span class="b">except</span> Exception:
+                    <span class="b">if</span> i == times - 1: <span class="b">raise</span>
+        <span class="b">return</span> wrapper
+    <span class="b">return</span> deco
+
+@timed
+@retry(times=2)
+<span class="b">def</span> fetch(url): ...
+<span class="c"># 等价于 fetch = timed(retry(2)(fetch))</span>
+<span class="c"># 堆叠顺序：靠近函数的先应用；调用时最外层先执行</span></pre>
+  <h3>元类：控制"类的创建"</h3>
+  <pre><span class="c"># 元类是 type 的子类。定义类时 __new__ 被调用，可以改写/注册这个类</span>
+REGISTRY = {}
+
+<span class="b">class</span> RegistryMeta(type):
+    <span class="b">def</span> __new__(mcs, name, bases, ns):
+        cls = super().__new__(mcs, name, bases, ns)
+        <span class="b">if</span> bases:                <span class="c"># 跳过基类自身，只注册子类</span>
+            REGISTRY[name] = cls
+        <span class="b">return</span> cls
+
+<span class="b">class</span> Plugin(<span class="b">metaclass</span>=RegistryMeta): <span class="b">pass</span>
+
+<span class="b">class</span> AuthPlugin(Plugin): <span class="b">pass</span>
+<span class="c"># AuthPlugin 定义的瞬间，REGISTRY["AuthPlugin"] 已自动就位 —— 插件系统的经典实现</span>
+
+<span class="c"># 现代替代：__init_subclass__（Python 3.6+），普通类就能挂钩子，比元类轻得多</span>
+<span class="b">class</span> Plugin:
+    <span class="b">def</span> __init_subclass__(cls, **kw):
+        super().__init_subclass__(**kw)
+        REGISTRY[cls.__name__] = cls</pre>
+  <div class="callout warn">
+    <b>装饰器与元类的隐性成本：</b>① 调用栈每加一层，出错时堆栈就深一层，日志像洋葱；② 导入期副作用让启动变慢、测试难隔离；③ IDE 跳转和静态分析对动态注册失效。<b>优先级建议：普通函数 &gt; 装饰器 &gt; __init_subclass__ &gt; 元类。</b>元类是最后手段，Django ORM、ABCMeta 之外的场景，九成用不着。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Lua 嵌入：配置与插件 DSL</h2></div>
+  <p class="lead">Lua 是嵌入式脚本之王：解释器体积约 200KB、纯 ANSI C 无依赖、设计目标就是"嵌入宿主程序"。</p>
+  <h3>三种典型用途</h3>
+  <table>
+    <tr><th style="width:140px">用途</th><th style="width:220px">形态</th><th>代表与关键风险</th></tr>
+    <tr><td><b>配置 DSL</b></td><td>求值一个 Lua 表，得到配置</td><td>游戏数值表。比 JSON/YAML 强：可计算、可复用常量。风险：配置错误变成运行时错误</td></tr>
+    <tr><td><b>插件 / mod 系统</b></td><td>受限解释器执行第三方脚本</td><td>魔兽世界插件、Roblox、各类游戏 mod。风险：沙箱逃逸、无限循环拖死主线程</td></tr>
+    <tr><td><b>网关 / 业务规则</b></td><td>嵌入 NGINX（OpenResty）写路由与逻辑</td><td>APISIX、Kong 的插件生态。风险：阻塞调用拖垮事件循环</td></tr>
+  </table>
+  <h3>游戏配置：比 JSON 多出来的表达力</h3>
+  <pre><span class="c">-- weapon.lua：策划可以直接写公式，不用改引擎代码</span>
+<span class="b">local</span> BASE_DAMAGE = 100
+
+<span class="b">return</span> {
+    weapon = {
+        sword = { damage = BASE_DAMAGE * 1.0, speed = 1.2 },
+        bow   = { damage = BASE_DAMAGE * 0.8, speed = 0.9, range = 300 },
+    },
+    <span class="c">-- 函数也是合法配置：平衡性调整无需重新编译</span>
+    crit_chance = <span class="b">function</span>(level) <span class="b">return</span> math.min(0.05 * level, 0.5) <span class="b">end</span>,
+    <span class="c">-- 按环境切换，JSON 得写三份</span>
+    server = DEV and { exp_rate = 10 } <span class="b">or</span> { exp_rate = 1 },
+}</pre>
+  <h3>网关路由：OpenResty 风格的 Lua 逻辑</h3>
+  <pre><span class="c">-- APISIX / OpenResty：每个请求都会执行这段 Lua，注意别写阻塞操作</span>
+<span class="b">local</span> cjson = require <span class="y">"cjson"</span>
+
+<span class="b">local</span> routes = {
+    { pattern = <span class="y">"^/api/v1/users"</span>,  upstream = <span class="y">"user_service"</span> },
+    { pattern = <span class="y">"^/api/v1/orders"</span>, upstream = <span class="y">"order_service"</span> },
+}
+
+ngx.req.read_body()
+<span class="b">local</span> uri = ngx.var.uri
+
+<span class="b">for</span> _, r <span class="b">in</span> ipairs(routes) <span class="b">do</span>
+    <span class="b">if</span> string.find(uri, r.pattern) <span class="b">then</span>
+        ngx.log(ngx.INFO, <span class="y">"route "</span>, uri, <span class="y">" -&gt; "</span>, r.upstream)
+        <span class="b">break</span>
+    <span class="b">end</span>
+<span class="b">end</span>
+
+ngx.header[<span class="y">"Content-Type"</span>] = <span class="y">"application/json"</span>
+ngx.say(cjson.encode({ ok = <span class="b">true</span>, path = uri }))</pre>
+  <h3>C 侧集成：最小骨架</h3>
+  <pre><span class="c">/* 标准 lua C API：建状态 → 加载 → 执行 → 取全局量 */</span>
+<span class="b">#include</span> &lt;lua.h&gt;
+<span class="b">#include</span> &lt;lauxlib.h&gt;
+
+lua_State *L = luaL_newstate();
+luaL_openlibs(L);                       <span class="c">// 打开标准库 —— 注意：这会带上 os.execute 等危险函数</span>
+
+<span class="b">if</span> (luaL_loadbuffer(L, script, len, <span class="y">"config"</span>) || lua_pcall(L, 0, 0, 0)) {
+    fprintf(stderr, <span class="y">"lua error: %s\n"</span>, lua_tostring(L, -1));
+    <span class="b">return</span> 1;
+}
+lua_getglobal(L, <span class="y">"routes"</span>);           <span class="c">// 从配置表里取值</span></pre>
+  <div class="callout danger">
+    <b>Lua 嵌入的安全三件套，缺一件就是事故：</b>① <b>函数白名单</b>——不调 luaL_openlibs 全开，手动只注册安全函数（去掉 os.execute、io.open、loadstring）；② <b>指令数 hook</b>——lua_sethook 设 count hook，超预算直接 error，防死循环；③ <b>内存上限</b>——自定义 alloc 函数统计用量，超限拒绝分配。默认全开标准库的 Lua 沙箱约等于没沙箱。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>DSL 设计的坑</h2></div>
+  <p class="lead">造 DSL 的最大风险不是技术实现，是<b>造完之后只有你一个人懂，而需求还在天天变</b>。</p>
+  <table>
+    <tr><th style="width:220px">症状</th><th style="width:220px">根因</th><th>处方</th></tr>
+    <tr><td>评审会上说不出 DSL 的目标用户是谁</td><td>没有真实需求，为造而造</td><td>砍掉。先用配置格式（YAML/TOML），需求稳定且高频后再抽</td></tr>
+    <tr><td>语法靠"约定"，没有正式解析器</td><td>内部 DSL 硬拗超出宿主语言表达力的语法</td><td>上 ANTLR/Pest 写真正的解析器，或砍需求</td></tr>
+    <tr><td>报错只有"语法错误：第 3 行"</td><td>AST 没保留源码位置</td><td>token 携带位置信息一路传到错误提示</td></tr>
+    <tr><td>每个新需求都要改解析器</td><td>设计时没留扩展点</td><td>预留表达式/函数调用机制，别把每种写法都焊死</td></tr>
+    <tr><td>用户偷偷绕过 DSL 直接改代码</td><td>DSL 表达力不够或学习成本太高</td><td>复盘：是补表达力，还是承认该用通用语言</td></tr>
+    <tr><td>生成代码没人敢动，也没人动得了</td><td>无 diff 校验、无版本锁定</td><td>CI 强制生成 + git diff 检查 + 生成器版本锁定</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>三条红线的自查：</b>① <b>过度设计</b>——先问"不用 DSL 行不行"，答案通常是"行"。 DSL 应该是被需求挤出来的，不是被灵感喷出来的。② <b>调试困难</b>——写第一行解析器之前，先回答"语法错误时长什么样、怎么定位"；断点能进 DSL 吗？栈里能看懂吗？③ <b>学习成本</b>——团队平均已经要学几种 DSL 了？再加一种，边际成本谁付？
+  </div>
+  <div class="callout ok">
+    <b>务实的演化路径：</b>配置格式（JSON/YAML）→ 带逻辑的配置（Lua 表 / 模板变量）→ 内部 DSL（宿主语言的链式/块结构 API）→ 外部 DSL（独立解析器）。每上升一级，都应该是被真实需求逼的，而不是被野心推的。停在越低的一级，维护越便宜。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">为想象中的需求设计图灵完备 DSL</div><div class="pd">目标是"让业务自己写规则"，最后造出一门没人会维护的语言。先提供函数库和配置格式，需求被验证三次以上再抽 DSL。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">内部 DSL 硬拗超出宿主语言的语法</div><div class="pd">在 Java 里用链式调用模拟 if/else，代码像天书。宿主语言的语法边界就是内部 DSL 的天花板，越界即灾难。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">宏/生成代码调试断链</div><div class="pd">断点进不去、栈里全是展开后的噪声、报错行号指向宏定义处。写宏的同时就要写展开后的调试视图（cargo expand、rust-analyzer 的宏展开）。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">生成代码被手改，下次生成静默覆盖</div><div class="pd">CI 里没有"重新生成 + git diff --exit-code"这一步，手改的补丁迟早丢失。生成物必须 boring，且 DO NOT EDIT 头要加。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">反射万能论：字符串拼方法名</div><div class="pd">"这样最灵活"，直到某次重命名字段，线上半夜 NoSuchMethodException。反射是框架的底层工具，不是业务的日常手段。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">宏错误信息指向宏内部而非调用点</div><div class="pd">用户看到的是 50 行展开代码里第 3 个 token 不匹配。Rust 的 macro_rules 尤其如此，过程宏里要主动构造可读错误。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Lisp 宏忽略卫生性导致变量捕获</div><div class="pd">宏内部引入的变量名与调用方撞车，行为随上下文漂移。Racket 的 syntax-rules / syntax-parameters 就是为解决这个而生。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Lua 沙箱白名单不严</div><div class="pd">直接 luaL_openlibs 全开标准库，第三方脚本一个 os.execute 就拿下宿主进程。白名单 + 指令 hook + 内存限额，三件套一件不能少。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">装饰器叠了七八层</div><div class="pd">一次调用的执行路径横跨八个文件，堆栈像洋葱，测一个 bug 要剥半天。控制层数，能用组合就不用嵌套。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">DSL 语法变更不提供迁移路径</div><div class="pd">外部 DSL 的存量文件全部报错，业务停摆。语法变更要版本化（proto 的 reserved、DSL 的 dialect 声明），并提供自动迁移工具。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="0">
+      <div class="qt">1. 判断外部 DSL 与内部 DSL 的分界线是？</div>
+      <button class="opt">是否需要独立的解析器</button>
+      <button class="opt">是否有图形界面</button>
+      <button class="opt">是否图灵完备</button>
+      <div class="ans">正确答案：<b>是否需要独立解析器</b>。SQL、protobuf 需要自己的解析器，是外部 DSL；Java Stream、Builder 寄生在宿主语言语法里，是内部 DSL。图灵完备与否不是分界——很多配置型 DSL 并不图灵完备。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. Rust 里的 #[derive(Debug)] 属于哪种机制？</div>
+      <button class="opt">声明宏 macro_rules!</button>
+      <button class="opt">C 风格预处理器</button>
+      <button class="opt">过程宏（derive 宏），编译期读 AST 生成实现</button>
+      <div class="ans">正确答案：<b>过程宏</b>。Rust 的过程宏分三种：derive（自动实现 trait）、attribute（替换被标注项）、类函数宏（my_macro!(...)）。macro_rules! 是声明宏，靠 token 模式匹配，做不了"读结构体字段再生成代码"这类事。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. C 语言的 X-Macro 技巧解决什么问题？</div>
+      <button class="opt">给 C 增加面向对象能力</button>
+      <button class="opt">预处理器没有循环和语法感知，用"同一数据文件多次包含 + token 粘贴"生成枚举/字符串表</button>
+      <button class="opt">替代链接器做符号去重</button>
+      <div class="ans">正确答案：<b>多次包含 + token 粘贴</b>。数据只写一份（colors.def），每次 #include 前用 #define X 改变展开形态，就得到枚举、字符串表等不同产物。它的现代等价物就是 protoc / sqlc 这类正式代码生成器。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于生成代码，正确的工程纪律是？</div>
+      <button class="opt">生成器版本锁定 + CI 强制重新生成并检查 git diff + 文件加 DO NOT EDIT 头</button>
+      <button class="opt">生成后允许手工修补，反正下次生成前会记得</button>
+      <button class="opt">生成代码提交进仓库后就再也不用管</button>
+      <div class="ans">正确答案：<b>版本锁定 + diff 校验 + 标准头</b>。"记得"是不会记得的——没有 CI 校验，手改的补丁某次生成后静默消失，故障在几周后才爆发。生成物必须 boring，这是纪律不是洁癖。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 反射方案相对编译期生成的主要工程代价是？</div>
+      <button class="opt">生成的文件太多，仓库变大</button>
+      <button class="opt">编译期检查归零（字符串方法名）、热路径性能损失、重构工具失效</button>
+      <button class="opt">不能跨进程通信</button>
+      <div class="ans">正确答案：<b>编译期检查归零 + 性能 + 重构失效</b>。方法名拼错运行期才炸、JIT 难内联、IDE 重命名覆盖不到反射调用。这也是序列化框架从反射（Jackson）转向编译期生成（kotlinx.serialization、serde derive）的原因。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 把 Lua 嵌进网关做插件系统，防死循环的正确手段是？</div>
+      <button class="opt">把 Lua 脚本放到独立进程，崩了重启</button>
+      <button class="opt">禁止使用 while 循环</button>
+      <button class="opt">用 lua_sethook 设指令计数 hook，超预算直接报错；同时配函数白名单和内存上限</button>
+      <div class="ans">正确答案：<b>指令计数 hook + 白名单 + 内存上限三件套</b>。lua_sethook 的 count hook 每执行 N 条指令回调一次，超限抛错，这是 Lua 官方的执行预算机制。只开白名单函数（去掉 os.execute 等）防逃逸，内存 alloc 统计防撑爆宿主。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>机制选择速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>消灭重复样板</code><span class="desc">函数 + 泛型，别上宏</span><button class="copy">复制</button></div>
+    <div class="crow"><code>自动实现接口/trait</code><span class="desc">derive 宏 / Source Generator / 注解处理器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>跨语言契约</code><span class="desc">protobuf / OpenAPI，生成 client 与桩代码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>拒绝反射 ORM</code><span class="desc">sqlc：写 SQL，生成类型安全数据层</span><button class="copy">复制</button></div>
+    <div class="crow"><code>业务/策划写规则</code><span class="desc">先 YAML/Lua 表，验证需求后再考虑外部 DSL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>第三方脚本进进程</code><span class="desc">Lua 沙箱三件套：白名单 + 指令 hook + 内存上限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>调试宏代码</code><span class="desc">cargo expand 看展开；CI 强制生成 + git diff</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>常用生成命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>protoc --go_out=. --go-grpc_out=. order.proto</code><span class="desc">生成 Go 结构体与 gRPC 桩</span><button class="copy">复制</button></div>
+    <div class="crow"><code>protoc --python_out=. order.proto</code><span class="desc">生成 Python 绑定</span><button class="copy">复制</button></div>
+    <div class="crow"><code>openapi-generator-cli generate -i openapi.yaml -g typescript-axios -o src/client</code><span class="desc">OpenAPI → TS 客户端</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sqlc generate</code><span class="desc">schema + queries.sql → 类型安全 Go 代码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cargo expand</code><span class="desc">展开 Rust 宏，看真实生成代码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git diff --exit-code</code><span class="desc">CI 里校验"重新生成后无差异"</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>外部 DSL</b></td><td>有独立语法和解析器的领域语言，如 SQL、protobuf、正则</td></tr>
+    <tr><td><b>内部 DSL</b></td><td>寄生在宿主语言语法里的领域 API，如链式调用、Builder、块结构</td></tr>
+    <tr><td><b>Fluent API</b></td><td>链式方法调用，读起来像句子的接口风格</td></tr>
+    <tr><td><b>Builder 模式</b></td><td>用链式 setter 逐步构造复杂对象，构建时统一校验</td></tr>
+    <tr><td><b>宏</b></td><td>编译期执行的代码变换：输入语法树，输出语法树</td></tr>
+    <tr><td><b>卫生宏</b></td><td>保证宏内部引入的标识符不会捕获调用方变量的宏机制</td></tr>
+    <tr><td><b>声明宏</b></td><td>Rust macro_rules!，按 token 模式匹配展开</td></tr>
+    <tr><td><b>过程宏</b></td><td>Rust 编译期读 AST 生成代码的宏，分 derive/attribute/类函数三种</td></tr>
+    <tr><td><b>Source Generator</b></td><td>C# 基于 Roslyn 的编译期源码生成机制</td></tr>
+    <tr><td><b>注解处理器</b></td><td>Java APT / Kotlin KSP：编译期扫注解生成代码</td></tr>
+    <tr><td><b>X-Macro</b></td><td>C 预处理器技巧：同一数据文件多次包含，生成不同形态代码</td></tr>
+    <tr><td><b>Token 粘贴</b></td><td>C 预处理器 ## 运算符，把两个 token 粘成一个（COLOR_##name）</td></tr>
+    <tr><td><b>反射</b></td><td>运行期读写类型信息、调用方法的机制，代价是编译期检查归零</td></tr>
+    <tr><td><b>MethodHandle</b></td><td>Java 的方法句柄，比反射快且更可内联的动态调用机制</td></tr>
+    <tr><td><b>装饰器</b></td><td>Python 的 @语法糖，导入时把函数替换成包装后的版本</td></tr>
+    <tr><td><b>元类</b></td><td>type 的子类，控制类的创建过程，Python 最重的元编程机制</td></tr>
+    <tr><td><b>__init_subclass__</b></td><td>Python 3.6+ 的类继承钩子，比元类轻量的替代</td></tr>
+    <tr><td><b>沙箱</b></td><td>限制脚本能力的执行环境：函数白名单 + 执行预算 + 资源上限</td></tr>
+    <tr><td><b>词法/语法分析</b></td><td>把源码文本切成 token、再组织成语法树的过程，外部 DSL 的地基</td></tr>
+    <tr><td><b>AST</b></td><td>抽象语法树，代码的结构化表示，宏与编译期生成的操作对象</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 macro_rules! 或 C# Source Generator 给一个重复的数据结构写派生实现，用 cargo expand / 反编译确认产物；② 给一个已有项目加 sqlc，把最脏的查询从 ORM 迁过去，对比代码量和类型安全；③ 用 lua_sethook 给一个嵌入 Lua 的配置系统加执行预算和函数白名单；④ 复盘你项目里最老的一个"自制 DSL"：它的目标用户真的存在吗？<br><br>
+    <b>之后值得单独学：</b>ANTLR 完整工作流（语法文件→listener/visitor）、Rust syn/quote 的过程宏工程实践、protobuf 的 schema 演进规范（reserved、wire compatibility）、以及 Lisp/Racket 的卫生宏体系。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 DSL 与元编程 · 先问"不用 DSL 行不行"，答案通常是行</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（宏机制对比）和模块 3（代码生成纪律）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边数你项目里潜伏着几种 DSL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边数一数：你手头的项目里已经"埋伏"着几种 DSL？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

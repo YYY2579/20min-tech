@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Docker Compose</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 Docker Compose</h1>
+    <p class="sub">compose 文件谁都会写，但<b>启动顺序、变量插值、卷的语义、profiles、本地与生产的行为差异</b>才是本地开发环境天天出问题的根源。这篇按 Compose 规范讲清楚这些，以及 K8s 之前你到底需不需要 compose。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>3</b> 种卷类型辨析</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边敲：docker compose up -d 起一套 web+db 再对着拆</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>确认你在用 v2</h2></div>
+  <pre><span class="c"># v1（docker-compose，Python 实现）已停止维护，命令带连字符的是 v1</span>
+docker compose version        <span class="c"># v2：插件形式，输出 Compose version v2.x.x</span>
+docker-compose --version      <span class="c"># v1：2016 年的产物，别再用了</span>
+
+<span class="c"># 一条命令起一套 web + db + redis，然后对着拆</span>
+docker compose up -d
+docker compose ps             <span class="c"># 看状态、端口映射</span>
+docker compose logs -f web    <span class="c"># 跟日志</span>
+docker compose exec web sh    <span class="c"># 进容器</span>
+docker compose down           <span class="c"># 拆环境（注意数据卷语义，见模块 5）</span></pre>
+  <div class="callout warn">
+    <b>先对齐两个概念：</b>① <b>compose 文件</b>是声明式描述（YAML）；② <b>compose 项目（project）</b>是一次 <span class="k">up</span> 产生的运行实体，默认项目名 = 目录名，所有资源带前缀 <span class="k">&lt;项目名&gt;_</span>（容器 <span class="k">proj-web-1</span>、网络 <span class="k">proj_default</span>）。改名用 <span class="k">-p</span> 或 <span class="k">COMPOSE_PROJECT_NAME</span>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>compose 文件全景：三大顶层块</h2></div>
+  <p class="lead">一个生产可用的 compose 文件只有三个必学顶层块：<b>services</b>（定义每个容器）、<b>networks</b>（自定义网络）、<b>volumes</b>（命名卷声明）。看懂下面这个文件，80% 的 compose 文件你都能读。</p>
+  <pre><span class="b">services</span>:
+  <span class="g">api</span>:
+    build: .                          <span class="c"># 从当前目录构建（等价 build.context: .）</span>
+    ports: [<span class="y">"8080:8080"</span>]             <span class="c"># 宿主:容器</span>
+    environment:
+      <span class="c"># 支持 ${VAR} 插值，见模块 3</span>
+      DB_HOST: db
+      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 里设置 DB_PASSWORD}
+    env_file: .env.api                <span class="c"># 或从文件读一批变量</span>
+    depends_on:
+      db: {condition: service_healthy}   <span class="c"># 等 db 健康检查通过再启动，见模块 2</span>
+    volumes:
+      - ./src:/app/src                <span class="c"># bind mount：源码热挂载</span>
+      - api-cache:/app/cache          <span class="c"># 命名卷：持久数据</span>
+    networks: [backend]
+    restart: unless-stopped           <span class="c"># 退出后总是重启（除手动 stop）</span>
+
+  <span class="g">db</span>:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data   <span class="c"># 数据落命名卷，容器重建不丢</span>
+    healthcheck:                          <span class="c"># 定义"就绪"</span>
+      test: [<span class="y">"CMD-SHELL"</span>, <span class="y">"pg_isready -U postgres"</span>]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  <span class="g">redis</span>:
+    image: redis:7-alpine
+    command: [<span class="y">"redis-server"</span>, <span class="y">"--save"</span>, <span class="y">"60"</span>, <span class="y">"1"</span>]
+    networks: [backend]
+
+<span class="b">networks</span>:
+  backend: {}                      <span class="c"># 自定义网络，服务间可用服务名互解析</span>
+
+<span class="b">volumes</span>:
+  pgdata: {}                       <span class="c"># 命名卷声明，数据由 Docker 管理</span>
+  api-cache: {}</pre>
+  <div class="callout danger">
+    <b>废弃的 version 字段：</b>老 compose 文件顶部都有 <span class="k">version: "3.8"</span>。Compose 规范已把它标记为<b>废弃</b>，v2 遇到会告警并忽略 —— <b>新文件不要写</b>。规范在 github.com/compose-spec/compose-spec 持续演进，不追版本号，字段以规范为准。
+  </div>
+  <p>两个减少重复的 YAML 原生技巧：<b>锚点</b>（<span class="k">&amp;common</span> 定义、<span class="k">*common</span> 引用）消除复制粘贴；<b>x- 扩展字段</b>（如 <span class="k">x-logging: &amp;default-logging</span>）存放复用片段，compose 规范明确允许且不会报未知字段。</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>启动顺序：depends_on 到底等什么</h2></div>
+  <p>本地环境最常见的 bug：<b>app 起来了但连不上 5432，connection refused</b>。根因是 <span class="k">depends_on</span> 短语法只保证<b>容器创建/启动</b>，不保证<b>服务就绪</b> —— postgres 容器进程起来了，但要几百毫秒到几秒才接受连接。</p>
+  <table>
+    <tr><th style="width:220px">写法</th><th>语义</th></tr>
+    <tr><td class="f">depends_on: [db]</td><td>只等 db 容器 <b>started</b>（短语法，不推荐）</td></tr>
+    <tr><td class="f">depends_on:&#10;  db:&#10;    condition: service_healthy</td><td>等 db <b>healthcheck 连续成功</b>（推荐）</td></tr>
+    <tr><td class="f">condition: service_completed_successfully</td><td>等依赖<b>正常退出（exit 0）</b>，适合迁移/初始化任务</td></tr>
+  </table>
+  <p>三个配套机制要一起用：</p>
+  <ul>
+    <li><b>healthcheck</b>：<span class="k">test</span> 三种形式 —— <span class="k">NONE</span>（禁用）、<span class="k">["CMD", ...]</span>（exec 直跑）、<span class="k">["CMD-SHELL", "..."]</span>（走 shell，可用管道）。<span class="k">start_period</span> 给启动宽限期（期间失败不计重试），<span class="k">start_interval</span> 可让探测在启动期更密集。</li>
+    <li><b>up --wait</b>：<span class="k">docker compose up -d --wait</span> 会阻塞到所有服务 healthy（或 running），配合 <span class="k">--wait-timeout</span>。CI 里等依赖就绪的标准姿势，比 sleep 30 靠谱一万倍。</li>
+    <li><b>restart 策略</b>：<span class="k">no</span>（默认）/ <span class="k">always</span> / <span class="k">on-failure[:n]</span> / <span class="k">unless-stopped</span>。本地开发用 <span class="k">unless-stopped</span>，注意 <span class="k">always</span> 在手动 stop 后宿主机重启还是会拉起。</li>
+  </ul>
+  <div class="callout warn">
+    <b>wait-for-it 是反模式：</b>镜像里塞 <span class="k">wait-for-it.sh db:5432 -- python app.py</span> 只是把"等端口通"搬进容器，端口通了服务也可能没就绪，且拖慢崩溃时的重启。<b>正确答案是 healthcheck + depends_on + up --wait</b>，把"就绪"定义在 compose 层，各服务无感。
+  </div>
+  <pre><span class="c"># 一次性初始化任务：跑完 migration 就退出，api 等它成功</span>
+<span class="b">services</span>:
+  migrate:
+    build: .
+    command: [<span class="y">"python"</span>, <span class="y">"manage.py"</span>, <span class="y">"migrate"</span>]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: <span class="y">"no"</span>          <span class="c"># 任务型容器绝不自动重启</span>
+  api:
+    build: .
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      db: {condition: service_healthy}</pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>环境变量与 .env：插值的精确规则</h2></div>
+  <p>compose 在<b>读取 YAML 时</b>先在宿主机做变量插值，再把结果写进容器。语法表：</p>
+  <table>
+    <tr><th style="width:200px">写法</th><th>含义</th></tr>
+    <tr><td class="f">${VAR}</td><td>替换为环境变量值；<b>未设置时替换成空串并告警</b></td></tr>
+    <tr><td class="f">${VAR:-default}</td><td>未设置<b>或为空</b>时用默认值</td></tr>
+    <tr><td class="f">${VAR-default}</td><td>仅未设置时用默认值</td></tr>
+    <tr><td class="f">${VAR:?错误信息}</td><td>未设置/为空时<b>直接报错退出</b>，密码类变量必用</td></tr>
+    <tr><td class="f">$$</td><td>转义成字面量 <span class="k">$</span>，防插值</td></tr>
+  </table>
+  <h3>.env 放哪、什么时候读</h3>
+  <ul>
+    <li>默认从<b>项目目录</b>（第一个 <span class="k">-f</span> 文件所在目录）加载 <span class="k">.env</span>，<span class="k">--env-file other.env</span> 可换。</li>
+    <li>优先级：<b>shell 环境变量 &gt; .env 文件</b>。CI 里 export 一个变量就能临时覆盖，不用改文件。</li>
+    <li><span class="k">.env</span> 只服务于<b>宿主机插值</b>；容器内变量来源是 <span class="k">environment</span> 和 <span class="k">env_file</span>，三者别搞混。</li>
+  </ul>
+  <table>
+    <tr><th style="width:130px">方式</th><th>是否参与宿主机插值</th><th>其他要点</th></tr>
+    <tr><td><b>environment</b></td><td>是（值里可写 ${}）</td><td>覆盖 env_file 同名变量；<span class="k">KEY</span> 无值 = 从 shell 透传</td></tr>
+    <tr><td><b>env_file</b></td><td>否（文件内容原样进容器）</td><td>按文件顺序读取，后者覆盖前者；<b>不参与 build</b></td></tr>
+    <tr><td><b>.env</b></td><td>本身就是插值源</td><td>只影响 compose 文件解析，<b>不会自动进容器</b></td></tr>
+  </table>
+  <pre><span class="c"># .env（项目目录，务必进 .gitignore）</span>
+DB_PASSWORD=s3cr3t
+COMPOSE_PROJECT_NAME=myshop
+
+<span class="c"># compose 文件里</span>
+services:
+  api:
+    environment:
+      <span class="c"># 容器里拿到 DB_PASSWORD=s3cr3t</span>
+      DB_PASSWORD: ${DB_PASSWORD:?missing}
+      <span class="c"># 密码里带 $ 的写法：$$ 转义，否则 $abc 会被当变量吞掉</span>
+      APP_SECRET: pa$$w0rd
+      <span class="c"># 数组简写等价于 - KEY=VALUE</span>
+      TZ: Asia/Shanghai</pre>
+  <div class="callout danger">
+    <b>血的教训：</b>把 <span class="k">.env</span> 提交进 git 是泄露事故第一名。正确姿势：<span class="k">.env</span> 进 <span class="k">.gitignore</span>，仓库里只放 <span class="k">.env.example</span>（所有 key + 假值），新同事 <span class="k">cp .env.example .env</span> 再填真值。配合 <span class="k">${VAR:?}</span>，漏配直接启动失败，而不是服务跑起来后才报连不上。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>profiles 与多环境：一套文件管三种场景</h2></div>
+  <h3>profiles：给服务分组，按需启动</h3>
+  <p>标了 <span class="k">profiles</span> 的服务<b>默认不启动</b>，只有显式启用才起。典型用途：调试工具、压测负载、可选依赖。</p>
+  <pre><span class="b">services</span>:
+  api:
+    image: myshop/api
+    ports: [<span class="y">"8080:8080"</span>]
+  db:
+    image: postgres:16-alpine
+  <span class="g">adminer</span>:                      <span class="c"># 数据库 Web 管理界面</span>
+    image: adminer
+    ports: [<span class="y">"8081:8080"</span>]
+    profiles: [<span class="y">"debug"</span>]          <span class="c"># 不启用就不起</span>
+  <span class="g">k6</span>:                          <span class="c"># 压测</span>
+    image: grafana/k6
+    profiles: [<span class="y">"debug"</span>, <span class="y">"loadtest"</span>]   <span class="c"># 可属多个 profile</span>
+
+<span class="c"># 启用：命令行指定 / 环境变量指定</span>
+docker compose --profile debug up -d
+COMPOSE_PROFILES=debug,loadtest docker compose up -d</pre>
+  <p>一个容易忽视的规则：<b>被启用服务依赖的服务会自动启动</b>，哪怕它自己带着 profile。比如给 api 挂上 debug 工具做 sidecar，api 无 profile、工具有 profile，启用工具时 api 作为依赖照样起来。</p>
+  <h3>多文件覆盖：dev / prod 一套基座</h3>
+  <p>两种组织方式，选一：</p>
+  <ul>
+    <li><b>自动 override</b>：<span class="k">docker-compose.yml</span> + <span class="k">docker-compose.override.yml</span> 成对存在时，后者<b>自动</b>合并，不用写 <span class="k">-f</span>。适合"默认开发配置，个别字段覆盖"。</li>
+    <li><b>显式 -f 顺序合并</b>：<span class="k">docker compose -f base.yml -f prod.yml up -d</span>。<b>后者覆盖前者</b>：标量字段后者赢；列表类字段（ports、volumes 等）按项合并。不确定合并结果时 <span class="k">docker compose config</span> 直接看最终产物 —— CI 里加一步 <span class="k">docker compose config -q</span> 还能做语法校验。</li>
+  </ul>
+  <pre><span class="c"># docker-compose.override.yml：开发专属，全部默认加载</span>
+services:
+  api:
+    build: .                     <span class="c"># 开发时用本地构建，不用镜像</span>
+    volumes: [<span class="y">"./src:/app/src"</span>]     <span class="c"># 挂源码热重载</span>
+    environment:
+      LOG_LEVEL: debug
+
+<span class="c"># prod.yml：显式传入，覆盖 override 的默认值</span>
+services:
+  api:
+    image: registry.myshop.io/api:1.4.2   <span class="c"># 生产用固定 tag，禁 latest</span>
+    environment:
+      LOG_LEVEL: info</pre>
+  <div class="callout ok">
+    <b>判断标准：</b>只在本地跑、要挂源码、要带调试工具 → compose + profiles + override；要上多副本、滚动更新、服务网格、统一声明式管理 → 直接上 K8s，别硬撑（模块 6 有边界表）。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>网络与存储：compose 的两条暗线</h2></div>
+  <h3>网络：服务名就是 DNS 名</h3>
+  <p>同一项目里，每个服务加入名为 <span class="k">&lt;项目&gt;_default</span> 的默认 bridge 网络，<b>服务名/别名可直接解析</b>（api 里连 <span class="k">db:5432</span> 即可，不用记 IP）。自定义网络可以按用途切分，一个服务可同时加入多个。</p>
+  <ul>
+    <li><b>aliases</b>：给服务起额外 DNS 名，做蓝绿/版本切换时流量切别名很方便。</li>
+    <li><b>external: true</b>：接入已存在的网络（比如先 <span class="k">docker network create shared</span>），配 <span class="k">name:</span> 指定真实名。跨项目通信的唯一正道 —— 服务名<b>不出项目网络</b>。</li>
+    <li><b>network_mode</b>：<span class="k">host</span>（共享宿主网络栈，无网络隔离）、<span class="k">service:[name]</span>（共享另一个服务的网络栈，sidecar 模式，如 istio 早期的 pilot-agent 形态）、<span class="k">none</span>。</li>
+    <li><b>ports vs expose</b>：<span class="k">ports</span> 发布到宿主（宿主:容器）；<span class="k">expose</span> 仅文档作用，不发布端口，项目内互访根本不需要 expose。</li>
+  </ul>
+  <h3>卷：三种类型，别用错</h3>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:190px">写法</th><th>适用与风险</th></tr>
+    <tr><td><b>命名卷</b></td><td class="f">- pgdata:/var/lib/postgresql/data</td><td>数据库/有状态服务首选。数据由 Docker 管理，容器重建不丢</td></tr>
+    <tr><td><b>bind mount</b></td><td class="f">- ./src:/app/src</td><td>源码、配置文件。宿主任意路径直接可见，<b>容器内改动会写回宿主</b></td></tr>
+    <tr><td><b>tmpfs</b></td><td class="f">tmpfs: /tmp</td><td>内存盘，敏感临时数据，重启即失</td></tr>
+  </table>
+  <p>常用修饰：<span class="k">:ro</span> 只读（配置卷防篡改）；<span class="k">:z</span>/<span class="k">:Z</span> SELinux 重新打标；macOS/Windows 上 <span class="k">:cached</span>/<span class="k">:delegated</span> 换一致性换性能。长语法（<span class="k">type: bind,source: ...,target: ...</span>）表达力更强，复杂场景推荐。</p>
+  <pre><span class="c"># 跨项目共享数据库：两边用同一个 external 网络 + 同一命名卷</span>
+<span class="c"># 项目 A（myshop）：db 加入 shared 网络，卷声明 external</span>
+networks:
+  shared: {external: true, name: shared}
+volumes:
+  pgdata: {external: true, name: myshop_pgdata}   <span class="c"># 引用其他项目已创建的卷</span></pre>
+  <div class="callout warn">
+    <b>postgres 的 initdb 规则：</b>官方镜像只在 <span class="k">PGDATA</span> 目录<b>为空</b>时初始化。命名卷第一次起会初始化；以后容器重建复用该卷，<b>不会重新初始化</b>，你的建表脚本不会重跑 —— 所以 schema 变更要走 migration 工具，不能靠 entrypoint 脚本。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>本地开发工作流：watch、构建与边界</h2></div>
+  <h3>文件监听：docker compose watch</h3>
+  <p>v2.22+ 起 <span class="k">develop.watch</span> 成为标准能力：监听宿主路径，按动作分 <b>sync</b>（同步文件）、<b>rebuild</b>（重建镜像）、<b>sync+restart</b>。比裸 bind mount 更可控（能排除 node_modules、能指定 rebuild 触发条件）。</p>
+  <pre><span class="b">services</span>:
+  api:
+    build: .
+    develop:
+      watch:
+        - path: ./src          <span class="c"># 源码改动：同步进容器</span>
+          action: sync
+          target: /app/src
+        - path: ./package.json <span class="c"># 依赖变了：重建镜像</span>
+          action: rebuild
+        - path: ./static       <span class="c"># 静态资源：同步并重启进程</span>
+          action: sync+restart
+          target: /app/static
+
+<span class="c"># 起服务并进入 watch 模式</span>
+docker compose watch
+<span class="c"># 或 up 时带 watch</span>
+docker compose up -d --watch</pre>
+  <h3>构建与日常命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker compose build [--no-cache] [service]</code><span class="desc">构建/重建镜像，Dockerfile 层缓存默认生效</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose up -d --build</code><span class="desc">配置变了要加 --build，否则只用旧镜像起容器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose config</code><span class="desc">打印合并后的最终配置，排查插值/合并问题的第一现场</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose run --rm api pytest</code><span class="desc">跑一次性命令，退出即删容器；默认会拉起依赖服务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose up -d --scale api=3</code><span class="desc">起多个同服务副本（端口需随机映射或走内部负载）</span><button class="copy">复制</button></div>
+  </div>
+  <p>工程化上再包一层 <b>Makefile / task 脚本</b>，把 <span class="k">up</span>、<span class="k">test</span>、<span class="k">migrate</span>、<span class="k">down -v</span> 固化成 <span class="k">make dev</span>，新人一天内能跑起来。</p>
+  <h3>与 K8s 的边界：什么时候该换了</h3>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:230px">Docker Compose</th><th>Kubernetes</th></tr>
+    <tr><td>运行位置</td><td>单机（Docker 引擎）</td><td>集群（多节点调度）</td></tr>
+    <tr><td>副本管理</td><td>--scale，无控制器</td><td>Deployment 声明式 replicas + 自愈</td></tr>
+    <tr><td>服务发现</td><td>项目网络内 DNS</td><td>Service + DNS，跨 namespace 可控</td></tr>
+    <tr><td>健康检查</td><td>healthcheck + depends_on</td><td>liveness/readiness/startup 三类探针</td></tr>
+    <tr><td>配置管理</td><td>.env + environment</td><td>ConfigMap/Secret，可滚动更新</td></tr>
+    <tr><td>存储</td><td>命名卷（本机）</td><td>PV/PVC/StorageClass，可跨节点</td></tr>
+    <tr><td>发布能力</td><td>recreate 容器，无滚动策略</td><td>RollingUpdate/金丝雀/回滚</td></tr>
+  </table>
+  <p>中间地带的务实做法：<b>本地用 kind/minikube 起真 K8s，用 Skaffold/Tilt 把 compose 式体验（监听、重建、转发）带到集群</b>。团队规范如果已经在 K8s 上，本地环境应尽量贴近生产，而不是维护两套语义。</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>compose up 与 docker stack deploy：同名不同命</h2></div>
+  <p>compose 文件可以喂给 <span class="k">docker stack deploy -c xxx.yml</span>（Swarm 模式），但<b>两边的引擎不同，字段支持差异巨大</b>。最大的坑：你以为配了资源限制和副本数，本地跑时它压根没生效。</p>
+  <table>
+    <tr><th style="width:190px">字段</th><th style="width:170px">docker compose up</th><th>docker stack deploy</th></tr>
+    <tr><td class="f">deploy.replicas</td><td>忽略，用 <span class="k">--scale</span></td><td>生效（Swarm 服务副本数）</td></tr>
+    <tr><td class="f">deploy.resources.limits</td><td>生效（映射为容器资源限制）</td><td>生效</td></tr>
+    <tr><td class="f">deploy.resources.reservations</td><td>忽略</td><td>生效</td></tr>
+    <tr><td class="f">deploy.placement / update / rollback_config</td><td>忽略</td><td>生效</td></tr>
+    <tr><td class="f">depends_on</td><td>生效</td><td><b>忽略并告警</b>（Swarm 无启动顺序概念）</td></tr>
+    <tr><td class="f">healthcheck</td><td>生效</td><td>生效（Swarm 也支持）</td></tr>
+    <tr><td class="f">ports</td><td>宿主端口映射</td><td>ingress/published ports，需 overlay 网络</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>结论：</b>别写"一份 compose 文件同时服务 compose up 和 stack deploy"。要么本地 compose + 远端 K8s（各自文件，CI 分别校验），要么全面 Swarm/K8s。<span class="k">docker compose config</span> 只验证 compose 语义，不验证 Swarm 兼容性。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个真实坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">depends_on 只等 started，应用连接被拒</div><div class="pd">容器起来了 postgres 还没 listen。改成 condition: service_healthy + up -d --wait。判断标准：报错是 connection refused 而不是鉴权失败。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">.env 提交进 git / 放错目录不生效</div><div class="pd">密码进仓库是事故；放错目录（--project-directory 之外）则插值全是空串服务起不来。.env 进 .gitignore，仓库只留 .env.example；用 ${VAR:?} 让漏配直接报错。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">密码里的 $ 被插值吞掉</div><div class="pd">DB_PASSWORD=abc$xyz 在 environment 里写 ${DB_PASSWORD} 时，$xyz 被当成变量名解析成空。字面量美元写 $$ 转义，或者密码本身别用 $。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">容器重建后数据没了</div><div class="pd">三种丢数据路径：用了匿名卷（down 时随容器清理）、数据写在容器可写层（重建即失）、postgres 卷已存在导致 initdb 不跑而 schema 没迁移。数据库必须命名卷 + migration 工具，别赌。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">container_name 写死，--scale 直接冲突</div><div class="pd">container_name: api 时第二个副本起不来（名字已占用），也无法在多个项目里复用同一文件。删掉它，让 compose 用 &lt;项目&gt;_&lt;服务&gt;_&lt;序号&gt; 自动命名。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">healthcheck 写法错，永远 unhealthy</div><div class="pd">test: pg_isready 这种字符串写法已废弃；管道判断（如 ps aux | grep x）必须包在 CMD-SHELL 里。先 docker exec 手动跑一遍 test 命令，确认退出码为 0 再配上去。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">服务名跨项目/宿主机解析失败</div><div class="pd">服务名只在所属项目的网络内有效。另一个 compose 项目或宿主机进程连 api:8080 会直接 name resolution error。跨项目用 external 网络 + 固定网络名，宿主访问走 localhost:published-port。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">bind mount 的两宗罪：root 污染 + CRLF</div><div class="pd">① 容器内进程以 root 写文件，宿主目录出现 root 属主文件（node_modules 被覆盖、git status 一片红）；② Windows 编辑的脚本带 CRLF，容器里执行报 exec format error。统一容器内 UID/GID，脚本走 LF，或只用命名卷。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">json-file 日志不设上限，磁盘悄悄打满</div><div class="pd">默认 json-file 驱动无限增长，本地开发跑几天几个 GB 很常见。全局或按服务配 logging.options 的 max-size / max-file：单文件 10m、保留 3 个。这是从 Docker 到 compose 都适用的底线配置。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">deploy 段配了却没用，CI 拉起整堆调试服务</div><div class="pd">deploy.replicas 在 compose up 下被忽略（见模块 7）；忘了给 adminer/k6 等工具设 profiles，CI 的 up 把它们全拉起来，端口冲突、资源抢占。profile 是环境分组的第一道闸。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. compose up 后 api 报 connection refused，db 容器状态是 running。根因和正确修复是？</div>
+      <button class="opt">db 镜像坏了，换个 tag</button>
+      <button class="opt">给 api 加 restart: always，多重试几次总能连上</button>
+      <button class="opt">depends_on 只保证容器启动不保证就绪，应改 condition: service_healthy 并配 db 的 healthcheck</button>
+      <div class="ans">正确答案：<b>service_healthy</b>。depends_on 短语法等的是 started；就绪的定义要放进 healthcheck，CI 场景再配 up --wait。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 想让同一份基础配置在开发/生产用不同端口和镜像，最规范的组织方式是？</div>
+      <button class="opt">维护两份完整 compose 文件，手工保持同步</button>
+      <button class="opt">基座文件 + 覆盖文件：开发用自动加载的 compose.override.yml，生产用 -f base.yml -f prod.yml 显式合并</button>
+      <button class="opt">把配置写进镜像的环境变量里</button>
+      <div class="ans">正确答案：<b>基座 + 覆盖</b>。override 自动合并适合开发默认值；生产用显式 -f 顺序，后者覆盖前者，docker compose config 验证最终结果。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 数据库密码是 pa$$word，compose 文件里 environment 应怎么写才能让容器拿到字面量 pa$$word？</div>
+      <button class="opt">DB_PASSWORD: pa$$word（$$ 转义成一个 $）</button>
+      <button class="opt">DB_PASSWORD: pa$word</button>
+      <button class="opt">DB_PASSWORD: ${pa$$word}</button>
+      <div class="ans">正确答案：<b>写 $$</b>。compose 插值会把单个 $ 当变量起始，$$ 才表示字面美元符。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 同一宿主上另一个 compose 项目里的服务，想直接访问 myshop 项目的 api 容器。可行方案是？</div>
+      <button class="opt">直接用 api:8080 连接，服务名全网可解析</button>
+      <button class="opt">建一个 external 网络，两边都加入，或用服务别名；访问不到就走宿主 localhost:published-port</button>
+      <button class="opt">把两个服务的 compose 文件合并成一个项目</button>
+      <div class="ans">正确答案：<b>external 网络 + 别名</b>。服务名 DNS 只在所属项目网络内有效，这是 compose 的隔离边界，不是 bug。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于 profiles，下列说法正确的是？</div>
+      <button class="opt">带 profiles 的服务在 compose up 时默认也会启动</button>
+      <button class="opt">profiles 只能通过编辑 compose 文件删除，不能命令行控制</button>
+      <button class="opt">带 profiles 的服务默认不启动，需 --profile 或 COMPOSE_PROFILES 启用；被启用服务的依赖会自动启动</button>
+      <div class="ans">正确答案：<b>默认不启动</b>。这正是 profiles 做环境分组的价值：CI 里默认不带 debug 工具，依赖链上的服务仍会被自动拉起。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. docker compose up 后你发现 deploy.replicas=3 没起 3 个副本、reservations 也没生效。解释和做法是？</div>
+      <button class="opt">deploy 段是给 Swarm 的 stack deploy 用的；compose up 要副本用 --scale，limits 会生效而 reservations 被忽略</button>
+      <button class="opt">compose 坏了，升级到最新版就好</button>
+      <button class="opt">replicas 要写在顶层 services 里而不是 deploy 里</button>
+      <div class="ans">正确答案：<b>compose up 与 stack deploy 语义不同</b>。compose up 下 replicas 忽略（用 --scale=3）、resources.limits 生效、reservations/placement 等 Swarm 专属字段无效。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>日常命令速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker compose up -d --build --wait</code><span class="desc">起服务并等到全部 healthy</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose --profile debug up -d</code><span class="desc">带调试工具启动</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose -f base.yml -f prod.yml config</code><span class="desc">查看多文件合并后的最终配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose logs -f --tail=100 api</code><span class="desc">跟某个服务最近 100 行日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose exec api sh</code><span class="desc">进运行中的容器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose run --rm api pytest</code><span class="desc">一次性命令（自动拉起依赖）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose watch</code><span class="desc">按 develop.watch 规则同步/重建</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker compose down -v</code><span class="desc">拆环境并删命名卷（数据没了，慎用）</span><button class="copy">复制</button></div>
+  </div>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Compose 规范</b></td><td>compose 文件的开放标准，version 字段已废弃</td></tr>
+    <tr><td><b>project（项目）</b></td><td>一次 up 的运行实体，默认取目录名，可用 -p / COMPOSE_PROJECT_NAME 指定</td></tr>
+    <tr><td><b>service</b></td><td>compose 文件里的一个容器定义，项目内以服务名做 DNS</td></tr>
+    <tr><td><b>插值 interpolation</b></td><td>读取 YAML 时在宿主机做 ${VAR} 替换，$$ 表示字面 $</td></tr>
+    <tr><td><b>.env</b></td><td>项目目录下的插值变量文件，只影响 compose 解析，不自动进容器</td></tr>
+    <tr><td><b>env_file</b></td><td>声明要注入容器的变量文件，不参与宿主机插值</td></tr>
+    <tr><td><b>healthcheck</b></td><td>容器内就绪/存活探测，test 支持 CMD / CMD-SHELL / NONE</td></tr>
+    <tr><td><b>depends_on</b></td><td>启动顺序控制，condition 可取 started / healthy / completed_successfully</td></tr>
+    <tr><td><b>profiles</b></td><td>服务分组开关，未启用的 profile 服务默认不启动</td></tr>
+    <tr><td><b>override 文件</b></td><td>compose.override.yml 自动合并，或 -f 多文件按顺序后者覆盖</td></tr>
+    <tr><td><b>命名卷</b></td><td>volumes 顶层声明、Docker 管理的持久化存储，容器重建不丢</td></tr>
+    <tr><td><b>bind mount</b></td><td>宿主路径直接映射进容器，适合源码/配置，改动双向可见</td></tr>
+    <tr><td><b>external 网络/卷</b></td><td>引用 compose 之外已存在的资源，跨项目共享的唯一正道</td></tr>
+    <tr><td><b>network alias</b></td><td>服务的额外 DNS 名，用于流量切换与兼容旧主机名</td></tr>
+    <tr><td><b>develop.watch</b></td><td>v2.22+ 的文件监听，动作分 sync / rebuild / sync+restart</td></tr>
+    <tr><td><b>docker stack deploy</b></td><td>Swarm 模式的部署入口，deploy 段在此生效，忽略 depends_on</td></tr>
+    <tr><td><b>x- 扩展字段</b></td><td>以 x- 开头的自定义顶层字段，用于存放可复用的 YAML 片段</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>把手上一个本地环境改造成"基座 + override + profiles"三段式：基座只留服务与网络，override 挂源码和 debug 日志，把 adminer/k6 收进 debug profile。再给 db 加上 healthcheck，把 depends_on 全部改成长语法，最后 <span class="k">docker compose config</span> 检查一遍合并结果。<br><br>
+    <b>之后值得单独学：</b>BuildKit 与多阶段构建进阶（compose 的 build 段）、Docker Desktop 的 WSL2 后端细节、以及 Skaffold/Tilt 把 compose 式体验搬进 K8s。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Docker Compose · 记住三件事：命名卷存数据，healthcheck 定顺序，$ 要转义</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（启动顺序）和模块 3（变量插值）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边用 docker compose up -d 敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：docker compose up -d 起一套 web+db 再对着拆';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 监控告警平台设计实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 监控告警平台设计实战</h1>
+    <p class="sub">监控平台不是"装个 Prometheus + Grafana"就完事。这篇讲机制：指标模型怎么设计才不炸、告警怎么分级抑制收敛、on-call 怎么联动、容量怎么算，以及<b>告警风暴、阈值拍脑袋、只监控不发</b>这三个经典死法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 层平台架构</span>
+      <span class="chip"><b>P0~P3</b> 告警分级</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议对着你司现有监控平台读：先看它的指标命名规范和告警分级表</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>监控平台到底解决什么问题</h2></div>
+  <p class="lead">一句话：<b>让故障在"用户投诉之前"被发现，并且能快速定位到根因。</b>拆开是三件事：</p>
+  <table>
+    <tr><th style="width:130px">能力</th><th>回答的问题</th><th style="width:240px">典型实现</th></tr>
+    <tr><td><b>可观测（Observability）</b></td><td>系统现在健康吗？哪里慢了？哪里错了？</td><td>Metrics + Logging + Tracing 三位一体</td></tr>
+    <tr><td><b>告警（Alerting）</b></td><td>出事了，该通知谁？半夜叫不叫人？</td><td>告警规则引擎 + 分级 + on-call 排班</td></tr>
+    <tr><td><b>定位（Diagnosis）</b></td><td>为什么出问题？根因在哪一层？</td><td>大盘、下钻、链路追踪、CMDB 关联</td></tr>
+  </table>
+  <div class="callout">
+    <b>一个常见误区：把监控当"看板工程"。</b>Grafana 大盘画得再漂亮，如果告警规则是拍脑袋设的、没人值班、告警一发几百条，那等于没监控。<b>监控的价值 = 发现率 × 及时性 × 准确率</b>，任何一个为零，整体就是零。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>整体架构：采集 / 存储 / 计算 / 告警 / 可视化</h2></div>
+  <p class="lead">主流架构（以 Prometheus 生态为范本）分五层。每一层都有明确的职责边界和数据流向。</p>
+  <pre><span class="c">┌─────────────────────────────────────────────────────────────┐</span>
+<span class="c">│  采集层 Exporter / Agent                                     │</span>
+<span class="c">│  node_exporter(机器)  mysqld_exporter(DB)                     │</span>
+<span class="c">│  app /metrics 端点(业务埋点)  kafka_exporter otel-collector   │</span>
+<span class="c">└──────────────┬──────────────────────────────────────────────┘</span>
+               <span class="g">│ pull(拉取) 或 push(推送) 原始指标</span>
+<span class="c">┌──────────────▼──────────────────────────────────────────────┐</span>
+<span class="c">│  存储层 TSDB                                                │</span>
+<span class="c">│  Prometheus(单机/Thanos/VictoriaMetrics) 本地 TSDB + 对象存储  │</span>
+<span class="c">└──────────────┬──────────────────────────────────────────────┘</span>
+               <span class="g">│ PromQL 查询</span>
+<span class="c">┌──────────────▼──────────────────────────────────────────────┐</span>
+<span class="c">│  计算层 Rule Engine                                         │</span>
+<span class="c">│  Recording Rules(预聚合降本)  Alert Rules(阈值/同比/环比)     │</span>
+<span class="c">└──────────────┬──────────────────────────────────────────────┘</span>
+               <span class="g">│ firing alerts</span>
+<span class="c">┌──────────────▼──────────────────────────────────────────────┐</span>
+<span class="c">│  告警层 Alertmanager                                        │</span>
+<span class="c">│  分组(group) 抑制(inhibit) 静默(silence) 路由(route→渠道)     │</span>
+<span class="c">└──────────────┬──────────────────────────────────────────────┘</span>
+               <span class="g">│ 电话/短信/IM/值班系统</span>
+<span class="c">┌──────────────▼──────────────────────────────────────────────┐</span>
+<span class="c">│  可视化层 Grafana / 自研大盘                                 │</span>
+<span class="c">└─────────────────────────────────────────────────────────────┘</span></pre>
+  <table>
+    <tr><th style="width:110px">层</th><th style="width:250px">关键决策点</th><th>常见选型</th></tr>
+    <tr><td><b>采集</b></td><td>pull 还是 push？采集间隔多长？谁发现 target 挂了？</td><td>pull 为主（Prometheus SD），日志/事件类用 push（Kafka/Loki）</td></tr>
+    <tr><td><b>存储</b></td><td>保留多久？单机够不够？要不要全局视图？</td><td>Prometheus 本地 15 天；长期用 VictoriaMetrics / Thanos + S3</td></tr>
+    <tr><td><b>计算</b></td><td>哪些查询要预聚合？告警规则放哪管理？</td><td>Recording rules 把慢查询固化成新指标；规则用 GitOps 管理</td></tr>
+    <tr><td><b>告警</b></td><td>怎么分组？谁被通知？升级路径是什么？</td><td>Alertmanager + PagerDuty / 自研 on-call</td></tr>
+    <tr><td><b>可视化</b></td><td>大盘谁维护？怎么防止"看板垃圾场"？</td><td>Grafana + 代码化管理（Jsonnet / Terraform），禁止手改线上大盘</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>pull 与 push 的真实差别：</b>Prometheus 的 pull 模式要求 target 可达，且<b>天然知道 target 是死是活</b>（拉取失败 = up{job="x"} = 0），这是 push 模式（如 InfluxDB、 statsd 直推）做不到的 —— push 模式下 target 自己挂了，你收到的最后一条数据看起来"岁月静好"。所以<b>即使中间有 Pushgateway / vmagent，也要保留主动探测</b>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>指标模型设计：标签规范、基数控制、分层聚合</h2></div>
+  <p class="lead">指标模型是监控平台的"数据建模"，设计错了后面全歪。<b>核心矛盾：标签（label）越丰富，能回答的问题越多，但存储和查询成本指数级上升。</b></p>
+  <h3>命名规范</h3>
+  <table>
+    <tr><th style="width:300px">规范</th><th>正例 / 反例</th></tr>
+    <tr><td><b>三层结构：命名空间_子系统_指标名_单位</b></td><td class="f">http_requests_total{code="200"}<br>反例：requestCount、请求总数</td></tr>
+    <tr><td><b>基础单位，不用 K/M 缩写</b></td><td class="f">node_memory_bytes 而不是 node_memory_mb</td></tr>
+    <tr><td><b>_total 后缀表示累计计数器</b></td><td class="f">requests_total，查询时用 rate() 取增量</td></tr>
+    <tr><td><b>标签小写 + 下划线，值用枚举</b></td><td class="f">env="prod" 而不是 env="生产环境"</td></tr>
+    <tr><td><b>必备标准标签</b></td><td class="f">service / env / cluster / instance / zone</td></tr>
+  </table>
+  <h3>基数（Cardinality）控制——最贵的教训</h3>
+  <p>一条时间序列 = 指标名 + 所有标签值组合的唯一标识。<b>基数爆炸是监控平台的头号死因。</b></p>
+  <pre><span class="c"># 基数计算示例</span>
+http_requests_total{service="api", method="GET|POST", path, code="200|500|...", pod="20个"}
+<span class="c"># 如果 path 是"原始 URL"，比如 /user/12345/order/67890</span>
+<span class="c"># 基数 = method(2) × path(百万级) × code(5) × pod(20) = 千万级序列 → 直接炸</span>
+
+<span class="c"># 正确做法：path 做归一化（路由模板）</span>
+http_requests_total{path="/user/:id/order/:oid"}  <span class="c"># 基数 = 路由模板数量，通常几十</span></pre>
+  <table>
+    <tr><th style="width:150px">标签类型</th><th>是否可加</th><th>原因</th></tr>
+    <tr><td>枚举值（status=success/fail）</td><td><b>推荐</b></td><td>值域有限，每个值就是一条序列</td></tr>
+    <tr><td>低基数 ID（pod 名、机器名）</td><td><b>谨慎</b></td><td>pod 重建序列就漂移，用实例数 × 基数估算成本</td></tr>
+    <tr><td>高基数 ID（user_id、order_id、trace_id）</td><td><b>禁止</b></td><td>一条指标能裂变成几百万条序列，TSDB 直接被打死</td></tr>
+    <tr><td>message、堆栈、URL 原文</td><td><b>禁止</b></td><td>属于日志不属于指标，送 Loki / ES</td></tr>
+  </table>
+  <h3>分层聚合：RED 与 USE</h3>
+  <table>
+    <tr><th style="width:120px">方法</th><th>适用对象</th><th>三要素</th></tr>
+    <tr><td><b>RED 方法</b></td><td>请求驱动型（服务、接口）</td><td><b>R</b>ate 请求速率 / <b>E</b>rrors 错误率 / <b>D</b>uration 延迟分布</td></tr>
+    <tr><td><b>USE 方法</b></td><td>资源型（CPU、内存、磁盘、网卡）</td><td><b>U</b>tilization 使用率 / <b>S</b>aturation 饱和度 / <b>E</b>rrors 错误数</td></tr>
+    <tr><td><b>四大黄金信号</b></td><td>通用（Google SRE）</td><td>延迟 / 流量 / 错误 / 饱和度</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>工程落地顺序：</b>① 每个服务先按 RED 埋三个指标（rate、error ratio、p99 latency），覆盖 80% 故障发现；② 机器按 USE 用现成 exporter 覆盖；③ 有富余预算再上业务指标（订单量、支付成功率）；④ <b>所有指标接入前过一遍"基数评审"</b>，评估新增序列数，超过阈值的要打回。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>告警体系：分级、抑制、收敛、升级</h2></div>
+  <p class="lead">告警体系的设计目标是：<b>该叫的时候一定叫，不该叫的时候一声不吭。</b>靠四件事：分级、抑制、收敛、升级。</p>
+  <h3>告警分级</h3>
+  <table>
+    <tr><th style="width:60px">级别</th><th style="width:150px">定义</th><th style="width:170px">响应要求</th><th>通知方式</th></tr>
+    <tr><td><b>P0</b></td><td>核心业务受损、资金损失、数据丢失风险</td><td>立即响应，5 分钟内有人处理</td><td>电话 + 短信，循环拨打直到接起</td></tr>
+    <tr><td><b>P1</b></td><td>核心功能降级，部分用户受影响</td><td>30 分钟内响应</td><td>IM 群 + 短信</td></tr>
+    <tr><td><b>P2</b></td><td>非核心功能异常，有损服务</td><td>工作时间处理</td><td>IM 群，工作时间</td></tr>
+    <tr><td><b>P3</b></td><td>隐患类：容量将满、证书临期</td><td>排期内处理</td><td>邮件 / 工单，不打扰</td></tr>
+  </table>
+  <h3>抑制（Inhibit）：一个故障只发一条告警</h3>
+  <p>网络抖动导致机房 A 全挂，几千个 target 同时告警 —— 这就是<b>告警风暴</b>。抑制规则的作用是：<b>当"上游/全局"告警已触发时，压制其下游/局部的告警。</b></p>
+  <pre><span class="c"># Alertmanager 抑制示例：机房级告警抑制机器级告警</span>
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+      - alertname="IDC-Down"          <span class="c"># 上游：机房整体不可用</span>
+    target_matchers:
+      - severity=~"warning|info"       <span class="c"># 下游：被波及的实例告警全部静默</span>
+    equal: ['idc']</pre>
+  <h3>收敛（Group）：把相关的告警合并</h3>
+  <table>
+    <tr><th style="width:150px">机制</th><th>作用</th><th style="width:250px">Alertmanager 配置</th></tr>
+    <tr><td><b>分组 group_by</b></td><td>同组告警合并成一条通知</td><td class="f">group_by: ['alertname', 'service']</td></tr>
+    <tr><td><b>等待 group_wait</b></td><td>等一会儿，把同窗口的告警凑一桌</td><td class="f">group_wait: 30s</td></tr>
+    <tr><td><b>重复间隔 group_interval</b></td><td>已通知组的新增告警打包再发</td><td class="f">group_interval: 5m</td></tr>
+    <tr><td><b>重复抑制 repeat_interval</b></td><td>同一告警未恢复，静默多久不再发</td><td class="f">repeat_interval: 4h</td></tr>
+  </table>
+  <h3>升级（Escalation）：没人认领就往上捅</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>T+0：</b>P0/P1 触发，电话 + IM 通知<b>一线值班</b>（当前 on-call）</div></div>
+    <div class="step"><div class="txt"><b>T+5min：</b>未认领（ack）→ 升级通知<b>二线（备份值班 + 主管）</b></div></div>
+    <div class="step"><div class="txt"><b>T+15min：</b>仍未认领 → 升级到 <b>SRE 负责人 / CTO</b>，并拉应急群</div></div>
+    <div class="step"><div class="txt"><b>全程：</b>告警触发即自动建 incident 工单，记录时间线，事后复盘必须引用工单</div></div>
+  </div>
+  <div class="callout danger">
+    <b>告警疲劳是组织病不是技术病：</b>如果一个值班人一周被叫醒 5 次，其中 4 次是误报，第 5 次真的他也会当误报处理。<b>衡量指标：告警准确率（真故障/总告警）目标 &gt; 90%，P0 月均误报 &lt; 2 次。</b>做不到就砍阈值、加持续时间（for: 5m）、修数据质量，而不是"大家忍一忍"。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>值班与 on-call 联动</h2></div>
+  <p class="lead">告警的终点是人。<b>on-call 机制决定了告警从"一条消息"到"一次响应"的转化率。</b></p>
+  <table>
+    <tr><th style="width:130px">要素</th><th>设计要点</th></tr>
+    <tr><td><b>排班表</b></td><td>按周轮转，主备双人（primary + secondary），节假日单独排。日历要可订阅（ICS）</td></tr>
+    <tr><td><b>认领（ack）</b></td><td>告警必须显式 ack，ack 后停止升级，同时记录"谁在处理"</td></tr>
+    <tr><td><b>升级路径</b></td><td>没人 ack 就按时间轴升级，避免"以为别人会处理"</td></tr>
+    <tr><td><b>处理 SOP</b></td><td>每个 recurring 告警配 runbook：看到什么 → 查什么 → 做什么。没有 runbook 的告警不配发</td></tr>
+    <tr><td><b>事后闭环</b></td><td>每次 P0/P1 出复盘：加监控了吗？告警及时吗？误报要不要修？</td></tr>
+    <tr><td><b>补偿机制</b></td><td>夜间被叫、节假日值班要有补贴或调休，否则排班表没人接</td></tr>
+  </table>
+  <pre><span class="c"># 一个最小可用的 on-call 状态流转</span>
+FIRING ──通知──&gt; primary 电话/IM
+   │
+   ├─ ack ──&gt; INVESTIGATING（记录处理人）──&gt; RESOLVED
+   │                                        （触发恢复通知 + 工单自动关单）
+   └─ 5min 未 ack ──&gt; 通知 secondary
+          │
+          └─ 15min 未 ack ──&gt; 通知负责人，拉应急群</pre>
+  <div class="callout">
+    <b>值班三定律：</b>① <b>没有补偿的轮值是耍流氓</b>，排班会崩；② <b>告警必须能 ack</b>，不能 ack 的系统等于逼所有人无视；③ <b>复盘必须回填到监控</b>：每次故障后问一句"这次故障监控提前发现了吗？"，把答案变成新的告警规则。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>自监控：监控系统自己的监控</h2></div>
+  <p class="lead">一个没人监控的监控系统，是集群里最大的单点。<b>自监控要独立于主监控：主监控挂了，自监控要还能发出"监控挂了"的告警。</b></p>
+  <table>
+    <tr><th style="width:180px">自监控项</th><th>判断方法</th><th>异常处理</th></tr>
+    <tr><td><b>采集存活</b></td><td>up{job="node"} == 0 持续 5 分钟</td><td>检查 exporter 进程、网络、SD 配置</td></tr>
+    <tr><td><b>数据新鲜度</b></td><td>最新样本时间戳距 now &gt; 2×scrape_interval</td><td>采集卡死 / 时钟漂移 / TSDB 写阻塞</td></tr>
+    <tr><td><b>告警链路</b></td><td>心跳告警：每 5 分钟发一条"监控系统存活"的低优先级消息到独立渠道</td><td>链路断了立刻能发现（看门狗式）</td></tr>
+    <tr><td><b>Alertmanager 状态</b></td><td>alertmanager_alerts_received_total 掉零；集群成员数 &lt; 2</td><td>HA 实例挂了要补</td></tr>
+    <tr><td><b>规则评估</b></td><td>rule_evaluation_failures_total &gt; 0；某规则 last evaluation 时间变老</td><td>规则写错 / 查询超时 / PromQL 太重</td></tr>
+    <tr><td><b>存储水位</b></td><td>磁盘使用率 &gt; 75%；序列数接近上限</td><td>扩盘 / 降基数 / 加长期存储</td></tr>
+  </table>
+  <pre><span class="c"># 数据新鲜度自监控 PromQL：超过 2 个采集周期没数据就告警</span>
+<span class="b">time</span>() - max by (job) (<span class="b">timestamp</span>(up{job=~".+"})) &gt; <span class="b">2</span> * 60
+
+<span class="c"># 心跳告警：Prometheus 侧</span>
+- alert: MonitoringPipelineHeartbeat
+  expr: vector(1)          <span class="c"># 永远为真，5 分钟发一次</span>
+  for: 0m
+  labels: {severity: info}
+  annotations:
+    summary: "监控链路存活心跳 {{ $labels.instance }}"</pre>
+  <div class="callout warn">
+    <b>心跳告警的正确用法：</b>不要指望它"告诉人一切正常"，它的价值是<b>证明链路断了</b> —— 心跳是定时发到独立 IM 群的，一旦群里心跳停了，说明监控系统自己出事了。<b>发送通道必须和主告警通道解耦</b>（比如主告警走电话系统，心跳走另一个 IM 机器人），否则一荣俱荣一损俱损。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>容量估算：用数字说话</h2></div>
+  <p class="lead">容量估算不是玄学，是乘法。下面用一套<b>真实量级的算例</b>走一遍全过程。</p>
+  <h3>算例背景</h3>
+  <ul>
+    <li>业务规模：<b>2000 台</b>物理机/虚机，<b>300 个</b>微服务实例（每服务 3~10 pod）</li>
+    <li>采集间隔：<b>15 秒</b>（Prometheus 默认）</li>
+    <li>保留策略：<b>热数据 15 天本地 + 长期 13 个月对象存储</b></li>
+  </ul>
+  <h3>第一步：算序列总数（基数）</h3>
+  <pre><span class="c"># 每台机器（node_exporter）约 800~1000 条序列</span>
+机器序列 = 2000 × 900        = 1,800,000
+
+<span class="c"># 每个业务实例：RED 指标 + JVM/运行时 + 依赖，约 1500 条</span>
+业务序列 = 300 × 3.5(pod均值) × 1500 = 1,575,000
+
+<span class="c"># 中间件：MySQL 50 实例 × 2000 + Redis 100 实例 × 1500 + Kafka 20×3000</span>
+中间件序列 = 100,000 + 150,000 + 60,000 = 310,000
+
+<span class="c"># 合计活跃序列</span>
+总序列 ≈ 1,800,000 + 1,575,000 + 310,000 ≈ <span class="g">370 万条</span></pre>
+  <h3>第二步：算写入与存储</h3>
+  <table>
+    <tr><th style="width:200px">项目</th><th>计算过程</th><th>结果</th></tr>
+    <tr><td>样本写入速率</td><td>370 万序列 ÷ 15s</td><td><b>≈ 24.7 万样本/秒</b></td></tr>
+    <tr><td>未压缩样本大小</td><td>每样本约 1~2 字节（delta-of-delta + varint）</td><td>压缩前 ≈ 24.7万 × 2B ≈ <b>0.5 MB/s</b></td></tr>
+    <tr><td>压缩后磁盘增量</td><td>压缩率约 10~15:1</td><td><b>≈ 35~55 KB/s</b></td></tr>
+    <tr><td>15 天热数据</td><td>45KB/s × 86400 × 15</td><td><b>≈ 58 GB</b></td></tr>
+    <tr><td>13 个月长期</td><td>45KB/s × 86400 × 395（降采样 5m 后约 ×1/20）</td><td>降采样后 ≈ 45KB/s ÷ 20 × 3.4e7 ≈ <b>75 GB</b></td></tr>
+    <tr><td>内存经验值</td><td>每百万活跃序列约 2~4 GB 内存</td><td>370 万 × 3GB ≈ <b>11 GB/实例</b></td></tr>
+  </table>
+  <h3>第三步：得出部署结论</h3>
+  <ul>
+    <li>单台 Prometheus 建议活跃序列 <b>&lt; 200 万</b>（再大查询和 compaction 都吃力）→ <b>至少 2~3 个 Prometheus 分片</b>，按业务线/中间件分片</li>
+    <li>需要<b>全局查询视图</b> → 上加 Thanos Query / VictoriaCluster，冷数据进对象存储</li>
+    <li>磁盘：每分片热数据 ≥ 100GB（留 40% 余量给 compaction 临时文件）</li>
+    <li>成本参考：若不降基数，序列翻 10 倍，存储和内存同步翻 10 倍 —— <b>基数治理的 ROI 是监控平台所有优化里最高的</b></li>
+  </ul>
+  <div class="callout ok">
+    <b>估算口诀：</b>序列数 ÷ 间隔 = 写入速率；写入速率 × 保留秒数 × 压缩系数 = 磁盘；活跃序列 × 2~4GB/百万 = 内存。<b>四个数乘出来，加 30~50% 余量，就是采购单。</b>记住一个数量级感觉：15s 间隔下，100 万序列 ≈ 6.7 万样本/s ≈ 每日 6~9 GB 压缩后数据。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>与 CMDB / 服务树集成</h2></div>
+  <p class="lead">监控数据回答"什么指标异常了"，<b>CMDB（配置管理数据库）回答"这是谁的服务、归谁负责"</b>。两者不打通，告警就是"某台 10.0.3.17 CPU 高了"，没人知道该找谁。</p>
+  <h3>集成点</h3>
+  <table>
+    <tr><th style="width:170px">CMDB 提供</th><th>监控消费方式</th></tr>
+    <tr><td><b>服务树/归属</b>（服务→团队→负责人）</td><td>告警路由按服务标签找到负责人电话；事故复盘自动拉组织架构</td></tr>
+    <tr><td><b>实例清单与元数据</b>（IP、机型、地域）</td><td>Prometheus service discovery 的 file_sd / 云 SD 数据源；标签富化（zone、idc、owner）</td></tr>
+    <tr><td><b>变更记录</b>（发布、扩缩容、配置变更）</td><td>告警时间轴上叠加变更事件，定位"是不是发布搞的"</td></tr>
+    <tr><td><b>依赖关系</b>（A 调 B 调 C）</td><td>故障传播分析：根因服务高亮，下游告警抑制</td></tr>
+  </table>
+  <h3>落地方式</h3>
+  <pre><span class="c"># 方式一：标签富化（推荐）—— CMDB 数据周期性写进指标标签</span>
+http_requests_total{service="order", team="trade", owner="zhangsan", zone="az1"}
+
+<span class="c"># 方式二：告警时关联查询 —— 告警 webhook 里带 instance IP，</span>
+<span class="c"># 通知前回调 CMDB API 反查负责人，动态填充 @人</span>
+
+<span class="c"># 方式三：服务树即配置源 —— 大盘、告警规则按服务树节点自动继承</span>
+<span class="c"># 新服务注册到服务树叶子节点，自动获得父级的大盘模板和告警基线</span></pre>
+  <div class="callout warn">
+    <b>两个一致性坑：</b>① <b>CMDB 里的实例已经下线了，监控还在采</b>（僵尸 target，up=1 但是没人用的机器）；② <b>CMDB 显示已下线，监控 target 没了</b>但服务还在跑（漏采）。解法：<b>每日对账作业</b> —— 拿 CMDB 清单和 Prometheus 的 target 列表做双向 diff，两边都生成差异报告，进工单闭环。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>核心配置示例</h2></div>
+  <p class="lead">下面是一套可以直接参考的最小可用配置：Prometheus 抓取 + 告警规则 + Alertmanager 路由与抑制。</p>
+  <h3>Prometheus 抓取配置</h3>
+  <pre><span class="c"># prometheus.yml 片段</span>
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels: {cluster: "prod-east", replica: "A"}
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: node
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/nodes/*.json"]   <span class="c"># CMDB 生成</span>
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: "(.*):.*"
+        target_label: instance
+        replacement: "$1"
+
+  - job_name: app
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"                                       <span class="c"># 只抓带注解的 pod</span></pre>
+  <h3>告警规则（分级 + 持续时间 + runbook）</h3>
+  <pre><span class="c"># rules/service.yml 片段</span>
+groups:
+  - name: order-service
+    rules:
+      - alert: OrderErrorRateHigh
+        expr: |
+          sum by (service)(rate(http_requests_total{service="order",code=~"5.."}[5m]))
+          / sum by (service)(rate(http_requests_total{service="order"}[5m])) &gt; 0.05
+        for: 5m                    <span class="c"># 持续 5 分钟才触发，躲过瞬时毛刺</span>
+        labels: {severity: critical, team: trade}
+        annotations:
+          summary: "订单服务 5xx 错误率 {{ $value | humanizePercentage }}"
+          runbook: "https://wiki/runbook/order-5xx"   <span class="c"># 没有 runbook 的告警不该存在</span>
+
+      - alert: OrderLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum by (le)(rate(http_duration_seconds_bucket{service="order"}[10m]))) &gt; 1.5
+        for: 10m
+        labels: {severity: warning, team: trade}</pre>
+  <h3>Alertmanager 路由（分级分流）</h3>
+  <pre><span class="c"># alertmanager.yml 片段</span>
+route:
+  receiver: default-im
+  group_by: ['alertname', 'service', 'cluster']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: pager-critical        <span class="c"># P0/P1 走电话</span>
+      repeat_interval: 1h
+      continue: true                  <span class="c"># 继续匹配后续路由（同时进 IM 群）</span>
+    - matchers:
+        - severity =~ "warning|info"
+      receiver: im-only               <span class="c"># P2/P3 只进 IM，不打电话</span>
+      repeat_interval: 12h
+
+inhibit_rules:                          <span class="c"># 机房挂了，别再用机器告警刷屏</span>
+  - source_matchers: [alertname="IDC-Down", severity="critical"]
+    target_matchers: [severity=~"warning|info"]
+    equal: ['idc']
+
+receivers:
+  - name: pager-critical
+    webhook_configs: [{url: "http://oncall-system/api/v1/alert", send_resolved: true}]
+  - name: im-only
+    webhook_configs: [{url: "http://bot.internal/alert", send_resolved: true}]
+  - name: default-im
+    webhook_configs: [{url: "http://bot.internal/alert", send_resolved: true}]</pre>
+  <div class="callout danger">
+    <b>三条配置纪律：</b>① <b>告警规则必须进 Git 仓库</b>，Code Review 后才能上线，禁止在 Grafana 页面上手点"创建告警"；② <b>每条告警必须有 runbook 链接</b>，值班人半夜 3 点看到"磁盘满了"要知道第一步跑什么命令；③ <b>for 持续时间必须显式设置</b>，默认 0s 的规则会把一次发布重试的抖动变成一次 P0。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">告警风暴：一次网络抖动发几千条告警</div><div class="pd">机房/核心交换机故障时，所有下游实例同时 up=0，短信通道都被打爆，真正的告警被淹没。必须配 inhibit_rules（机房级抑制实例级）+ group_by 收敛，并对通知渠道本身限流。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">阈值拍脑袋：CPU &gt; 80% 就告警</div><div class="pd">80% 哪来的？为什么不是 75% 或 90%？正确做法是看历史分布定基线（如 p99 水位上浮 20%），或用同比/环比（"较昨天同时段高 50%"），而不是一个魔数用三年。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只监控不发：大盘很漂亮，告警规则是空的</div><div class="pd">看板是给人"主动看"的，告警是机器"主动叫"的。核心链路（下单、支付、登录）没有配置告警规则，等于把发现故障的希望寄托在用户投诉上。每条黄金链路都必须有对应的告警。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">标签基数爆炸：把 user_id 塞进标签</div><div class="pd">一条指标裂变成几百万条序列，TSDB 内存和磁盘双双起飞，查询直接超时。指标里只允许枚举值和低基数 ID；高基数数据（用户、订单、URL 原文）是日志的活，送 Loki/ES。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">没有自监控：监控系统自己挂了三天没人知道</div><div class="pd">Prometheus 磁盘写满、Alertmanager 集群脑裂、规则评估失败，这些都不会"自己报警"。必须配心跳告警 + 数据新鲜度检查，且发送通道与主告警解耦。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">告警没人认领：没有 ack 机制，全靠@所有人</div><div class="pd">告警发到群里，每个人都以为别人会处理。必须接 on-call 系统：告警直达当前值班人，未认领按时间轴升级（5 分钟二线、15 分钟负责人），ack 后停止升级。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">告警没有 for 持续时间：发布一次抖三次 P0</div><div class="pd">滚动发布、重试、GC 都会造成秒级毛刺，规则 for: 0m 全部照单全收。所有 rate/error 类告警至少 for: 5m；容量类（磁盘将满）可以短，但要配合趋势判断。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">CMDB 与监控两边不同步</div><div class="pd">机器下线了监控还在抓（僵尸 target 刷错误日志），新扩容的机器没进 target 列表（裸奔）。必须做每日双向对账：CMDB 清单 vs Prometheus targets，差异进工单。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">监控平台本身不做高可用：单点 Prometheus</div><div class="pd">一台 Prometheus 管所有业务，它挂了全公司监控瞎一半。至少按业务线分片 + 双实例互备（Thanos Sidecar / VMCluster），Alertmanager 集群模式（≥3 实例）保证告警通道不中断。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">复盘不回流：同样的故障犯第二次</div><div class="pd">故障复盘报告写完归档，监控缺口没有补：这次是缓存命中率跌了导致的，复盘后并没有加"缓存命中率"告警。闭环要求：每个 P0/P1 复盘必须产出"新增/修改的监控项"清单，并纳入下个迭代。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 机房核心交换机故障，几千个实例同时 up=0，告警把短信通道打爆。最有效的治理手段是？</div>
+      <button class="opt">给每条告警设置更长的 repeat_interval</button>
+      <button class="opt">配置 inhibit_rules，用机房级 critical 告警抑制下层的实例级告警</button>
+      <button class="opt">把短信换成邮件，反正邮件不会爆</button>
+      <div class="ans">正确答案：<b>inhibit_rules 抑制</b>。根因是"一个全局故障产生了海量派生告警"，抑制规则让上层 critical 告警触发时自动静音下层 warning/info，一条通知解决问题。repeat_interval 只降低重复频率，解决不了首轮的几千条并发。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于指标标签（label）的基数，哪种做法是正确的？</div>
+      <button class="opt">把 user_id 加进标签，方便按用户下钻排查问题</button>
+      <button class="opt">把接口的原始 URL 加进标签，精确到每个请求路径</button>
+      <button class="opt">path 标签使用路由模板（如 /user/:id/order/:oid），禁止高基数 ID 入标签</button>
+      <div class="ans">正确答案：<b>用路由模板归一化</b>。序列数 = 指标名 × 各标签值组合数，user_id、原始 URL 会让一条指标裂变成百万级序列，TSDB 内存和磁盘都扛不住。高基数数据应该走日志（Loki/ES）链路。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于自监控，下列说法最重要的是？</div>
+      <button class="opt">心跳告警的发送通道必须与主告警通道解耦，否则监控系统整体故障时告警也发不出去</button>
+      <button class="opt">自监控就是把 Prometheus 自己也抓一遍，不需要额外机制</button>
+      <button class="opt">自监控等出故障时再补也行，平时不用关心</button>
+      <div class="ans">正确答案：<b>通道解耦</b>。自监控的核心不是"监控系统自己的指标"，而是"监控系统整体失效时还能通知到人"。心跳消息要走独立渠道（如另一个 IM 机器人），心跳停了即证明链路断裂。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 估算容量：370 万活跃序列、15 秒采集间隔，样本写入速率约为多少？</div>
+      <button class="opt">约 2.5 万样本/秒</button>
+      <button class="opt">约 24.7 万样本/秒</button>
+      <button class="opt">约 370 万样本/秒</button>
+      <div class="ans">正确答案：<b>约 24.7 万样本/秒</b>。计算：3,700,000 ÷ 15s ≈ 246,667 样本/秒。记忆锚点：15s 间隔下 100 万序列 ≈ 6.7 万样本/s ≈ 每日 6~9 GB 压缩后数据。单台 Prometheus 建议活跃序列控制在 200 万以内，所以这套规模至少分 2~3 片。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 告警分级里，P2 级告警（非核心功能受损）的正确处理方式是？</div>
+      <button class="opt">电话呼叫值班人，立即处理</button>
+      <button class="opt">静默丢弃，不通知任何人</button>
+      <button class="opt">发 IM 群/工单，工作时间处理，不打扰休息</button>
+      <div class="ans">正确答案：<b>IM/工单，工作时段处理</b>。分级的意义是"按影响匹配通知强度"：P0/P1 电话 + 立即响应，P2 工作时段 IM，P3 邮件/工单。全部电话会制造告警疲劳，全部静默则会漏掉真实劣化。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 一条 order 服务 5xx 错误率告警规则，哪种写法最合理？</div>
+      <button class="opt">rate 窗口 5m + for: 5m + severity 标签 + runbook 链接</button>
+      <button class="opt">瞬时值 &gt; 0 就触发，for: 0m，追求最快发现</button>
+      <button class="opt">只配大盘不配告警，值班人每小时看一次大盘</button>
+      <div class="ans">正确答案：<b>5m 窗口 + for: 5m + runbook</b>。瞬时毛刺（重试、发布抖动）用 for 持续时间过滤；runbook 保证半夜被叫的人知道第一步干什么；severity 标签决定路由到哪个通知渠道。"只看大盘"等于把发现故障寄托在人的自觉上。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用 PromQL 速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>rate(x_total[5m])</code><span class="desc">计数器增速，QPS/错误率的分母都靠它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum by (svc)(rate(x_total[5m]))</code><span class="desc">按服务聚合的请求速率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>histogram_quantile(0.99, sum by (le)(rate(dur_bucket[10m])))</code><span class="desc">P99 延迟，直方图标准算法</span><button class="copy">复制</button></div>
+    <div class="crow"><code>up{job="x"} == 0</code><span class="desc">target 采集失败，最基础的存活告警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>time() - max(timestamp(up)) &gt; 120</code><span class="desc">数据新鲜度：超过 2 个周期没数据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>predict_linear(node_filesystem_free[6h], 24*3600) &lt; 0</code><span class="desc">磁盘按线性趋势 24 小时内写满</span><button class="copy">复制</button></div>
+    <div class="crow"><code>topk(5, sum by (pod)(rate(cpu[5m])))</code><span class="desc">CPU 占用 Top5 pod</span><button class="copy">复制</button></div>
+    <div class="crow"><code>increase(x_total[1d])</code><span class="desc">一天累计增量，日报/容量统计</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>容量估算速查表（15s 采集间隔）</h3>
+  <table>
+    <tr><th style="width:150px">活跃序列</th><th>样本/秒</th><th>压缩后日增</th><th>内存经验值</th></tr>
+    <tr><td>10 万</td><td>≈ 6,700/s</td><td>≈ 0.6~0.9 GB</td><td>≈ 0.3 GB</td></tr>
+    <tr><td>100 万</td><td>≈ 6.7 万/s</td><td>≈ 6~9 GB</td><td>≈ 2~4 GB</td></tr>
+    <tr><td>500 万</td><td>≈ 33 万/s</td><td>≈ 30~45 GB</td><td>≈ 10~20 GB（需分片）</td></tr>
+    <tr><td>1000 万</td><td>≈ 67 万/s</td><td>≈ 60~90 GB</td><td>≈ 20~40 GB（多分片 + 长期存储）</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Metrics</b></td><td>聚合后的数值型可观测数据，带时间戳和标签，适合告警和趋势</td></tr>
+    <tr><td><b>TSDB</b></td><td>时序数据库，为"按时间顺序写、按标签查"优化的存储引擎</td></tr>
+    <tr><td><b>Exporter</b></td><td>把第三方系统指标转成 Prometheus 格式的采集代理，如 node_exporter</td></tr>
+    <tr><td><b>Pull / Push</b></td><td>拉取式采集（监控端主动抓）vs 推送式（被监控端主动发）</td></tr>
+    <tr><td><b>Cardinality 基数</b></td><td>指标名 + 标签值组合出的唯一序列数，决定存储成本</td></tr>
+    <tr><td><b>Recording Rule</b></td><td>预聚合规则，把复杂 PromQL 固化成新指标，查询降本</td></tr>
+    <tr><td><b>RED 方法</b></td><td>请求驱动系统的监控三要素：Rate、Errors、Duration</td></tr>
+    <tr><td><b>USE 方法</b></td><td>资源监控三要素：Utilization、Saturation、Errors</td></tr>
+    <tr><td><b>告警分级</b></td><td>按影响面分 P0~P3，决定通知方式和响应时限</td></tr>
+    <tr><td><b>抑制 Inhibit</b></td><td>上层告警触发时静音下层派生告警，防告警风暴</td></tr>
+    <tr><td><b>收敛 Group</b></td><td>把同组告警合并、按时间窗打包发送，减少通知条数</td></tr>
+    <tr><td><b>静默 Silence</b></td><td>维护期间临时屏蔽某类告警，到期自动失效</td></tr>
+    <tr><td><b>升级 Escalation</b></td><td>告警未认领时按时间轴通知更高级别响应人</td></tr>
+    <tr><td><b>On-call</b></td><td>值班机制：排班、认领、升级、事后复盘的闭环</td></tr>
+    <tr><td><b>Runbook</b></td><td>告警处置手册：看到什么、查什么、做什么，值班人的操作指南</td></tr>
+    <tr><td><b>自监控</b></td><td>对监控系统自身的存活、新鲜度、规则评估做监控</td></tr>
+    <tr><td><b>CMDB</b></td><td>配置管理数据库，记录服务归属、实例清单、依赖关系</td></tr>
+    <tr><td><b>服务树</b></td><td>服务的层级组织视图，告警路由和大盘权限的基本单元</td></tr>
+    <tr><td><b>告警疲劳</b></td><td>误报过多导致响应人对真告警也麻木的组织病</td></tr>
+    <tr><td><b>MTTD / MTTR</b></td><td>平均发现时间 / 平均修复时间，监控体系的核心 KPI</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 docker-compose 起一套 Prometheus + node_exporter + Alertmanager，把三个组件互相监控（自监控最小闭环）；② 写一条"错误率 &gt; 5% 持续 5 分钟"的规则，用 webhook 收到自己的 IM；③ 故意 kill 一个 exporter，观察 up==0 告警和抑制规则；④ 数一数你司现有监控的序列总数（prometheus 的 <span class="k">prometheus_tsdb_head_series</span>），对照本文速查表估算存储；⑤ 翻出最近一次 P0 的复盘，检查每条结论是否都变成了新的告警规则。<br><br>
+    <b>之后值得单独学：</b>分布式追踪（OpenTelemetry 全链路）、日志聚合（Loki/ELK 与 trace 联动）、eBPF 无侵入采集、SLO 与错误预算（用可靠性目标驱动告警，而不是拍阈值）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 监控告警平台设计实战 · 上线前务必检查：抑制规则、for 持续时间、有没有 runbook</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（告警体系）和模块 6（容量估算）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照你司的监控平台。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议对着你司现有监控平台读：先看它的指标命名规范和告警分级表';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Nginx 与负载均衡</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 21 期 · 高密度版</span>
+    <h1>二十分钟学透 Nginx 与负载均衡</h1>
+    <p class="sub">Nginx 是所有后端和运维的"必经关口"：它站在流量入口，几乎所有线上事故都会经过它。这篇的重点不是背配置，而是<b>location 匹配优先级、proxy_pass 的路径拼接、四层与七层的选择、以及 499/502/504 到底是谁的锅</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>40+</b> 配置片段</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 Nginx 跟着改配置：docker run -d -p 8080:80 --name ngx nginx</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能改配置的 Nginx</h2></div>
+  <pre><span class="c"># 一条命令起一个 Nginx（映射配置和日志出来，方便改）</span>
+mkdir -p /tmp/ngx/conf.d /tmp/ngx/logs
+docker run -d --name ngx -p 8080:80 \
+  -v /tmp/ngx/conf.d:/etc/nginx/conf.d \
+  -v /tmp/ngx/logs:/var/log/nginx \
+  nginx:alpine
+
+<span class="c"># 改完配置后校验语法（生产改配置前必做！）</span>
+docker exec ngx nginx -t
+
+<span class="c"># 平滑重载（不断连接，比 restart 安全）</span>
+docker exec ngx nginx -s reload
+
+<span class="c"># 看配置生效情况 / 版本信息</span>
+docker exec ngx nginx -T          <span class="c"># 打印最终生效的完整配置（含 include）</span>
+docker exec ngx nginx -v</pre>
+  <div class="callout warn">
+    <b>一个必须养成的习惯：</b>改配置永远先 <span class="k">nginx -t</span> 校验，再 <span class="k">nginx -s reload</span>。<br>
+    <b>为什么用 reload 不用 restart：</b>reload 是"热重载" —— master 进程用新配置启动新的 worker，老 worker 处理完手头请求再退出，<b>不丢连接</b>。restart 会断掉所有连接。但如果配置里有语法错误，reload 会失败（这也是要先 -t 的原因）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Nginx 是什么、为什么快</h2></div>
+  <p class="lead">Nginx 的核心竞争力就一个字：快。理解它为什么快，才能理解它的配置为什么长这样。</p>
+  <table>
+    <tr><th style="width:170px">特性</th><th>说明</th></tr>
+    <tr><td><b>事件驱动 + 异步非阻塞</b></td><td>一个 worker 进程用 epoll（Linux 的 IO 多路复用机制）同时管理成千上万个连接，<b>不需要为每个连接开一个线程</b></td></tr>
+    <tr><td><b>多进程 master-worker</b></td><td>一个 master 管配置和 worker，多个 worker 各自独立处理请求，充分利用多核，一个 worker 崩了不影响其他</td></tr>
+    <tr><td><b>C 语言 + 内存池</b></td><td>底层用 C 写，自己管理内存池，减少系统调用和内存分配开销</td></tr>
+    <tr><td><b>零拷贝 sendfile</b></td><td>静态文件直接从磁盘送到网卡，不经过用户态，省掉两次内存拷贝</td></tr>
+  </table>
+
+  <h3>和 Apache prefork 模型的对比（关键差异）</h3>
+  <table>
+    <tr><th style="width:130px">模型</th><th style="width:250px">机制</th><th>问题</th></tr>
+    <tr><td><b>Apache prefork</b></td><td><b>一个连接一个进程</b>（或线程）。1000 个连接就要 1000 个进程</td><td>进程重、内存占用大、上下文切换开销高。<b>几千并发就撑不住了</b></td></tr>
+    <tr><td><b>Nginx 事件驱动</b></td><td>一个 worker 管几万个连接，用事件循环处理"哪个连接有数据了"</td><td>内存占用极低，<b>单机几万并发不费劲</b></td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一句话记住：</b>Apache 是"人多好办事"（每连接一个进程），Nginx 是"一个高手管全场"（事件循环）。<b>并发连接的瓶颈不在 CPU，而在内存和文件描述符</b> —— 这也是为什么 Nginx 调优要调 <span class="k">worker_connections</span> 和 <span class="k">ulimit</span>（模块 7 讲）。
+  </div>
+
+  <h3>master-worker 架构</h3>
+  <pre><span class="c"># 进程结构（ps 能看到）</span>
+root      1234  nginx: master process        <span class="c"># 读配置、管理 worker、处理信号</span>
+www-data  1235  nginx: worker process        <span class="c"># 实际处理请求</span>
+www-data  1236  nginx: worker process
+www-data  1237  nginx: worker process        <span class="c"># 通常 = CPU 核数</span>
+
+<span class="c"># 为什么这么设计</span>
+<span class="g">✓</span> 多 worker 独立，利用多核，单个崩溃不影响整体
+<span class="g">✓</span> reload 时 master 启新 worker、停旧 worker，实现零停机
+<span class="g">✓</span> master 以 root 运行（绑 80/443 特权端口），worker 降权到 www-data（安全）</pre>
+  <div class="callout">
+    <b>一个常见的认知误区：</b>"Nginx 是单线程的，所以慢"。<b>错。</b>Nginx 是<b>多进程单线程</b> —— 每个 worker 是单线程的事件循环，但有多个 worker（默认等于 CPU 核数）。所以它是"多核并行 + 每核内事件驱动"，既利用了多核，又避免了线程切换开销。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>配置结构与 location 匹配优先级</h2></div>
+  <p class="lead">Nginx 配置是树形结构。搞懂层级关系，就知道一条配置该写在哪；搞懂 location 优先级，就避开了 80% 的"配置不生效"问题。</p>
+
+  <h3>配置层级关系</h3>
+  <pre><span class="c"># 从外到内，作用域逐层收窄</span>
+<span class="b">全局块</span>            <span class="c"># worker_processes、user 等，影响整个 Nginx</span>
+├── <span class="b">events 块</span>       <span class="c"># worker_connections 等，连接处理相关</span>
+└── <span class="b">http 块</span>         <span class="c"># HTTP 相关全局配置：log_format、gzip、upstream...</span>
+    ├── <span class="b">server 块</span>     <span class="c"># 一个虚拟主机（一个域名/端口）</span>
+    │   ├── <span class="b">location 块</span>  <span class="c"># 按 URL 路径匹配，做具体处理</span>
+    │   └── <span class="b">location 块</span>
+    └── <span class="b">server 块</span>     <span class="c"># 另一个虚拟主机</span>
+
+<span class="c"># 继承规则：内层没配就继承外层，内层配了就覆盖外层</span>
+<span class="c"># 例：http 块配了 gzip on，所有 server/location 默认都开 gzip</span></pre>
+
+  <h3>用 include 组织配置</h3>
+  <pre><span class="c"># 主配置里 include 进来，避免一个文件几千行</span>
+<span class="b">http</span> {
+    include /etc/nginx/conf.d/*.conf;      <span class="c"># 每个站点一个文件</span>
+    include /etc/nginx/mime.types;          <span class="c"># MIME 类型映射</span>
+    include /etc/nginx/sites-enabled/*;
+}
+
+<span class="c"># 推荐的组织方式：一个域名一个文件</span>
+conf.d/
+├── api.example.com.conf
+├── www.example.com.conf
+├── upstreams.conf       <span class="c"># 所有 upstream 定义集中放</span>
+└── snippets/
+    ├── ssl.conf          <span class="c"># SSL 公共配置</span>
+    ├── proxy.conf        <span class="c"># 反代公共头</span>
+    └── security.conf     <span class="c"># 安全响应头</span></pre>
+
+  <h3>location 匹配优先级（最容易搞错的地方）</h3>
+  <p>Nginx 按下面的顺序决定用哪个 location，<b>匹配到高优先级就不再往下看</b>：</p>
+  <table>
+    <tr><th style="width:60px">优先级</th><th style="width:170px">修饰符</th><th>含义</th></tr>
+    <tr><td><b>1（最高）</b></td><td class="f">location = /path</td><td><b>精确匹配</b>。URL 完全等于 /path 才命中。命中即停止</td></tr>
+    <tr><td><b>2</b></td><td class="f">location ^~ /path/</td><td><b>前缀匹配且不做正则</b>。以 /path/ 开头就命中，且命中后<b>不再检查正则 location</b></td></tr>
+    <tr><td><b>3</b></td><td class="f">location ~ regex</td><td><b>正则匹配（区分大小写）</b>。按配置中出现的<b>先后顺序</b>匹配，第一个命中即用</td></tr>
+    <tr><td><b>3</b></td><td class="f">location ~* regex</td><td><b>正则匹配（忽略大小写）</b>。同 ~ ，也按顺序</td></tr>
+    <tr><td><b>4（最低）</b></td><td class="f">location /path/</td><td><b>普通前缀匹配</b>。<b>记住最长前缀</b>，但会先让位给正则 —— 如果正则命中了，就用正则</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最反直觉的一点：普通前缀匹配"最长匹配优先"，但会被正则"截胡"。</b><br>
+    Nginx 的实际流程是：① 先找所有前缀匹配，<b>记下最长的那个</b>；② 如果最长的前缀是 <span class="k">^~</span>，直接用，结束；③ 否则<b>继续按顺序试所有正则 location</b>，第一个命中就用正则；④ 正则都没命中，才用第 ① 步记下的最长前缀。<br>
+    <b>所以 <span class="k">location /api/</span> 配了反代，但如果有个 <span class="k">location ~ \.php$</span> 正则，那 <span class="k">/api/x.php</span> 会走正则而不是 /api/。</b>
+  </div>
+  <pre><span class="c"># 匹配优先级实战：请求 /static/logo.png 会命中哪个？</span>
+<span class="b">location</span> = /static/logo.png { }        <span class="c"># 精确 → 优先，直接命中（如果有）</span>
+<span class="b">location</span> ^~ /static/ { }               <span class="c"># 前缀且不做正则 → 命中即停</span>
+<span class="b">location</span> ~ \.(png|jpg)$ { }            <span class="c"># 正则 → 会截胡普通前缀，但输给 ^~</span>
+<span class="b">location</span> / { }                          <span class="c"># 兜底前缀 → 优先级最低</span>
+
+<span class="c"># 结果：/static/logo.png → 命中 ^~ /static/（因为 ^~ 优先于正则）</span>
+<span class="c"># 若是 /images/logo.png → 命中正则 ~ \.(png|jpg)$</span>
+
+<span class="c"># 最常用的兜底写法</span>
+<span class="b">location</span> / {
+    try_files $uri $uri/ /index.html;   <span class="c"># 单页应用：找不到文件就返回 index.html</span>
+}</pre>
+  <div class="callout ok">
+    <b>实战建议：</b>① 静态资源用 <span class="k">^~</span>（避免被正则误伤）；② 后端接口用普通前缀 + <span class="k">proxy_pass</span>；③ 正则只用于必要的场景（如文件后缀）；④ <b>始终配一个 <span class="k">location /</span> 兜底</b>，否则没匹配的请求会返回 404 且很难排查。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>反向代理与负载均衡</h2></div>
+  <p class="lead">这是 Nginx 最核心的用途。其中 <span class="k">proxy_pass</span> 的路径拼接规则，是坑最多的地方。</p>
+
+  <h3>proxy_pass 的两种写法与路径拼接规则</h3>
+  <pre><span class="c"># 写法一：不带 URI（末尾没有 /）—— 保留原始路径</span>
+<span class="b">location</span> /api/ {
+    proxy_pass http://backend;         <span class="c"># 注意：http://backend 后面什么都没有</span>
+}
+<span class="c"># 请求 /api/users → 转发到 http://backend/api/users   （原样带过去）</span>
+
+<span class="c"># 写法二：带 URI（末尾有 /）—— 替换掉 location 匹配的部分</span>
+<span class="b">location</span> /api/ {
+    proxy_pass http://backend/;        <span class="c"># 注意：末尾有个 /</span>
+}
+<span class="c"># 请求 /api/users → 转发到 http://backend/users   （/api/ 被替换成 /）</span></pre>
+  <div class="callout danger">
+    <b>这是 Nginx 最经典的坑：<span class="k">proxy_pass</span> 末尾那个斜杠决定了一切。</b><br>
+    <b>规则：</b>如果 <span class="k">proxy_pass</span> 的 URL <b>包含 URI（哪怕只是一个 /）</b>，Nginx 会用这个 URI <b>替换</b>掉 location 匹配的那部分；如果<b>不包含 URI</b>（只有 <span class="k">http://backend</span>），就把完整原始路径<b>原样</b>传给上游。<br>
+    <b>记忆口诀：末尾有斜杠 = 替换（去掉前缀）；末尾没斜杠 = 保留（带上前缀）。</b><br>
+    写错的表现：后端收到的路径多了或少了 <span class="k">/api</span> 前缀，导致 404。
+  </div>
+  <pre><span class="c"># 更复杂的例子，帮你彻底搞懂</span>
+
+<span class="b">location</span> /api/v1/ {
+    proxy_pass http://backend/svc/;
+}
+<span class="c"># 请求 /api/v1/users → http://backend/svc/users</span>
+<span class="c"># 规则：/api/v1/ 被替换成 /svc/</span>
+
+<span class="b">location</span> /api/v1/ {
+    proxy_pass http://backend;
+}
+<span class="c"># 请求 /api/v1/users → http://backend/api/v1/users</span>
+<span class="c"># 规则：没有 URI，原样保留</span>
+
+<span class="c"># 正则 location 里 proxy_pass 带 URI 时，不能有未捕获的变量</span>
+<span class="b">location</span> ~ ^/user/(\d+)/ {
+    proxy_pass http://backend/u$1/;    <span class="c"># ✓ 用捕获组 $1</span>
+}</pre>
+
+  <h3>负载均衡算法</h3>
+  <pre><span class="c"># upstream 定义后端服务器组</span>
+<span class="b">upstream</span> backend {
+    server 10.0.0.1:8080;
+    server 10.0.0.2:8080;
+    server 10.0.0.3:8080;
+}</pre>
+  <table>
+    <tr><th style="width:180px">算法</th><th style="width:230px">机制</th><th>适用场景</th></tr>
+    <tr><td><b>轮询 round-robin</b><br>（默认）</td><td>按顺序依次分发</td><td>后端机器性能一致、请求耗时接近</td></tr>
+    <tr><td class="f">weight=N</td><td>按权重分发，权重高的接更多请求</td><td>机器配置不同（新老机器混用）</td></tr>
+    <tr><td class="f">ip_hash</td><td>按客户端 IP 哈希，<b>同一 IP 固定到同一台后端</b></td><td>需要会话粘性（Session 不共享的场景）</td></tr>
+    <tr><td class="f">least_conn</td><td>发给当前连接数最少的后端</td><td><b>请求耗时差异大</b>的场景（长连接、长请求）</td></tr>
+    <tr><td class="f">hash $key consistent</td><td>一致性哈希，按某个 key（如 URL、Cookie）分发</td><td>缓存命中优化（同 key 到同后端，提高缓存命中率）</td></tr>
+  </table>
+  <pre><span class="c"># 完整 upstream 配置示例</span>
+<span class="b">upstream</span> backend {
+    least_conn;                          <span class="c"># 用最少连接算法</span>
+    server 10.0.0.1:8080 weight=3;       <span class="c"># 权重 3</span>
+    server 10.0.0.2:8080 weight=1;
+    server 10.0.0.3:8080 <span class="y">backup</span>;         <span class="c"># 备份机，主节点全挂才启用</span>
+    server 10.0.0.4:8080 <span class="r">down</span>;           <span class="c"># 手动下线（维护时用）</span>
+
+    keepalive 32;                        <span class="c"># 到上游保持 32 个空闲长连接（重要！）</span>
+    keepalive_timeout 60s;
+    keepalive_requests 1000;             <span class="c"># 单个长连接最多处理多少请求后重建</span>
+}</pre>
+  <div class="callout warn">
+    <b>最容易漏的配置：upstream 的 <span class="k">keepalive</span>。</b><br>
+    默认情况下，Nginx 到后端的连接<b>每个请求都要重新建立</b>（TCP 三次握手 + 可能 TLS 握手），在高 QPS 下这是巨大的开销。<br>
+    <b>但光加 <span class="k">keepalive 32</span> 还不够</b> —— 还必须在 location 里配两个头，否则长连接不生效：
+  </div>
+  <pre><span class="b">location</span> /api/ {
+    proxy_pass http://backend;
+    <span class="c"># 这两行必须配，否则 upstream keepalive 不生效！</span>
+    proxy_http_version 1.1;              <span class="c"># HTTP/1.0 不支持长连接，必须用 1.1</span>
+    proxy_set_header Connection "";      <span class="c"># 清空 Connection 头，避免发 close</span>
+}</pre>
+
+  <h3>健康检查</h3>
+  <pre><span class="c"># 开源版 Nginx：被动的失败标记（请求失败到阈值就暂时踢掉）</span>
+<span class="b">upstream</span> backend {
+    server 10.0.0.1:8080 <span class="y">max_fails=3 fail_timeout=30s</span>;
+    <span class="c"># 30 秒内失败 3 次 → 标记为不可用 30 秒，期间不再分发</span>
+}
+<span class="c"># 局限：只有真实请求失败才会标记，不能主动探测</span>
+
+<span class="c"># 主动健康检查需要 Nginx Plus（商业版）或用 OpenResty / 第三方模块</span>
+<span class="c"># Nginx Plus 写法：</span>
+<span class="c"># health_check interval=5s fails=3 passes=2 uri=/health;</span>
+
+<span class="c"># 更通用的做法：让上游服务自己保证健康，靠 K8s 的就绪探针摘流量</span></pre>
+  <div class="callout">
+    <b>注意：开源版 Nginx 没有主动健康检查。</b>它只做被动标记（请求失败了才踢）。如果一台后端已经死了但还没被标记，流量会继续打过去，用户就会看到 502。<b>生产上通常靠外层（如 K8s Service + 就绪探针、云 LB）做主动健康检查。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>四层与七层</h2></div>
+  <p class="lead">"四层"和"七层"指 OSI 模型的工作层次。Nginx 两种都支持，但用途完全不同。</p>
+  <table>
+    <tr><th style="width:110px">层次</th><th style="width:140px">Nginx 模块</th><th>能看到什么</th><th>典型用途</th></tr>
+    <tr><td><b>四层 L4</b></td><td class="f">stream 模块</td><td>只看到 IP + 端口 + TCP/UDP 包</td><td>TCP 转发、数据库代理、MySQL/Redis 负载均衡、非 HTTP 协议</td></tr>
+    <tr><td><b>七层 L7</b></td><td class="f">http 模块</td><td>能看到 HTTP 请求：URL、Header、Cookie、方法</td><td>HTTP 反代、按路径/域名路由、改 Header、缓存、限流</td></tr>
+  </table>
+  <pre><span class="c"># 四层（stream）配置：注意是在 http 块"外面"</span>
+<span class="b">stream</span> {
+    <span class="b">upstream</span> mysql_cluster {
+        server 10.0.0.1:3306;
+        server 10.0.0.2:3306;
+    }
+    <span class="b">server</span> {
+        listen 3307;
+        proxy_pass mysql_cluster;        <span class="c"># 纯 TCP 转发，不看协议内容</span>
+        proxy_timeout 10s;
+        proxy_connect_timeout 3s;
+    }
+}</pre>
+  <table>
+    <tr><th style="width:170px">对比维度</th><th>四层</th><th>七层</th></tr>
+    <tr><td><b>性能</b></td><td><b>更好</b>（不解析应用层协议，纯转发）</td><td>略低（要解析 HTTP）</td></tr>
+    <tr><td><b>能看到应用信息</b></td><td>看不到（不知道 URL、Header）</td><td><b>能看到并改写</b></td></tr>
+    <tr><td><b>路由能力</b></td><td>只能按 IP/端口</td><td><b>能按 URL、域名、Header、Cookie 路由</b></td></tr>
+    <tr><td><b>SSL 卸载</b></td><td>可以（SSL 透传或终止）</td><td>可以（通常在这里终止）</td></tr>
+    <tr><td><b>会话保持</b></td><td>按 IP 哈希</td><td>按 Cookie / Header</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>什么时候用四层：</b>① 非 HTTP 协议（数据库、Redis、MQ、gRPC 的 TCP 模式）；② 只需要转发、不需要看内容，追求极致性能；③ 做 TLS 透传（证书在后端，Nginx 不解密）；④ 对 HTTPS 只做 TCP 转发，把证书放在后端统一管理。<br>
+    <b>什么时候用七层：</b>绝大多数 HTTP/HTTPS 场景 —— 需要按路径路由、改 Header、透传真实 IP、限流、缓存时，必须用七层。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>常用配置实战</h2></div>
+  <p class="lead">这一节全是可直接复制的配置片段，覆盖线上 90% 的需求。</p>
+
+  <h3>静态文件服务与缓存头</h3>
+  <pre><span class="b">location</span> ^~ /static/ {
+    root /var/www/html;                  <span class="c"># 文件路径 = root + URI</span>
+    expires 30d;                         <span class="c"># 加 Cache-Control 和 Expires 头，缓存 30 天</span>
+    add_header Cache-Control "public, immutable";  <span class="c"># immutable 表示内容永不变，强缓存</span>
+    access_log off;                      <span class="c"># 静态资源不打访问日志，省 IO</span>
+
+    <span class="c"># 大文件传输优化</span>
+    sendfile on;                         <span class="c"># 零拷贝，磁盘直接到网卡</span>
+    tcp_nopush on;                       <span class="c"># 攒满一个包再发，减少网络开销</span>
+    open_file_cache max=1000 inactive=20s;  <span class="c"># 缓存文件句柄，减少 stat 调用</span>
+}
+
+<span class="c"># 带哈希的静态资源（如 app.a1b2c3.js）可以设超长缓存</span>
+<span class="b">location</span> ~* \.[0-9a-f]{8}\.(js|css)$ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+}</pre>
+
+  <h3>反向代理与真实 IP 透传（必配）</h3>
+  <pre><span class="b">location</span> /api/ {
+    proxy_pass http://backend;
+
+    <span class="c"># ===== 真实 IP 透传（关键！不配的话后端日志全是 Nginx 的 IP）=====</span>
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;                              <span class="c"># 客户端真实 IP</span>
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;          <span class="c"># IP 链</span>
+    proxy_set_header X-Forwarded-Proto $scheme;                           <span class="c"># 原始协议 http/https</span>
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+
+    <span class="c"># ===== 超时（AI/长请求要调大）=====</span>
+    proxy_connect_timeout 5s;            <span class="c"># 连后端超时</span>
+    proxy_send_timeout 60s;              <span class="c"># 发请求给后端超时</span>
+    proxy_read_timeout 60s;              <span class="c"># 读后端响应超时（流式响应要调大）</span>
+
+    <span class="c"># ===== 长连接（配合 upstream keepalive）=====</span>
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+}
+
+<span class="c"># 说明：X-Forwarded-For 是"IP 链"，格式如 客户端IP, 代理1IP, 代理2IP</span>
+<span class="c"># 后端要取第一个（最左边）才是真实客户端 IP</span>
+<span class="c"># $proxy_add_x_forwarded_for = 原有 XFF + 当前 $remote_addr，自动追加</span></pre>
+  <div class="callout warn">
+    <b>X-Forwarded-For 可以伪造！</b>客户端可以自己带一个 <span class="k">X-Forwarded-For: 1.2.3.4</span> 头，Nginx 默认会追加，于是后端看到的第一个 IP 是伪造的。<br>
+    <b>正确做法：</b>在最外层入口（可信代理）用 <span class="k">proxy_set_header X-Real-IP $remote_addr</span>（直接取 TCP 层的真实源 IP，不可伪造），或者用 <span class="k">real_ip</span> 模块配合可信代理列表：
+  </div>
+  <pre><span class="c"># 用 real_ip 模块把 $remote_addr 改写成真实客户端 IP（推荐）</span>
+<span class="b">set_real_ip_from</span> 10.0.0.0/8;          <span class="c"># 信任的代理网段</span>
+<span class="b">set_real_ip_from</span> 172.16.0.0/12;
+<span class="b">real_ip_header</span> X-Forwarded-For;       <span class="c"># 从哪个头取真实 IP</span>
+<span class="b">real_ip_recursive</span> on;                  <span class="c"># 递归剥离可信代理，找到最左的非可信 IP</span>
+
+<span class="c"># 配完之后 $remote_addr 就是真实客户端 IP 了</span>
+<span class="c"># 日志格式里用 $remote_addr 即可，不需要额外处理</span></pre>
+
+  <h3>WebSocket 升级配置</h3>
+  <pre><span class="b">location</span> /ws/ {
+    proxy_pass http://backend;
+    proxy_http_version 1.1;                          <span class="c"># WebSocket 需要 1.1</span>
+    proxy_set_header Upgrade $http_upgrade;          <span class="c"># 透传 Upgrade 头</span>
+    proxy_set_header Connection "upgrade";           <span class="c"># 声明要升级协议</span>
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+
+    proxy_read_timeout 3600s;                        <span class="c"># WebSocket 长连接，超时要设很大</span>
+    proxy_send_timeout 3600s;
+}
+<span class="c"># 少了 Upgrade/Connection 两行，WebSocket 握手会失败（返回 400 或直接降级为普通 HTTP）</span></pre>
+
+  <h3>gzip 压缩</h3>
+  <pre><span class="b">gzip</span> on;
+gzip_min_length 1k;                      <span class="c"># 小于 1KB 不压缩（压缩反而更大）</span>
+gzip_comp_level 5;                       <span class="c"># 压缩级别 1-9，5 是性能/效果平衡点</span>
+gzip_types text/plain text/css application/json
+           application/javascript text/xml application/xml;   <span class="c"># 默认只压 text/html</span>
+gzip_vary on;                            <span class="c"># 加 Vary: Accept-Encoding 头，让 CDN 正确缓存</span>
+gzip_disable "msie6";                    <span class="c"># 老 IE 不压（兼容）</span>
+gzip_proxied any;                        <span class="c"># 代理的请求也压缩</span>
+<span class="c"># 注意：不要压缩图片/视频（已压缩过，再压是浪费 CPU）</span></pre>
+
+  <h3>限流：limit_req 与 limit_conn</h3>
+  <pre><span class="c"># limit_req_zone 必须写在 http 块里（定义共享内存区）</span>
+<span class="b">limit_req_zone</span> $binary_remote_addr zone=perip:10m rate=10r/s;
+<span class="c"># $binary_remote_addr：按客户端 IP 限流（比 $remote_addr 省内存）</span>
+<span class="c"># zone=perip:10m：名为 perip 的共享内存，10MB（约能存 16 万个 IP 状态）</span>
+<span class="c"># rate=10r/s：每秒 10 个请求</span>
+
+<span class="b">limit_conn_zone</span> $binary_remote_addr zone=conn_perip:10m;   <span class="c"># 按连接数限流</span>
+
+<span class="b">server</span> {
+    <span class="b">location</span> /api/ {
+        <span class="c"># 请求速率限流</span>
+        limit_req zone=perip <span class="y">burst=20 nodelay</span>;
+        <span class="c"># burst=20：允许突发 20 个请求排队（超过就 503）</span>
+        <span class="c"># nodelay：突发请求立即处理，不排队延迟</span>
+        <span class="c">#   不加 nodelay → 突发请求被排队，逐个放行（平滑但有延迟）</span>
+        limit_req_status 429;            <span class="c"># 超限返回 429（默认 503）</span>
+
+        <span class="c"># 并发连接数限流</span>
+        limit_conn conn_perip 10;        <span class="c"># 单个 IP 最多 10 个并发连接</span>
+        limit_conn_status 429;
+
+        proxy_pass http://backend;
+    }
+}</pre>
+  <div class="callout danger">
+    <b>限流的经典坑：不配 burst，正常用户会被误杀。</b><br>
+    <span class="k">rate=10r/s</span> 意味着平均每 100ms 一个请求。如果用户浏览器同时加载 15 个资源（HTML + JS + CSS + 图片），瞬间超过 10 个，<b>多出来的直接 503</b>，用户看到页面错乱。<br>
+    <b>正确做法：一定要配 <span class="k">burst</span></b>（允许一定的突发），并视情况加 <span class="k">nodelay</span>（突发立即处理）。<b>没有 burst 的限流是"误杀制造机"。</b>
+  </div>
+
+  <h3>跨域（CORS）配置</h3>
+  <pre><span class="b">location</span> /api/ {
+    <span class="c"># 简单请求：直接加响应头</span>
+    add_header Access-Control-Allow-Origin $http_origin always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
+    add_header Access-Control-Allow-Credentials "true" always;
+    <span class="c"># 注意：Allow-Credentials 为 true 时，Allow-Origin 不能用 *，必须回显具体源</span>
+
+    <span class="c"># 预检请求（OPTIONS）：直接返回 204，不转发给后端</span>
+    <span class="b">if</span> ($request_method = OPTIONS) {
+        add_header Access-Control-Max-Age 86400;   <span class="c"># 预检结果缓存 1 天</span>
+        return 204;
+    }
+
+    proxy_pass http://backend;
+}
+<span class="c"># add_header 的 always 参数：即使返回 4xx/5xx 也带上这个头，否则错误响应会丢 CORS 头</span></pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>HTTPS 配置</h2></div>
+  <p class="lead">HTTPS 配置不难，但有三个细节没做对会导致"部分客户端报错"或"安全评级低"。</p>
+
+  <h3>完整 HTTPS 配置</h3>
+  <pre><span class="b">server</span> {
+    listen 443 ssl;
+    http2 on;                            <span class="c"># 开启 HTTP/2（1.25.1+ 的写法；旧版用 listen 443 ssl http2）</span>
+    server_name www.example.com;
+
+    <span class="c"># ===== 证书配置（注意证书链要完整）=====</span>
+    ssl_certificate     /etc/nginx/ssl/fullchain.pem;   <span class="c"># 服务器证书 + 中间证书</span>
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;     <span class="c"># 私钥</span>
+    ssl_trusted_certificate /etc/nginx/ssl/chain.pem;   <span class="c"># 用于 OCSP Stapling 验证</span>
+
+    <span class="c"># ===== 协议版本与加密套件 =====</span>
+    ssl_protocols TLSv1.2 TLSv1.3;       <span class="c"># 只留 1.2/1.3，禁用不安全的 1.0/1.1</span>
+    ssl_prefer_server_ciphers off;       <span class="c"># TLS1.3 下建议 off，让客户端选更优套件</span>
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_session_cache shared:SSL:10m;    <span class="c"># 会话缓存，减少重复握手</span>
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;             <span class="c"># 关闭 ticket（有安全隐患）</span>
+
+    <span class="c"># ===== HSTS（强制浏览器只用 HTTPS）=====</span>
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    <span class="c"># ===== OCSP Stapling（加速证书状态校验）=====</span>
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 1.1.1.1 valid=300s;
+    resolver_timeout 5s;
+
+    <span class="c"># ===== 其他安全头 =====</span>
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Content-Type-Options nosniff always;
+
+    location / { proxy_pass http://backend; }
+}
+
+<span class="c"># ===== HTTP 自动跳转 HTTPS =====</span>
+<span class="b">server</span> {
+    listen 80;
+    server_name www.example.com;
+    return 301 https://$host$request_uri;   <span class="c"># 301 永久重定向</span>
+}</pre>
+
+  <h3>三个关键细节</h3>
+  <table>
+    <tr><th style="width:180px">细节</th><th>问题与解法</th></tr>
+    <tr><td><b>证书链要完整</b></td><td><b>最常见的坑。</b>只配了服务器证书、没配中间证书，浏览器（有缓存）能正常访问，但部分客户端（如某些 Java/Android/curl）会报"证书不受信任"。<b>必须用 fullchain.pem（服务器证书 + 中间证书拼接）</b></td></tr>
+    <tr><td><b>TLS 版本</b></td><td>只留 TLSv1.2 和 TLSv1.3。TLS 1.0/1.1 已被各大浏览器废弃，且存在安全漏洞。留着会拉低安全评级</td></tr>
+    <tr><td><b>HSTS 要谨慎开启</b></td><td><span class="k">Strict-Transport-Security</span> 会让浏览器"记住"该域名只能用 HTTPS，<b>一旦开启就无法回退到 HTTP</b>（max-age 期内）。首次上线建议先用短 max-age 测试，确认无误再调长</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>OCSP Stapling 是什么、为什么有用：</b>客户端验证证书时，理论上要访问 CA 的 OCSP 服务器确认证书没被吊销 —— 这个请求很慢（跨网络），且泄露隐私。<br>
+    <b>Stapling</b> 让 Nginx 自己去取 OCSP 响应并"钉"（staple）在 TLS 握手里一起发给客户端，<b>客户端不用再访问 CA，握手更快</b>。
+  </div>
+  <pre><span class="c"># 证书自动续期思路（Let's Encrypt）</span>
+<span class="c"># 方案一：certbot 自动续期</span>
+certbot renew --quiet --post-hook "nginx -s reload"
+<span class="c"># 加进 crontab，每天跑两次（Let's Encrypt 官方建议）</span>
+0 0,12 * * * certbot renew --quiet --post-hook "nginx -s reload"
+
+<span class="c"># 方案二：acme.sh（更轻量）</span>
+acme.sh --install-cert -d example.com \
+  --key-file /etc/nginx/ssl/privkey.pem \
+  --fullchain-file /etc/nginx/ssl/fullchain.pem \
+  --reloadcmd "nginx -s reload"
+<span class="c"># acme.sh 自带定时任务，无需额外配 crontab</span>
+
+<span class="c"># 关键：续期后必须 reload，否则 Nginx 还在用旧证书</span>
+<span class="c"># 建议设一个证书到期告警（到期前 30 天），作为兜底</span></pre>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>性能调优与排错</h2></div>
+  <p class="lead">调优的核心就三件事：进程数、连接数、文件描述符。排错的核心是看懂错误码和日志。</p>
+
+  <h3>核心调优参数</h3>
+  <pre><span class="c"># ===== 全局块 =====</span>
+worker_processes auto;                   <span class="c"># 通常 = CPU 核数（auto 自动检测）</span>
+worker_rlimit_nofile 65535;              <span class="c"># 单个 worker 能打开的文件描述符上限</span>
+
+<span class="b">events</span> {
+    worker_connections 10240;            <span class="c"># 每个 worker 的最大连接数（默认 512 太小！）</span>
+    use epoll;                           <span class="c"># Linux 下用 epoll（最高效）</span>
+    multi_accept on;                     <span class="c"># 一次接受多个新连接</span>
+}
+
+<span class="b">http</span> {
+    sendfile on;                         <span class="c"># 零拷贝，静态文件必开</span>
+    tcp_nopush on;                       <span class="c"># 配合 sendfile，攒包再发</span>
+    tcp_nodelay on;                      <span class="c"># 长连接下不攒包，降低延迟</span>
+    keepalive_timeout 65;                <span class="c"># 客户端连接保持时间</span>
+    keepalive_requests 1000;             <span class="c"># 单个长连接最多处理多少请求</span>
+    client_max_body_size 20m;            <span class="c"># 请求体大小上限（默认 1m，上传大文件要调大）</span>
+    client_body_buffer_size 128k;
+    client_header_timeout 10s;
+    client_body_timeout 10s;
+    types_hash_max_size 2048;
+    server_tokens off;                   <span class="c"># 隐藏版本号（安全）</span>
+}</pre>
+  <div class="callout danger">
+    <b>默认 <span class="k">worker_connections 512</span> 是线上最常见的容量陷阱。</b><br>
+    最大并发连接数 = <span class="k">worker_processes × worker_connections</span>。默认 4 核 × 512 = 2048 —— 看起来还行？<br>
+    <b>但注意：</b>Nginx 作为反向代理时，<b>一个客户端连接要占用两个连接</b>（客户端→Nginx 一个，Nginx→后端一个）。所以实际能服务的客户端数只有一半。而且还要留出内部连接（如 upstream keepalive）。<br>
+    <b>还有一层坑：</b>即使 Nginx 配得再大，如果操作系统 <span class="k">ulimit -n</span>（进程能打开的文件描述符上限）还是 1024，那 Nginx 依然卡在 1024。<b>必须同时调 <span class="k">worker_rlimit_nofile</span> 和系统 <span class="k">ulimit</span>。</b>
+  </div>
+  <pre><span class="c"># 查看并调整系统级限制</span>
+ulimit -n                        <span class="c"># 看当前限制（默认常是 1024）</span>
+
+<span class="c"># 临时调整</span>
+ulimit -n 65535
+
+<span class="c"># 永久调整（systemd 管理的服务）</span>
+<span class="c"># /etc/systemd/system/nginx.service.d/override.conf</span>
+[Service]
+LimitNOFILE=65535
+
+<span class="c"># 或改 /etc/security/limits.conf</span>
+nginx soft nofile 65535
+nginx hard nofile 65535</pre>
+
+  <h3>错误日志与日志格式</h3>
+  <pre><span class="c"># 错误日志级别：debug info notice warn error crit alert emerg</span>
+<span class="c"># 级别越高记录越少。生产用 warn 或 error，排查时临时降到 info</span>
+error_log /var/log/nginx/error.log warn;
+
+<span class="c"># 自定义日志格式：包含上游信息，排错必备</span>
+<span class="b">log_format</span> main '$remote_addr - $remote_user [$time_local] "$request" '
+                   '$status $body_bytes_sent "$http_referer" '
+                   '"$http_user_agent" '
+                   'rt=$request_time '                    <span class="c"># 总耗时</span>
+                   'urt=$upstream_response_time '         <span class="c"># 后端耗时（关键！）</span>
+                   'ua=$upstream_addr '                   <span class="c"># 实际转发到哪个后端</span>
+                   'us=$upstream_status';                 <span class="c"># 后端返回的状态码</span>
+
+access_log /var/log/nginx/access.log main;
+
+<span class="c"># 排错技巧：$request_time vs $upstream_response_time</span>
+<span class="c"># 如果 request_time 大但 upstream_response_time 小 → 问题在 Nginx 或网络</span>
+<span class="c"># 如果 upstream_response_time 大 → 问题在后端应用</span></pre>
+
+  <h3>常见错误码：谁的问题？</h3>
+  <table>
+    <tr><th style="width:100px">错误码</th><th style="width:140px">谁的问题</th><th>含义与排查</th></tr>
+    <tr><td><b>499</b></td><td><b>客户端</b></td><td><b>客户端主动断开连接</b>（Nginx 特有码）。常见原因：用户刷新/关闭页面、后端太慢用户等不及、超时时间配得太短。<b>大量 499 说明后端响应太慢</b></td></tr>
+    <tr><td><b>502</b></td><td><b>后端</b></td><td><b>Bad Gateway。</b>Nginx 连上了后端，但后端返回了非法响应或直接断开。常见原因：后端进程崩溃、后端返回格式错误、upstream 配置的后端地址不通</td></tr>
+    <tr><td><b>504</b></td><td><b>后端</b></td><td><b>Gateway Timeout。</b>Nginx 连上了后端，但后端在 <span class="k">proxy_read_timeout</span> 内没返回响应。<b>后端处理太慢</b>，要优化后端或调大超时</td></tr>
+    <tr><td><b>500</b></td><td><b>后端</b></td><td>后端应用自己抛的服务器错误（应用 bug），不是 Nginx 的问题</td></tr>
+    <tr><td><b>503</b></td><td><b>Nginx</b></td><td>Service Unavailable。常见于：限流触发（limit_req 超限默认返回 503）、上游全部不可用、Nginx 达到连接上限</td></tr>
+    <tr><td><b>413</b></td><td><b>Nginx</b></td><td>Request Entity Too Large。请求体超过 <span class="k">client_max_body_size</span>，上传大文件时常见</td></tr>
+    <tr><td><b>404</b></td><td><b>Nginx 或后端</b></td><td>路径不存在。看日志的 <span class="k">$upstream_status</span>：如果是 404 说明后端返回的；如果 upstream 没记录说明 Nginx 自己就没匹配到文件/location</td></tr>
+    <tr><td><b>301/302</b></td><td><b>Nginx</b></td><td>重定向。检查是 return 还是 rewrite 触发的，以及 Location 头指向哪里</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>499 和 504 的区分：</b>两者都是"慢"，但方向相反。<br>
+    <b>499</b> = 客户端先不等了，主动断开（Nginx 记录到客户端断开）。<br>
+    <b>504</b> = Nginx 等到自己的超时时间，还没等到后端响应，主动断开后端并返回 504。<br>
+    <b>如果同时出现大量 499 和 504，说明后端确实很慢</b>，用户在超时前就跑了，Nginx 的超时又比用户耐心长。
+  </div>
+
+  <h3>用 stub_status 看连接状态</h3>
+  <pre><span class="c"># 开启状态页（nginx 编译时需带 --with-http_stub_status_module）</span>
+<span class="b">location</span> /nginx_status {
+    stub_status;
+    allow 127.0.0.1;                     <span class="c"># 只允许本机访问（安全！）</span>
+    deny all;
+}
+
+<span class="c"># curl 访问的输出</span>
+<span class="b">Active connections</span>: 291
+server accepts handled requests
+ <span class="g">10431 10431 88432</span>
+Reading: 0 Writing: 12 Waiting: 279</pre>
+  <table>
+    <tr><th style="width:150px">字段</th><th>含义</th></tr>
+    <tr><td><b>Active connections</b></td><td>当前活跃连接数</td></tr>
+    <tr><td><b>accepts</b></td><td>总共接受的连接数</td></tr>
+    <tr><td><b>handled</b></td><td>成功处理的连接数。<b>handled &lt; accepts 说明有连接被丢弃</b>（连接数超限！）</td></tr>
+    <tr><td><b>requests</b></td><td>总请求数。requests / handled = 平均每连接处理了多少请求（keepalive 效果）</td></tr>
+    <tr><td><b>Reading</b></td><td>正在读请求头的连接数</td></tr>
+    <tr><td><b>Writing</b></td><td>正在写响应的连接数</td></tr>
+    <tr><td><b>Waiting</b></td><td>空闲的 keepalive 连接数（<b>过大说明 keepalive_timeout 太长</b>）</td></tr>
+  </table>
+  <div class="callout">
+    <b>关键诊断点：如果 <span class="k">handled</span> 明显小于 <span class="k">accepts</span>，说明 Nginx 因为连接数达到上限丢弃了连接</span>，需要调大 <span class="k">worker_connections</span> 和 <span class="k">ulimit</span>。如果 <span class="k">Waiting</span> 很大（几百上千），说明空闲长连接太多，可以适当调小 <span class="k">keepalive_timeout</span>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">location 匹配顺序搞错，规则不生效</div><div class="pd">以为前缀匹配就是最长优先，结果被正则 location 截胡。记住优先级：精确 = &gt; ^~ 前缀 &gt; 正则 ~ &gt; 普通前缀。静态资源用 ^~ 避免被正则误伤。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">proxy_pass 末尾斜杠导致路径拼接错误</div><div class="pd">末尾有斜杠 = 替换 location 匹配的部分；没斜杠 = 原样保留。写错的表现是后端收到多/少一个前缀，直接 404。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">没配真实 IP 透传，日志全是网关 IP</div><div class="pd">不配 X-Real-IP / X-Forwarded-For，后端日志里所有请求的来源 IP 都是 Nginx 的 IP，无法定位用户、无法按 IP 限流。必须透传，并用 real_ip 模块处理可信代理。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">限流没配 burst，正常用户被误杀</div><div class="pd">rate=10r/s 但没配 burst，页面并发加载十几个资源时，超出的直接被拒（503/429）。必须配 burst（并视情况加 nodelay）。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">默认只开了 512 个连接数</div><div class="pd">worker_connections 默认 512，4 核才 2048，作为反向代理时每客户端占 2 个连接，实际只能服务 1000 个客户端。必须调大，同时调 worker_rlimit_nofile 和系统 ulimit。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">没配 upstream keepalive，上游连接反复重建</div><div class="pd">默认每个请求都要和上游重新握手。高 QPS 下开销巨大。配 keepalive 时别忘了在 location 里加 proxy_http_version 1.1 和 proxy_set_header Connection ""，否则不生效。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">证书链不全，部分客户端报错</div><div class="pd">只配了服务器证书没配中间证书，有缓存的浏览器正常，但 curl/Java/部分 Android 报"证书不受信任"。必须用 fullchain.pem（服务器证书 + 中间证书）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">rewrite 和 return 优先级混淆</div><div class="pd">return 直接返回（不转发），rewrite 改 URI 后继续处理。server 块里如果同时有 return 和 location，return 会优先执行。要跳转用 return 301，要改路径用 rewrite。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">WebSocket 没配 Upgrade 头，握手失败</div><div class="pd">少配 proxy_set_header Upgrade / Connection "upgrade"，WebSocket 握手失败。而且 proxy_read_timeout 默认 60s 会掐断长连接，要调大。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">改配置直接 restart 而不是 reload</div><div class="pd">restart 会断掉所有连接（用户请求中断）。应该 nginx -t 校验后 nginx -s reload 平滑重载。而且 reload 失败会保留旧配置继续运行，比 restart 安全得多。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 请求 <span class="k">/static/logo.png</span>，下面哪个 location 会被命中？（假设都存在）</div>
+      <button class="opt">location ~ \.(png|jpg)$</button>
+      <button class="opt">location /static/</button>
+      <button class="opt">location ^~ /static/</button>
+      <div class="ans">正确答案：<b>^~ /static/</b>。优先级顺序是：精确 = &gt; ^~ 前缀 &gt; 正则 &gt; 普通前缀。^~ 前缀命中后不再检查正则，所以它赢过正则 location ~ \.(png|jpg)$。如果是普通前缀 location /static/，则会被正则截胡。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 配置 <span class="k">location /api/ { proxy_pass http://backend/; }</span>，请求 <span class="k">/api/users</span> 会被转发到？</div>
+      <button class="opt">http://backend/api/users</button>
+      <button class="opt">http://backend/users</button>
+      <button class="opt">http://backend/</button>
+      <div class="ans">正确答案：<b>http://backend/users</b>。proxy_pass 末尾有斜杠（带了 URI），会用这个 URI 替换掉 location 匹配的部分（/api/），所以 /api/users 变成 /users。如果写成 <span class="k">proxy_pass http://backend;</span>（没斜杠），则原样保留为 /api/users。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 后端应用处理很慢，Nginx 在超时时间内没等到响应，会返回哪个错误码？</div>
+      <button class="opt">504 Gateway Timeout</button>
+      <button class="opt">502 Bad Gateway</button>
+      <button class="opt">499</button>
+      <div class="ans">正确答案：<b>504</b>。Nginx 连上了后端，但后端在 proxy_read_timeout 内没返回响应，Nginx 主动断开并返回 504。502 是连上了但后端返回非法响应/崩溃；499 是客户端主动断开（Nginx 特有码）。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于 upstream keepalive，哪个说法是对的？</div>
+      <button class="opt">只要在 upstream 里配了 keepalive 32 就生效了</button>
+      <button class="opt">keepalive 是 Nginx 和客户端之间的连接复用</button>
+      <button class="opt">还需要在 location 里配 proxy_http_version 1.1 和 proxy_set_header Connection ""，否则不生效</button>
+      <div class="ans">正确答案：<b>还需要配那两个头</b>。upstream keepalive 是 Nginx 到后端的长连接复用，默认 HTTP/1.0 不支持长连接，必须用 proxy_http_version 1.1，并清空 Connection 头（否则会发 close）。少任何一个，keepalive 都不生效。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 客户端大量收到 503，且 stub_status 里 handled 明显小于 accepts，最可能的原因是？</div>
+      <button class="opt">后端服务崩溃了</button>
+      <button class="opt">Nginx 达到了连接数上限，丢弃了部分连接</button>
+      <button class="opt">证书配置错误</button>
+      <div class="ans">正确答案：<b>连接数达到上限</b>。handled &lt; accepts 说明 Nginx 接受了连接但没能处理，通常是因为 worker_connections 太小或系统 ulimit 限制。需要调大 worker_connections、worker_rlimit_nofile 和系统 ulimit。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 为什么反向代理场景下，一个客户端连接要占用两个 Nginx 连接？</div>
+      <button class="opt">因为一个是客户端到 Nginx 的连接，一个是 Nginx 到后端的连接</button>
+      <button class="opt">因为 Nginx 需要读写各一个连接</button>
+      <button class="opt">因为 HTTP 和 HTTPS 各占一个</button>
+      <div class="ans">正确答案：<b>客户端↔Nginx 和 Nginx↔后端各一个</b>。Nginx 作为代理，要同时持有到客户端的连接和到上游后端的连接。所以最大并发客户端数 ≈ (worker_processes × worker_connections) / 2，规划容量时必须考虑这个。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查配置集与术语表</h2></div>
+
+  <h3>常用配置片段（可直接复制）</h3>
+  <pre><span class="c"># ===== 1. 完整反向代理 location =====</span>
+<span class="b">location</span> /api/ {
+    proxy_pass http://backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 60s;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+}
+
+<span class="c"># ===== 2. upstream 带健康检查和长连接 =====</span>
+<span class="b">upstream</span> backend {
+    least_conn;
+    server 10.0.0.1:8080 weight=3 max_fails=3 fail_timeout=30s;
+    server 10.0.0.2:8080 weight=1;
+    server 10.0.0.3:8080 backup;
+    keepalive 32;
+}
+
+<span class="c"># ===== 3. 静态资源 + 强缓存 =====</span>
+<span class="b">location</span> ^~ /static/ {
+    root /var/www/html;
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+    access_log off;
+}
+
+<span class="c"># ===== 4. 限流 =====</span>
+<span class="b">limit_req_zone</span> $binary_remote_addr zone=perip:10m rate=10r/s;
+<span class="b">location</span> /api/ {
+    limit_req zone=perip burst=20 nodelay;
+    limit_req_status 429;
+    limit_conn conn_perip 10;
+}
+
+<span class="c"># ===== 5. HTTPS 核心三行 =====</span>
+ssl_certificate     /etc/nginx/ssl/fullchain.pem;
+ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+ssl_protocols TLSv1.2 TLSv1.3;
+
+<span class="c"># ===== 6. HTTP 跳 HTTPS =====</span>
+<span class="b">server</span> { listen 80; server_name example.com; return 301 https://$host$request_uri; }</pre>
+
+  <h3>命令速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>nginx -t</code><span class="desc">校验配置语法（改配置前必做）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nginx -T</code><span class="desc">打印最终生效的完整配置（含 include）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nginx -s reload</code><span class="desc">平滑重载配置，不断连接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nginx -s quit</code><span class="desc">优雅退出（处理完手头请求）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nginx -v / -V</code><span class="desc">看版本 / 看编译参数和模块</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tail -f /var/log/nginx/error.log</code><span class="desc">实时看错误日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps aux | grep nginx</code><span class="desc">看 master 和 worker 进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ulimit -n</code><span class="desc">看文件描述符上限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>openssl s_client -connect host:443 -servername host</code><span class="desc">测 HTTPS 证书链是否完整</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -I -H "Host: example.com" http://ip/</code><span class="desc">带 Host 头测指定站点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ab -n 1000 -c 100 http://host/</code><span class="desc">简单压测</span><button class="copy">复制</button></div>
+    <div class="crow"><code>systemctl reload nginx</code><span class="desc">systemd 管理的 reload</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>错误码排查对照表</h3>
+  <table>
+    <tr><th style="width:90px">错误码</th><th style="width:110px">责任方</th><th>典型原因</th><th style="width:180px">排查方向</th></tr>
+    <tr><td><b>499</b></td><td>客户端</td><td>客户端主动断开（用户等不及/刷新/超时短）</td><td>看后端是否太慢；调大客户端超时</td></tr>
+    <tr><td><b>502</b></td><td>后端</td><td>后端崩溃/返回非法响应/端口不通</td><td>看 error.log 的 upstream 错误；测后端直连</td></tr>
+    <tr><td><b>504</b></td><td>后端</td><td>后端处理超时</td><td>看 $upstream_response_time；优化后端或调 proxy_read_timeout</td></tr>
+    <tr><td><b>503</b></td><td>Nginx</td><td>限流触发/上游全挂/连接数超限</td><td>看 stub_status 的 handled vs accepts；检查 limit_req 配置</td></tr>
+    <tr><td><b>413</b></td><td>Nginx</td><td>请求体超过 client_max_body_size</td><td>调大 client_max_body_size</td></tr>
+    <tr><td><b>400</b></td><td>客户端/Nginx</td><td>请求格式错误/Header 过大</td><td>检查 client_header_buffer_size</td></tr>
+    <tr><td><b>301/302</b></td><td>Nginx</td><td>重定向</td><td>看 Location 头；检查 return/rewrite 规则</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>反向代理</b></td><td>Nginx 代表后端接收客户端请求并转发，客户端不知道真实后端</td></tr>
+    <tr><td><b>正向代理</b></td><td>代表客户端去访问外部服务（如公司上网代理），和反向代理方向相反</td></tr>
+    <tr><td><b>upstream</b></td><td>Nginx 里定义的一组后端服务器，用于负载均衡</td></tr>
+    <tr><td><b>epoll</b></td><td>Linux 的 IO 多路复用机制，一个线程管理大量连接</td></tr>
+    <tr><td><b>worker</b></td><td>实际处理请求的工作进程，数量通常等于 CPU 核数</td></tr>
+    <tr><td><b>四层 L4</b></td><td>工作在 TCP/UDP 层，只转发不解析应用协议</td></tr>
+    <tr><td><b>七层 L7</b></td><td>工作在 HTTP 层，能看 URL/Header 做智能路由</td></tr>
+    <tr><td><b>location</b></td><td>按 URL 路径匹配的配置块，有精确/前缀/正则三种匹配方式</td></tr>
+    <tr><td><b>proxy_pass</b></td><td>把请求转发给上游后端的指令，末尾斜杠影响路径拼接</td></tr>
+    <tr><td><b>X-Forwarded-For</b></td><td>记录请求经过的代理 IP 链，用于还原客户端真实 IP</td></tr>
+    <tr><td><b>X-Real-IP</b></td><td>直接记录客户端真实 IP（比 XFF 更可靠，但要注意可信代理）</td></tr>
+    <tr><td><b>real_ip 模块</b></td><td>把 $remote_addr 改写成真实客户端 IP，需配合可信代理网段</td></tr>
+    <tr><td><b>会话粘性</b></td><td>同一用户固定路由到同一后端（如 ip_hash），用于 Session 不共享场景</td></tr>
+    <tr><td><b>least_conn</b></td><td>把请求发给连接数最少的后端，适合请求耗时差异大的场景</td></tr>
+    <tr><td><b>limit_req</b></td><td>按请求速率限流，burst 控制突发容量，nodelay 决定突发是否排队</td></tr>
+    <tr><td><b>limit_conn</b></td><td>按并发连接数限流</td></tr>
+    <tr><td><b>HSTS</b></td><td>让浏览器强制只用 HTTPS 访问，一旦开启无法在 max-age 内回退</td></tr>
+    <tr><td><b>OCSP Stapling</b></td><td>Nginx 代取证书吊销状态并附在握手里，加速验证</td></tr>
+    <tr><td><b>证书链</b></td><td>服务器证书 + 中间证书的拼接，不全会导致部分客户端不信任</td></tr>
+    <tr><td><b>stub_status</b></td><td>Nginx 状态页，显示活跃连接、读写等待连接数</td></tr>
+    <tr><td><b>sendfile</b></td><td>零拷贝技术，静态文件从磁盘直接送网卡，不经过用户态</td></tr>
+    <tr><td><b>worker_connections</b></td><td>单个 worker 的最大连接数，默认 512，线上必须调大</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个 Nginx，写三个 location（精确、^~ 前缀、正则），用 curl 验证匹配顺序；② 配两个 upstream 后端（可用两个 nginx 容器），对比 <span class="k">proxy_pass</span> 带斜杠和不带斜杠的路径差异；③ 配一个带 <span class="k">proxy_buffering off</span> 的 SSE 转发，观察流式效果；④ 用 <span class="k">openssl s_client</span> 检查你的证书链是否完整；⑤ 配 <span class="k">limit_req</span> 并用 <span class="k">ab</span> 压测，观察 burst 的作用。<br><br>
+    <b>之后值得单独学：</b>OpenResty（用 Lua 扩展 Nginx 做复杂逻辑）、Nginx Ingress Controller（K8s 里的 Nginx）、动态 upstream（服务发现自动更新后端列表）、以及和 Envoy 的对比（云原生时代另一种主流选择）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Nginx 与负载均衡 · 上线前务必检查：location 优先级、proxy_pass 斜杠、真实 IP 透传、keepalive</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（location 优先级）和模块 3（proxy_pass 斜杠）是最高频的坑，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在本地 Nginx 里改一条 location 试试。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 Nginx 跟着改配置：docker run -d -p 8080:80 --name ngx nginx';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟实战 ClickHouse</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 10 期 · 高密度版</span>
+    <h1>二十分钟实战 ClickHouse</h1>
+    <p class="sub">ClickHouse 写起来像 SQL，用起来全是反常识。这篇不讲 SELECT 语法，讲<b>列式存储为什么快</b>、MergeTree 家族怎么选、数据怎么导、以及那些真正让集群慢下来的坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 种 MergeTree 引擎</span>
+      <span class="chip"><b>5</b> 类跳数索引</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 ClickHouse 跟着敲：docker run -d -p 8123:8123 --name ch clickhouse/clickhouse-server</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起 ClickHouse（HTTP 8123 + Native 9000）</span>
+docker run -d --name ch -p 8123:8123 -p 9000:9000 clickhouse/clickhouse-server
+
+<span class="c"># 进客户端</span>
+docker exec -it ch clickhouse-client
+
+<span class="c"># 也可以直接用 HTTP 接口</span>
+curl "http://localhost:8123/?query=SELECT%20version()"
+
+<span class="c"># 常用元命令</span>
+<span class="b">SELECT</span> version()                     <span class="c"># 版本，注意 22.x/23.x/24.x 差异不小</span>
+<span class="b">SHOW</span> tables                        <span class="c"># 当前库的表</span>
+<span class="b">SHOW CREATE TABLE</span> t              <span class="c"># 看建表语句，运维第一件事</span>
+system.parts                        <span class="c"># 看 part 数量和大小（重点盯）</span>
+system.query_log                    <span class="c"># 所有查询的日志，排查慢查询</span>
+system.mutations                    <span class="c"># 看 mutation 有没有卡住</span></pre>
+  <div class="callout warn">
+    <b>版本提醒：</b>本系列示例基于 <b>22.x / 23.x</b>（当前生产主流）。22.x 起 <span class="k">insert_deduplicate</span> 默认值变为 <span class="k">1</span>，且官方主推 <span class="k">ClickHouse Keeper</span> 替代 ZooKeeper。老版本（19.x 及更早）的部分行为与本文描述不一致。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>列式存储：为什么它快</h2></div>
+  <p class="lead">行式数据库按"行"存，一行的所有列挨在一起；列式数据库按"列"存，一列的所有值挨在一起。OLAP 场景 99% 的查询只碰几列，列存就是为这个而生的。</p>
+  <table>
+    <tr><th style="width:150px">机制</th><th>说明</th></tr>
+    <tr><td><b>列式读取</b></td><td>查 5 列就不读其他 95 列，IO 直接少一个数量级。宽表（100+ 列）优势最大</td></tr>
+    <tr><td><b>高压缩率</b></td><td>同一列数据类型相同、值域接近，LZ4/ZSTD 压缩比通常在 <b>5:1 ~ 20:1</b>。官方常见说法：1TB 行存数据 → 100GB 左右列存</td></tr>
+    <tr><td><b>向量化执行</b></td><td>不是一行一行算，而是一次处理一"块"（block，约 65,536 行），能吃满 SIMD 指令，单线程吞吐可达 <b>每秒数亿行</b> 级别的简单计算</td></tr>
+    <tr><td><b>多核并行</b></td><td>每个 part 的分片可以分给不同线程，<span class="k">max_threads</span> 默认取 CPU 核数，单查询天然并行</td></tr>
+    <tr><td><b>稀疏索引</b></td><td>主键索引不是逐行的，而是每 <span class="k">index_granularity</span>（默认 <b>8192 行</b>）记一个标记，索引可以完全放进内存</td></tr>
+  </table>
+  <h4>代价是什么</h4>
+  <table>
+    <tr><th style="width:150px">弱项</th><th>说明</th></tr>
+    <tr><td><b>点查弱</b></td><td>按主键查单行不如 MySQL 直接命中 B+ 树。ClickHouse 适合"扫一批"而不是"点一行"</td></tr>
+    <tr><td><b>事务弱</b></td><td>没有跨表事务，单条 INSERT 的一个 block 内原子。<span class="k">UPDATE</span> / <span class="k">DELETE</span> 是 mutation，异步重写整个 part</td></tr>
+    <tr><td><b>并发弱</b></td><td>默认 <span class="k">max_concurrent_queries</span> 100、单查询内存默认上限约 10GB，几百个并发复杂查询就能把机器拖死</td></tr>
+  </table>
+  <div class="callout">
+    <b>定位一句话：</b>ClickHouse 是 <b>OLAP / 日志分析 / 报表</b> 引擎，不是 MySQL 的替代品。选型判断标准很简单：写基本不更新、查询扫大量行只取少量列 —— 用它；频繁单行增删改、强事务 —— 别用它。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>MergeTree 引擎家族</h2></div>
+  <p class="lead">表引擎决定了数据怎么存、怎么合并。<b>选错引擎是 ClickHouse 最常见的架构级错误</b>，而且后期改引擎要搬数据，代价极大。</p>
+  <h4>MergeTree 本体</h4>
+  <pre><span class="b">CREATE TABLE</span> events (
+    event_date <span class="b">Date</span>,
+    event_time <span class="b">DateTime</span>,
+    user_id    <span class="b">UInt64</span>,
+    page       <span class="b">String</span>,
+    stay_ms    <span class="b">UInt32</span>
+) <span class="b">ENGINE</span> = MergeTree
+<span class="b">PARTITION BY</span> toYYYYMM(event_date)          <span class="c"># 按月分区</span>
+<span class="b">ORDER BY</span> (event_date, user_id)            <span class="c"># 排序键 = 主键 = 稀疏索引依据</span>
+<span class="b">SETTINGS</span> index_granularity = 8192;</pre>
+  <ul>
+    <li><b>part</b>：每次 INSERT 生成一个 part（物理目录），后台 merge 线程把小 part 合成大 part。所有"合并"都发生在这里</li>
+    <li><b>ORDER BY</b> 就是排序键，也是主键。<b>它不保证唯一性</b> —— 同样键的两行可以同时存在，直到某次 merge 才可能去掉重复（取决于引擎）</li>
+    <li>查询时同键多行都返回，<b>想要去重要么建表时选对引擎，要么查询时自己 GROUP BY</b></li>
+  </ul>
+  <h4>家族成员怎么选</h4>
+  <table>
+    <tr><th style="width:190px">引擎</th><th style="width:230px">合并时行为</th><th>适用场景</th></tr>
+    <tr><td><b>MergeTree</b></td><td>只按排序键归并，不去重不聚合</td><td>原始流水、日志。不关心重复的默认选择</td></tr>
+    <tr><td><b>ReplacingMergeTree</b></td><td>排序键相同的行只保留最后写入的一行（可带 version 列定"最后"）</td><td>需要去重的宽表、CDC 结果表。<b>只在 merge 时去重，不保证实时</b></td></tr>
+    <tr><td><b>SummingMergeTree</b></td><td>排序键相同的行，数值列求和后合并</td><td>简单预聚合：点击量、金额汇总。<b>非聚合列取任意一行的值</b></td></tr>
+    <tr><td><b>AggregatingMergeTree</b></td><td>按 AggregateFunction 类型列存储聚合状态（uniq、sumIf 等）</td><td>复杂预聚合：UV（uniq）、漏斗、多维汇总</td></tr>
+    <tr><td><b>CollapsingMergeTree</b></td><td>sign=+1/-1 的两行互相抵消，等价于"更新"</td><td>需要更新历史数据的场景。写两行（新值 +1，旧值 -1）</td></tr>
+    <tr><td><b>VersionedCollapsingMergeTree</b></td><td>带 version 列，乱序也能正确折叠</td><td>Collapsing 的乱序安全版本</td></tr>
+  </table>
+  <pre><span class="c"># ReplacingMergeTree：去重表的标准写法</span>
+<span class="b">CREATE TABLE</span> user_profile (
+    user_id    <span class="b">UInt64</span>,
+    nick       <span class="b">String</span>,
+    updated_at <span class="b">DateTime</span>
+) <span class="b">ENGINE</span> = ReplacingMergeTree(updated_at)  <span class="c"># version 列：取 updated_at 最大的行</span>
+<span class="b">ORDER BY</span> (user_id);
+
+<span class="c"># SummingMergeTree：预聚合表</span>
+<span class="b">CREATE TABLE</span> pv_daily (
+    stat_date <span class="b">Date</span>,
+    page      <span class="b">String</span>,
+    pv        <span class="b">UInt64</span>
+) <span class="b">ENGINE</span> = SummingMergeTree
+<span class="b">ORDER BY</span> (stat_date, page);
+
+<span class="c"># AggregatingMergeTree：UV 统计</span>
+<span class="b">CREATE TABLE</span> uv_daily (
+    stat_date <span class="b">Date</span>,
+    uv_state  AggregateFunction(uniq, <span class="b">UInt64</span>)
+) <span class="b">ENGINE</span> = AggregatingMergeTree
+<span class="b">ORDER BY</span> (stat_date);
+<span class="b">INSERT INTO</span> uv_daily <span class="b">SELECT</span> event_date, uniqState(user_id) <span class="b">FROM</span> events <span class="b">GROUP BY</span> event_date;</pre>
+  <div class="callout danger">
+    <b>ReplacingMergeTree 的头号误区：以为插入了去重数据，查询就查不出来重复。</b><br>
+    去重只发生在<b>后台 merge</b>。一条新数据插入后、merge 之前，同样的 key 查出来是<b>两行</b>。查询侧兜底手段：<span class="k">GROUP BY user_id HAVING ...</span> 取一行，或者 <span class="k">FINAL</span>（见模块 7 的代价）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>分区与索引</h2></div>
+  <p class="lead">ClickHouse 的索引体系分两层：<b>分区</b>做粗粒度裁剪，<b>稀疏主索引 + 跳数索引</b>做 part 内定位。理解这层的顺序，才能看懂 EXPLAIN。</p>
+  <h4>分区（PARTITION BY）</h4>
+  <ul>
+    <li>分区是<b>物理目录</b>：每个分区一个目录，查询时按分区表达式直接跳过无关目录（partition pruning）</li>
+    <li>典型写法：<span class="k">toYYYYMM(date)</span> 按月、<span class="k">toMonday(date)</span> 按周、<span class="k">tuple()</span> 单分区（小表）</li>
+    <li><b>不要用高基数字段做分区键</b>（如 user_id、事件 ID），也不要按天分得太细 —— 分区太多会让 merge 任务碎片化。日志场景按月足够</li>
+  </ul>
+  <h4>稀疏主索引</h4>
+  <ul>
+    <li>主键索引按 <span class="k">index_granularity</span>（默认 <b>8192 行</b>）为粒度记录"这个 granule 的最小值"，一个 1 亿行的表索引只有约 1.2 万条记录，全放内存</li>
+    <li>因为稀疏，<b>同一个 granule 内的行不能被索引区分</b> —— 查单行要读整个 8192 行的 granule。这就是它不适合点查的原因</li>
+    <li>主键就是 ORDER BY 的前几个字段。<b>把查询过滤最高频的字段放前面</b>，后面的字段只参与排序不参与定位</li>
+  </ul>
+  <h4>跳数索引（Skip Index）</h4>
+  <p>主索引之外的第二层。按 part 粒度存储，查询时能跳过整个 granule，对"非主键列的等值/范围过滤"有效：</p>
+  <table>
+    <tr><th style="width:170px">类型</th><th style="width:250px">作用</th><th>示例</th></tr>
+    <tr><td class="f">minmax</td><td>记录 granule 内最大最小值，范围查询跳过</td><td>对 status_code 建 minmax</td></tr>
+    <tr><td class="f">set(N)</td><td>记录 granule 内出现过的 N 个值，等值 IN 跳过</td><td>对 city 建 set(100)</td></tr>
+    <tr><td class="f">ngrambf_v1</td><td>对字符串的 n-gram 建布隆过滤器，支持 LIKE 前缀</td><td>ngrambf_v1(1,3,0,42)</td></tr>
+    <tr><td class="f">tokenbf_v1</td><td>对分词后的 token 建布隆过滤器</td><td>tokenbf_v1(10240,2,0)</td></tr>
+    <tr><td class="f">bloom_filter</td><td>对任意列建布隆过滤器，等值跳过</td><td>bloom_filter GRANULARITY 3</td></tr>
+  </table>
+  <pre><span class="c"># 建跳数索引的语法</span>
+<span class="b">ALTER TABLE</span> events <span class="b">ADD INDEX</span> idx_page set(100) GRANULARITY 4;
+<span class="b">ALTER TABLE</span> events <span class="b">MATERIALIZE INDEX</span> idx_page;   <span class="c"># 对已有数据建索引（重操作）</span>
+
+<span class="c"># 验证索引是否被用上</span>
+<span class="b">SETTINGS</span> use_skip_indexes = 1;
+<span class="b">EXPLAIN</span> indexes = 1
+<span class="b">SELECT</span> count() <span class="b">FROM</span> events <span class="b">WHERE</span> page = '/home';</pre>
+  <h4>TTL：让数据自己过期</h4>
+  <pre><span class="c"># 表级 TTL：3 个月前的数据自动删分区</span>
+) <span class="b">ENGINE</span> = MergeTree
+<span class="b">ORDER BY</span> (event_date, user_id)
+<span class="b">TTL</span> event_date + <span class="b">INTERVAL</span> 3 <span class="b">MONTH</span>;
+
+<span class="c"># 列级 TTL：过期后把列置默认值而不是删整行</span>
+<span class="b">TTL</span> event_date + <span class="b">INTERVAL</span> 7 <span class="b">DAY</span> <span class="b">DELETE</span> WHERE stay_ms = 0;   <span class="c"># 条件 TTL</span>
+
+<span class="c"># TTL 由后台线程按 ttl_interval 检查（默认 4 小时一次）</span>
+<span class="b">SHOW</span> server_settings <span class="b">LIKE</span> 'ttl%';</pre>
+  <div class="callout warn">
+    <b>TTL 不是精确到期的：</b>默认 4 小时扫一次，到期数据可能在磁盘上多待半天。<b>不能把 TTL 当合规删除的精确手段</b>，需要精确删还是要走分区 DROP PARTITION（秒级且不产生 IO）。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>数据导入：批量、乱序与 Exactly-once</h2></div>
+  <p class="lead">ClickHouse 的性能一半靠引擎，一半靠"怎么喂数据"。喂错了，再好的配置也跑不动。</p>
+  <h4>批量是第一生产力</h4>
+  <pre><span class="c"># 正确：一次插入 1 万 ~ 10 万行</span>
+<span class="b">INSERT INTO</span> events <span class="b">VALUES</span>
+('2026-10-01', '2026-10-01 10:00:00', 1001, '/home', 120),
+...                          <span class="c"># 一批至少 1000 行，官方建议 1000 ~ 100000</span>
+
+<span class="c"># 错误示范（每个新手都干过）</span>
+<span class="b">INSERT INTO</span> events <span class="b">VALUES</span> (...);   <span class="c"># 循环逐行插 → part 爆炸，merge 永远追不上</span>
+
+<span class="c"># 22.x+ 小插入救星：服务端自动攒批</span>
+<span class="b">SET</span> async_insert = 1;                 <span class="c"># 服务端把并发小 INSERT 合成块</span>
+<span class="b">SET</span> wait_for_async_insert = 1;        <span class="c"># 等攒批完成再返回，保证读得到</span>
+
+<span class="c"># 从文件直接灌（CSV/TSV/Parquet）</span>
+<span class="b">INSERT INTO</span> events <span class="b">SELECT</span> * <span class="b">FROM</span> file('events.tsv', TSV, 'event_date Date, ...');</pre>
+  <div class="callout danger">
+    <b>part 爆炸是 ClickHouse 第一大病：</b>每次 INSERT 生成一个 part，后台 merge 有速率上限。写入速度 &gt; merge 速度时，part 数量滚雪球 —— 查询变慢、<span class="k">Too many parts</span> 报错（<span class="k">parts_to_throw_insert</span> 默认 3000）。<b>规则：保证单分区 part 数维持在三位数以内。</b>用 <span class="k">SELECT partition, count() FROM system.parts GROUP BY partition</span> 日常巡检。
+  </div>
+  <h4>乱序插入问题</h4>
+  <ul>
+    <li>MergeTree 假设数据<b>大致按主键有序到达</b>。批量插入顺序颠倒的数据时，每个 part 的键范围错乱，merge 时无法"顺序拼接"，只能做更贵的交叉合并</li>
+    <li>更糟的是<b>跨分区乱序</b>：今天的 INSERT 里混进上个月的数据，会产生大量极小 part，merge 直接崩</li>
+    <li>工程对策：① 上游按时间分片后按序发送；② 大延迟数据单独一张"迟到表"，定期 <span class="k">INSERT SELECT</span> 归位；③ 批量内先 <span class="k">ORDER BY</span> 再插</li>
+  </ul>
+  <h4>Exactly-once：只有 Replicated 表能做到</h4>
+  <table>
+    <tr><th style="width:210px">能力</th><th>MergeTree（单机）</th><th>ReplicatedMergeTree</th></tr>
+    <tr><td>重复 INSERT 同一批数据</td><td>插几次存几份</td><td><b>insert_deduplicate=1 时块级去重</b></td></tr>
+    <tr><td>原理</td><td>无状态，不记录已插入的块</td><td>块指纹（block id）记录在 <b>ClickHouse Keeper</b> 中，重试/重发同指纹直接跳过</td></tr>
+    <tr><td>注意</td><td>该设置对非 Replicated 表<b>完全无效</b>，不会报错，但照样重复</td><td>22.x 起默认开启；块 id 可由客户端生成保证重试幂等</td></tr>
+  </table>
+  <pre><span class="c"># 客户端保证幂等的标准姿势：显式指定 insert_deduplication_token（23.x+）</span>
+<span class="b">INSERT INTO</span> events <span class="b">SETTINGS</span> insert_deduplication_token = 'batch-uuid-123'
+<span class="b">VALUES</span> (...);
+
+<span class="c"># 常见同步链路选型</span>
+<span class="c"># Kafka → ClickHouse：Kafka 引擎表 + 物化视图落库（见模块 5）</span>
+<span class="c"># MySQL → ClickHouse：MaterializeMySQL 引擎（CDC 实时，19.x+）</span>
+<span class="c"># 批量 T+1：S3/HDFS url() 函数 + INSERT SELECT</span></pre>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>物化视图与投影</h2></div>
+  <p class="lead">两个名字都带"预计算"，但机制完全不同。<b>混用它们是经典事故来源。</b></p>
+  <h4>物化视图（Materialized View）</h4>
+  <ul>
+    <li>ClickHouse 的 MV 是<b>插入触发器</b>：源表每插入一个 block，触发引擎把 block 按 SELECT 语句变换后写入目标表。<b>不是查询时替换原表的"视图"</b></li>
+    <li>目标表必须用聚合引擎（AggregatingMergeTree / SummingMergeTree 等），MV 本身只是管道</li>
+    <li><b>只对新数据生效</b>：建 MV 之前的历史数据不会自动回填，要手动 <span class="k">INSERT SELECT</span> 灌一次</li>
+    <li>查询永远查目标表，源表可以保留也可以 TTL 掉</li>
+  </ul>
+  <pre><span class="c"># 实时 UV 统计：源表 → MV → 聚合表</span>
+<span class="b">CREATE TABLE</span> uv_mv (
+    stat_date <span class="b">Date</span>,
+    uv        AggregateFunction(uniq, <span class="b">UInt64</span>)
+) <span class="b">ENGINE</span> = AggregatingMergeTree <span class="b">ORDER BY</span> stat_date;
+
+<span class="b">CREATE MATERIALIZED VIEW</span> uv_view <span class="b">TO</span> uv_mv
+<span class="b">AS SELECT</span>
+    event_date,
+    uniqState(user_id) <span class="b">AS</span> uv
+<span class="b">FROM</span> events
+<span class="b">GROUP BY</span> event_date;
+
+<span class="c"># 查询时用 uniqMerge 合并状态</span>
+<span class="b">SELECT</span> stat_date, uniqMerge(uv) <span class="b">AS</span> uv <span class="b">FROM</span> uv_mv <span class="b">GROUP BY</span> stat_date <span class="b">ORDER BY</span> stat_date;</pre>
+  <h4>Kafka 实时管道（MV 的经典组合）</h4>
+  <pre><span class="c"># 1. Kafka 引擎表（只是管道，不存数据）</span>
+<span class="b">CREATE TABLE</span> kafka_events (event_date Date, user_id UInt64, page String)
+<span class="b">ENGINE</span> = Kafka <span class="b">SETTINGS</span> kafka_broker_list = 'kafka:9092',
+    kafka_topic_list = 'events', kafka_group_name = 'ch_consumer',
+    kafka_format = 'JSONEachRow';
+
+<span class="c"># 2. 目标表（真正的存储）</span>
+<span class="b">CREATE TABLE</span> events (event_date Date, user_id UInt64, page String)
+<span class="b">ENGINE</span> = MergeTree <span class="b">ORDER BY</span> (event_date, user_id);
+
+<span class="c"># 3. MV 把 Kafka 数据搬进目标表</span>
+<span class="b">CREATE MATERIALIZED VIEW</span> kafka_to_events <span class="b">TO</span> events
+<span class="b">AS SELECT</span> * <span class="b">FROM</span> kafka_events;</pre>
+  <h4>投影（PROJECTION）</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>物化视图</th><th>投影</th></tr>
+    <tr><td><b>本质</b></td><td>独立的管道 + 目标表，数据多存一份</td><td>同一张表内的附加数据副本（另一份排序/聚合）</td></tr>
+    <tr><td><b>查询方式</b></td><td>应用显式查目标表</td><td>透明加速，优化器自动选（可用 <span class="k">SETTINGS optimize_use_projections=0</span> 关闭）</td></tr>
+    <tr><td><b>数据一致性</b></td><td>与源表最终一致，有延迟</td><td>与主数据强一致（同一 part 内维护）</td></tr>
+    <tr><td><b>代价</b></td><td>存储 + 写入翻倍</td><td>存储 + 写入也翻倍（但无跨表一致性烦恼）</td></tr>
+  </table>
+  <pre><span class="c"># 投影：给表加一份按 page 聚合的副本，查询按 page 汇总时自动走它</span>
+<span class="b">ALTER TABLE</span> events <span class="b">ADD PROJECTION</span> pv_by_page (
+    <span class="b">SELECT</span> page, count() <span class="b">AS</span> pv, sum(stay_ms) <span class="b">AS</span> total_ms
+    <span class="b">GROUP BY</span> page
+);
+<span class="b">ALTER TABLE</span> events <span class="b">MATERIALIZE PROJECTION</span> pv_by_page;   <span class="c"># 对已有数据生效</span></pre>
+  <div class="callout warn">
+    <b>MV 的"只对新数据生效"坑过无数人：</b>晚上 8 点建好 UV 物化视图，一看数字很小 —— 因为今天之前的数据没回填。<b>建完 MV 必须补一次历史数据</b>，否则图表断崖。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>从 MySQL/PostgreSQL 过来：语法差异</h2></div>
+  <p class="lead">会 SQL 不等于会写 ClickHouse。<b>下面这些差异没有报错提示，只有慢查询和错数据。</b></p>
+  <table>
+    <tr><th style="width:170px">概念</th><th style="width:250px">MySQL / PostgreSQL</th><th>ClickHouse</th></tr>
+    <tr><td><b>主键</b></td><td>唯一约束 + 索引</td><td>稀疏索引 + 排序键。<b>不保证唯一</b>，重复键可以共存</td></tr>
+    <tr><td><b>UPDATE/DELETE</b></td><td>行级操作，毫秒级，事务内</td><td><b>mutation</b>：异步重写整个 part，大表上以小时计，期间产生额外 IO</td></tr>
+    <tr><td><b>事务</b></td><td>ACID，跨表跨行</td><td>单条 INSERT 的一个 block 内原子。没有跨表事务</td></tr>
+    <tr><td><b>JOIN</b></td><td>嵌套循环 / hash / 索引，优化器选</td><td>hash join 为主。<b>大表在线 JOIN 是灾难</b>，应宽表化或用字典</td></tr>
+    <tr><td><b>NULL</b></td><td>普遍使用</td><td>Nullable 类型有额外存储和计算开销，<b>能用默认值就别用 NULL</b></td></tr>
+    <tr><td><b>自增 ID</b></td><td>AUTO_INCREMENT</td><td>没有。需要序列用 <span class="k">generateSnowflakeID()</span> 或上游生成</td></tr>
+    <tr><td><b>ALTER</b></td><td>轻量（多数场景）</td><td>加列是元数据操作（秒级）；<b>改类型、删列是 mutation</b>（重写数据）</td></tr>
+    <tr><td><b>分页</b></td><td>LIMIT OFFSET</td><td>同样支持，但深分页要扫全部前序行，大表用 <span class="k">LIMIT BY</span> + 分区裁剪</td></tr>
+  </table>
+  <pre><span class="c"># ===== 日期函数：MySQL 的 DATE_FORMAT → ClickHouse 的 formatDateTime =====</span>
+<span class="b">SELECT</span> formatDateTime(event_time, '%Y-%m-%d %H:00:00') <span class="b">AS</span> hour_bucket, count()
+<span class="b">FROM</span> events <span class="b">GROUP BY</span> hour_bucket;
+<span class="c"># 更高效的做法：时间先归整再聚合，减少分组基数</span>
+<span class="b">SELECT</span> toStartOfHour(event_time) <span class="b">AS</span> h, count()
+<span class="b">FROM</span> events <span class="b">GROUP BY</span> h;
+
+<span class="c"># ===== PG 的 generate_series → ClickHouse 没有，用数组或系统表 =====</span>
+<span class="b">SELECT</span> arrayJoin(range(toUInt32(1), 101)) <span class="b">AS</span> n;
+
+<span class="c"># ===== ClickHouse 特有的 LIMIT BY：每组取前 N =====</span>
+<span class="b">SELECT</span> user_id, page, event_time
+<span class="b">FROM</span> events
+<span class="b">ORDER BY</span> user_id, event_time <span class="b">DESC</span>
+<span class="b">LIMIT</span> 3 <span class="b">BY</span> user_id;        <span class="c"># 每个 user_id 取最近 3 条</span>
+
+<span class="c"># ===== WITH TOTALS：PG/Oracle 有的 ROLLUP 平替 =====</span>
+<span class="b">SELECT</span> page, count() <span class="b">FROM</span> events <span class="b">GROUP BY</span> page <span class="b">WITH TOTALS</span>;</pre>
+  <div class="callout warn">
+    <b>mutation 不是普通 UPDATE：</b><span class="k">ALTER TABLE t UPDATE col = v WHERE id = 1</span> 提交后立刻返回，但它在后台<b>重写包含这些行的每个 part</b>。百万级行的表上一个 mutation 可能跑几十分钟，期间磁盘 IO 翻倍。<b>ClickHouse 的正确姿势是"追加写"</b>：更新 = 插一行新版本 + ReplacingMergeTree 去重，或者 CollapsingMergeTree 折叠。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>性能优化：宽表、PREWHERE 与 FINAL</h2></div>
+  <h4>宽表设计：把 JOIN 消灭在写入时</h4>
+  <ul>
+    <li>OLAP 的第一优化原则：<b>查询时少 JOIN，写入时多冗余</b>。维度表（用户、商品、地区）在 ETL 阶段打成宽表，一条记录查所有列</li>
+    <li>实在要关联小维表：用<b>外部字典</b>（dictionary）或 <span class="k">LowCardinality(String)</span> + <span class="k">ENUM</span>，字典常驻内存，<span class="k">dictGet()</span> 是内存查找不走 join</li>
+    <li><b>LowCardinality(String)</b>：低基数（几百到几万个不同值）字符串列的利器，字典编码通常省 5~10 倍内存，聚合也能走全局序数</li>
+  </ul>
+  <pre><span class="c"># 宽表 + 低基数类型</span>
+<span class="b">CREATE TABLE</span> events_wide (
+    event_date <span class="b">Date</span>,
+    city       <span class="b">LowCardinality</span>(<span class="b">String</span>),   <span class="c"># 几百个城市，字典编码</span>
+    device     <span class="b">LowCardinality</span>(<span class="b">String</span>),
+    user_id    <span class="b">UInt64</span>,
+    stay_ms    <span class="b">UInt32</span>
+) <span class="b">ENGINE</span> = MergeTree <span class="b">PARTITION BY</span> toYYYYMM(event_date)
+<span class="b">ORDER BY</span> (event_date, city);
+
+<span class="c"># 字典 JOIN 的替代：dictGet</span>
+<span class="b">SELECT</span> user_id, dictGet('user_dict', 'nick', toUInt64(user_id)) <span class="b">AS</span> nick
+<span class="b">FROM</span> events_wide <span class="b">LIMIT</span> 10;</pre>
+  <h4>PREWHERE：先过滤再读列</h4>
+  <ul>
+    <li>ClickHouse 的列存读取是"按需读列"。<span class="k">PREWHERE</span> 先算过滤条件、用结果去读其他列，能少读大列（长字符串、大 JSON）</li>
+    <li><b>对 MergeTree，优化器会自动把 WHERE 提升为 PREWHERE</b>（move_primary_key_columns 相关优化），所以多数情况写 WHERE 就够；显式 PREWHERE 用于强制语义或兼容旧版</li>
+    <li>真正常见的性能杀手是 <span class="k">SELECT *</span> —— 把 200 列全读出来只为查 2 列。<b>永远点名要查的列</b></li>
+  </ul>
+  <pre><span class="c"># PREWHERE 显式写法（等价语义，显式提示优化器）</span>
+<span class="b">SELECT</span> user_id, stay_ms
+<span class="b">FROM</span> events_wide
+<span class="b">PREWHERE</span> event_date = '2026-10-01'      <span class="c"># 先按分区裁剪</span>
+<span class="b">WHERE</span> stay_ms &gt; 5000;
+
+<span class="c"># 看查询瓶颈：rows_read vs rows_returned</span>
+<span class="b">SELECT</span> query, read_rows, result_rows, query_duration_ms
+<span class="b">FROM</span> system.query_log <span class="b">WHERE</span> type = 'QueryFinish' <span class="b">ORDER BY</span> query_duration_ms <span class="b">DESC</span> <span class="b">LIMIT</span> 10;</pre>
+  <h4>FINAL：最贵的四个字母</h4>
+  <table>
+    <tr><th style="width:200px">写法</th><th>行为</th></tr>
+    <tr><td class="f">SELECT ... FROM t FINAL WHERE ...</td><td>查询时实时执行"合并"：跨 part 按排序键去重/折叠。<b>每个查询都要做一遍，CPU 和内存双倍消耗</b></td></tr>
+    <tr><td class="f">GROUP BY + any/argMax</td><td>查询时按业务键自去重，<b>只碰查询真正需要的列</b>，通常比 FINAL 便宜</td></tr>
+    <tr><td class="f">写入时保证唯一</td><td>上游去重后写入，或 Replicated + insert_deduplicate。<b>根治方案</b></td></tr>
+  </table>
+  <pre><span class="c"># 替代 FINAL 的惯用法：argMax 取每个 key 最新的版本</span>
+<span class="b">SELECT</span> user_id,
+       argMax(nick, updated_at)      <span class="b">AS</span> nick,
+       max(updated_at)               <span class="b">AS</span> updated_at
+<span class="b">FROM</span> user_profile
+<span class="b">GROUP BY</span> user_id;</pre>
+  <div class="callout danger">
+    <b>FINAL 的正确用法：</b>只用于<b>低并发管理查询、对账、巡检</b>。放在高并发 API 查询里，QPS 一上来 CPU 直接打满 —— 而且 FINAL 无法利用主键索引跳过 granule，是全表归并。生产上要么 GROUP BY 去重，要么把去重下沉到写入侧。
+  </div>
+  <h4>更多必调项</h4>
+  <div class="cmds">
+    <div class="crow"><code>max_threads</code><span class="desc">默认 CPU 核数。高并发多租户场景要往下调，防止单查询吃满机器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_execution_time</code><span class="desc">单查询最大秒数，默认 0（不限）。必须设，兜底慢查询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_memory_usage</code><span class="desc">单查询内存上限，约 10GB。GROUP BY 大基数聚合前先估算</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_bytes_before_external_group_by</code><span class="desc">超限自动溢写磁盘，防大分组 OOM</span><button class="copy">复制</button></div>
+    <div class="crow"><code>parts_to_throw_insert</code><span class="desc">单分区 part 数超限直接拒绝插入（默认 3000），防 part 爆炸的最后防线</span><button class="copy">复制</button></div>
+    <div class="crow"><code>use_query_cache</code><span class="desc">21.6+ 查询缓存，重复相同 SELECT 直接命中，适合看板</span><button class="copy">复制</button></div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">循环逐行 INSERT</div><div class="pd">每次插入生成一个 part，merge 永远追不上写入，part 数滚雪球直至 Too many parts 报错。至少攒 1000 行一批，或开 async_insert。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">高频小批量乱序插入</div><div class="pd">跨分区、跨主键乱序的小 part 会让 merge 退化成交叉合并，磁盘 IO 和 CPU 双高。上游按时间分片按序发送，迟到数据走单独表。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为 ReplacingMergeTree 查出来就没重复</div><div class="pd">去重只在后台 merge 时发生，未合并前同键多行都返回。兜底：查询时 GROUP BY 去重，或 FINAL（低并发场景）。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">高并发查询用 FINAL</div><div class="pd">FINAL 每次查询都实时归并全 part，不能利用主键索引，CPU 和内存双倍消耗。看板和 API 场景禁用，用 argMax 替代。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把 UPDATE/DELETE 当日常操作</div><div class="pd">mutation 异步重写整个 part，大表上以小时计，期间磁盘 IO 翻倍、查询变慢。正确姿势是追加写 + 去重引擎。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">分区键选了高基数字段</div><div class="pd">按 user_id 分区会产生几十万个分区目录，merge 调度碎片化，元数据爆炸。分区键用日期类低基数表达式。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把 ORDER BY 当唯一约束</div><div class="pd">MergeTree 主键不保证唯一。上游重试、双写、回灌都会产生重复行，上游必须自己做幂等。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">线上查询 SELECT *</div><div class="pd">宽表 200 列全读，IO 和网络全浪费。永远点名要查的列，大字段（String/JSON）按需取。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">两张大表在线 JOIN</div><div class="pd">ClickHouse 的 JOIN 是 hash join，两张十亿级表 join 直接吃光内存。要么宽表化，要么字典，要么先聚合再 join。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">不设 TTL、不巡检磁盘</div><div class="pd">日志类数据只增不减，磁盘写满集群进入只读。建表即设 TTL，日常巡检 system.parts 和磁盘水位。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. MergeTree 的 ORDER BY 定义的主键，下面哪个说法是对的？</div>
+      <button class="opt">保证排序键组合唯一，重复插入会报错</button>
+      <button class="opt">是稀疏索引，不保证唯一，重复键可以共存于不同 part</button>
+      <button class="opt">等同于 MySQL 的聚簇索引，逐行精确定位</button>
+      <div class="ans">正确答案：<b>稀疏索引，不保证唯一</b>。索引每 8192 行（一个 granule）只记一个标记，同 granule 内的行无法区分；排序键相同的两行可以同时存在，直到后台 merge 才可能去掉。点查单行也不是它的强项。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一张用户画像表需要"同一 user_id 只保留最新一条"，应该选哪种引擎？</div>
+      <button class="opt">SummingMergeTree</button>
+      <button class="opt">AggregatingMergeTree</button>
+      <button class="opt">ReplacingMergeTree(updated_at)，ORDER BY user_id</button>
+      <div class="ans">正确答案：<b>ReplacingMergeTree</b>。带 version 列（这里是 updated_at）时，后台 merge 对相同排序键的行保留版本最大的那行。注意去重不是实时的，未 merge 前查询仍可能查到多行，需要 GROUP BY 或 FINAL 兜底。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 想用 insert_deduplicate 实现 Exactly-once 插入，前提是？</div>
+      <button class="opt">表必须是 ReplicatedMergeTree（块指纹记录在 Keeper 中）</button>
+      <button class="opt">任何表都行，这是服务端全局设置</button>
+      <button class="opt">必须开启 Kafka 引擎</button>
+      <div class="ans">正确答案：<b>只对 ReplicatedMergeTree 有效</b>。块级去重依赖 ClickHouse Keeper 里记录的 block id，单机 MergeTree 没有这个协调机制，设置它不会报错但完全不生效。22.x 起默认值为 1。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 一条查询要按 event_date 过滤后取两列大字符串，应该怎么写？</div>
+      <button class="opt">SELECT * FROM t WHERE event_date = '2026-10-01'</button>
+      <button class="opt">SELECT col_a, col_b FROM t PREWHERE event_date = '2026-10-01'</button>
+      <button class="opt">先不加条件查全表再在客户端过滤</button>
+      <div class="ans">正确答案：<b>点名列 + PREWHERE</b>。列存的优势就是"只读要用的列"，SELECT * 把 200 列全读出来是最大的浪费；PREWHERE 先算过滤条件再读其他列。对 MergeTree，优化器通常会自动做 WHERE→PREWHERE 提升，但显式写更保险。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 为什么 ClickHouse 不推荐用 ALTER TABLE ... UPDATE 更新数据？</div>
+      <button class="opt">语法不支持，UPDATE 是禁用的</button>
+      <button class="opt">因为会锁全表导致查询全部阻塞</button>
+      <button class="opt">因为它是 mutation：异步重写包含目标行的每个 part，大表上极慢且 IO 翻倍</button>
+      <div class="ans">正确答案：<b>mutation 重写整个 part</b>。提交后立刻返回但后台执行，重写期间磁盘 IO 翻倍、查询变慢，十亿级行的表上一个 mutation 可能跑几小时。正确做法是追加写新版本行 + ReplacingMergeTree 去重，或 CollapsingMergeTree 折叠。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. SummingMergeTree 对"相同排序键"的多行记录会怎么合并？</div>
+      <button class="opt">数值列求和后合并成一行，其他列取任意一行的值</button>
+      <button class="opt">保留最后写入的一行，其余丢弃</button>
+      <button class="opt">所有列原样保留，只是物理上放到一起</button>
+      <div class="ans">正确答案：<b>数值列求和，非聚合列取任意值</b>。这是"保留最后一行"（ReplacingMergeTree）和"求和"（SummingMergeTree）的关键区别。也因为非聚合列取任意值，SummingMergeTree 不适合明细混合场景。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查 SQL</h3>
+  <div class="cmds">
+    <div class="crow"><code>SELECT * FROM system.parts WHERE active</code><span class="desc">巡检 part 数量和大小，防 part 爆炸</span><button class="copy">复制</button></div>
+    <div class="crow"><code>OPTIMIZE TABLE t FINAL</code><span class="desc">强制触发合并（运维窗口用，线上慎用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ALTER TABLE t DROP PARTITION '202601'</code><span class="desc">秒级删分区，比 DELETE 高效几个数量级</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN indexes = 1 SELECT ...</code><span class="desc">看索引和分区裁剪是否生效</span><button class="copy">复制</button></div>
+    <div class="crow"><code>KILL QUERY WHERE query_duration_ms &gt; 60</code><span class="desc">杀掉超时慢查询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT ... FROM system.query_log ORDER BY query_duration_ms DESC LIMIT 10</code><span class="desc">找最慢的查询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT table, sum(rows) FROM system.parts GROUP BY table</code><span class="desc">估算每张表的行数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW CREATE TABLE t</code><span class="desc">看建表语句：引擎、分区、排序键、TTL 全在里面</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SET async_insert = 1, wait_for_async_insert = 1</code><span class="desc">小插入攒批，22.x+ 救星</span><button class="copy">复制</button></div>
+    <div class="crow"><code>INSERT INTO t SETTINGS insert_deduplication_token = 'uuid'</code><span class="desc">显式幂等令牌，Exactly-once</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT argMax(col, ver) FROM t GROUP BY key</code><span class="desc">替代 FINAL 的去重惯用法</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dictGet('dict', 'col', key)</code><span class="desc">字典查找，替代小表 JOIN</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置项</h3>
+  <pre><span class="c"># server 级（config.xml）里最该盯的几个</span>
+max_threads                    <span class="c"># 默认 CPU 核数；高并发多租户往下调</span>
+max_execution_time = 120       <span class="c"># 单查询最大秒数，必须设</span>
+max_memory_usage = 10GB        <span class="c"># 单查询内存上限</span>
+parts_to_throw_insert = 3000   <span class="c"># 单分区 part 数上限，防爆炸最后防线</span>
+merge_tree.max_bytes_to_merge  <span class="c"># 单次合并最大字节，防单次合并 IO 尖刺</span>
+async_insert = 1               <span class="c"># 22.x+ 小插入自动攒批</span>
+
+<span class="c"># 日常巡检 SQL（建议放监控）</span>
+<span class="b">SELECT</span> partition, count() <span class="b">AS</span> parts, formatReadableSize(sum(bytes_on_disk)) <span class="b">AS</span> size
+<span class="b">FROM</span> system.parts <span class="b">WHERE</span> active <span class="b">GROUP BY</span> partition <span class="b">ORDER BY</span> parts <span class="b">DESC</span>;</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>列式存储</b></td><td>按列连续存储数据，查询只读需要的列，高压缩、适合 OLAP</td></tr>
+    <tr><td><b>MergeTree</b></td><td>ClickHouse 的核心引擎家族：INSERT 生成 part，后台 merge 合并</td></tr>
+    <tr><td><b>Part</b></td><td>每次插入生成的物理数据单元，合并的最小单位</td></tr>
+    <tr><td><b>排序键 / 主键</b></td><td>ORDER BY 定义的键，数据在 part 内按它有序，也是稀疏索引依据，不保证唯一</td></tr>
+    <tr><td><b>Granule</b></td><td>索引粒度，默认 8192 行，主键索引按它记录边界值</td></tr>
+    <tr><td><b>分区</b></td><td>PARTITION BY 定义的物理目录，查询时整目录跳过</td></tr>
+    <tr><td><b>跳数索引</b></td><td>part 内的二级索引（minmax/set/bloom_filter 等），跳过无关 granule</td></tr>
+    <tr><td><b>ReplacingMergeTree</b></td><td>merge 时对相同键保留最后一行，实现最终一致去重</td></tr>
+    <tr><td><b>SummingMergeTree</b></td><td>merge 时相同键的数值列求和，做简单预聚合</td></tr>
+    <tr><td><b>AggregatingMergeTree</b></td><td>存储 AggregateFunction 聚合状态，做 UV 等复杂预聚合</td></tr>
+    <tr><td><b>物化视图</b></td><td>插入触发器：源表数据按 SELECT 变换后增量写入目标表，只对新数据生效</td></tr>
+    <tr><td><b>投影</b></td><td>表内附加数据副本，查询时透明加速，与主数据强一致</td></tr>
+    <tr><td><b>Mutation</b></td><td>ALTER UPDATE/DELETE 的异步重写操作，大表上极重</td></tr>
+    <tr><td><b>insert_deduplicate</b></td><td>块级去重开关，只对 ReplicatedMergeTree 有效，22.x 默认开启</td></tr>
+    <tr><td><b>PREWHERE</b></td><td>先计算过滤条件再读其他列，减少大列 IO</td></tr>
+    <tr><td><b>FINAL</b></td><td>查询时实时执行合并，去重准确但极贵，禁用于高并发</td></tr>
+    <tr><td><b>LowCardinality</b></td><td>低基数字符串列的字典编码类型，省 5~10 倍内存</td></tr>
+    <tr><td><b>ClickHouse Keeper</b></td><td>替代 ZooKeeper 的协调服务，管复制、块去重、DDL 协调</td></tr>
+    <tr><td><b>TTL</b></td><td>数据/列的自动过期机制，按 ttl_interval（默认 4h）周期性执行</td></tr>
+    <tr><td><b>part 爆炸</b></td><td>小批量高频插入导致 part 数远超 merge 速度，查询劣化直至拒绝写入</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 ClickHouse，完成这五件事 —— ① 建一张按月分区、LowCardinality 列的宽表，灌 10 万行，用 system.parts 看 part 数量；② 用 ReplacingMergeTree + insert_deduplication_token 测幂等插入；③ 建一个 SummingMergeTree 物化视图做每日 PV，验证 MV 只对新数据生效；④ 对同一查询分别用 FINAL 和 argMax 去重，对比 query_log 里的耗时；⑤ 给表加 TTL，观察过期行为。<br><br>
+    <b>之后值得单独学：</b>Distributed 表与分片策略、ClickHouse Keeper 部署、与 Kafka/MySQL 的实时链路、以及查询缓存和查询调优的完整方法论。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟实战 ClickHouse · 上线前务必检查：批量插入、part 数量、FINAL 用法</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（引擎选择）和模块 7（FINAL 坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 clickhouse-client 里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 ClickHouse 跟着敲：docker run -d -p 8123:8123 --name ch clickhouse/clickhouse-server';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Linux 命令行与系统排查</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:28px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:22px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 10 期 · 高密度版</span>
+    <h1>二十分钟学透 Linux 命令行与系统排查</h1>
+    <p class="sub">这篇按 <b>SRE 排查思路</b>写 —— 重点不是"有哪些命令"，而是<b>线上出问题了，按什么顺序查、看到什么数字该怀疑什么</b>。命令只是工具，方法论才是核心。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>12</b> 大模块</span>
+      <span class="chip"><b>150+</b> 条命令</span>
+      <span class="chip"><b>1</b> 套排查方法论</span>
+      <span class="chip"><b>10</b> 个高危坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">在 Linux 上敲。Windows 用户可以用 WSL 或起个容器：docker run -it ubuntu bash</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个心智模型</h2></div>
+  <p class="lead">Linux 命令很多，但底层只有三个思想。抓住它们，命令就是自然推论。</p>
+  <table>
+    <tr><th style="width:150px">思想</th><th>含义</th><th>带来的好处</th></tr>
+    <tr><td><b>一切皆文件</b></td><td>设备、进程信息、网络状态，都以文件形式暴露。比如 <span class="k">/proc/cpuinfo</span> 是 CPU 信息，<span class="k">/dev/sda</span> 是磁盘</td><td>所有工具都能统一处理它们，不用为每种资源学新语法</td></tr>
+    <tr><td><b>小工具 + 管道组合</b></td><td>每个命令只做一件事，用 <span class="k">|</span> 把前一个的输出接到后一个的输入</td><td>几个简单命令拼起来能解决复杂问题，不用写脚本</td></tr>
+    <tr><td><b>一切皆文本</b></td><td>配置是文本、日志是文本、命令输出是文本</td><td>grep / sed / awk 三件套通吃所有场景</td></tr>
+  </table>
+
+  <h3>重定向与退出码（管道的基础）</h3>
+  <pre><span class="c"># 重定向</span>
+cmd <span class="b">&gt;</span> file         <span class="c"># 标准输出写入文件（覆盖）</span>
+cmd <span class="b">&gt;&gt;</span> file        <span class="c"># 追加</span>
+cmd <span class="b">2&gt;</span> err.log     <span class="c"># 只把错误输出写入文件（2 = stderr）</span>
+cmd <span class="b">&gt;</span> out.log <span class="b">2&gt;&amp;1</span>  <span class="c"># 标准输出和错误都写进去（最常用）</span>
+cmd <span class="b">&gt;</span> /dev/null    <span class="c"># 丢弃输出（只关心退出码时）</span>
+cmd <span class="b">&lt;</span> input.txt    <span class="c"># 从文件读输入</span>
+
+<span class="c"># 退出码：0 表示成功，非 0 表示失败</span>
+echo $?                  <span class="c"># 上一条命令的退出码</span>
+cmd1 <span class="b">&amp;&amp;</span> cmd2          <span class="c"># cmd1 成功才执行 cmd2</span>
+cmd1 <span class="b">||</span> cmd2          <span class="c"># cmd1 失败才执行 cmd2</span>
+cmd1 <span class="b">;</span> cmd2           <span class="c"># 顺序执行，不管成败</span></pre>
+  <div class="callout ok">
+    <b>为什么退出码重要？</b>因为它是脚本和 CI/CD 判断"上一步成没成功"的唯一依据。<span class="k">grep</span> 找不到匹配时退出码是 1（不是错误），这在脚本里经常导致意外 —— 想忽略它就用 <span class="k">grep xxx || true</span>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>文件与文本处理：日志分析的日常</h2></div>
+  <h3>找文件</h3>
+  <pre><span class="c"># find：按条件查找（功能最强）</span>
+find /var/log -name "*.log"                    <span class="c"># 按名字</span>
+find / -type f -size +100M 2&gt;/dev/null         <span class="c"># 大于 100MB 的文件，排查磁盘满</span>
+find /data -mtime -1                           <span class="c"># 最近 1 天修改过的</span>
+find . -name "*.log" -delete                   <span class="c"># 找到并删除</span>
+find / -type f -size +100M -exec ls -lh {} \;  <span class="c"># 找到后执行命令</span></pre>
+  <div class="callout warn">
+    <b>find 从根目录 <span class="k">/</span> 搜会非常慢</b>，而且会报一堆权限错误（用 <span class="k">2&gt;/dev/null</span> 丢掉）。<b>先缩小范围</b>，比如 <span class="k">/var</span>、<span class="k">/home</span>、<span class="k">/data</span>。<br>
+    另一个坑：<span class="k">find . -name "*.log" -delete</span> 删之前一定要先跑一遍不带 -delete 的版本看清楚。
+  </div>
+
+  <h3>grep：搜索文本</h3>
+  <pre>grep "ERROR" app.log                     <span class="c"># 基本搜索</span>
+grep -i "error" app.log                  <span class="c"># 忽略大小写</span>
+grep -r "关键词" /path/                  <span class="c"># 递归搜索目录</span>
+grep -c "ERROR" app.log                  <span class="c"># 只输出匹配行数</span>
+grep -n "ERROR" app.log                  <span class="c"># 显示行号</span>
+grep -v "DEBUG" app.log                  <span class="c"># 反向：排除匹配的行</span>
+grep -A 3 -B 1 "Exception" app.log       <span class="c"># 显示匹配行后 3 行、前 1 行</span>
+grep -E "ERROR|WARN" app.log             <span class="c"># 扩展正则，用 | 表达"或"</span></pre>
+
+  <h3>sed：流式编辑</h3>
+  <pre>sed -n '100,200p' app.log                <span class="c"># 只打印 100-200 行</span>
+sed 's/old/new/g' file                   <span class="c"># 替换（不修改原文件）</span>
+sed -i 's/old/new/g' file                <span class="c"># 原地替换（会改文件，谨慎）</span>
+sed -i.bak 's/old/new/g' file            <span class="c"># 原地替换并留备份</span>
+sed '/^$/d' file                         <span class="c"># 删除空行</span></pre>
+
+  <h3>awk：按列处理（日志分析神器）</h3>
+  <pre><span class="c"># 假设 access.log 格式：IP - - [时间] "请求" 状态码 大小</span>
+awk '{print $1}' access.log                       <span class="c"># 打印第 1 列（IP）</span>
+awk '{print $1, $9}' access.log                   <span class="c"># 打印 IP 和状态码</span>
+awk '$9 == 500' access.log                        <span class="c"># 筛选状态码是 500 的行</span>
+awk '$9 &gt;= 400 {print $1, $9}' access.log         <span class="c"># 条件 + 输出</span>
+awk '{sum += $10} END {print sum/1024/1024 " MB"}' access.log   <span class="c"># 求和</span></pre>
+
+  <h3>五个实战组合（直接抄）</h3>
+  <pre><span class="c"># ① 统计访问量 Top 10 的 IP</span>
+awk '{print $1}' access.log | sort | uniq -c | sort -rn | head -10
+
+<span class="c"># ② 统计各状态码出现次数</span>
+awk '{print $9}' access.log | sort | uniq -c | sort -rn
+
+<span class="c"># ③ 实时看日志里的错误（最常用）</span>
+tail -f app.log | grep --line-buffered "ERROR"
+
+<span class="c"># ④ 找出某时间段内的日志</span>
+sed -n '/2026-10-16 10:00/,/2026-10-16 11:00/p' app.log
+
+<span class="c"># ⑤ 统计每分钟的请求量（看有没有突刺）</span>
+awk '{print substr($4, 2, 17)}' access.log | uniq -c</pre>
+  <div class="callout ok">
+    <b>管道组合的读法：从左往右，每一步的输出就是下一步的输入。</b><br>
+    以 ① 为例：<span class="k">awk</span> 取 IP → <span class="k">sort</span> 排序（uniq 要求相邻才能去重）→ <span class="k">uniq -c</span> 统计连续重复的次数 → <span class="k">sort -rn</span> 按数字倒序 → <span class="k">head -10</span> 取前 10。<br>
+    <b>理解了这个链条，你就能自己拼出无数种分析。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>进程与作业管理</h2></div>
+  <pre><span class="c"># 看进程</span>
+ps aux                                   <span class="c"># 所有进程，BSD 风格</span>
+ps -ef                                   <span class="c"># 所有进程，System V 风格</span>
+ps aux --sort=-%mem | head -10           <span class="c"># 按内存倒序取前 10</span>
+ps aux --sort=-%cpu | head -10           <span class="c"># 按 CPU 倒序</span>
+pgrep -f "python app.py"                 <span class="c"># 按名字找 PID</span>
+pstree -p                                <span class="c"># 进程树，看父子关系</span>
+
+<span class="c"># 实时监控</span>
+top                                      <span class="c"># 基础版。按 M 按内存排序，P 按 CPU，1 展开每核</span>
+htop                                     <span class="c"># 更好用（需安装）</span>
+
+<span class="c"># 结束进程</span>
+kill 12345                               <span class="c"># 发送 SIGTERM(15)，优雅退出，让程序清理资源</span>
+kill -9 12345                            <span class="c"># 发送 SIGKILL(9)，强杀，程序无法清理</span>
+pkill -f "python app.py"                 <span class="c"># 按名字杀</span>
+killall nginx                            <span class="c"># 按进程名杀所有</span></pre>
+  <div class="callout danger">
+    <b>先 kill 再 kill -9，这个顺序很重要。</b>SIGTERM 让程序有机会保存数据、关闭连接、释放锁；SIGKILL 直接由内核终止，程序没有任何反应机会。<br>
+    <b>直接 -9 可能导致：数据只写了一半、文件锁没释放、子进程变孤儿。</b>只有在进程完全卡死不响应 SIGTERM 时才用 -9。
+  </div>
+  <pre><span class="c"># 后台运行</span>
+cmd &amp;                    <span class="c"># 放到后台</span>
+nohup cmd &amp;              <span class="c"># 后台运行且不受终端关闭影响，输出到 nohup.out</span>
+nohup cmd &gt; out.log 2&gt;&amp;1 &amp;   <span class="c"># 指定输出文件（更常用）</span>
+jobs                     <span class="c"># 看当前 shell 的后台任务</span>
+fg %1                    <span class="c"># 把任务 1 调回前台</span>
+bg %1                    <span class="c"># 让任务 1 继续在后台跑</span>
+disown %1                <span class="c"># 脱离 shell，关终端也不退出</span></pre>
+  <div class="callout warn">
+    <b>nohup 和 disown 都只解决"终端关闭"，不解决"进程崩溃"。</b>生产环境跑常驻服务应该用 <b>systemd</b>（模块 8 会讲）—— 它能自动重启、开机自启、统一管日志。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>权限与用户</h2></div>
+  <pre><span class="c"># 权限的读法：-rwxr-xr--</span>
+<span class="c">#  第1位：类型（- 普通文件，d 目录，l 软链接）</span>
+<span class="c">#  2-4位：属主权限（u）</span>
+<span class="c">#  5-7位：属组权限（g）</span>
+<span class="c">#  8-10位：其他人权限（o）</span>
+
+<span class="c"># 数字表示：r=4  w=2  x=1</span>
+<span class="c"># 755 = rwxr-xr-x   644 = rw-r--r--   600 = rw-------</span>
+
+chmod 755 script.sh              <span class="c"># 数字方式（最常用）</span>
+chmod +x script.sh               <span class="c"># 加执行权限</span>
+chmod -R 755 /var/www            <span class="c"># 递归</span>
+
+chown user:group file            <span class="c"># 改属主和属组</span>
+chown -R www-data:www-data /var/www
+
+<span class="c"># 查看自己是谁</span>
+whoami; id                       <span class="c"># id 会显示所属的所有组</span>
+sudo cmd                         <span class="c"># 以 root 身份执行</span>
+sudo -i                          <span class="c"># 切换到 root 的交互式 shell</span></pre>
+  <div class="callout warn">
+    <b>三个必须知道的特殊权限位：</b><br>
+    <b>SUID（4）</b>：<span class="k">chmod 4755</span>，执行时以文件属主身份运行。<span class="k">/usr/bin/passwd</span> 就是典型（普通用户也能改密码）。<b>这也是提权攻击的重点目标。</b><br>
+    <b>SGID（2）</b>：目录上设置后，新建文件继承目录的属组，团队共享目录常用。<br>
+    <b>Sticky（1）</b>：<span class="k">/tmp</span> 就是 <span class="k">1777</span>，任何人都能建文件，但只能删自己的。
+  </div>
+  <div class="callout danger">
+    <b>线上最危险的操作之一：<span class="k">chmod -R 777</span>。</b>它能"解决"权限问题，但把所有文件对所有用户开放读写执行，等于拆掉了整个安全模型。生产环境发现权限报错，应该去查"哪个用户需要什么权限"，而不是一把 777 了事。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>网络诊断</h2></div>
+  <h3>看本机网络状态</h3>
+  <pre><span class="c"># ss 是现代替代 netstat 的工具，更快</span>
+ss -tulnp                <span class="c"># 所有监听中的 TCP/UDP 端口 + 对应进程 ← 最常用</span>
+ss -tan state established    <span class="c"># 已建立的连接</span>
+ss -s                    <span class="c"># 连接数汇总统计</span>
+ss -tan | awk '{print $1}' | sort | uniq -c   <span class="c"># 各状态连接数分布</span>
+
+<span class="c"># 老命令（有些系统还有）</span>
+netstat -tulnp</pre>
+  <div class="callout ok">
+    <b><span class="k">ss -tulnp</span> 是排查"服务起没起来"的第一条命令。</b>如果端口没在监听，后面的都不用查了。<br>
+    参数记忆：<span class="k">-t</span> TCP、<span class="k">-u</span> UDP、<span class="k">-l</span> 只看监听、<span class="k">-n</span> 不解析域名（快）、<span class="k">-p</span> 显示进程。
+  </div>
+
+  <h3>测连通性</h3>
+  <pre>ping -c 4 8.8.8.8                <span class="c"># 测通不通（注意：很多服务器禁 ICMP，ping 不通不代表不通）</span>
+traceroute 8.8.8.8               <span class="c"># 看路由跳转，定位在哪一跳断了</span>
+mtr 8.8.8.8                      <span class="c"># traceroute + ping 结合，持续统计每跳丢包率（更好用）</span>
+dig example.com                  <span class="c"># DNS 解析，看返回的 IP 和 TTL</span>
+dig +short example.com
+dig @8.8.8.8 example.com         <span class="c"># 指定 DNS 服务器测试</span>
+nslookup example.com             <span class="c"># 老命令，简单场景够用</span>
+
+<span class="c"># 测端口通不通（nc = netcat，一个能读能写网络连接的小工具，比 ping 有用得多）</span>
+nc -zv host 443                  <span class="c"># 能连上会输出 succeeded</span>
+telnet host 443
+curl -v telnet://host:443        <span class="c"># 没有 nc 时的替代</span></pre>
+  <h3>看请求</h3>
+  <pre>curl -v https://example.com                <span class="c"># 完整报文（配合第 8 期看）</span>
+curl -o /dev/null -s -w "%{http_code} %{time_total}\n" URL   <span class="c"># 只要状态码和耗时</span>
+curl --resolve example.com:443:1.2.3.4 https://example.com   <span class="c"># 绕过 DNS 直连某 IP</span>
+curl -x http://proxy:8080 URL              <span class="c"># 走代理</span>
+wget -c URL                                <span class="c"># 断点续传下载</span>
+tcpdump -i eth0 -nn port 80 -c 100 -w cap.pcap   <span class="c"># 抓包（配合第 1 期）</span></pre>
+  <div class="callout danger">
+    <b>排查网络的正确顺序（不要跳步）：</b><br>
+    ① <b>本机服务在监听吗</b> → <span class="k">ss -tulnp | grep 端口</span><br>
+    ② <b>域名能解析吗</b> → <span class="k">dig 域名</span><br>
+    ③ <b>网络通吗</b> → <span class="k">ping</span> / <span class="k">traceroute</span>（注意 ICMP 可能被禁）<br>
+    ④ <b>目标端口通吗</b> → <span class="k">nc -zv host port</span>（这一步最关键，能区分"网络不通"和"服务没起"）<br>
+    ⑤ <b>应用层返回什么</b> → <span class="k">curl -v</span><br>
+    ⑥ <b>包到底发出去了吗</b> → <span class="k">tcpdump</span><br>
+    <b>按这个顺序走，能避免 90% 的瞎猜。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>磁盘与 IO</h2></div>
+  <pre><span class="c"># 磁盘空间</span>
+df -h                    <span class="c"># 各分区使用率（-h 人类可读）</span>
+df -ih                   <span class="c"># 看 inode 使用率！磁盘没满但 inode 满了也会写不进去</span>
+
+<span class="c"># 目录占用</span>
+du -sh /var/*            <span class="c"># 各子目录大小汇总</span>
+du -sh /* 2&gt;/dev/null | sort -rh | head -10   <span class="c"># 找出最大的目录</span>
+du -ah /var | sort -rh | head -20             <span class="c"># 找出最大的文件</span></pre>
+  <div class="callout danger">
+    <b>磁盘满的两个常见陷阱：</b><br>
+    ① <b>文件被删了但空间没释放</b> —— 某个进程还持有这个文件的句柄。用 <span class="k">lsof | grep deleted</span> 找出来，重启那个进程就释放了。<br>
+    ② <b>inode 用满</b> —— 小文件太多（比如大量临时文件、session 文件）。<span class="k">df -h</span> 看着有空间，但就是写不进去。<b>用 <span class="k">df -ih</span> 确认。</b>
+  </div>
+  <pre><span class="c"># IO 性能</span>
+iostat -x 1              <span class="c"># 每秒刷新，看每块磁盘的详细指标（需装 sysstat）</span>
+iotop                    <span class="c"># 看哪个进程在疯狂读写</span>
+vmstat 1                 <span class="c"># 综合视图：r 运行队列、b 阻塞、si/so 交换、wa IO 等待</span>
+
+<span class="c"># 谁占着文件/端口</span>
+lsof -p 12345            <span class="c"># 某进程打开的所有文件</span>
+lsof -i :8080            <span class="c"># 谁占用了 8080 端口 ← 排查端口冲突</span>
+lsof /var/log/app.log    <span class="c"># 谁在用这个文件</span></pre>
+  <h4>iostat 关键列怎么看</h4>
+  <table>
+    <tr><th style="width:130px">列</th><th>含义与判断标准</th></tr>
+    <tr><td class="f">%util</td><td>磁盘繁忙度。<b>持续接近 100% 说明磁盘是瓶颈</b></td></tr>
+    <tr><td class="f">await</td><td>平均 IO 等待时间（毫秒）。机械盘 &gt; 20ms、SSD &gt; 5ms 就偏高了</td></tr>
+    <tr><td class="f">r/s w/s</td><td>每秒读写次数（IOPS）</td></tr>
+    <tr><td class="f">rkB/s wkB/s</td><td>每秒读写吞吐量</td></tr>
+    <tr><td class="f">aqu-sz</td><td>平均请求队列长度，持续大于 1 说明有排队</td></tr>
+  </table>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>内存</h2></div>
+  <pre>free -h                  <span class="c"># 最直观的内存概览</span>
+vmstat 1                 <span class="c"># 关注 si/so（交换分区读写），非 0 说明在换页，性能会崩</span>
+ps aux --sort=-%mem | head -10    <span class="c"># 内存占用最高的进程</span>
+cat /proc/meminfo        <span class="c"># 详细内存信息</span></pre>
+  <h4>free -h 的输出怎么读</h4>
+  <pre>               total        used        free      shared  buff/cache   available
+Mem:            15Gi       8.0Gi       1.2Gi       300Mi       6.0Gi       6.5Gi
+Swap:          2.0Gi       100Mi       1.9Gi</pre>
+  <div class="callout ok">
+    <b>关键：不要只看 free 那一列！</b><br>
+    Linux 会用空闲内存做文件缓存（buff/cache），所以 <b>free 很小是正常的，甚至是好事</b>。<br>
+    <b>真正该看的是 <span class="k">available</span></b> —— 它表示"应用真正还能用多少内存"。available 充足就没问题。<br>
+    <b>Swap 的 used 如果持续增长</b>，说明物理内存不够了，系统在把内存换到磁盘上，性能会急剧下降。<b>这是需要立刻处理的信号。</b>
+  </div>
+  <div class="callout danger">
+    <b>OOM Killer：内存耗尽时，Linux 内核会主动杀掉占用内存最多的进程。</b>排查方法：<br>
+    <span class="k">dmesg -T | grep -i "killed process"</span> —— 能看到被杀的进程名和当时的调用栈。<br>
+    <b>如果被杀的是你的服务，说明它确实吃太多内存了</b>（内存泄漏？缓存无上限？），而不是"系统有问题"。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>性能排查方法论（本篇核心）</h2></div>
+  <p class="lead">前面都是工具。这一节讲<b>怎么用</b> —— 线上报警了，你坐下来，第一步做什么。</p>
+
+  <h3>USE 方法</h3>
+  <p>对每一种资源，问三个问题：</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>含义</th><th>典型指标</th></tr>
+    <tr><td><b>U 使用率</b></td><td>资源被占用了多少</td><td>CPU 使用率、内存使用率、磁盘 %util</td></tr>
+    <tr><td><b>S 饱和度</b></td><td><b>有多少在排队等</b>（比使用率更能说明问题）</td><td>运行队列长度、IO 队列长度、swap 换页</td></tr>
+    <tr><td><b>E 错误</b></td><td>有没有出错</td><td>网卡丢包、磁盘坏道、OOM 事件</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>为什么"饱和度"比"使用率"更重要？</b>因为使用率 100% 不一定有问题（比如 CPU 100% 但任务都在快速完成）。<b>但只要有排队，就一定有延迟。</b>看到队列长度持续增长，才是真问题。
+  </div>
+
+  <h3>排查顺序（固定流程，不要跳）</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先看整体负载。</b><span class="k">uptime</span> —— 看 1/5/15 分钟平均负载。<b>负载值不应持续超过 CPU 核心数</b>（<span class="k">nproc</span> 看核心数）。15 分钟负载很高但 1 分钟低 → 问题可能已经过去。</div></div>
+    <div class="step"><div class="txt"><b>看 CPU。</b><span class="k">top</span> —— 重点看 <span class="k">%us</span>（用户态，说明应用在算）、<span class="k">%sy</span>（内核态，高说明系统调用多）、<span class="k">%wa</span>（<b>IO 等待，高说明瓶颈在磁盘不在 CPU</b>）、<span class="k">%id</span>（空闲）。</div></div>
+    <div class="step"><div class="txt"><b>看内存。</b><span class="k">free -h</span> 看 available，<span class="k">vmstat 1</span> 看 si/so。<b>si/so 非 0 = 在用 swap = 内存不够</b>。</div></div>
+    <div class="step"><div class="txt"><b>看磁盘 IO。</b><span class="k">iostat -x 1</span> 看 %util 和 await，<span class="k">iotop</span> 找是哪个进程。<b>top 里 %wa 高的话，直接跳到这里。</b></div></div>
+    <div class="step"><div class="txt"><b>看网络。</b><span class="k">ss -s</span> 看连接数，<span class="k">sar -n DEV 1</span> 看流量，<span class="k">netstat -s | grep -i retrans</span> 看有没有重传。</div></div>
+    <div class="step"><div class="txt"><b>定位到具体进程。</b><span class="k">ps aux --sort=-%cpu | head</span> 或 <span class="k">--sort=-%mem</span>，然后用 <span class="k">lsof -p PID</span>、<span class="k">cat /proc/PID/status</span> 深挖。</div></div>
+  </div>
+
+  <h3>三个典型症状 → 病因对照</h3>
+  <table>
+    <tr><th style="width:200px">症状</th><th>最可能的原因</th></tr>
+    <tr><td><b>负载高但 CPU 空闲</b></td><td>大量进程在等 IO（<span class="k">%wa</span> 高）。查磁盘：<span class="k">iostat -x 1</span></td></tr>
+    <tr><td><b>负载高但内存也没满</b></td><td>可能是"不可中断睡眠"的进程（D 状态），通常还是卡在 IO 上。用 <span class="k">ps -eo state,pid,cmd | grep "^D"</span></td></tr>
+    <tr><td><b>响应慢但各项指标都正常</b></td><td>查网络延迟（<span class="k">mtr</span>）、查下游依赖（数据库、外部 API）、查应用内部（线程池满、锁竞争、GC）</td></tr>
+  </table>
+  <div class="callout">
+    <b>补充一个关键概念：平均负载（load average）包含"运行中"和"不可中断睡眠（D 状态）"两类进程。</b>所以 load 高不一定代表 CPU 忙 —— <b>如果 load 高而 CPU 空闲，八成是 IO 卡住了。</b>这是新手最容易误判的地方，会白花很多时间在 CPU 上。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>systemd 与服务日志</h2></div>
+  <pre><span class="c"># 服务管理</span>
+systemctl start nginx
+systemctl stop nginx
+systemctl restart nginx          <span class="c"># 完全重启</span>
+systemctl reload nginx           <span class="c"># 重载配置（不中断服务，推荐）</span>
+systemctl status nginx           <span class="c"># 看状态 ← 排查服务问题的第一步</span>
+systemctl enable nginx           <span class="c"># 开机自启</span>
+systemctl disable nginx
+systemctl list-units --failed    <span class="c"># 列出所有启动失败的服务</span>
+
+<span class="c"># 日志（journalctl）</span>
+journalctl -u nginx              <span class="c"># 看某个服务的日志</span>
+journalctl -u nginx -f           <span class="c"># 实时跟踪（最常用）</span>
+journalctl -u nginx --since "10 min ago"
+journalctl -u nginx --since "2026-10-16 10:00" --until "2026-10-16 11:00"
+journalctl -p err -b             <span class="c"># 本次启动以来的所有错误</span>
+journalctl -n 100                <span class="c"># 最近 100 行</span>
+journalctl --disk-usage          <span class="c"># 日志占了多少磁盘</span>
+journalctl --vacuum-size=500M    <span class="c"># 清理日志，只保留 500M</span></pre>
+  <h3>写一个自己的 systemd 服务</h3>
+  <pre><span class="c"># /etc/systemd/system/myapp.service</span>
+[Unit]
+Description=My Python App
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/myapp
+ExecStart=/opt/myapp/.venv/bin/python app.py
+Restart=always                 <span class="c"># 崩溃自动重启</span>
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target</pre>
+  <pre>systemctl daemon-reload        <span class="c"># 改完配置必须执行</span>
+systemctl enable --now myapp   <span class="c"># 设置自启并立即启动</span></pre>
+  <div class="callout ok">
+    <b>这比 nohup 强太多：</b>崩溃自动重启、开机自启、日志统一进 journalctl、能用 systemctl 统一管理、可以设资源限制和依赖关系。<b>生产环境的常驻服务都应该用 systemd。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>定时任务与远程操作</h2></div>
+  <h3>cron</h3>
+  <pre>crontab -e               <span class="c"># 编辑当前用户的定时任务</span>
+crontab -l               <span class="c"># 列出</span>
+
+<span class="c"># 格式：分 时 日 月 周  命令</span>
+<span class="c">#      0  2  *  *  *   /opt/backup.sh    # 每天凌晨 2 点</span>
+<span class="c">#      */5 *  *  *  *  /opt/check.sh     # 每 5 分钟</span>
+<span class="c">#      0  9  *  *  1-5 /opt/report.sh    # 工作日 9 点</span>
+<span class="c">#      0  0  1  *  *   /opt/monthly.sh   # 每月 1 号</span></pre>
+  <div class="callout danger">
+    <b>cron 的三个经典坑：</b><br>
+    ① <b>环境变量不一样。</b>cron 的 PATH 很短，命令要写绝对路径（用 <span class="k">which python</span> 查）。<br>
+    ② <b>看不到输出。</b>cron 的输出会发邮件，但通常没人看。调试时把输出重定向到文件：<span class="k">/opt/x.sh &gt; /tmp/x.log 2&gt;&amp;1</span>。<br>
+    ③ <b>% 有特殊含义</b>（表示换行），命令里用到 % 要转义成 <span class="k">\%</span>。
+  </div>
+
+  <h3>ssh 与文件传输</h3>
+  <pre><span class="c"># 免密登录（三行搞定）</span>
+ssh-keygen -t ed25519 -C "你的邮箱"      <span class="c"># 一路回车</span>
+ssh-copy-id user@host                    <span class="c"># 把公钥传到服务器</span>
+ssh user@host                            <span class="c"># 之后就不用输密码了</span>
+
+<span class="c"># 传输文件</span>
+scp file.txt user@host:/path/            <span class="c"># 上传</span>
+scp -r dir/ user@host:/path/             <span class="c"># 上传目录</span>
+scp user@host:/path/file.txt ./          <span class="c"># 下载</span>
+
+<span class="c"># rsync：更适合大量文件，支持增量同步（只传变化的部分）</span>
+rsync -avz --progress ./data/ user@host:/backup/data/
+rsync -avz --delete ./src/ user@host:/dst/   <span class="c"># 让目标与源完全一致（会删多余文件）</span>
+
+<span class="c"># 端口转发（访问内网服务）</span>
+ssh -L 8080:internal-host:80 user@jump-host   <span class="c"># 本地 8080 → 内网 80</span>
+
+<span class="c"># ~/.ssh/config 配置别名，省得每次敲一长串</span>
+Host prod
+    HostName 1.2.3.4
+    User deploy
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519
+<span class="c"># 之后直接 ssh prod</span></pre>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>十个高危坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">rm -rf 变量为空</div><div class="pd"><span class="k">rm -rf $DIR/</span> 如果 DIR 是空的，就变成了 <span class="k">rm -rf /</span>。脚本里必须用 <span class="k">set -u</span> 并在删除前检查变量非空。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">chmod -R 777 解决权限问题</div><div class="pd">拆掉整个安全模型。应该查清楚哪个用户需要什么权限，精确授权。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">直接 kill -9</div><div class="pd">程序没有机会保存数据、释放锁、关闭连接。先发 SIGTERM（默认 kill），等几秒不响应再 -9。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">磁盘满了只删文件不查进程</div><div class="pd">文件被删了但进程还持有句柄，空间不会释放。用 <span class="k">lsof | grep deleted</span> 找出来重启进程。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">只看 df 不看 inode</div><div class="pd">磁盘有空间但 inode 用满，照样写不进去。用 <span class="k">df -ih</span> 确认。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到 load 高就去查 CPU</div><div class="pd">load 包含不可中断睡眠进程。load 高而 CPU 空闲，八成是 IO 卡住。先看 <span class="k">top</span> 里的 %wa。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">以为 free 小就是内存不足</div><div class="pd">buff/cache 占用是正常的。看 available 那一列才是真实可用内存。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">cron 里用相对路径和简短 PATH</div><div class="pd">cron 的环境变量和登录 shell 不同，命令要写绝对路径，脚本开头显式设置 PATH。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">在 / 下直接 find 或 du</div><div class="pd">遍历整个文件系统，慢且会产生大量 IO，可能把正在跑的服务拖慢。缩小到具体目录。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用 ping 判断服务是否可用</div><div class="pd">ping 通只说明网络层通，不代表服务端口开着；ping 不通也不代表服务不可用（ICMP 常被禁）。<b>测端口要用 <span class="k">nc -zv host port</span> 或 <span class="k">curl</span>。</b></div></div></div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 系统负载很高，但 CPU 使用率很低（%id 很高）。最可能的原因是？</div>
+      <button class="opt">内存不足，在用 swap</button>
+      <button class="opt">大量进程卡在磁盘 IO 上（%wa 高）</button>
+      <button class="opt">网络带宽被打满</button>
+      <div class="ans">正确答案：<b>磁盘 IO 瓶颈</b>。平均负载包含"不可中断睡眠（D 状态）"的进程，这些进程在等 IO 但没占用 CPU。所以 load 高而 CPU 空闲，第一个该查的就是 <span class="k">iostat -x 1</span>。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 要排查某个端口被哪个进程占用了，用哪条命令？</div>
+      <button class="opt">ps aux | grep 8080</button>
+      <button class="opt">df -h</button>
+      <button class="opt">lsof -i :8080 或 ss -tulnp | grep 8080</button>
+      <div class="ans">正确答案：<b>lsof -i :8080 或 ss -tulnp</b>。前者按端口找进程，后者列出所有监听端口及对应进程。这是排查"端口冲突"和"服务起没起来"的标准动作。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. free -h 显示 free 只有 1GB，但系统运行正常。应该怎么看？</div>
+      <button class="opt">看 available 那一列，它才是应用真正可用的内存</button>
+      <button class="opt">立刻加内存，free 太小了</button>
+      <button class="opt">重启系统释放内存</button>
+      <div class="ans">正确答案：<b>看 available</b>。Linux 会用空闲内存做文件缓存（buff/cache），free 小是正常甚至有益的。<b>真正该警惕的是 Swap 的 used 持续增长</b>，那说明物理内存不够、在用磁盘换页。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 删除了一个大文件，但 df 显示磁盘空间没释放。为什么？</div>
+      <button class="opt">需要重启系统才能释放</button>
+      <button class="opt">某个进程还持有这个文件的句柄，用 lsof | grep deleted 找出来并重启它</button>
+      <button class="opt">需要执行 sync 命令</button>
+      <div class="ans">正确答案：<b>进程还持有句柄</b>。在 Linux 里，文件被删除后，只要还有进程打开它，磁盘块就不会释放。用 <span class="k">lsof | grep deleted</span> 定位，重启该进程即可释放。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 要检查服务是否可用，为什么不该用 ping？</div>
+      <button class="opt">因为 ping 只能测本机</button>
+      <button class="opt">因为 ping 会修改服务状态</button>
+      <button class="opt">因为 ping 只测网络层，且 ICMP 常被防火墙禁用 —— 测端口应该用 nc -zv 或 curl</button>
+      <div class="ans">正确答案：<b>ping 只到网络层，且 ICMP 常被禁</b>。ping 通不代表服务端口开着；ping 不通也不代表服务不可用。测服务应该用 <span class="k">nc -zv host port</span>（测端口）或 <span class="k">curl</span>（测应用层）。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. USE 方法里的"饱和度（Saturation）"指的是？</div>
+      <button class="opt">有多少任务在排队等待这个资源</button>
+      <button class="opt">资源被占用的百分比</button>
+      <button class="opt">资源出错的次数</button>
+      <div class="ans">正确答案：<b>排队等待的量</b>。它比"使用率"更能说明问题 —— 使用率 100% 不一定有延迟，但只要有排队就一定有延迟。对应指标如运行队列长度、IO 队列长度、swap 换页频率。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令（SRE 日常）</h3>
+  <div class="cmds">
+    <div class="crow"><code>uptime</code><span class="desc">看平均负载，排查第一步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>top</code><span class="desc">CPU/内存总览，重点看 %wa 和 %id</span><button class="copy">复制</button></div>
+    <div class="crow"><code>free -h</code><span class="desc">内存，看 available 而不是 free</span><button class="copy">复制</button></div>
+    <div class="crow"><code>vmstat 1</code><span class="desc">综合视图，si/so 非 0 说明在用 swap</span><button class="copy">复制</button></div>
+    <div class="crow"><code>iostat -x 1</code><span class="desc">磁盘 IO，看 %util 和 await</span><button class="copy">复制</button></div>
+    <div class="crow"><code>iotop</code><span class="desc">哪个进程在疯狂读写磁盘</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -tulnp</code><span class="desc">监听端口 + 对应进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -s</code><span class="desc">连接数汇总</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lsof -i :8080</code><span class="desc">谁占用了端口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lsof | grep deleted</code><span class="desc">找出已删除但仍占空间的文件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>df -h &amp;&amp; df -ih</code><span class="desc">磁盘空间 + inode 使用率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>du -sh /* 2&gt;/dev/null | sort -rh | head -10</code><span class="desc">找出最大的目录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps aux --sort=-%cpu | head -10</code><span class="desc">CPU 占用最高的进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps aux --sort=-%mem | head -10</code><span class="desc">内存占用最高的进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -u 服务名 -f</code><span class="desc">实时看服务日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -p err -b</code><span class="desc">本次启动以来所有错误</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dmesg -T | tail -50</code><span class="desc">内核日志，查 OOM 和硬件错误</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mtr host</code><span class="desc">持续追踪路由和丢包</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nc -zv host port</code><span class="desc">测端口通不通（比 ping 有用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>systemctl status 服务名</code><span class="desc">服务状态，排查服务问题第一步</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>排查速查：症状 → 命令</h3>
+  <table>
+    <tr><th style="width:210px">症状</th><th>先敲这个</th></tr>
+    <tr><td>系统整体变慢</td><td class="f">uptime → top</td></tr>
+    <tr><td>负载高但 CPU 闲</td><td class="f">top 看 %wa → iostat -x 1 → iotop</td></tr>
+    <tr><td>内存不够 / 在用 swap</td><td class="f">free -h → vmstat 1 → ps aux --sort=-%mem</td></tr>
+    <tr><td>磁盘写不进去</td><td class="f">df -h → df -ih → lsof | grep deleted</td></tr>
+    <tr><td>服务访问不通</td><td class="f">ss -tulnp → nc -zv → curl -v</td></tr>
+    <tr><td>端口被占用</td><td class="f">lsof -i :端口</td></tr>
+    <tr><td>服务莫名重启</td><td class="f">journalctl -u 服务名 -n 200 → dmesg -T | grep -i killed</td></tr>
+    <tr><td>网络时通时不通</td><td class="f">mtr host → netstat -s | grep -i retrans</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>标准输入/输出/错误</b></td><td>stdin(0) / stdout(1) / stderr(2)，重定向的基础</td></tr>
+    <tr><td><b>管道 pipe</b></td><td>把前一个命令的输出接到后一个命令的输入</td></tr>
+    <tr><td><b>退出码</b></td><td>命令的返回状态，0 成功，非 0 失败</td></tr>
+    <tr><td><b>inode</b></td><td>文件的元数据索引节点，数量有限，用满也会写不进文件</td></tr>
+    <tr><td><b>平均负载 load average</b></td><td>1/5/15 分钟内运行中 + 不可中断睡眠进程的平均数</td></tr>
+    <tr><td><b>D 状态</b></td><td>不可中断睡眠，通常在等 IO。也是它让 load 虚高</td></tr>
+    <tr><td><b>%wa</b></td><td>CPU 等待 IO 的时间占比。高说明瓶颈在磁盘</td></tr>
+    <tr><td><b>buff/cache</b></td><td>内核用空闲内存做的文件缓存，可被回收，不是"被浪费的内存"</td></tr>
+    <tr><td><b>available</b></td><td>应用真正还能用的内存，含可回收的 cache</td></tr>
+    <tr><td><b>swap</b></td><td>交换分区。启用说明物理内存不够，性能会显著下降</td></tr>
+    <tr><td><b>OOM Killer</b></td><td>内存耗尽时内核主动杀掉占内存最多的进程</td></tr>
+    <tr><td><b>SUID / SGID / Sticky</b></td><td>三个特殊权限位，分别控制执行身份、组继承、删除限制</td></tr>
+    <tr><td><b>SIGTERM / SIGKILL</b></td><td>优雅终止信号(15) / 强制杀死信号(9)</td></tr>
+    <tr><td><b>systemd</b></td><td>现代 Linux 的服务管理器，负责启动服务、管日志、自动重启</td></tr>
+    <tr><td><b>journalctl</b></td><td>systemd 的日志查询工具</td></tr>
+    <tr><td><b>cron</b></td><td>定时任务调度器</td></tr>
+    <tr><td><b>rsync</b></td><td>增量文件同步工具，只传变化的部分</td></tr>
+    <tr><td><b>USE 方法</b></td><td>对每种资源检查使用率、饱和度、错误三维度</td></tr>
+    <tr><td><b>饱和度</b></td><td>有多少任务在排队等待资源。比使用率更能反映问题</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>找一台 Linux（虚拟机、云服务器或 Docker 容器都行），依次完成 —— ① 用 <span class="k">ss -tulnp</span> 找出所有监听端口并说清每个是什么服务；② 人为用 <span class="k">stress-ng --cpu 4</span> 压满 CPU，用 top 观察各指标变化；③ 用 <span class="k">dd</span> 制造磁盘 IO，观察 %wa 和 iostat；④ 把一个服务写成 systemd unit，测试崩溃自动重启；⑤ 写一个日志分析管道，统计出访问量 Top 10 的 IP。<br><br>
+    <b>之后值得单独学：</b>容器里的 Linux（namespace 与 cgroup，正好衔接第 2 期 Docker）、eBPF 性能分析（bpftrace）、Prometheus + Grafana 监控体系、以及 Ansible 批量运维。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Linux · 记住排查顺序：先看负载，再分资源，别一上来就猜</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 7（USE 方法论）是这篇的核心，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在真实 Linux 上敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='在 Linux 上敲。Windows 用户可以用 WSL 或起个容器：docker run -it ubuntu bash';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透查询优化器</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 13 期 · 高密度版</span>
+    <h1>二十分钟学透查询优化器</h1>
+    <p class="sub">慢查询 90% 的解法不在加机器，在<b>让优化器选对计划</b>。这篇讲 CBO 怎么估行数、EXPLAIN 每列读什么、JOIN 三种算法怎么选、子查询怎么被改写，最后给一套慢查询改写手册。默认 MySQL 8.0，关键处对比 PostgreSQL。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种 JOIN 算法</span>
+      <span class="chip"><b>4</b> 类真实执行计划</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起 MySQL 8.0 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起 MySQL 8.0（有 EXPLAIN ANALYZE 和 hash join）</span>
+docker run -d -p 3306:3306 --name mysql8 -e MYSQL_ROOT_PASSWORD=root mysql:8.0
+docker exec -it mysql8 mysql -uroot -proot
+
+<span class="c"># 全文使用的测试表：订单 + 订单项 + 用户</span>
+<span class="b">CREATE TABLE</span> t_user  (user_id <span class="y">BIGINT</span> <span class="b">PRIMARY KEY</span>, name <span class="y">VARCHAR</span>(64), city <span class="y">VARCHAR</span>(32));
+<span class="b">CREATE TABLE</span> t_order (
+  order_id <span class="y">BIGINT</span> <span class="b">PRIMARY KEY</span>,
+  user_id  <span class="y">BIGINT</span> <span class="b">NOT NULL</span>,
+  status   <span class="y">TINYINT</span> <span class="b">NOT NULL</span>,
+  amount   <span class="y">DECIMAL</span>(10,2),
+  create_time <span class="y">DATETIME</span> <span class="b">NOT NULL</span>,
+  <span class="b">KEY</span> idx_user (user_id), <span class="b">KEY</span> idx_time (create_time)
+) <span class="b">ENGINE</span>=InnoDB;
+<span class="b">CREATE TABLE</span> t_order_item (
+  item_id <span class="y">BIGINT</span> <span class="b">PRIMARY KEY</span>,
+  order_id <span class="y">BIGINT</span> <span class="b">NOT NULL</span>,
+  product_id <span class="y">BIGINT</span>,
+  quantity <span class="y">INT</span>,
+  <span class="b">KEY</span> idx_order (order_id)
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c"># 灌数（各 100 万行），然后：</span>
+<span class="b">ANALYZE TABLE</span> t_order, t_order_item, t_user;
+
+<span class="c"># 打开慢日志，采集真实样本</span>
+<span class="b">SET GLOBAL</span> slow_query_log = <span class="y">ON</span>;
+<span class="b">SET GLOBAL</span> long_query_time = 1;        <span class="c">-- 超过 1 秒记入</span>
+<span class="b">SET GLOBAL</span> log_queries_not_using_indexes = <span class="y">ON</span>;  <span class="c">-- 没走索引的也记</span></pre>
+  <div class="callout warn">
+    <b>先建立正确认知：优化器不是敌人，它只是在信息不全的情况下做估算。</b>排查慢查询的顺序永远是：① 它<b>实际</b>花了多久、扫了多少行（EXPLAIN ANALYZE）→ ② 为什么选了这个计划（统计信息 + 代价）→ ③ 改写 SQL 或改索引，而不是一上来就 force index。跳过前两步直接加 hint，经常把 3 秒变成 30 秒。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>基于代价的优化器框架（CBO）</h2></div>
+  <p class="lead">CBO 干两件事：<b>逻辑优化</b>（把 SQL 改写成等价但更好算的形式）和<b>物理优化</b>（在多个执行计划里挑代价最小的）。它的判断完全建立在<b>统计信息</b>上。</p>
+  <h4>统计信息：优化器的眼睛</h4>
+  <table>
+    <tr><th style="width:170px">统计项</th><th style="width:230px">MySQL 8.0 来源</th><th>影响什么</th></tr>
+    <tr><td><b>表行数</b></td><td>innodb_table_stats（采样估算）</td><td>全表扫描代价、驱动表大小</td></tr>
+    <tr><td><b>索引 cardinality</b></td><td>innodb_index_stats，按页采样</td><td>等值条件的选择率</td></tr>
+    <tr><td><b>列 min/max</b></td><td>索引统计的一部分</td><td>范围条件估算</td></tr>
+    <tr><td><b>直方图</b></td><td>ANALYZE TABLE ... UPDATE HISTOGRAM（8.0 新增，等深/等宽）</td><td><b>范围选择率</b>，解决 BETWEEN 估算偏差</td></tr>
+    <tr><td><b>空值比例</b></td><td>采样</td><td>IS NULL / IS NOT NULL 估算</td></tr>
+  </table>
+  <pre><span class="c">-- 选择率估算：优化器的核心算式</span>
+等值条件：匹配行数 ≈ 表总行数 / cardinality(列)
+范围条件：匹配行数 ≈ 表总行数 × (值在 min~max 中的相对位置)
+无统计时：  MySQL 默认猜（如 range 猜一定比例，函数猜固定值）
+
+<span class="c">-- 代价模型（简化）：总代价 = IO 代价 + CPU 代价</span>
+读一个页的 IO 代价    = 1.0     <span class="c">-- io_block_read_cost 默认 1.0</span>
+比较一行的 CPU 代价  = 0.2     <span class="c">-- cpu_tuple_cost 默认 0.2</span>
+一次索引查找的 CPU   = 0.1     <span class="c">-- cpu_key_match_cost？实际 0.1~0.4 之间取</span>
+建哈希表的 CPU       = 0.2~0.4 <span class="c">-- hash join 相关</span>
+
+<span class="c">-- 直方图实战：范围估算从"瞎猜"变"有据可查"</span>
+<span class="b">ANALYZE TABLE</span> t_order <span class="b">UPDATE HISTOGRAM ON</span> create_time <span class="b">WITH</span> 256 <span class="b">BUCKETS</span>;
+<span class="b">SELECT</span> * <span class="b">FROM</span> information_schema.column_statistics;  <span class="c">-- 查看直方图</span></pre>
+  <h4>估算不准的三大根源</h4>
+  <table>
+    <tr><th style="width:150px">问题</th><th style="width:250px">现象</th><th>对策</th></tr>
+    <tr><td><b>列相关性被忽略</b></td><td>city='北京' AND level='VIP'，优化器按独立事件相乘，实际高度相关，行数估少 10 倍</td><td>建联合索引让 cardinality 覆盖组合；或上直方图</td></tr>
+    <tr><td><b>数据倾斜</b></td><td>status 列 99% 是 1、1% 是 0，等值估算按平均值，查稀有值反而估多</td><td>直方图（8.0）；或改写查询让优化器知道具体值</td></tr>
+    <tr><td><b>统计信息过期</b></td><td>大批量导入后没 ANALYZE，cardinality 是上个月的值，计划整体跑偏</td><td>导入后 ANALYZE TABLE；或开 innodb_stats_auto_recalc</td></tr>
+  </table>
+  <div class="callout">
+    <b>逻辑优化都做了什么（看不到但影响巨大）：</b>① 常量传播（WHERE 1=1 直接消掉）；② 外连接转内连接（WHERE 里的条件让外连接无意义时）；③ 子查询展开/半连接化；④ 分区裁剪；⑤ 等价改写（IN 列表去重排序）。<b>你写的 SQL 和优化器执行的经常不是一回事</b>，这就是为什么要看执行计划而不是"我觉得"。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>执行计划阅读</h2></div>
+  <p class="lead">EXPLAIN 是"优化器的估算"，EXPLAIN ANALYZE 是"实际发生的真相"。<b>两者对不上的地方就是问题所在。</b></p>
+  <table>
+    <tr><th style="width:120px">列</th><th>读什么</th></tr>
+    <tr><td class="f">id</td><td>执行顺序号：大 id 先执行；同 id 按上到下。 UNION 会出现多行</td></tr>
+    <tr><td class="f">select_type</td><td>SIMPLE（简单查询）/ PRIMARY（含子查询的外层）/ DERIVED（物化派生表）/ UNION / SUBQUERY</td></tr>
+    <tr><td class="f">table</td><td>正在访问哪张表；出现 &lt;derivedN&gt; / &lt;subqueryN&gt; 说明是物化结果</td></tr>
+    <tr><td class="f">type</td><td><b>访问方式，性能第一指标</b>：const &gt; eq_ref &gt; ref &gt; range &gt; index &gt; ALL</td></tr>
+    <tr><td class="f">possible_keys</td><td>可能用的索引（预估阶段）</td></tr>
+    <tr><td class="f">key</td><td><b>实际用的索引。NULL = 全表扫描</b></td></tr>
+    <tr><td class="f">key_len</td><td>索引用了多长（字节）。判断联合索引用了几列：utf8mb4 4 字节/字符</td></tr>
+    <tr><td class="f">ref</td><td>索引列的匹配来源：const（常量）/ func / 某表某列</td></tr>
+    <tr><td class="f">rows</td><td><b>预估</b>要扫描的行数。与 filtered 相乘 ≈ 预估结果集</td></tr>
+    <tr><td class="f">filtered</td><td>按 WHERE 条件过滤后剩余比例（百分比）</td></tr>
+    <tr><td class="f">Extra</td><td>关键信号：Using index（覆盖）/ Using index condition（ICP）/ Using filesort / Using temporary / Using join buffer</td></tr>
+  </table>
+  <pre><span class="c">-- EXPLAIN ANALYZE（MySQL 8.0，树状输出，含真实执行数据）</span>
+mysql&gt; <span class="b">EXPLAIN ANALYZE</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888 <span class="b">ORDER BY</span> create_time <span class="b">LIMIT</span> 10;
+-&gt; Limit: 10 row(s)  (actual time=0.052..0.058 rows=10 loops=1)
+    -&gt; Sort: t_order.create_time DESC, ...
+        (actual time=0.051..0.053 rows=10 loops=1)
+        -&gt; Index lookup on t_order <span class="g">using idx_user (user_id=888)</span>
+           (actual time=0.031..0.048 rows=42 loops=1)
+<span class="c">-- 读法：预估 rows=42，实际 rows=42（准）；排序只排了 42 行（快）</span>
+<span class="c">-- 如果 actual rows=50000 而预估 42，就是统计信息或写法出了问题</span>
+
+<span class="c">-- 三个必看对比：</span>
+<span class="c">-- 1. actual time：真实耗时（毫秒），Limit 节点是总时间</span>
+<span class="c">-- 2. rows vs estimated rows：偏差 &gt; 10 倍就要警觉</span>
+<span class="c">-- 3. loops &gt; 1：该节点被执行多次，成本 = 单次 × loops</span></pre>
+  <div class="callout danger">
+    <b>最常见的误读：</b>① 看到 type=ref 就觉得没问题——ref 后面跟 500 万 rows 一样慢；② 看到 key 有值就放心——可能选了个区分度极低的索引，每次扫 25% 的表；③ 只看 EXPLAIN 不看 EXPLAIN ANALYZE——<b>预估行数可能和真实差 1000 倍</b>，那说明统计信息骗了优化器，改 SQL 之前先修统计。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>JOIN 算法：Nested Loop / Hash / Sort Merge</h2></div>
+  <p class="lead">两张表 JOIN，数据库只有三种物理算法。<b>选错算法的代价是天差地别的：NLJ 是毫秒，无索引 BNL 可能是分钟。</b></p>
+  <table>
+    <tr><th style="width:150px">算法</th><th style="width:230px">原理</th><th style="width:200px">适用条件</th><th>MySQL / PG</th></tr>
+    <tr><td><b>Nested Loop Join</b></td><td>外层结果集每行，去内层<b>索引</b>里查匹配</td><td>内层连接键有索引；外层（驱动表）结果集小</td><td>两者都有，PG 默认优先</td></tr>
+    <tr><td><b>Block Nested Loop</b></td><td>外层整块存入 join buffer，内层逐行与 buffer 比对</td><td>内层无索引；外层小（能放进 buffer）</td><td>MySQL 特有，8.0.20 后被 hash join 取代</td></tr>
+    <tr><td><b>Hash Join</b></td><td>小表建内存哈希表，大表逐行探测</td><td><b>等值连接</b>；至少一表无索引；大表 JOIN 大表</td><td>MySQL 8.0.20+ / PG 主力</td></tr>
+    <tr><td><b>Sort Merge Join</b></td><td>两表先按连接键各自排序，再顺序归并</td><td>连接键已有序（索引）；范围连接；等值</td><td>PG 有；MySQL 无显式实现</td></tr>
+  </table>
+  <pre><span class="c">-- 驱动表原则：永远是"过滤后行数小"的表驱动"行数大"的表</span>
+<span class="c">-- 反例理解：用 100 万行的表驱动 10 行的表，NLJ 要做 100 万次索引查找</span>
+<span class="c">-- 正确：10 行驱动 100 万行，只做 10 次索引查找，每次带出 10 万行</span>
+
+<span class="c">-- MySQL 8.0 hash join 的执行计划长相</span>
+mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order o <span class="b">JOIN</span> t_user u <span class="b">ON</span> o.user_id = u.user_id
+    -&gt; <span class="b">WHERE</span> o.amount &gt; 900;
++----+-------------+-------+------------+------+---------------+----------+---------+-------------+------+----------+----------------------------------------+
+| id | select_type | table | partitions | type | possible_keys | key      | key_len | ref         | rows | filtered | Extra                                  |
++----+-------------+-------+------------+------+---------------+----------+---------+-------------+------+----------+----------------------------------------+
+|  1 | SIMPLE      | o     | NULL       | ALL  | idx_time      | NULL     | NULL    | NULL        | 1M   |    33.33 | Using where                            |
+|  1 | SIMPLE      | u     | NULL       | <span class="g">eq_ref</span>| PRIMARY      | PRIMARY  | 8       | db.o.user_id |    1 |   100.00 | NULL                                   |
++----+-------------+-------+------------+------+---------------+----------+---------+-------------+------+----------+----------------------------------------+
+<span class="c">-- 读法：o 全表 + amount 过滤（约 33 万行），每行用 PRIMARY 等值查 u（eq_ref，1 次树查找）</span>
+<span class="c">-- 这是 NLJ：o 驱动、u 被驱动。如果 u.user_id 没主键，就会退化成 hash join 或 BNL</span></pre>
+  <h4>算法选择速查</h4>
+  <pre><span class="c"># 场景 → 算法 → 你该做什么</span>
+内层有索引 + 驱动表小        → NLJ     → 确保内表连接键有索引
+内层无索引 + 驱动表小        → Hash/BNL → 加 join_buffer_size；或给内表加索引
+大表等值 JOIN 大表（无索引） → Hash Join → MySQL 8.0 自动；&lt;8.0.20 加索引或拆批
+连接键已有序                 → Merge Join → 保持索引顺序，避免中间排序
+范围连接（&gt;、&lt;、BETWEEN）    → NLJ / Merge → Hash 不支持范围连接</pre>
+  <div class="callout warn">
+    <b>MySQL 版本行为差异（面试高频）：</b>8.0.20 之前，无索引的等值 JOIN 走 <b>Block Nested Loop</b>（Extra: Using join buffer (hash join 出现前的 block nested loop)）；8.0.20 起 hash join 取代 BNL。所以老文档里"Using join buffer 就要加索引"的说法在今天要修正：<b>先看 Extra 具体是哪种 join buffer</b>，如果是 hash join 且驱动表不大，可能已经是最优。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>子查询优化：半连接、物化、IN→EXISTS</h2></div>
+  <p class="lead">子查询是慢查询重灾区，因为优化器对它的处理策略有五六种，选错就是数量级差距。</p>
+  <table>
+    <tr><th style="width:150px">策略</th><th style="width:250px">行为</th><th>适用</th></tr>
+    <tr><td><b>semijoin（firstMatch）</b></td><td>IN (SELECT) 转成半连接：外表每行去内表找<b>第一个</b>匹配即停</td><td>内表有索引、结果去重</td></tr>
+    <tr><td><b>semijoin（loosescan）</b></td><td>对分组内表（一对多）跳跃扫描，每组只查一次</td><td>内表连接键有索引且是分组型</td></tr>
+    <tr><td><b>materialization</b></td><td>把子查询结果物化成临时派生表（可能自动加索引 auto-key）</td><td>子查询结果小、被多次引用</td></tr>
+    <tr><td><b>IN → EXISTS</b></td><td>语义等价改写，让外层成为驱动表</td><td>外层小、内层大时手写 EXISTS 更快</td></tr>
+    <tr><td><b>物化 derived</b></td><td>FROM 里的子查询直接物化成临时表</td><td>复杂派生表，避免重复执行</td></tr>
+  </table>
+  <pre><span class="c">-- 经典场景：查"下过单的用户"</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_user <span class="b">WHERE</span> user_id <span class="b">IN</span> (<span class="b">SELECT</span> user_id <span class="b">FROM</span> t_order);
+<span class="c">-- 优化器可能：① semijoin-firstMatch（默认，内表 idx_user 有索引时最优）</span>
+<span class="c">--            ② materialization（把子查询结果物化成临时表再 JOIN）</span>
+
+<span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_user <span class="b">WHERE</span> user_id <span class="b">IN</span> (<span class="b">SELECT</span> user_id <span class="b">FROM</span> t_order);
++----+--------------+-------------+------------+--------+---------------+----------+---------+-------------+--------+----------+--------------------------+
+| id | select_type  | table       | type       | key    | key_len | ref         | rows    | filtered | Extra                    |
++----+--------------+-------------+------------+--------+---------------+----------+---------+-------------+--------+----------+--------------------------+
+|  1 | SIMPLE       | t_user      | index      | PRIMARY| 8       | NULL        | 1000000 |   100.00 | Using index              |
+|  1 | SIMPLE       | &lt;subquery2&gt; | semijoin   | idx_user| 9       | db.t_user..|       1 |   100.00 | FirstMatch(t_order)      |
++----+--------------+-------------+------------+--------+---------------+----------+---------+-------------+--------+----------+--------------------------+
+<span class="c">-- Extra: FirstMatch(t_order) 就是 semijoin 生效的标志</span>
+
+<span class="c">-- 手动切换策略（排查用）</span>
+<span class="b">SET</span> optimizer_switch = <span class="y">'semijoin=off'</span>;                <span class="c"># 关闭半连接，退回物化</span>
+<span class="b">SET</span> optimizer_switch = <span class="y">'materialization=off'</span>;       <span class="c"># 关闭派生表物化</span>
+<span class="b">SET</span> optimizer_switch = <span class="y">'subquery_to_derived=off'</span>;   <span class="c"># 8.0.22+：子查询转派生表</span>
+
+<span class="c">-- NOT IN 与 NOT EXISTS 的 NULL 陷阱（血泪坑）：</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_user <span class="b">WHERE</span> user_id <span class="b">NOT IN</span> (<span class="b">SELECT</span> user_id <span class="b">FROM</span> t_order);
+<span class="c">-- 若子查询结果含 NULL，整个 NOT IN 永远返回空集！</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_user <span class="b">WHERE</span> <span class="b">NOT EXISTS</span> (<span class="b">SELECT</span> 1 <span class="b">FROM</span> t_order <span class="b">WHERE</span> t_order.user_id = t_user.user_id);
+<span class="c">-- NOT EXISTS 无 NULL 问题，语义等价但更安全、常更快</span></pre>
+  <div class="callout danger">
+    <b>两个必须记住的事实：</b>① <b>NOT IN (含 NULL 子查询) = 空结果集</b>，这是 SQL 语义不是 bug——NOT IN 展开成 AND 链，任何 NULL 比较都返回 UNKNOWN；② <b>IN 与 EXISTS 在纯等值且无 NULL 时等价</b>，但执行上"IN 适合大表驱动小表、EXISTS 适合小表驱动大表"，手写时要配合数据规模。MySQL 8.0 会自动做大部分转换，但 <b>PostgreSQL 不会自动把 NOT IN 转 anti join</b>，那边必须手写 NOT EXISTS。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>排序与分组的实现</h2></div>
+  <p class="lead">ORDER BY / GROUP BY 是 CPU + 内存大户。理解"什么时候走索引有序、什么时候 filesort、什么时候临时表"，就理解了这类慢查询的全部。</p>
+  <table>
+    <tr><th style="width:170px">场景</th><th style="width:200px">实现方式</th><th>EXPLAIN 信号</th></tr>
+    <tr><td><b>ORDER BY 走索引</b></td><td>索引本身有序，顺序扫描即可</td><td>无 Using filesort</td></tr>
+    <tr><td><b>ORDER BY 内存排序</b></td><td>结果集进 sort_buffer 快排</td><td>Using filesort</td></tr>
+    <tr><td><b>ORDER BY 落盘</b></td><td>sort_buffer 放不下，写临时文件多路归并</td><td>Using filesort（慢，看 status）</td></tr>
+    <tr><td><b>GROUP BY 走索引</b></td><td>紧凑索引扫描，边读边聚合</td><td>无 Using temporary</td></tr>
+    <tr><td><b>GROUP BY 临时表</b></td><td>先物化分组再聚合</td><td>Using temporary + Using filesort</td></tr>
+  </table>
+  <pre><span class="c">-- 排序相关参数</span>
+sort_buffer_size        = 256KB   <span class="c">-- 会话级，放不下就落盘</span>
+max_length_for_sort_data = 4096   <span class="c">-- 超过则用"双路排序"（只读排序列+主键）</span>
+max_sort_length         = 1024    <span class="c">-- 排序键前 N 字节参与比较</span>
+
+<span class="c">-- 双路 vs 单路排序</span>
+单路（row 数据小）：一次性读全字段进 buffer 排序 → 内存省但可能两次回表
+双路（row 数据大）：buffer 只存 排序列 + 主键 → 排序后按主键回表取行
+<span class="c">-- 宽表 + 大 offset 时双路常更快，因为 buffer 能装更多待排项</span>
+
+<span class="c">-- GROUP BY 优化：让分组顺序匹配索引顺序</span>
+<span class="b">CREATE INDEX</span> idx_ut <span class="b">ON</span> t_order(user_id, create_time);
+
+<span class="c">-- 走索引分组（无 Using temporary）：</span>
+<span class="b">SELECT</span> user_id, <span class="b">COUNT</span>(*) <span class="b">FROM</span> t_order <span class="b">GROUP BY</span> user_id;
+<span class="c">-- 不匹配索引顺序时：</span>
+<span class="b">SELECT</span> user_id, <span class="b">COUNT</span>(*) <span class="b">FROM</span> t_order <span class="b">GROUP BY</span> user_id <span class="b">ORDER BY</span> <span class="b">NULL</span>;  <span class="c">-- 禁止隐式排序，消掉多余 filesort</span></pre>
+  <div class="callout ok">
+    <b>三条实战规则：</b>① ORDER BY 的列顺序和方向必须与索引<b>完全一致</b>（混合 ASC/DESC 时 8.0 支持降序索引，之前只能全升序匹配）；② <b>SELECT 的排序列不要跨表分散</b>——两表各排一列时 filesort 无法避免，尽量把排序字段冗余到单表；③ 分组 + 计数这类"周期性重复计算"，直接建汇总表预聚合，别指望优化器每次现场算百万行。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>MySQL vs PostgreSQL 优化器差异</h2></div>
+  <table>
+    <tr><th style="width:120px">维度</th><th style="width:250px">MySQL 8.0</th><th>PostgreSQL 14+</th></tr>
+    <tr><td><b>统计体系</b></td><td>索引 cardinality 按页采样；8.0 起支持直方图（UPDATE HISTOGRAM）</td><td>每列完整统计：n_distinct、most_common_vals/freqs、histogram_bounds、<b>correlation（物理顺序相关性）</b></td></tr>
+    <tr><td><b>JOIN 算法</b></td><td>NLJ/BNL 为主；8.0.20+ 引入 hash join；无 merge join</td><td>NLJ / hash / merge 三件套齐全，cost 自动选</td></tr>
+    <tr><td><b>子查询</b></td><td>semijoin / materialization / derived 自动策略</td><td>subquery pullup（拉平）、semi/anti join，策略更激进</td></tr>
+    <tr><td><b>并行查询</b></td><td><b>无</b>（8.0 全系不支持并行扫描）</td><td>parallel seq scan / parallel index scan / parallel hash join</td></tr>
+    <tr><td><b>CTE</b></td><td>8.0 前总是物化，不可内联</td><td>默认内联，可用 MATERIALIZED / NOT MATERIALIZED 显式指定</td></tr>
+    <tr><td><b>排序缓冲</b></td><td>sort_buffer_size（会话级）</td><td>work_mem（按操作分配，排序和哈希分开算）</td></tr>
+    <tr><td><b>Hint</b></td><td>FORCE INDEX / optimizer_switch / optimizer hint（8.0 注释语法）</td><td>无 hint 语法（靠统计 + 调参），可 extend 自定义 plan</td></tr>
+  </table>
+  <pre><span class="c">-- PostgreSQL 的执行计划（注意 actual rows 与估算的对比方式不同）</span>
+postgres=# <span class="b">EXPLAIN</span> (ANALYZE, BUFFERS)
+postgres-# <span class="b">SELECT</span> * <span class="b">FROM</span> t_order o <span class="b">JOIN</span> t_user u <span class="b">ON</span> o.user_id = u.user_id
+postgres-# <span class="b">WHERE</span> o.amount &gt; 900;
+                                                QUERY PLAN
+----------------------------------------------------------------------------------------------------------
+ Hash Join  (cost=31145.00..48231.00 rows=330000 width=40)
+            (actual time=185.220..402.117 rows=332145 loops=1)
+   Hash Cond: (o.user_id = u.user_id)
+   -&gt; Seq Scan on t_order o  (cost=0.00..18334.00 rows=330000 width=32)
+                            (actual time=0.012..112.442 rows=332145 loops=1)
+         Filter: (amount &gt; 900)
+         Rows Removed by Filter: 667855
+   -&gt; Hash  (cost=20134.00..20134.00 rows=1000000 width=16)
+           (actual time=184.998..184.998 rows=1000000 loops=1)
+         Buckets: 65536  Batches: 1  Memory Usage: 61000kB
+   -&gt; Seq Scan on t_user u  (cost=0.00..16334.00 rows=1000000 width=16)
+                            (actual time=0.008..62.113 rows=1000000 loops=1)
+ Planning Time: 0.201 ms
+ Execution Time: 425.338 ms
+<span class="c">-- 读法：PG 选了 Hash Join（o 与 u 都全表扫），实际 33 万行与估算 33 万高度吻合</span>
+<span class="c">-- Rows Removed by Filter 直白告诉你过滤掉了多少行；BUFFERS 看缓存命中</span></pre>
+  <div class="callout warn">
+    <b>跨库迁移的最大认知差：</b>MySQL 的 <span class="k">rows</span> 是"索引查找预估行数"，PG 的 <span class="k">rows</span> 是"节点输出行数"，口径不同；MySQL 没有并行，PG 的并行计划会把一个操作拆成 loops=N。<b>同一套 SQL 在两边跑出不同计划是常态</b>，迁移时不能照搬 MySQL 的索引设计，要按 PG 的统计体系重建统计和索引。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>慢查询改写手册</h2></div>
+  <p class="lead">按出现频率排序的八种改写。每种都先看执行计划，再动手。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>深翻页改游标</b>：LIMIT 100000,10 → WHERE create_time &lt; 上一页末条 LIMIT 10，把 offset 换成索引范围条件</div></div>
+    <div class="step"><div class="txt"><b>select * 改按需取列</b>：让查询走覆盖索引（Extra: Using index）；必须取整行时用延迟关联（子查询拿主键再 JOIN）</div></div>
+    <div class="step"><div class="txt"><b>大 IN 拆批</b>：IN 列表 5000 个值改临时表 JOIN，或 500 个一批循环——IN 过长时优化器可能直接放弃索引</div></div>
+    <div class="step"><div class="txt"><b>OR 改 UNION ALL</b>：WHERE a=1 OR b=2 且 b 无索引 → 拆成两个走各自索引的查询 UNION ALL（注意去重时用 UNION）</div></div>
+    <div class="step"><div class="txt"><b>NOT IN 改 NOT EXISTS</b>：避开 NULL 语义陷阱，同时让优化器走 anti join</div></div>
+    <div class="step"><div class="txt"><b>拆分大 SQL</b>：一条 30 表 JOIN 拆成多次单表查询 + 内存关联。数据库的 JOIN 算法没有"应用层 HashMap"灵活，应用层关联常快数倍</div></div>
+    <div class="step"><div class="txt"><b>预聚合替代实时计算</b>：count/sum over 百万行且周期性重复 → 汇总表 + 定时任务，查询变点查</div></div>
+    <div class="step"><div class="txt"><b>修统计信息再谈索引</b>：ANALYZE TABLE 刷新 cardinality，或 UPDATE HISTOGRAM 修范围估算。很多"索引失效"其实是统计过期造成的误判</div></div>
+  </div>
+  <pre><span class="c">-- 改写前后对比的标准流程（以深翻页为例）</span>
+<span class="c">-- 改写前：</span>
+<span class="b">EXPLAIN ANALYZE</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">ORDER BY</span> create_time <span class="b">LIMIT</span> 100000, 10;
+<span class="c">-- actual time=850ms，Sort 节点 rows=100010</span>
+
+<span class="c">-- 改写后（延迟关联 + 游标）：</span>
+<span class="b">EXPLAIN ANALYZE</span>
+<span class="b">SELECT</span> o.* <span class="b">FROM</span> t_order o <span class="b">JOIN</span> (
+  <span class="b">SELECT</span> order_id <span class="b">FROM</span> t_order
+  <span class="b">WHERE</span> create_time &lt; <span class="y">'2026-10-01 00:00:00'</span>
+  <span class="b">ORDER BY</span> create_time <span class="b">DESC LIMIT</span> 10
+) t <span class="b">ON</span> o.order_id = t.order_id;
+<span class="c">-- actual time=0.3ms：子查询走 idx_time 覆盖扫描 10 行，回表 10 次</span>
+
+<span class="c">-- 提速 2800 倍，没加一台机器、没改一行代码逻辑</span></pre>
+  <div class="callout ok">
+    <b>Hint 的正确用法：</b>FORCE INDEX 是<b>诊断工具不是生产工具</b>——它绕过了优化器的估算，统计信息一变就可能从 3 秒变 30 秒。正确顺序：先修统计信息（ANALYZE / 直方图）→ 再改索引 → 还不行才考虑 hint，且必须配套监控。MySQL 8.0 的优化器 hint（<span class="k">/*+ INDEX(t, idx) */</span>）比 FORCE INDEX 更细粒度（可指定 join order、semijoin 策略），优先用它。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>真实执行计划逐列解读</h2></div>
+  <p class="lead">四个典型输出，覆盖 90% 的线上场景。每个都按"先看什么、结论是什么、怎么改"讲。</p>
+  <h4>场景一：健康的计划（覆盖索引 + 范围）</h4>
+  <pre>mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> order_id, user_id, create_time <span class="b">FROM</span> t_order
+    -&gt; <span class="b">WHERE</span> user_id = 888 <span class="b">AND</span> create_time &gt; <span class="y">'2026-09-01'</span>;
++----+-------------+---------+------------+-------+---------------+----------+---------+-------------+------+----------+---------------------+
+| id | select_type | table   | partitions | type  | possible_keys | key      | key_len | ref         | rows | filtered | Extra               |
++----+-------------+---------+------------+-------+---------------+----------+---------+-------------+------+----------+---------------------+
+|  1 | SIMPLE      | t_order | NULL       | <span class="g">range</span> | idx_user      | idx_user | 9       | const       |  120 |   100.00 | Using index         |
++----+-------------+---------+------------+-------+---------------+----------+---------+-------------+------+----------+---------------------+
+<span class="c">-- 结论：type=range、key=idx_user、Extra=Using index（覆盖，零回表）</span>
+<span class="c">-- rows=120 小结果集。注意 key_len=9：user_id(8) + 1（可空标记），create_time 未进 key_len</span>
+<span class="c">-- 因为范围列只用于定位起点，若要 create_time 也消 filesort，索引需为 (user_id, create_time)</span></pre>
+  <h4>场景二：索引失效（隐式转换）</h4>
+  <pre>mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> phone = 13800000000;
++----+-------------+---------+------------+------+---------------+------+---------+------+---------+----------+-------------+
+| id | select_type | table   | partitions | type | possible_keys | key  | key_len | ref  | rows    | filtered | Extra       |
++----+-------------+---------+------------+------+---------------+------+---------+------+---------+----------+-------------+
+|  1 | SIMPLE      | t_order | NULL       | <span class="r">ALL</span>  | idx_phone     | <span class="r">NULL</span>| NULL    | NULL | 1000000 |    10.00 | Using where |
++----+-------------+---------+------------+------+---------------+------+---------+------+---------+----------+-------------+
+<span class="c">-- 结论：type=ALL、key=NULL、rows=100 万 = 全表扫描</span>
+<span class="c">-- 诊断：phone 是 VARCHAR 却传数字 → 隐式转换，索引列被函数包裹</span>
+<span class="c">-- 修复：WHERE phone = '13800000000'（加引号）。EXPLAIN 立刻变 ref/rows=2</span></pre>
+  <h4>场景三：无索引 JOIN（BNL/Hash）</h4>
+  <pre>mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order o <span class="b">LEFT JOIN</span> t_ext e <span class="b">ON</span> o.order_id = e.order_id;
++----+-------------+-------+------------+------+---------------+------+---------+------+---------+----------+-------------------------------------+
+| id | select_type | table | partitions | type | possible_keys | key  | key_len | ref  | rows    | filtered | Extra                               |
++----+-------------+-------+------------+------+---------------+------+---------+------+---------+----------+-------------------------------------+
+|  1 | SIMPLE      | o     | NULL       | ALL  | NULL          | NULL | NULL    | NULL | 1000000 |   100.00 | NULL                                |
+|  1 | SIMPLE      | e     | NULL       | ALL  | NULL          | NULL | NULL    | NULL |  500000 |   100.00 | <span class="r">Using where; Using join buffer (hash join)</span> |
++----+-------------+-------+------------+------+---------------+------+---------+------+---------+----------+-------------------------------------+
+<span class="c">-- 结论：e 表 order_id 无索引 → 100 万行 × 50 万行 的匹配</span>
+<span class="c">-- MySQL 8.0 自动选了 hash join（小表建哈希表），比 BNL 快但仍是 O(N)</span>
+<span class="c">-- 修复：CREATE INDEX idx_order ON t_ext(order_id); 之后 e 变 eq_ref，总成本从 O(N) 降 O(N log N)</span></pre>
+  <h4>场景四：子查询被物化</h4>
+  <pre>mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id <span class="b">IN</span> (<span class="b">SELECT</span> user_id <span class="b">FROM</span> t_vip_user);
++----+--------------+-------------+------------+--------+---------------+----------+---------+----------------+------+----------+--------------------------+
+| id | select_type  | table       | type       | key    | key_len | ref            | rows    | filtered | Extra                    |
++----+--------------+-------------+------------+--------+---------------+----------+---------+----------------+------+----------+--------------------------+
+|  1 | SIMPLE       | &lt;derived2&gt;  | ALL        | NULL   | NULL    | NULL           |   50000 |   100.00 | NULL                     |
+|  1 | SIMPLE       | t_order     | <span class="g">ref</span>       | idx_user| 9       | &lt;derived2&gt;.user_id |      20 |   100.00 | Using index condition    |
++----+--------------+-------------+------------+--------+---------------+----------+---------+----------------+------+----------+--------------------------+
+<span class="c">-- 结论：子查询被物化成 derived2（临时表），外层用 ref 关联</span>
+<span class="c">-- Extra 的 Using index condition = ICP 生效，回表前先过滤</span>
+<span class="c">-- 诊断点：derived2 rows=50000 若远大于实际 VIP 数，说明统计过期或 VIP 表没 ANALYZE</span>
+<span class="c">-- 若 VIP 表只有 500 行但物化出 5 万行，先 ANALYZE TABLE t_vip_user 再评估</span></pre>
+  <div class="callout ok">
+    <b>读计划的四步口诀：</b>① 先找 <b>type=ALL 且 rows 大</b> 的节点——那是主要成本；② 看 <b>key=NULL</b> 的节点是不是本该走索引；③ 看 <b>Extra</b> 有没有 Using filesort / Using temporary / Using join buffer 三件套；④ 最后用 <b>EXPLAIN ANALYZE 的 actual rows 对比 rows</b>，偏差大就先修统计信息，别急着改 SQL。
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">深坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看 type 不看 rows 和 filtered</div><div class="pd">type=ref 但 rows=500 万一样慢死。type 只说明访问方式，成本 = rows × 单行成本。永远把 rows × filtered 算出来看结果集大小。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">驱动表选反：大表驱动小表</div><div class="pd">用 100 万行表驱动 10 行表，NLJ 做 100 万次索引查找。驱动表永远是过滤后行数小的那张。JOIN 顺序不对时用 STRAIGHT_JOIN 或优化器 hint 固定。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">filesort 落盘</div><div class="pd">sort_buffer_size 默认 256KB，排 10 万行就写临时文件，多路归并慢一个量级。排序列别跨表、顺序匹配索引、必要时拆查询。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">Using temporary：GROUP BY 建了临时表</div><div class="pd">分组顺序和索引不一致时优化器建临时表再聚合，百万行直接卡死。GROUP BY 顺序对齐索引列，或加 ORDER BY NULL 去掉多余排序。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">NOT IN 子查询含 NULL，结果永远为空</div><div class="pd">SQL 语义：NOT IN 展开成 AND 链，遇 NULL 返回 UNKNOWN，整体空集。改 NOT EXISTS，既安全又能走 anti join。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">隐式转换让索引失效</div><div class="pd">VARCHAR 列传数字、JOIN 列字符集不一致（utf8 vs utf8mb4），都会把索引列包进转换函数，EXPLAIN type=ALL。统一类型和字符集。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">深翻页 LIMIT 100000,10</div><div class="pd">每翻一页多扫 10 行还多排一次序，第 100 页比第 1 页慢 100 倍。改游标（WHERE 排序列 &lt; 上页末值 LIMIT 10）或延迟关联。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">OR 连接导致全表扫描</div><div class="pd">WHERE a=1 OR b=2，b 无索引时整个查询 ALL。拆成 UNION ALL 各走索引；或给 b 补索引后评估 index_merge。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">统计信息过期，优化器持续选错索引</div><div class="pd">大批量导入/删除后 cardinality 失真，好索引被弃用。ANALYZE TABLE 刷新；范围估算偏差大就 UPDATE HISTOGRAM。别用 FORCE INDEX 掩盖。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">ORDER BY 与索引顺序差一点，filesort 就回来</div><div class="pd">索引 (user_id, create_time)，ORDER BY create_time（少了 user_id）或 ASC/DESC 混合，都无法用索引有序。排序列必须完整匹配索引列顺序和方向。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. EXPLAIN 的 type 值中，性能最差的是哪个？</div>
+      <button class="opt">index（全索引扫描）</button>
+      <button class="opt">range（索引范围扫描）</button>
+      <button class="opt">ALL（全表扫描）</button>
+      <div class="ans">正确答案：<b>ALL</b>。性能谱：system &gt; const &gt; eq_ref &gt; ref &gt; range &gt; index &gt; ALL。range 只读索引中满足条件的部分，index 扫全索引，ALL 扫全表——大表上 ALL 是最贵的访问方式。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. Hash Join 最适合哪种场景？</div>
+      <button class="opt">两张表都有索引且结果集都很小</button>
+      <button class="opt">等值连接、至少一张表无索引、连接的是大表</button>
+      <button class="opt">范围连接（BETWEEN、&gt;）</button>
+      <div class="ans">正确答案：<b>等值连接 + 大表 + 无索引</b>。Hash Join 把小表建哈希表、大表逐行探测，一次 O(N+M)，完美绕过"没有索引就没有 NLJ"的死局。范围连接它不支持（哈希无法处理范围），那还是 NLJ 或 Merge Join。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. Extra 出现 Using index condition 表示？</div>
+      <button class="opt">走了覆盖索引，零回表</button>
+      <button class="opt">查询结果被缓存了</button>
+      <button class="opt">索引条件下推 ICP 生效，回表前先在引擎层过滤</button>
+      <div class="ans">正确答案：<b>ICP 生效</b>。零回表是 Using index（覆盖索引）的能力。Using index condition 表示 WHERE 中索引相关条件下推到存储引擎，在页内先过滤，减少的是回表次数而非归零。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. IN 改写为 EXISTS 的主要场景和收益是？</div>
+      <button class="opt">外层结果集小、内层大时，让外层驱动内层索引，减少扫描</button>
+      <button class="opt">EXISTS 一定能消除全表扫描</button>
+      <button class="opt">两者语义完全不同，改写会改变结果</button>
+      <div class="ans">正确答案：<b>小表驱动大表</b>。等值无 NULL 时 IN 与 EXISTS 语义等价，但执行方向不同：IN 倾向内表物化、EXISTS 倾向外表逐行探测内表索引。外层小时 EXISTS 更快。注意 NOT IN 与 NOT EXISTS 在 NULL 语义下<b>不等价</b>，改写要小心。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. EXPLAIN ANALYZE 相比 EXPLAIN 最大的价值是？</div>
+      <button class="opt">显示更详细的索引信息</button>
+      <button class="opt">显示每个节点的真实执行行数和耗时，能发现估算偏差</button>
+      <button class="opt">可以自动改写 SQL</button>
+      <div class="ans">正确答案：<b>真实执行数据</b>。EXPLAIN 全是优化器的<b>预估</b>（基于统计信息），EXPLAIN ANALYZE 会真正执行并给出 actual time / actual rows / loops。预估 rows=42 实际 rows=50 万，说明统计信息或数据分布骗了优化器——这是排查的起点。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 优化深翻页 LIMIT 100000,10 的首选手段是？</div>
+      <button class="opt">改成游标/书签：WHERE 排序列 &lt; 上一页末值 ORDER BY 排序列 LIMIT 10</button>
+      <button class="opt">调大 sort_buffer_size</button>
+      <button class="opt">加 FORCE INDEX 强制走主键</button>
+      <div class="ans">正确答案：<b>游标法</b>。它把"跳过 10 万行"变成"从某个索引位置开始读 10 行"，offset 彻底消失，每页耗时恒定。调大 sort buffer 只是让排序不落盘，扫描量没变；force index 不改变 offset 的本质成本。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>EXPLAIN SELECT ...</code><span class="desc">看优化器预估计划：type/key/rows/Extra</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN ANALYZE SELECT ...</code><span class="desc">看真实执行：actual time/rows/loops</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN FORMAT=TREE SELECT ...</code><span class="desc">树状计划，看 JOIN 算法和顺序更直观</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ANALYZE TABLE t_order</code><span class="desc">刷新索引统计信息（导入后必做）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ANALYZE TABLE t UPDATE HISTOGRAM ON col WITH 256 BUCKETS</code><span class="desc">建直方图，修范围选择率估算（8.0）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW STATUS LIKE 'Handler_read%'</code><span class="desc">看实际扫描行数，识别假索引命中</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SET optimizer_switch='semijoin=off'</code><span class="desc">切换子查询策略（materialization/semijoin）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM t FORCE INDEX(idx)</code><span class="desc">强制索引（诊断用，别进生产）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW VARIABLES LIKE 'sort_buffer_size'</code><span class="desc">排序缓冲区大小（默认 256KB）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>慢日志与诊断配置</h3>
+  <pre><span class="c"># 采集慢查询样本</span>
+<span class="b">SET GLOBAL</span> slow_query_log = <span class="y">ON</span>;
+<span class="b">SET GLOBAL</span> long_query_time = 1;               <span class="c">-- 阈值（秒）</span>
+<span class="b">SET GLOBAL</span> log_queries_not_using_indexes = <span class="y">ON</span>;
+
+<span class="c"># 日志分析：mysqldumpslow 提 TOP 10</span>
+mysqldumpslow -s c -t 10 /var/lib/mysql/slow.log
+<span class="c">-- -s c 按次数排序，-t 10 取前 10；还有 -s t 按总时间</span>
+
+<span class="c"># 排查三板斧</span>
+<span class="c">-- 1. EXPLAIN ANALYZE 拿真实执行数据</span>
+<span class="c">-- 2. SHOW STATUS LIKE 'Handler_read%' 看实际扫描量</span>
+<span class="c">-- 3. ANALYZE TABLE / UPDATE HISTOGRAM 修统计后再复测</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>CBO</b></td><td>基于代价的优化器：枚举候选计划、按代价选最小</td></tr>
+    <tr><td><b>统计信息</b></td><td>行数、cardinality、min/max、直方图，优化器决策的全部依据</td></tr>
+    <tr><td><b>选择率</b></td><td>匹配行数 / 总行数，决定走索引还是全表</td></tr>
+    <tr><td><b>直方图</b></td><td>列值分布的有序桶，MySQL 8.0 起支持，修范围估算</td></tr>
+    <tr><td><b>代价模型</b></td><td>IO 代价 + CPU 代价的加权求和，单位是"页读 + 行比较"</td></tr>
+    <tr><td><b>执行计划</b></td><td>优化器输出的物理操作序列（访问方式、JOIN 算法、顺序）</td></tr>
+    <tr><td><b>驱动表</b></td><td>JOIN 中被外层循环的表，应选过滤后行数小的</td></tr>
+    <tr><td><b>NLJ</b></td><td>嵌套循环连接：外层每行用内层索引查匹配</td></tr>
+    <tr><td><b>BNL</b></td><td>块嵌套循环：外层进 join buffer，内层逐行比对</td></tr>
+    <tr><td><b>Hash Join</b></td><td>小表建哈希表大表探测，等值连接大表场景主力</td></tr>
+    <tr><td><b>Sort Merge Join</b></td><td>两表按连接键排序后归并，PG 有、MySQL 无</td></tr>
+    <tr><td><b>半连接</b></td><td>IN/EXISTS 子查询的优化形态：找到即停，不重复匹配</td></tr>
+    <tr><td><b>物化</b></td><td>把子查询/派生表结果算出来存临时表，可能自动建索引</td></tr>
+    <tr><td><b>派生表</b></td><td>FROM 子查询生成的临时表，EXPLAIN 显 &lt;derivedN&gt;</td></tr>
+    <tr><td><b>filesort</b></td><td>排序在内存/磁盘进行（非索引有序），EXPLAIN 显 Using filesort</td></tr>
+    <tr><td><b>临时表</b></td><td>GROUP BY/DISTINCT 无法走索引时的中间结构，Using temporary</td></tr>
+    <tr><td><b>ICP</b></td><td>索引条件下推：条件在引擎层过滤，减少回表</td></tr>
+    <tr><td><b>anti join</b></td><td>NOT EXISTS/NOT IN 的优化形态，PG 擅长、MySQL 有限</td></tr>
+    <tr><td><b>慢查询日志</b></td><td>超过 long_query_time 的语句记录，优化第一数据源</td></tr>
+    <tr><td><b>优化器 hint</b></td><td>/*+ ... */ 注释语法指定索引/JOIN 顺序，比 FORCE INDEX 精细</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 t_order/t_order_item/t_user 完成这四件事 —— ① 灌 100 万行后故意写 6 种坏 SQL（隐式转换、深翻页、OR、NOT IN、无索引 JOIN、函数包裹），逐个 EXPLAIN ANALYZE 记录耗时；② 逐个改写并复测，做一张"改写前后耗时对比表"；③ 用 ANALYZE TABLE UPDATE HISTOGRAM 修一个范围查询的估算偏差；④ 把同一套 SQL 拿到 PostgreSQL 跑，对比两边的执行计划和差异。<br><br>
+    <b>之后值得单独学：</b>MySQL 8.0 优化器 hint 完整语法、直方图与扩展统计的深入调校、执行计划缓存与 prepared statement 的参数化陷阱，以及分布式数据库（TiDB）的执行计划体系——那里没有 B+ 树，但 CBO 的思想完全一致。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透查询优化器 · EXPLAIN ANALYZE 的 actual rows 比什么都诚实</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（JOIN 算法）、模块 4（子查询优化）和模块 7（改写手册）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 mysql 客户端里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起 MySQL 8.0 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透构建发布平台设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 高密度版</span>
+    <h1>二十分钟学透构建发布平台设计</h1>
+    <p class="sub">CI 平台的价值就三条：<b>构建快、产物可追溯、发布可控</b>。这篇讲调度器/执行器/缓存/制品库四大件、DAG 流水线、构建加速的缓存 key 设计、环境晋级链路，以及自研还是用开源。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 类构建缓存</span>
+      <span class="chip"><b>4</b> 级环境晋级</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议装 Docker，把 BuildKit 缓存挂载和多阶段构建敲一遍。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>CI 平台架构：四大件</h2></div>
+  <p class="lead">无论自研还是用开源，一个 CI 平台都由四个核心组件构成。先把职责分清楚，再看开源方案各自动了哪块。</p>
+  <table>
+    <tr><th style="width:130px">组件</th><th style="width:220px">职责</th><th>关键指标</th></tr>
+    <tr><td><b>调度器 Scheduler</b></td><td>接收触发（webhook/定时/手动），展开 DAG，分配任务到执行器</td><td>调度延迟 &lt; 1 s；支持优先级队列</td></tr>
+    <tr><td><b>执行器 Executor</b></td><td>真正跑构建的容器/VM。拉代码、装依赖、编译、跑测试、传产物</td><td>并发数；单任务资源规格；启动耗时</td></tr>
+    <tr><td><b>缓存服务 Cache</b></td><td>依赖缓存、Docker 层缓存、构建产物的分布式存储</td><td>命中率（目标 70%+）；拉取带宽</td></tr>
+    <tr><td><b>制品库 Artifacts</b></td><td>二进制产物的存储、版本管理、晋级、检索</td><td>可用性 99.99%；拉取延迟；不可变性</td></tr>
+    <tr><td><b>辅助件</b></td><td>Secret 管理（Vault）、日志服务、审计、通知</td><td>日志秒级可见；审计留存 180 天+</td></tr>
+  </table>
+  <h3>一次构建的完整旅程</h3>
+  <pre><span class="c">代码 push ──&gt; Webhook ──&gt; API 服务 ──&gt; 调度器</span>
+                                    │
+                                    ▼
+                        展开流水线 DAG，任务入优先级队列
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+            领取任务，启动容器                  依赖缓存/制品
+            拉代码 → 装依赖 → 编译 → 测试        按 key 拉取
+                    │                               │
+                    └───────────&gt; 上传产物 &lt;─────────┘
+                                    │
+                                    ▼
+                        制品入库（打版本、记元数据）
+                        状态回写（成功/失败 + 日志）</pre>
+  <h3>容量估算（给过程）</h3>
+  <pre><span class="c"># 假设：日均 2 万次构建，平均耗时 6 分钟，峰值是平均的 5 倍</span>
+平均并发 = 20000 × 6 ÷ (24 × 60) = <span class="y">83 个并发任务</span>
+峰值并发 = 83 × 5 = <span class="y">415 个并发任务</span>
+
+<span class="c"># 单任务规格 2C4G，K8s 节点 8C16G（每节点跑 3 个任务 Pod）</span>
+所需节点 = 415 ÷ 3 ≈ <span class="y">140 台节点</span>（预留 20% 缓冲 ≈ 170 台）
+
+<span class="c"># 缓存流量：60% 任务命中缓存，平均拉 500MB</span>
+缓存带宽 = 415 × 60% × 500MB ÷ 6min ≈ <span class="y">35 MB/s</span>（持续）
+<span class="c"># 结论：并发是容量规划的第一变量，缓存带宽是第二变量</span></pre>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>流水线模型：DAG 编排</h2></div>
+  <p class="lead">流水线不是"阶段串行"那么简单。现代 CI 的核心抽象是 <b>DAG（有向无环图）</b>：任务声明依赖，调度器按拓扑序执行，能并行的并行。</p>
+  <table>
+    <tr><th style="width:120px">概念</th><th>说明</th></tr>
+    <tr><td><b>阶段 stage</b></td><td>粗粒度串行边界：build 完才 test。适合门禁语义（不过测试不许部署）</td></tr>
+    <tr><td><b>任务 job/task</b></td><td>最小执行单元，同 stage 内默认并行</td></tr>
+    <tr><td><b>DAG 依赖</b></td><td>任务级依赖声明。test 只需等 build，不等同 stage 的其他任务，省等待时间</td></tr>
+    <tr><td><b>矩阵 matrix</b></td><td>一个任务模板 × 多组参数展开（如 Go 1.21/1.22 × linux/mac）</td></tr>
+    <tr><td><b>并发组</b></td><td>同一 group 的任务互斥，新触发可取消旧的（cancel-in-progress）</td></tr>
+    <tr><td><b>触发器</b></td><td>push / MR / tag / 定时 / 手动 / API，各自配过滤规则</td></tr>
+  </table>
+  <h3>GitLab CI 完整示例（DAG + 矩阵 + 环境）</h3>
+  <pre><span class="c"># .gitlab-ci.yml</span>
+stages: [build, test, deploy]
+
+variables:
+  GOPROXY: "https://goproxy.cn,direct"
+
+<span class="b">build</span>:
+  stage: build
+  image: golang:1.22
+  script:
+    - go build -ldflags "-s -w" -o app ./cmd/server
+  artifacts:
+    paths: [app]
+    expire_in: 1 week
+
+<span class="b">test-unit</span>:
+  stage: test
+  needs: [build]          <span class="c"># DAG：只依赖 build，不等同 stage 其他任务</span>
+  image: golang:1.22
+  script:
+    - go test -race -coverprofile=cover.out ./...
+  coverage: '/coverage: \d+.\d+%/'
+
+<span class="b">test-matrix</span>:
+  stage: test
+  needs: [build]
+  parallel:
+    matrix:               <span class="c"># 2×2 = 4 个任务并行</span>
+      - GO: ["1.21", "1.22"]
+        OS: ["linux", "darwin"]
+  image: golang:$GO
+  tags: [$OS-runner]
+  script:
+    - go test ./...
+
+<span class="b">deploy-staging</span>:
+  stage: deploy
+  needs: [test-unit, test-matrix]   <span class="c"># 两个 test 都过才部署</span>
+  environment:
+    name: staging
+  script:
+    - ./deploy.sh staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+<span class="b">deploy-prod</span>:
+  stage: deploy
+  needs: [deploy-staging]
+  environment:
+    name: production
+  script:
+    - ./deploy.sh prod
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  when: manual            <span class="c"># 生产部署必须人工确认</span></pre>
+  <h3>Jenkins Declarative Pipeline（K8s 动态 agent）</h3>
+  <pre><span class="c">// Jenkinsfile</span>
+pipeline {
+  agent {
+    kubernetes {
+      yaml '''
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          namespace: ci
+        spec:
+          containers:
+          - name: builder
+            image: golang:1.22
+            command: ['sleep']
+            args: ['99d']
+            resources:
+              requests: {cpu: "2", memory: "4Gi"}
+              limits:   {cpu: "4", memory: "8Gi"}
+      '''
+    }
+  }
+  options {
+    timeout(time: 30, unit: 'MINUTES')
+    disableConcurrentBuilds()          <span class="c"># 同分支并发互斥</span>
+    buildDiscarder(logRotator(numToKeepStr: '50'))
+  }
+  stages {
+    stage('Build') { steps { sh 'go build -o app ./cmd/server' } }
+    stage('Test') {
+      parallel(
+        'unit': { sh 'go test -race ./...' },
+        'lint': { sh 'golangci-lint run' }
+      )
+    }
+  }
+  post {
+    always  { junit 'report.xml' }
+    failure { slackSend channel: '#ci', message: "failed: ${env.BUILD_URL}" }
+  }
+}</pre>
+  <div class="callout warn">
+    <b>矩阵的乘法陷阱：</b>matrix 是笛卡尔积。GO × OS × ARCH = 2 × 2 × 2 = <b>8 个任务</b>；再加数据库版本就变成 24 个。上线前必须算组合数，超 10 个组合的任务要考虑拆成多个 job 或用 <span class="k">exclude</span> 剪枝，否则一次 push 打满整个集群。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>执行环境：容器化 Executor</h2></div>
+  <p class="lead">执行环境的核心要求是<b>无状态和一致性</b>：每次构建都是干净环境，构建之间互不影响。这是"可复现构建"的基础。</p>
+  <table>
+    <tr><th style="width:130px">Executor 类型</th><th style="width:150px">隔离性</th><th>适用</th></tr>
+    <tr><td><b>容器 executor</b></td><td>进程级（Namespace/CGroup）</td><td>主流。K8s Pod / Docker，秒级启动</td></tr>
+    <tr><td><b>VM executor</b></td><td>硬件虚拟化级</td><td>需要完整内核隔离、特殊内核参数的场景（如某些安全构建）</td></tr>
+    <tr><td><b>bare-metal</b></td><td>无</td><td>性能压测、特定硬件依赖（iOS 构建需 macOS）</td></tr>
+  </table>
+  <h3>关键机制</h3>
+  <pre><span class="c"># 1. 每次构建全新 Pod：代码在 emptyDir，跑完即毁，绝不复用</span>
+<span class="c">#    杜绝"上次构建的残留文件"导致的环境漂移</span>
+
+<span class="c"># 2. 镜像预热：常用基础镜像预拉到节点</span>
+<span class="c">#    冷启动 Pod ≈ 2~5 s（拉镜像占大头），预热后 &lt; 1 s</span>
+<span class="c">#    预热池：维护"最近 N 天用过的镜像"列表，DaemonSet 定时同步</span>
+
+<span class="c"># 3. 资源配额：每个 namespace 设 ResourceQuota，防一个业务抢光集群</span>
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ci-quota
+  namespace: ci
+spec:
+  hard:
+    requests.cpu: "200"
+    requests.memory: 400Gi
+    limits.cpu: "400"
+    limits.memory: 800Gi
+    pods: "200"
+
+<span class="c"># 4. sidecar 模式：主容器构建，sidecar 负责日志上报/缓存上传/制品上传</span>
+<span class="c">#    主容器只关心业务命令，平台能力全部下沉到 sidecar</span>
+
+<span class="c"># 5. 超时与清理：</span>
+<span class="c">#    任务级 timeout（如 30 分钟）、僵尸 Pod 回收（GC 控制器，15 分钟扫一次）</span></pre>
+  <div class="callout danger">
+    <b>可复现构建三件套：pin 镜像 digest、lock 依赖版本、记录工具链版本。</b>任何一环用了浮动版本（latest、*、SNAPSHOT），构建就不可复现，线上事故复盘时无法还原当时的二进制。正确写法：<span class="k">FROM golang:1.22.5@sha256:abc...</span>、<span class="k">go.sum</span> 提交入库、CI 里打印 <span class="k">go version</span> 与编译器信息进产物元数据。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>构建加速：缓存设计</h2></div>
+  <p class="lead">构建慢的账：拉依赖 60%、编译 25%、拉镜像 10%、其他 5%。<b>缓存是唯一能把分钟级压到秒级的手段</b>，而缓存的关键全在 key 设计。</p>
+  <h3>四类缓存</h3>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:200px">缓存什么</th><th>典型位置</th></tr>
+    <tr><td><b>依赖缓存</b></td><td>maven ~/.m2、npm node_modules、go mod、pip cache</td><td>分布式缓存（S3/NAS）按 key 拉取</td></tr>
+    <tr><td><b>Docker 层缓存</b></td><td>镜像构建的每一层</td><td>registry 或 BuildKit cache</td></tr>
+    <tr><td><b>构建工具缓存</b></td><td>Gradle build cache、Bazel action cache、ccache</td><td>分布式缓存服务</td></tr>
+    <tr><td><b>缓存挂载</b></td><td>构建过程产生的临时目录</td><td>BuildKit cache mount</td></tr>
+  </table>
+  <h3>缓存 key：命中率的全部</h3>
+  <pre><span class="c"># 错误的 key：对源码内容做 hash</span>
+cache:
+  key:
+    files: [**/*.go]        <span class="c"># ✗ 改一行代码 → 全量 hash 变化 → 缓存全失效</span>
+  paths: [.cache/go-build]
+
+<span class="c"># 正确的 key：只对"依赖声明文件"做 hash</span>
+cache:
+  key:
+    files: [go.sum]         <span class="c"># ✓ 依赖没变 → 命中；依赖变了 → 才失效</span>
+  paths: [.cache/go-build]
+
+<span class="c"># 通用公式：</span>
+<span class="c">#   cache key = hash(依赖 lock 文件) + 运行时版本 + 平台标识</span>
+<span class="c">#   例：go1.22-linux-{{ checksum "go.sum" }}</span>
+
+<span class="c"># 不同生态的 lock 文件：</span>
+<span class="c">#   Go:     go.sum        Node: package-lock.json / pnpm-lock.yaml</span>
+<span class="c">#   Java:   pom.xml(或 gradle.lockfile)   Python: requirements.txt(带 hash)</span>
+<span class="c">#   Rust:  Cargo.lock    PHP: composer.lock</span></pre>
+  <h3>Docker 多阶段构建 + BuildKit 缓存挂载</h3>
+  <pre><span class="c"># syntax=docker/dockerfile:1</span>
+FROM golang:1.22.5 AS builder
+WORKDIR /src
+
+<span class="c"># 第一层：只拷依赖声明（变化少，命中率高）</span>
+COPY go.mod go.sum ./
+RUN go mod download
+
+<span class="c"># 第二层：拷源码编译</span>
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags "-s -w" -o /app
+
+<span class="c"># 运行阶段：精简基础镜像，无编译工具链</span>
+FROM gcr.io/distroless/static-debian12
+COPY --from=builder /app /app
+ENTRYPOINT ["/app"]
+
+<span class="c"># 构建命令（缓存推到 registry，团队共享）：</span>
+docker buildx build \
+  --cache-from type=registry,ref=registry.example.com/cache/app:buildcache \
+  --cache-to   type=registry,ref=registry.example.com/cache/app:buildcache,mode=max \
+  -t registry.example.com/app:$CI_COMMIT_SHA .</pre>
+  <h3>分布式缓存与命中率治理</h3>
+  <ul>
+    <li><b>存储</b>：对象存储（S3/OSS/MinIO）做后端，按 key 寻址，天然分布式共享，不占节点磁盘</li>
+    <li><b>本地热副本</b>：节点上保留 LRU 本地副本（如最近 20GB），二次命中免网络</li>
+    <li><b>命中率监控</b>：按业务/仓库维度统计，目标 70%+；低于 50% 的仓库重点治理 key 设计</li>
+    <li><b>缓存消毒</b>：key 里加运行时版本，防止"缓存里混着旧版本依赖"（缓存中毒）</li>
+    <li><b>增量构建</b>：monorepo 按变更目录裁剪构建范围（Bazel/Turbo/Nx 的看家本领）</li>
+  </ul>
+  <div class="callout ok">
+    <b>加速效果的量级感：</b>Java Maven 项目冷构建 8~12 分钟，依赖缓存命中后 2~4 分钟；Go 项目冷构建 3 分钟，命中后 40 秒；Node 项目差异最大，node_modules 缓存能把 5 分钟压到 1 分钟。<b>先上依赖缓存，再上层缓存，收益按这个顺序排。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>制品管理：晋级与版本策略</h2></div>
+  <p class="lead">制品是 CI 与 CD 之间唯一的契约。核心原则：<b>一次构建、多处晋级、不可变、可回溯</b>。</p>
+  <h3>版本策略</h3>
+  <table>
+    <tr><th style="width:130px">策略</th><th>格式</th><th>适用</th></tr>
+    <tr><td><b>语义化版本</b></td><td class="f">MAJOR.MINOR.PATCH</td><td>对外发布的库和服务，如 1.4.2</td></tr>
+    <tr><td><b>构建号版本</b></td><td class="f">1.4.2+ci.1024</td><td>内部服务，CI 自动追加构建号保证唯一</td></tr>
+    <tr><td><b>Commit 短 hash</b></td><td class="f">1.4.2-a3f9c2d</td><td>快速定位代码，常与前两者组合</td></tr>
+    <tr><td><b>digest 引用</b></td><td class="f">sha256:9f2c...</td><td><b>部署时的最终引用</b>，保证内容不可变</td></tr>
+  </table>
+  <h3>不可变性：tag 不可覆盖</h3>
+  <pre><span class="c"># 铁律：任何 tag 一旦推送，禁止覆盖。release-1.4.2 永远指向同一个二进制。</span>
+
+<span class="c"># 错误做法：每次构建都打同样的 tag</span>
+docker tag app:ci registry/app:latest   <span class="c"># ✗ latest 被覆盖，无法知道线上跑的是哪次构建</span>
+
+<span class="c"># 正确做法：唯一 tag + digest 双保险</span>
+docker tag app:ci registry/app:1.4.2-ci.1024
+docker push registry/app:1.4.2-ci.1024
+<span class="c"># 部署清单记录 digest：</span>
+image: registry/app:1.4.2-ci.1024@sha256:9f2c8a...
+
+<span class="c"># 镜像晋级 = 给同一个 digest 打新 tag，不重新构建：</span>
+docker tag registry/app:1.4.2-ci.1024 registry/app:staging-latest
+<span class="c"># 晋级到生产：同一个 digest 打 prod tag</span>
+docker tag registry/app:1.4.2-ci.1024 registry/app:prod-v1.4.2</pre>
+  <h3>晋级（Promotion）的正确姿势</h3>
+  <div class="steps">
+    <div class="txt"><b>一次构建</b>：CI 产出二进制，上传制品库，记录完整元数据（commit SHA、构建号、时间、依赖清单 SBOM、触发人）</div>
+    <div class="txt"><b>逐级晋级</b>：dev → test → staging → prod，每一级都是<b>同一个二进制</b>换环境配置，不是重新构建</div>
+    <div class="txt"><b>门禁控制</b>：每级晋级跑自动化验证（测试、安全扫描），生产级加人工审批</div>
+    <div class="txt"><b>回滚</b>：出问题时把 tag/digest 指回上一个版本，秒级完成，不需要重新构建</div>
+  </div>
+  <div class="callout danger">
+    <b>最危险的偷懒：每个环境各构建一次。</b>"dev 构建过了，test 再构建一遍，prod 发布时再构建一遍"——三次编译可能引入不同的依赖解析结果（即使有 lock 文件也有工具链差异），结果是<b>测过的二进制 ≠ 上线的二进制</b>，事故复盘时对不上。必须坚持"构建一次，晋级多次"。
+  </div>
+  <h3>保留策略</h3>
+  <ul>
+    <li>失败构建的产物：<b>1 天</b>后删除（排查窗口足够）</li>
+    <li>日常成功构建：保留最近 <b>50~100</b> 个</li>
+    <li>发版制品（打 release tag 的）：<b>永久</b>保留，配合合规要求</li>
+    <li>制品库元数据单独存数据库，支持按 commit/版本/时间反查</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>权限与审计</h2></div>
+  <p class="lead">CI/CD 平台手里握着"改代码 + 上生产"两把刀。权限设计的核心原则：<b>代码权限与部署权限分离</b>，生产环境单独授权。</p>
+  <table>
+    <tr><th style="width:140px">权限点</th><th style="width:160px">谁能有</th><th>说明</th></tr>
+    <tr><td>触发/查看构建</td><td>全体研发</td><td>只读权限，人人可自助排查</td></tr>
+    <tr><td>改流水线配置</td><td>Tech Lead / 模块负责人</td><td>.gitlab-ci.yml 走代码评审，等同代码权限</td></tr>
+    <tr><td>部署 dev/test</td><td>研发 + QA</td><td>测试环境放开，鼓励自测</td></tr>
+    <tr><td>部署 staging</td><td>研发 + 运维</td><td>准生产环境，变更需记录</td></tr>
+    <tr><td><b>部署 production</b></td><td><b>单独授权 + 审批</b></td><td><b>与代码合并权限解耦</b>：能合代码 ≠ 能上生产</td></tr>
+  </table>
+  <h3>为什么要分离两把刀</h3>
+  <ul>
+    <li><b>权限最小化</b>：实习生能合并 feature 分支，但不该能直接把全站发到生产</li>
+    <li><b>误操作防护</b>：代码合并是日常操作，生产部署是高风险操作，混在一起等于把高风险操作的权限发给所有人</li>
+    <li><b>审计可追责</b>：出了问题能回答"谁部署的、部署的哪个版本、谁审批的"</li>
+    <li><b>合规要求</b>：金融/等保场景强制要求职责分离（SoD，职责分离控制）</li>
+  </ul>
+  <h3>Secret 管理</h3>
+  <pre><span class="c"># 分级存放：</span>
+<span class="c"># ① 低敏（非生产数据库密码）：CI 变量，masked + protected 分支限定</span>
+<span class="c"># ② 高敏（生产密钥、云 AK/SK）：Vault / K8s Secret，运行时注入，不落盘</span>
+
+<span class="c"># GitLab CI 变量示例：</span>
+variables:
+  DEPLOY_TOKEN:
+    value: "glpat-xxxxxxxx"
+    masked: true        <span class="c"># 日志中自动打码</span>
+    protected: true     <span class="c"># 只有保护分支能拿到</span>
+
+<span class="c"># 日志脱敏：CI 系统对输出做正则扫描（AK 模式、token 模式），命中即替换</span>
+<span class="c"># 红线：禁止 echo $SECRET 到日志；禁止把密钥写进制品层（docker history 可见）</span>
+
+<span class="c"># K8s Secret 注入 Pod：</span>
+env:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: app-secret
+        key: db-password</pre>
+  <h3>审计日志必备字段</h3>
+  <table>
+    <tr><th style="width:150px">字段</th><th>示例</th></tr>
+    <tr><td class="f">operator</td><td>zhangsan（触发/部署人）</td></tr>
+    <tr><td class="f">action</td><td>deploy.production / pipeline.update</td></tr>
+    <tr><td class="f">target</td><td>app:1.4.2-ci.1024 @ sha256:9f2c...</td></tr>
+    <tr><td class="f">environment</td><td>production</td></tr>
+    <tr><td class="f">approver</td><td>lisi（生产审批人）</td></tr>
+    <tr><td class="f">timestamp</td><td>2026-10-18T14:32:00+08:00</td></tr>
+    <tr><td class="f">source</td><td>commit a3f9c2d / MR !1024</td></tr>
+    <tr><td class="f">result</td><td>success / failed / rolled-back</td></tr>
+  </table>
+  <p>留存要求：生产相关审计日志<b>不少于 180 天</b>，不可篡改（追加写或外发日志服务）。</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>多环境晋级：dev → test → staging → prod</h2></div>
+  <p class="lead">多环境的目的是<b>让问题在廉价的环境暴露，不在生产爆炸</b>。技术核心：同一制品 + 不同配置，环境逐级逼近生产。</p>
+  <table>
+    <tr><th style="width:110px">环境</th><th style="width:130px">用途</th><th style="width:130px">数据</th><th>发布方式</th></tr>
+    <tr><td><b>dev</b></td><td>研发联调、冒烟</td><td>假数据 / 脱敏小样本</td><td>push 自动部署</td></tr>
+    <tr><td><b>test</b></td><td>QA 全量回归、自动化测试</td><td>造数工具生成</td><td>MR 合并自动部署</td></tr>
+    <tr><td><b>staging</b></td><td>上线前最终验证、压测、演练</td><td>生产脱敏全量（或等比例抽样）</td><td>手动触发，自动门禁</td></tr>
+    <tr><td><b>prod</b></td><td>生产</td><td>真实数据</td><td><b>人工审批 + 灰度</b></td></tr>
+  </table>
+  <h3>晋级链路的工程要点</h3>
+  <pre><span class="c"># 1. 配置外置：同一镜像，配置走环境变量/配置中心</span>
+<span class="c">#    禁止把配置打进镜像（那样每个环境都要重新构建）</span>
+env:
+  - name: APP_ENV
+    value: "staging"
+  - name: CONFIG_CENTER
+    value: "http://apollo-config:8080"
+
+<span class="c"># 2. staging 与 prod 同构：</span>
+<span class="c">#    相同中间件版本（MySQL/Redis/MQ 大版本一致）</span>
+<span class="c">#    相同部署拓扑（staging 按 1:4 缩小，但服务类型齐全）</span>
+<span class="c">#    相同网络策略（staging 独立 namespace，不共享 prod 中间件）</span>
+
+<span class="c"># 3. 生产灰度：</span>
+<span class="c">#    金丝雀：5% 流量 → 观察 10 分钟 → 50% → 观察 → 100%</span>
+<span class="c">#    蓝绿：新旧两套并存，一键切回</span>
+<span class="c">#    回滚：digest 指回旧版本，秒级生效</span>
+
+<span class="c"># 4. 变更窗口：生产发布集中在低峰期（如 10:00-11:30 / 14:00-17:00）</span>
+<span class="c">#    封网期（大促、财报日）禁止发布，由平台策略强制</span>
+
+<span class="c"># 5. 配置漂移检测：</span>
+<span class="c">#    staging 与 prod 的部署清单（镜像/副本数/资源）定期 diff，告警差异</span></pre>
+  <div class="callout warn">
+    <b>"在我机器上好的"的工程解药是 staging 同构。</b>很多团队 staging 用着旧的中间件版本、缩水的拓扑、共享的测试数据库，导致 staging 验证通过、生产出问题。判断标准很简单：<b>staging 能不能复现 90% 的生产问题</b>？不能就是同构没做到位。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>自研 vs 开源</h2></div>
+  <p class="lead">选型的正确答案取决于团队规模和痛点，不存在"自研一定好"或"开源一定香"。先看对比，再看决策路径。</p>
+  <table>
+    <tr><th style="width:110px">方案</th><th style="width:200px">优势</th><th>劣势</th></tr>
+    <tr><td><b>Jenkins</b></td><td>插件生态最大（2000+），灵活度最高，社区资料多</td><td>配置 drift 严重（UI 点出来的配置难追溯）、JCasC 治理成本高、UI 老旧、大规模 master 瓶颈</td></tr>
+    <tr><td><b>GitLab CI</b></td><td>与代码仓一体化、YAML 声明式（随代码走）、MR 集成顺滑、Runner 可水平扩展</td><td>YAML 复杂后难维护、Runner 大规模管理要自己做、重功能绑定 GitLab 生态</td></tr>
+    <tr><td><b>Tekton / Argo</b></td><td>K8s 原生（Pipeline 就是 CRD）、云原生生态、无服务器组件</td><td>学习曲线陡、调试体验差、小团队用不起来</td></tr>
+    <tr><td><b>自研</b></td><td>与内部系统（发布、监控、权限）深度集成、调度策略完全可控、体验统一</td><td>研发维护成本高（一个团队长期投入）、容易沦为"又一个 Jenkins"、文档和生态靠自己</td></tr>
+  </table>
+  <h3>决策路径</h3>
+  <div class="steps">
+    <div class="txt"><b>团队 &lt; 50 人、代码在 GitLab</b> → 直接用 GitLab CI + 托管 Runner，别犹豫</div>
+    <div class="txt"><b>已有 Jenkins 生态、插件依赖重</b> → Jenkins + Configuration as Code（Jenkinsfile 进仓库）+ K8s 插件做动态 agent</div>
+    <div class="txt"><b>已在深度运营 K8s、多云部署</b> → Tekton / Argo Workflows，Pipeline 即代码即资源</div>
+    <div class="txt"><b>日构建 &gt; 5 万、特殊调度需求（GPU 构建、混合云、超大规模 monorepo）</b> → 自研，且要有"一个团队长期维护"的预算</div>
+  </div>
+  <div class="callout ok">
+    <b>业界的真实分布：</b>中小公司 GitLab CI / GitHub Actions 占绝大多数；大厂几乎全部自研（字节 ByteCI、阿里云效、腾讯蓝鲸、Google Bazel + Forge），但自研的前提是<b>构建规模到了开源方案的成本失控线</b>（通常是万级日构建以上）。自研的第一课不是写调度器，是先把 Jenkins/GitLab 的痛点列清楚，否则只是重复造轮子。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">基础镜像用 latest，构建环境漂移</div><div class="pd">同一条流水线上周能过这周挂，因为镜像里的工具链静默升级。必须 pin 到 digest：FROM golang:1.22.5@sha256:abc...，升级走显式变更。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">缓存 key 对源码 hash，命中率趋近于零</div><div class="pd">改一行代码整个缓存失效，等于没缓存。key 只能对依赖 lock 文件 hash（go.sum / package-lock.json / pom.xml），加运行时版本和平台标识。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">缓存中毒</div><div class="pd">key 相同但内容被污染（如中间步骤失败留下了半个缓存），后续全部构建拿到脏缓存，错得莫名其妙。对策：缓存只在任务成功时上传，key 加内容校验，发现中毒按 key 前缀整体清除。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">并发构建无配额，节点被抢光</div><div class="pd">一个大 monorepo 触发 50 个任务，把集群 CPU/内存占满，其他团队排队。用 namespace 级 ResourceQuota + 队列优先级 + 单流水线并发上限（max_parallel）。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">制品 tag 可覆盖，版本不可回溯</div><div class="pd">latest 反复被覆盖，出事故时说不清线上跑的是哪次构建。tag 唯一化（版本+构建号），部署记录 digest，release 制品永久保留。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">部署权限 = 代码权限</div><div class="pd">任何能合并代码的人都能发生产，误操作和越权无法追责。生产部署单独授权 + 审批流，代码权限与部署权限解耦，审计日志记全操作链。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">流水线无并发组，同分支重复触发</div><div class="pd">连续 push 三次触发三次构建并行跑，互相踩 workspace、重复部署。必须配并发组：同 group 互斥，新触发取消旧任务（cancel-in-progress）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">凭据明文进日志</div><div class="pd">echo 密码、错误堆栈带 token、密钥打进镜像层，日志系统和镜像仓库全泄露。变量必须 masked+protected，日志侧加正则脱敏，密钥运行时注入。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">矩阵组合爆炸</div><div class="pd">matrix 是笛卡尔积，GO×OS×ARCH×DB = 24 个任务，一次 push 打满集群。上线前算组合数，超 10 组合就拆分或 exclude 剪枝。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">每个环境重新构建 + 重试不幂等</div><div class="pd">"dev 构建一次、test 再构建、prod 发布再构建"导致测的 ≠ 上的；重试不幂等导致重复部署、重复发消息。坚持构建一次多次晋级；重试逻辑加幂等键（构建号/部署单号）。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 依赖缓存的 key 应该基于什么计算？</div>
+      <button class="opt">全部源码文件的 hash</button>
+      <button class="opt">随机生成，命中靠运气</button>
+      <button class="opt">依赖 lock 文件的 hash（如 go.sum / package-lock.json），再加运行时版本</button>
+      <div class="ans">正确答案：<b>lock 文件 hash + 运行时版本</b>。对源码 hash 会导致改一行代码缓存全失效；只对 lock 文件 hash 才能做到"依赖不变则命中、依赖变才失效"。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. "这条流水线上周还成功，这周莫名失败"，最可能的原因是？</div>
+      <button class="opt">代码逻辑写错了</button>
+      <button class="opt">基础镜像用了 latest，镜像里的工具链静默升级了</button>
+      <button class="opt">测试用例写得太少</button>
+      <div class="ans">正确答案：<b>基础镜像漂移</b>。latest 是浮动版本，镜像内容会变，构建不可复现。必须 pin 到 digest（FROM golang:1.22.5@sha256:...），升级作为显式变更走评审。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. GitLab CI 中让 test 不必等同 stage 的其他任务、只等 build，用什么语法？</div>
+      <button class="opt">needs: [build]（DAG 依赖）</button>
+      <button class="opt">dependencies: [build]</button>
+      <button class="opt">把 test 挪到 build 前面</button>
+      <div class="ans">正确答案：<b>needs</b>。它声明任务级依赖，让流水线变成 DAG，可跳过 stage 边界的串行等待。dependencies 只控制产物下载，不控制执行顺序。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. "制品晋级"的正确含义是？</div>
+      <button class="opt">每个环境分别构建一次，保证环境匹配</button>
+      <button class="opt">把旧版本制品复制一份改名</button>
+      <button class="opt">同一个二进制按 dev→test→staging→prod 流转，只换配置不重新构建</button>
+      <div class="ans">正确答案：<b>同一制品逐级流转</b>。一次构建、多处晋级才能保证"测过的二进制就是上线的二进制"；每个环境重新构建会引入工具链和依赖解析差异，是重大事故源。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 并发构建互相争抢资源，把集群打满，怎么治理？</div>
+      <button class="opt">namespace 级 ResourceQuota + 队列优先级 + 单流水线并发上限</button>
+      <button class="opt">给每台机器设超售，让它多跑点</button>
+      <button class="opt">等它自己跑完，不需要治理</button>
+      <div class="ans">正确答案：<b>配额 + 优先级 + 并发上限</b>。ResourceQuota 限制单团队上限，优先级队列保证核心仓库先跑，max_parallel 限制单条流水线展开的任务数。超售会让 OOM 更严重。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 为什么生产部署权限必须与代码合并权限分离？</div>
+      <button class="opt">为了让流程更长、更麻烦</button>
+      <button class="opt">权限最小化 + 误操作防护 + 审计追责，合并代码是日常操作，上生产是高风险操作</button>
+      <button class="opt">因为运维想垄断发布权</button>
+      <div class="ans">正确答案：<b>权限最小化与追责</b>。合并代码高频低风险，发布生产低频高风险，权限混发等于把高风险操作开放给所有人。生产部署应单独授权 + 审批，且审计日志记全"谁部署、哪个版本、谁审批"。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>核心配置速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>cache: {key: {files: [go.sum]}, paths: [.cache/go-build]}</code><span class="desc">GitLab CI 依赖缓存（key 只对 lock 文件）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>RUN --mount=type=cache,target=/go/pkg/mod go build</code><span class="desc">BuildKit 缓存挂载</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker buildx build --cache-from type=registry,ref=... --cache-to type=registry,ref=...,mode=max</code><span class="desc">层缓存推/拉 registry，团队共享</span><button class="copy">复制</button></div>
+    <div class="crow"><code>concurrency: {group: ${{ github.ref }}, cancel-in-progress: true}</code><span class="desc">并发组：同分支互斥，新触发取消旧的</span><button class="copy">复制</button></div>
+    <div class="crow"><code>needs: [build] + parallel: {matrix: [...]}</code><span class="desc">DAG 依赖 + 矩阵展开</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker tag app:ci registry/app:1.4.2-ci.1024 &amp;&amp; docker push</code><span class="desc">唯一 tag 推送，禁覆盖</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl set image deploy/app app=registry/app@sha256:9f2c...</code><span class="desc">按 digest 部署/回滚</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl apply -f resourcequota.yaml</code><span class="desc">namespace 级构建资源配额</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键数值速记</h3>
+  <table>
+    <tr><th style="width:260px">项目</th><th>参考值</th></tr>
+    <tr><td class="f">缓存命中率目标</td><td>70%+（低于 50% 的仓库重点治理 key）</td></tr>
+    <tr><td class="f">Pod 冷启动 / 预热后</td><td>2~5 s / &lt; 1 s</td></tr>
+    <tr><td class="f">单 executor 规格</td><td>2C4G（requests）~ 4C8G（limits）</td></tr>
+    <tr><td class="f">任务超时</td><td>默认 30 分钟，编译类可到 60 分钟</td></tr>
+    <tr><td class="f">失败构建产物保留</td><td>1 天（排查窗口）</td></tr>
+    <tr><td class="f">成功构建产物保留</td><td>最近 50~100 个；release 永久</td></tr>
+    <tr><td class="f">审计日志留存</td><td>≥ 180 天，不可篡改</td></tr>
+    <tr><td class="f">生产灰度比例</td><td>5% → 观察 10 分钟 → 50% → 100%</td></tr>
+    <tr><td class="f">矩阵组合数上限</td><td>≤ 10，超出拆分或 exclude 剪枝</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:150px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>调度器 Scheduler</b></td><td>展开流水线 DAG 并把任务分配到执行器的组件</td></tr>
+    <tr><td><b>执行器 Executor</b></td><td>真正跑构建的容器/VM，无状态、用完即毁</td></tr>
+    <tr><td><b>流水线 Pipeline</b></td><td>一次完整构建发布过程的编排定义</td></tr>
+    <tr><td><b>DAG</b></td><td>有向无环图，任务按依赖而非固定阶段并行执行</td></tr>
+    <tr><td><b>阶段 stage</b></td><td>粗粒度串行边界，用于门禁语义</td></tr>
+    <tr><td><b>矩阵 matrix</b></td><td>任务模板 × 多组参数的笛卡尔积展开</td></tr>
+    <tr><td><b>并发组</b></td><td>同组任务互斥运行，新触发可取消旧任务</td></tr>
+    <tr><td><b>制品 Artifact</b></td><td>构建产出的二进制（jar/镜像/压缩包）及其元数据</td></tr>
+    <tr><td><b>制品库</b></td><td>存储管理制品的仓库，如 Nexus / Artifactory / Harbor</td></tr>
+    <tr><td><b>语义化版本</b></td><td>MAJOR.MINOR.PATCH 版本约定，表达兼容性</td></tr>
+    <tr><td><b>digest</b></td><td>内容寻址的哈希（sha256），保证制品不可变</td></tr>
+    <tr><td><b>晋级 Promotion</b></td><td>同一二进制逐级流向更高环境，只换配置不重建</td></tr>
+    <tr><td><b>镜像预热</b></td><td>常用基础镜像预拉到节点，把 Pod 启动压到 1 秒内</td></tr>
+    <tr><td><b>分层缓存</b></td><td>Docker 镜像按层复用，变化少的层放前面</td></tr>
+    <tr><td><b>缓存挂载</b></td><td>BuildKit 的 cache mount，构建期目录跨次复用</td></tr>
+    <tr><td><b>缓存 key</b></td><td>缓存寻址标识，设计原则是"对依赖声明 hash"</td></tr>
+    <tr><td><b>缓存中毒</b></td><td>key 相同但内容被污染，导致后续构建拿到脏缓存</td></tr>
+    <tr><td><b>SBOM</b></td><td>软件物料清单，记录产物的依赖构成，用于安全溯源</td></tr>
+    <tr><td><b>RBAC</b></td><td>基于角色的权限控制，代码权限与部署权限分离的基础</td></tr>
+    <tr><td><b>金丝雀发布</b></td><td>小比例流量验证新版本，逐步放大的灰度策略</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个含 needs DAG + matrix + concurrency 的 .gitlab-ci.yml，在 GitLab 项目里跑通；② 给一个 Go/Java 项目配缓存，对比命中前后的构建耗时；③ 写多阶段 Dockerfile 并用 buildx 把层缓存推到 registry，观察二次构建秒过；④ 用 K8s 起 ResourceQuota，压测并发构建观察排队与限流。<br><br>
+    <b>之后值得单独学：</b>Tekton/Argo 的 CRD 模型、Bazel 的远程缓存与远程执行、镜像漏洞扫描与 SBOM 生成（Syft/Grype）、以及制品晋级与灰度发布的控制面设计。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透构建发布平台设计 · 上线前检查：镜像 pin digest、缓存 key 对 lock 文件、生产权限与代码权限分离</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（缓存 key 设计）和模块 5（制品晋级）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 建议边看边把 BuildKit 缓存挂载敲一遍。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议装 Docker，把 BuildKit 缓存挂载和多阶段构建敲一遍。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

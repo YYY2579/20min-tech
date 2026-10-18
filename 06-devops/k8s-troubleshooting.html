@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Kubernetes 排障实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 Kubernetes 排障实战</h1>
+    <p class="sub">排障不是玄学，是<b>分层 + 二分 + 看事件</b>。这篇给你一套可复用的方法论：从 Pod 状态机反推动因，把网络、存储、节点三类高频故障的排查链路走通，附 3 个完整案例和真实命令序列。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 层排查框架</span>
+      <span class="chip"><b>3</b> 个完整案例</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 kind 集群，故意部署几个故障 Pod 跟着敲</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>造一个“故障训练场”</h2></div>
+  <p class="lead">排障是熟练工种，先得有故障可排。下面这些 Pod 覆盖最常见的四类异常，全文案例都基于它们。</p>
+  <pre><span class="c"># 故障 1：镜像不存在 → ImagePullBackOff</span>
+kubectl create deploy broken-image --image=nginx:not-exist-tag
+
+<span class="c"># 故障 2：容器启动即退出 → CrashLoopBackOff</span>
+kubectl create deploy crashy --image=busybox:1.36 -- /bin/sh -c "echo boot; exit 1"
+
+<span class="c"># 故障 3：资源请求过大 → Pending</span>
+kubectl create deploy greedy --image=nginx
+kubectl patch deploy greedy -p '{"spec":{"template":{"spec":{"containers":[{"name":"nginx","resources":{"requests":{"cpu":"64","memory":"512Gi"}}}]}}}}'
+
+<span class="c"># 故障 4：探针失败 → Pod 起来但不 Ready</span>
+kubectl create deploy badprobe --image=nginx
+kubectl patch deploy badprobe -p '{"spec":{"template":{"spec":{"containers":[{"name":"nginx","readinessProbe":{"httpGet":{"path":"/nope","port":80},"periodSeconds":5}}]}}}}'
+
+<span class="c"># 观察四兄弟的状态</span>
+kubectl get pods -w</pre>
+  <div class="callout warn">
+    <b>本篇假设：</b>你能用 kubectl 完成基本操作（apply / get / describe / logs / exec）。排障篇不讲怎么建集群，讲的是<b>出事后按什么顺序看什么</b>。配套前置建议先看同目录 <span class="k">kubernetes.html</span> 与 <span class="k">k8s-advanced.html</span>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>系统化排障方法论</h2></div>
+  <p class="lead">高手和菜鸟的差距不在命令量，在<b>顺序</b>。乱翻一通半小时，按层排查五分钟。核心原则：<b>先恢复业务，再找根因；先看系统自己说的，再看自己的猜测。</b></p>
+
+  <h3>四层排查框架</h3>
+  <table>
+    <tr><th style="width:120px">层级</th><th style="width:260px">查什么</th><th>典型症状与工具</th></tr>
+    <tr><td><b>集群层</b></td><td>控制面是否健康：API Server、etcd、scheduler、controller-manager、CoreDNS、CNI</td><td>kubectl 卡住/超时、对象改动不生效。<span class="k">kubectl get --raw='/readyz?verbose'</span>、看 kube-system Pod</td></tr>
+    <tr><td><b>节点层</b></td><td>kubelet 存活、Ready 状态、磁盘/PID/内存压力、容器运行时</td><td>节点 NotReady、Pod 被驱逐。<span class="k">kubectl describe node</span>、<span class="k">journalctl -u kubelet</span></td></tr>
+    <tr><td><b>网络层</b></td><td>DNS、Service/Endpoints、kube-proxy、NetworkPolicy、CNI</td><td>能创建 Pod 但访问不通、间歇超时。<span class="k">get endpoints</span>、netshoot 容器</td></tr>
+    <tr><td><b>应用层</b></td><td>Pod 状态、探针、日志、退出码、资源用量、配置与密钥</td><td>CrashLoop、5xx、慢查询。<span class="k">kubectl logs</span>、<span class="k">describe pod</span></td></tr>
+  </table>
+  <div class="callout ok">
+    <b>顺序心法：自上而下缩小范围，自下而上定位细节。</b>先用集群/节点层排除“大面”问题（控制面挂了查应用层毫无意义），再扎进应用层细节。<b>90% 的“应用故障”最后发现是节点或网络问题。</b>
+  </div>
+
+  <h3>黄金四问（每次排障先过一遍）</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>最近改了什么？</b>统计下来，大部分故障由变更引起：发版、配置更新、证书轮换、节点扩缩容、CNI/CSI 升级。<b>先看变更记录，再动手。</b></div></div>
+    <div class="step"><div class="txt"><b>影响面有多大？</b>单个 Pod、单个服务、整个 namespace、整个集群？影响面决定响应级别和排查方向（单 Pod → 应用层；整个集群 → 控制面/节点）。</div></div>
+    <div class="step"><div class="txt"><b>系统自己说了什么？</b>K8s 的 Event、Pod 的 status、容器的退出码，已经把 80% 的答案写在脸上了。<b>先读完再说。</b></div></div>
+    <div class="step"><div class="txt"><b>能先止损吗？</b>回滚版本、扩容副本、切流、重启。<b>止损和定位可以并行，不要为了“搞清楚再修”让故障延长。</b></div></div>
+  </div>
+
+  <h3>必备起手命令序列</h3>
+  <pre><span class="c"># 30 秒看清全局（按这个顺序敲）</span>
+kubectl get nodes                          <span class="c"># 1. 节点都 Ready 吗</span>
+kubectl get pods -A -o wide | grep -v Running   <span class="c"># 2. 谁不在 Running</span>
+kubectl get events -A --sort-by=.lastTimestamp | tail -30   <span class="c"># 3. 最近发生了什么</span>
+kubectl top nodes                           <span class="c"># 4. 节点资源水位（需 metrics-server）</span>
+kubectl get apiservices | grep -v True      <span class="c"># 5. 有没有 API 扩展挂了</span></pre>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Pod 状态机解读</h2></div>
+  <p class="lead">Pod 的 status.phase 只有五个值，但每个异常 phase 背后都有一棵<b>成因树</b>。学会从现象反推，比背命令重要。</p>
+
+  <h3>Pending：调度不出去</h3>
+  <table>
+    <tr><th style="width:200px">事件里的关键词</th><th>含义与解法</th></tr>
+    <tr><td class="f">FailedScheduling ... 0/5 nodes available: 3 Insufficient cpu</td><td><b>资源不够。</b>所有节点 requests 之和超了。降 requests、扩节点、或开 cluster-autoscaler</td></tr>
+    <tr><td class="f">... had untolerated taint {key: value}</td><td><b>候选节点有污点</b>，Pod 没带 toleration。加 toleration 或换节点组</td></tr>
+    <tr><td class="f">... didn't match Pod's node affinity/selector</td><td><b>节点标签不匹配</b>。检查 required nodeAffinity 与节点实际标签</td></tr>
+    <tr><td class="f">... node(s) didn't match pod topology spread constraints</td><td><b>打散约束</b>卡住。域数量不够，改 ScheduleAnyway 或扩域</td></tr>
+    <tr><td class="f">... unbound immediate PersistentVolumeClaims</td><td><b>PVC 没绑上</b>，Pod 无法调度（VolumeBinding 在 Filter 阶段）。先解决 PVC（见模块 5）</td></tr>
+    <tr><td class="f">... exceed quota</td><td><b>namespace ResourceQuota 打满</b>。<span class="k">kubectl describe quota</span> 看 used/hard</td></tr>
+    <tr><td class="f">... skipped due to intersect with LimitRange</td><td>LimitRange 限制下，默认 requests/limits 换算后超限。调整 LimitRange 或显式指定</td></tr>
+  </table>
+
+  <h3>CrashLoopBackOff：容器反复退出</h3>
+  <p>退出原因在 <b>lastState.terminated</b> 里，日志要看<b>上一轮</b>的。退避间隔 10s → 20s → 40s … 封顶 300s。</p>
+  <table>
+    <tr><th style="width:170px">线索</th><th>成因与解法</th></tr>
+    <tr><td><b>exitCode 137</b></td><td>SIGKILL。① <b>OOMKilled</b>（超 memory limit）：<span class="k">kubectl describe pod</span> 看 reason=OOMKilled，放大 limit 或修内存泄漏；② liveness 探针失败被 kubelet 杀</td></tr>
+    <tr><td><b>exitCode 143</b></td><td>SIGTERM。优雅终止超时后被杀，或收到关闭信号后自己退出。检查 terminationGracePeriodSeconds 与应用退出逻辑</td></tr>
+    <tr><td><b>exitCode 0 也重启</b></td><td>程序正常退出了 —— Command 写错（比如前台进程被 shell 包装后退出）、sidecar 模式的主进程结束。检查 command/args</td></tr>
+    <tr><td><b>exitCode 1 / 2</b></td><td>应用自身报错。<b>看 <span class="k">kubectl logs --previous</span></b>。常见：配置缺失、连不上依赖（DB/Redis）、启动检查不过</td></tr>
+    <tr><td><b>Init:CrashLoopBackOff</b></td><td>init 容器挂了，主容器还没轮到。单独看 init 容器日志</td></tr>
+    <tr><td><b>启动慢被杀</b></td><td>liveness 探针太激进。上 startupProbe 给启动预算（见进阶篇模块 6）</td></tr>
+  </table>
+
+  <h3>ImagePullBackOff / ErrImagePull</h3>
+  <table>
+    <tr><th style="width:200px">事件里的关键词</th><th>含义与解法</th></tr>
+    <tr><td class="f">manifest unknown / not found</td><td><b>tag 或仓库名写错。</b>最常见。核对 image:tag，确认镜像真被推送了</td></tr>
+    <tr><td class="f">authentication required / unauthorized</td><td><b>私有仓库没配凭证。</b>创建 imagePullSecret 并在 Pod 上引用（或打到 ServiceAccount 上）</td></tr>
+    <tr><td class="f">toomanyrequests / rate limit</td><td><b>触发仓库限流</b>（Docker Hub 匿名拉取 100 次/6 小时）。用镜像仓库代理或配凭证</td></tr>
+    <tr><td class="f">no route to host / i/o timeout</td><td><b>节点到仓库网络不通</b>。防火墙、代理、或 registry 证书问题（用 http 连 https 端口）</td></tr>
+  </table>
+  <pre><span class="c"># 三兄弟的标准排查动作</span>
+kubectl describe pod &lt;pod&gt;          <span class="c"># 看 Events 段和 lastState —— 一半答案在这里</span>
+kubectl logs &lt;pod&gt; --previous       <span class="c"># 看上一轮（已崩溃）容器的日志</span>
+kubectl get pod &lt;pod&gt; -o jsonpath='{.status.containerStatuses[0].lastState.terminated}' | jq
+<span class="c"># 输出里 reason/exitCode/message 三件套：OOMKilled / 137 / 各自的信息</span></pre>
+
+  <h3>其他常见 phase 与状态</h3>
+  <table>
+    <tr><th style="width:170px">状态</th><th>含义</th></tr>
+    <tr><td><b>Running 但 0/1 Ready</b></td><td>进程活着但 readiness 探针失败 —— Service 不会给它流量。<b>“服务好了但没流量”的第一嫌疑人</b></td></tr>
+    <tr><td><b>Terminating 卡住</b></td><td>优雅终止没完成：preStop 钩子阻塞、长连接不关、或 finalizer 没人移除</td></tr>
+    <tr><td><b>Completed</b></td><td>正常退出（Job/CronJob）。Deployment 里出现说明 command 写错了</td></tr>
+    <tr><td><b>Unknown</b></td><td>kubelet 长时间没上报状态，节点可能失联。配合 node NotReady 看</td></tr>
+  </table>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>事件与 describe 技巧</h2></div>
+  <p class="lead">Event 是 K8s 的“黑匣子”，默认只保留 1 小时（<span class="k">--event-ttl</span>，etcd 里默认 1h）。<b>排障要趁早，且要会按时间排序。</b></p>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get events -A --sort-by=.lastTimestamp</code><span class="desc">全集群事件按时间正序，看最后的异常</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get events --field-selector involvedObject.name=&lt;pod&gt;</code><span class="desc">只看某个对象的事件，最干净</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get events -A --field-selector type=Warning</code><span class="desc">只看告警事件，过滤噪音</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl describe pod &lt;pod&gt; -n &lt;ns&gt;</code><span class="desc">容器状态、探针配置、挂载、QoS 一页看全</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pod -o yaml &gt; pod.yaml</code><span class="desc">存证！改天复盘/对照历史时靠它</span><button class="copy">复制</button></div>
+  </div>
+  <h4>describe pod 的阅读顺序</h4>
+  <pre><span class="c"># 从上到下，只看这五段</span>
+1. <span class="b">Status / Conditions</span>    <span class="c"># Ready、Initialized、ContainersReady 哪个是 False</span>
+2. <span class="b">Events</span>                 <span class="c"># 最近 20 条，Warning 优先 —— 排障的主入口</span>
+3. <span class="b">Containers.State</span>       <span class="c"># waiting(reason) / running / terminated(exitCode)</span>
+4. <span class="b">Containers.Restart Count</span> <span class="c"># 重启几次了、Last State 是什么</span>
+5. <span class="b">Volumes / QoS / Node</span>    <span class="c"># 挂载对不对、QoS 类别、落在哪个节点</span></pre>
+  <h4>日志相关命令</h4>
+  <div class="cmds">
+    <div class="crow"><code>kubectl logs &lt;pod&gt; --previous --tail=200</code><span class="desc">看崩溃前一轮的日志（CrashLoop 必用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs &lt;pod&gt; -c &lt;container&gt; --since=30m</code><span class="desc">多容器 Pod 指定容器；按时间窗过滤</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs -l app=web --tail=-1 --prefix</code><span class="desc">按标签聚合多个 Pod 的日志，带 Pod 名前缀</span><button class="copy">复制</button></div>
+    <div class="crow"><code>stern web --since 10m</code><span class="desc">第三方神器：多 Pod 彩色实时 tail，支持正则</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>两个盲区：</b>① <b>被驱逐 Pod 的日志会随容器一起消失</b>，重要现场先用 <span class="k">kubectl logs --previous</span> 抢下来；② <b>Event 有 1 小时 TTL</b>，凌晨的故障早上九点再查，事件可能已过期。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>网络排障</h2></div>
+  <p class="lead">K8s 网络问题有个特点：<b>能建 Pod 不代表能通信。</b>四类高频：DNS、Service 不通、NetworkPolicy 误伤、kube-proxy 模式问题。</p>
+
+  <h3>DNS：先查 CoreDNS，再怀疑世界</h3>
+  <pre><span class="c"># 标准验证动作（在任意 Pod 里执行）</span>
+kubectl run netbox --rm -it --image=nicolaka/netshoot -- bash
+nslookup kubernetes.default.svc.cluster.local    <span class="c"># Service 全名必须能解析</span>
+nslookup myservice                                <span class="c"># 短名（靠 search 域）也要能解析</span>
+nslookup baidu.com                                <span class="c"># 外部域名（走节点上游 DNS）</span>
+
+<span class="c"># CoreDNS 自身状态</span>
+kubectl -n kube-system get deploy coredns
+kubectl -n kube-system logs deploy/coredns --tail=100
+kubectl -n kube-system get endpoints coredns       <span class="c"># 有没有后端</span></pre>
+  <table>
+    <tr><th style="width:170px">症状</th><th>根因与解法</th></tr>
+    <tr><td><b>短名解析失败、全名正常</b></td><td>Pod 的 dnsPolicy 不是 ClusterFirst（改了 Default/None），或 resolv.conf 的 search 域被覆盖</td></tr>
+    <tr><td><b>解析外部域名超时</b></td><td>CoreDNS 的上游（节点 /etc/resolv.conf）配错；或集群 CIDR 与外部冲突</td></tr>
+    <tr><td><b>解析慢（几百 ms~秒级）</b></td><td><b>ndots:5 经典问题：</b>默认对每个域名先依次拼 4 个 search 域再查全名，外部域名一次查询变 5 次。对外部域名用带点的全名，或调 dnsConfig 的 ndots 与 searches</td></tr>
+    <tr><td><b>间歇性超时、日志有 conntrack</b></td><td>UDP 并发打满 conntrack 表：<span class="k">sysctl net.netfilter.nf_conntrack_count/max</span>，调大 max 或启用 conntrack 回收</td></tr>
+  </table>
+  <pre><span class="c"># 调低 ndots、精简 search 域的 Pod 级配置</span>
+<span class="b">dnsConfig:</span>
+  <span class="b">options:</span>
+    - name: <span class="g">ndots</span>
+      value: <span class="g">"2"</span>            <span class="c"># 默认 5，含点超过 2 段就直接查全名</span>
+  <span class="b">searches:</span>
+    - <span class="g">default.svc.cluster.local</span>
+    - <span class="g">svc.cluster.local</span>
+    - <span class="g">cluster.local</span>    <span class="c"># 砍掉多余的 search 域</span></pre>
+
+  <h3>Service 不通：二分法定位</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先看 Endpoints 有没有内容：</b><span class="k">kubectl get endpoints &lt;svc&gt;</span>。为空 → selector 不匹配或后端 Pod 全不 Ready（回到模块 2）；有 IP → 继续往下</div></div>
+    <div class="step"><div class="txt"><b>直接 Pod IP 通不通：</b>从同节点/跨节点容器 <span class="k">curl &lt;podIP&gt;:port</span>。不通 → CNI/跨节点路由/NetworkPolicy；通 → 问题在 Service 链路</div></div>
+    <div class="step"><div class="txt"><b>ClusterIP 通不通：</b>集群内 <span class="k">curl &lt;clusterIP&gt;:port</span>。不通 → kube-proxy 规则或 conntrack；通 → 问题在 DNS 或外部入口</div></div>
+    <div class="step"><div class="txt"><b>看 kube-proxy 规则：</b>iptables 模式查 <span class="k">iptables -t nat -L KUBE-SVC-XXX</span> 有没有对应链；IPVS 模式 <span class="k">ipvsadm -Ln</span> 看 virtual server 和 real server</div></div>
+  </div>
+  <pre><span class="c"># Service 链路一键检查</span>
+kubectl get svc &lt;svc&gt; -o wide                 <span class="c"># ClusterIP 是什么</span>
+kubectl get endpoints &lt;svc&gt; -o yaml           <span class="c"># 后端 Pod IP 列表</span>
+kubectl get pods -o wide --show-labels        <span class="c"># Pod IP 和标签（核对 selector）</span>
+kubectl describe svc &lt;svc&gt; | grep -A3 Selector <span class="c"># Service 的 selector</span></pre>
+  <div class="callout warn">
+    <b>经典事故：改了 Deployment 的 Pod 模板标签（如 app=web → app=web-v2），Service selector 还是老的，Endpoints 直接清空，流量全 502。</b>发版改标签时，务必同步检查 Service selector。<b>看 endpoints 比看 Pod 快十倍。</b>
+  </div>
+
+  <h3>NetworkPolicy：默认放行，策略是“白名单叠加”</h3>
+  <ul>
+    <li><b>前提：CNI 必须实现 NetworkPolicy。</b>Flannel 默认<b>不实现</b>——你 apply 了策略但完全不生效，这是最隐蔽的坑。Calico/Cilium 可以</li>
+    <li>多个策略是<b>并集（允许的叠加）</b>，Pod 一旦被任何策略选中，就变成“只允许策略里声明的流量”</li>
+    <li>ingress 和 egress 是<b>两个独立维度</b>：只写了 ingress 策略，egress 仍全通；反过来同理</li>
+    <li>DNS 是隐藏依赖：默认拒绝 egress 时，必须放行 kube-system 里 CoreDNS 的 53/UDP+TCP，否则域名解析全挂</li>
+  </ul>
+  <pre><span class="c"># 最小必要策略：只放行 ingress 8080，egress 全拒（先确认 DNS 已放行）</span>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: <span class="g">api-allow</span>
+spec:
+  podSelector:
+    matchLabels: { <span class="y">app:</span> <span class="g">api</span> }
+  policyTypes: [<span class="g">Ingress</span>, <span class="g">Egress</span>]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { <span class="y">app:</span> <span class="g">gateway</span> }
+        - namespaceSelector:
+            matchLabels: { <span class="y">kubernetes.io/metadata.name:</span> <span class="g">monitoring</span> }
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { <span class="y">kubernetes.io/metadata.name:</span> <span class="g">kube-system</span> }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to: [{ podSelector: { matchLabels: { <span class="y">app:</span> <span class="g">db</span> } } }]
+      ports: [{ protocol: TCP, port: 5432 }]</pre>
+  <h4>kube-proxy 三种模式</h4>
+  <table>
+    <tr><th style="width:110px">模式</th><th>原理与排查</th></tr>
+    <tr><td><b>iptables</b></td><td>默认。Service 翻译成 nat 表链，规则 O(n) 线性扫描。<b>大规模集群（Service 上万）延迟明显</b>。排查：<span class="k">iptables -t nat -L KUBE-SERVICES | head</span></td></tr>
+    <tr><td><b>ipvs</b></td><td>基于哈希表，性能好，支持更多 LB 算法。排查：<span class="k">ipvsadm -Ln</span> 看 VS/RS 是否齐全</td></tr>
+    <tr><td><b>nftables</b></td><td>较新版本引入，替代 iptables 后端，规则管理更高效</td></tr>
+  </table>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>存储排障</h2></div>
+  <p class="lead">PVC 相关的故障有个特征：<b>Pod 卡在 ContainerCreating，事件里全是 FailedMount/FailedAttach。</b>按绑定 → 挂载两段拆。</p>
+
+  <h3>第一段：PVC 为什么 Pending</h3>
+  <pre><span class="c"># 看 PVC 卡在哪一步</span>
+kubectl get pvc                          <span class="c"># STATUS=Pending 就是没绑上</span>
+kubectl describe pvc &lt;pvc&gt;               <span class="c"># Events 会说明原因</span>
+kubectl get storageclass                 <span class="c"># 有没有默认 SC（default 标记）</span></pre>
+  <table>
+    <tr><th style="width:220px">事件关键词</th><th>成因与解法</th></tr>
+    <tr><td class="f">waiting for first consumer to be created before binding</td><td><b>正常行为，不是故障。</b>SC 配了 <span class="k">volumeBindingMode: WaitForFirstConsumer</span>，要等使用它的 Pod 被调度后才绑定。Pod 调度不出去 → PVC 一直 Pending，<b>根因在调度</b></td></tr>
+    <tr><td class="f">no persistent volumes available for this claim</td><td>没有 PV 可绑：动态供给没工作（provisioner 挂了/参数错），或静态 PV 的 capacity/accessModes 不匹配</td></tr>
+    <tr><td class="f">storageclass.storage.k8s.io "xxx" not found</td><td>PVC 引用的 SC 不存在，或名字拼错。删掉 storageClassName 用默认，或修正名字</td></tr>
+    <tr><td class="f">failed to provision volume ... exceeds quota</td><td>云厂商配额或 namespace ResourceQuota 打满。提配额或清理</td></tr>
+    <tr><td class="f">node(s) had volume node affinity conflict</td><td>PV 有 zone 限制（云盘跟节点同 AZ），Pod 被调度到了别的 AZ。给 Pod 加 nodeAffinity 或换拓扑感知 SC</td></tr>
+  </table>
+
+  <h3>第二段：挂载为什么超时</h3>
+  <table>
+    <tr><th style="width:220px">事件关键词</th><th>成因与解法</th></tr>
+    <tr><td class="f">Multi-Attach error for volume "pvc-xxx": Volume is already exclusively attached to one node</td><td><b>RWO 卷被两个节点同时挂。</b>老 Pod 没退干净（Terminating 卡住）、或 kubelet 缓存了旧的 attachment。强制删除卡住的 Pod，或上 CSI 的 attach detach 排查</td></tr>
+    <tr><td class="f">Unable to attach or mount volumes: unmounted volumes=[data]</td><td>attach 成功但 mount 失败。看 kubelet 日志与 CSI 节点插件日志</td></tr>
+    <tr><td class="f">timed out waiting for the condition</td><td>CSI 驱动无响应（驱动 Pod 挂了/云 API 超时）。<span class="k">kubectl -n kube-system get pods | grep csi</span></td></tr>
+  </table>
+  <pre><span class="c"># 节点侧定位（登录到 Pod 所在节点）</span>
+lsblk                                  <span class="c"># 块设备挂载情况</span>
+mount | grep pvc                       <span class="c"># 已挂载的 PVC</span>
+crictl ps -a | grep &lt;pod&gt;              <span class="c"># containerd 里的容器状态</span>
+journalctl -u kubelet --since "10 min ago" | grep -i volume   <span class="c"># kubelet 的挂载日志</span>
+
+<span class="c"># CSI 侧</span>
+kubectl -n kube-system get pods | grep -E 'csi|ebs|disk'   <span class="c"># CSI 驱动是否健康</span>
+kubectl get volumeattachment           <span class="c"># attach 到哪个节点、成功没有</span></pre>
+  <div class="callout ok">
+    <b>存储排障口诀：PVC 先看绑定（事件说清楚），挂载先看节点（kubelet 日志说清楚），中间看 VolumeAttachment。</b>另外记住：<b>改 accessModes 不会生效</b>（创建时定死），RWO 不能同时给两个节点 —— 多 AZ 扩容前先确认 SC 支持。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>节点问题</h2></div>
+  <p class="lead">节点问题的传播路径是<b>连锁</b>的：一个节点 NotReady → Pod 被重新调度 → 其他节点过载 → 更多驱逐。所以要快杀。</p>
+
+  <h3>NotReady 的排查链路</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>确认是节点问题还是控制面问题：</b><span class="k">kubectl get node</span> 看 STATUS 和最后心跳时间。<b>所有节点同时 NotReady → 大概率控制面/API Server 问题</b>，别去查节点</div></div>
+    <div class="step"><div class="txt"><b>看节点 condition：</b><span class="k">kubectl describe node &lt;node&gt;</span>。Ready=False、MemoryPressure/DiskPressure/PIDPressure 哪个亮灯，直接决定方向</div></div>
+    <div class="step"><div class="txt"><b>登录节点看 kubelet：</b><span class="k">systemctl status kubelet</span>、<span class="k">journalctl -u kubelet --since "20 min ago"</span>。kubelet 起不来最常见：证书过期、配置错、容器运行时（containerd/docker）挂了</div></div>
+    <div class="step"><div class="txt"><b>看资源压力：</b><span class="k">df -h</span>（磁盘）、<span class="k">df -i</span>（inode）、<span class="k">free -m</span>、<span class="k">ps aux | wc -l</span>（进程数）。日志写满 /tmp、镜像堆积是常事</div></div>
+    <div class="step"><div class="txt"><b>确认运行时与网络：</b><span class="k">systemctl status containerd</span>、CNI 插件 Pod 是否在该节点正常</div></div>
+  </div>
+  <pre><span class="c"># 节点侧高频命令</span>
+kubectl describe node &lt;node&gt; | grep -A8 "Conditions:"   <span class="c"># 四个 pressure + Ready</span>
+kubectl get node &lt;node&gt; -o jsonpath='{.status.allocatable}' | jq   <span class="c"># 可分配资源</span>
+journalctl -u kubelet -n 200 --no-pager                  <span class="c"># kubelet 日志</span>
+du -sh /var/lib/containerd 2&gt;/dev/null                  <span class="c"># 镜像/容器层占用</span>
+ls /var/log | head                                      <span class="c"># 日志文件是否爆了</span>
+sysctl vm.drop_caches=1                                 <span class="c"># 仅应急：释放 page cache</span></pre>
+  <table>
+    <tr><th style="width:150px">压力类型</th><th>第一时间动作</th></tr>
+    <tr><td><b>MemoryPressure</b></td><td>kubelet 开始按 QoS 驱逐 Pod。找内存大户（top pods --containers），必要时先扩容再查泄漏</td></tr>
+    <tr><td><b>DiskPressure</b></td><td>清理：<span class="k">crictl rmi --prune</span> 删未用镜像、清容器日志、设 logrotate。然后配 kubelet 的 imageGC 阈值</td></tr>
+    <tr><td><b>PIDPressure</b></td><td>进程/线程泄漏。看是哪个 Pod（按 namespace 统计 /proc），重启该 Pod 止血</td></tr>
+    <tr><td><b>Ready=False</b></td><td>kubelet 心跳断了。先救 kubelet（证书/运行时），不行就 <span class="k">kubectl drain</span> 摘流换机器</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>切勿：节点一 NotReady 就无脑重启节点。</b>不存证就重启，等于销毁现场；而且如果是磁盘写满，重启后照样 NotReady。<b>先 describe、再登录、最后才动大手术。</b>确认要重启时，先 <span class="k">kubectl drain &lt;node&gt; --ignore-daemonsets --delete-emptydir-data</span>，避免 Pod 被硬杀。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>调试工具：kubectl debug 与 netshoot</h2></div>
+  <p class="lead">容器里没有 curl、没有 dig、没有 tcpdump —— 这是排障第一堵墙。<b>不要为了调试改生产镜像</b>，用临时容器和旁路容器。</p>
+
+  <h3>kubectl debug 的三种用法</h3>
+  <pre><span class="c"># 1. 临时容器（Ephemeral Container）：进一个正在跑的 Pod，共享进程网络</span>
+kubectl debug &lt;pod&gt; -it --image=busybox:1.36 --target=&lt;container&gt;
+<span class="c"># --target 指定共享哪个容器；不指定也能进，但看不到对方进程（除非 shareProcessNamespace）</span>
+<span class="c"># 适用：容器挂了进不去、镜像里没 shell</span>
+
+<span class="c"># 2. 复制 Pod：克隆一个带调试工具的副本，不动原 Pod</span>
+kubectl debug &lt;pod&gt; --copy-to=&lt;pod&gt;-debug --image=nicolaka/netshoot
+<span class="c"># 适用：原 Pod 有严格安全策略，或怕污染现场</span>
+
+<span class="c"># 3. 节点调试：在目标节点上起一个特权 Pod</span>
+kubectl debug node/&lt;node&gt; -it --image=nicolaka/netshoot
+<span class="c"># 挂载宿主 /var/log、/var/lib/kubelet，直接看节点内部</span></pre>
+  <table>
+    <tr><th style="width:150px">能力</th><th>说明</th></tr>
+    <tr><td><b>共享进程/网络</b></td><td>临时容器与目标容器共享 network namespace，<b>直接 localhost:port 就能测</b>，这是最大价值</td></tr>
+    <tr><td><b>限制</b></td><td>临时容器不能改 ports/image 之外的大部分 spec；不适合“改完继续用”</td></tr>
+    <tr><td><b>node 调试</b></td><td>特权 Pod + hostPath，相当于登上节点。<b>用完务必删</b>，它不受常规调度约束</td></tr>
+  </table>
+
+  <h3>netshoot：一个包装满网络工具</h3>
+  <pre><span class="c"># nicola/netshoot 内置：dig/nslookup/curl/tcpdump/ip/ss/netstat/iperf...</span>
+kubectl run netbox --rm -it --image=nicolaka/netshoot -- bash
+
+dig +trace myservice.default.svc.cluster.local   <span class="c"># 完整 DNS 解析链</span>
+curl -sv http://myservice:8080/healthz --max-time 5   <span class="c"># 测 Service（看连到哪个 IP）</span>
+ss -lntp                                          <span class="c"># 本 Pod 监听端口</span>
+tcpdump -i eth0 port 8080 -c 100                  <span class="c"># 抓包（需要 NET_RAW 能力）</span>
+ip route                                          <span class="c"># Pod 路由表，看跨节点网段怎么走</span>
+iperf3 -c &lt;对端IP&gt;                                 <span class="c"># 带宽实测</span></pre>
+  <div class="callout ok">
+    <b>组合拳（记住这个序列）：</b>应用连不上依赖 → <span class="k">kubectl exec</span> 进 Pod 用 <span class="k">curl</span> 打 ClusterIP → 不通则 <span class="k">debug</span> 起 netshoot 打 Pod IP → 还不通抓包 + 看 NetworkPolicy → 域名问题先 <span class="k">dig</span> 全名再短名。<b>每一步都在缩小范围，而不是反复重试。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>三个完整故障案例</h2></div>
+
+  <h3>案例 1：间歇性 DNS 超时，服务随机报 connection timeout</h3>
+  <p><b>现象：</b>上午高峰期，约 5% 请求 DNS 解析耗时超过 1 秒，重试后恢复。应用日志只有超时，没有拒绝。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>验证是 DNS 而非网络：</b>netshoot 里 <span class="k">dig baidu.com</span> 反复 20 次，记录耗时分布 —— 确认部分查询慢、部分正常</div></div>
+    <div class="step"><div class="txt"><b>看查询放大了多少：</b>临时 Pod 里 <span class="k">cat /etc/resolv.conf</span>，发现 ndots:5 + 4 个 search 域 → 每个外部域名先查 4 个"域名.search域"再查全名，<b>查询量放大 5 倍</b></div></div>
+    <div class="step"><div class="txt"><b>看 CoreDNS 侧证据：</b><span class="k">kubectl -n kube-system logs deploy/coredns</span> 出现大量 NXDOMAIN 和 <span class="k">conntrack insertion failed</span>，CoreDNS 单副本 CPU 打满</div></div>
+    <div class="step"><div class="txt"><b>三层修复：</b>① CoreDNS 扩容到 3 副本 + nodeAffinity 打散；② 对高频访问外部域名的 Deployment 配 dnsConfig 降 ndots 到 2、砍 search 域；③ 节点调大 <span class="k">net.netfilter.nf_conntrack_max</span></div></div>
+    <div class="step"><div class="txt"><b>验证：</b>同时间段 dig 20 次全部 &lt;20ms；给应用加 DNS 耗时监控面板，防复发</div></div>
+  </div>
+  <div class="callout warn"><b>本案知识点：ndots 放大效应、CoreDNS 副本数、conntrack 表、dnsConfig 调优。</b>DNS 问题<b>一定要看放大倍数</b>，只看“能不能解析”会漏掉 90% 的慢查询。</div>
+
+  <h3>案例 2：发布后全站 502，Pod 明明 Running</h3>
+  <p><b>现象：</b>上线 web v2.3 后网关持续 502。<span class="k">kubectl get pods</span> 全部 Running，日志没有任何错误。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>分层定位：</b>Pod Running → 先跳过应用层查网络层。<span class="k">kubectl get endpoints web</span> —— <b>空的</b>，答案已经出现</div></div>
+    <div class="step"><div class="txt"><b>查为什么空：</b><span class="k">kubectl describe svc web</span>，selector 是 <span class="k">app=web</span>；<span class="k">kubectl get pods --show-labels</span>，v2.3 的 Pod 标签变成了 <span class="k">app=web-v2</span> —— <b>标签改了就脱管</b></div></div>
+    <div class="step"><div class="txt"><b>确认没有第二个原因：</b>临时把标签改回 app=web 的 Pod 起来后 endpoints 有内容、502 消失 —— 单点根因确认</div></div>
+    <div class="step"><div class="txt"><b>修复与止血：</b>① 立即 <span class="k">kubectl rollout undo</span> 回滚到 v2.2；② 修正 Deployment 标签回 <span class="k">app=web</span> 后重新发布；③ readiness 探针确认正常（本案里探针是好的，否则 endpoints 也会空）</div></div>
+    <div class="step"><div class="txt"><b>防复发：</b>CI 加校验“Service selector 必须匹配 Deployment 标签”；监控加 <span class="k">endpoints 数量为 0 持续 1 分钟</span> 告警 —— 比 502 告警早得多</div></div>
+  </div>
+  <div class="callout warn"><b>本案知识点：endpoints 是 Service 的真实后端；502 + Pod Running = 先查 endpoints；selector 与标签脱管是最常见的“无声故障”。</b></div>
+
+  <h3>案例 3：一个节点 NotReady，引发半个集群 Pod 重建</h3>
+  <p><b>现象：</b>凌晨告警 node-3 NotReady，随后多个服务 Pod 被重建，延迟飙升。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>判断影响面：</b><span class="k">kubectl get nodes</span> 只有 node-3 NotReady → 单节点问题，不去翻控制面</div></div>
+    <div class="step"><div class="txt"><b>看 condition：</b><span class="k">kubectl describe node node-3</span>：DiskPressure=True、Ready=False。事件有 <span class="k">eviction threshold met</span></div></div>
+    <div class="step"><div class="txt"><b>登录节点找谁吃满了盘：</b><span class="k">df -h</span> 显示 /var/log 100%；<span class="k">du -sh /var/log/containers/* | sort -h | tail</span> 定位到某 Pod 的日志把磁盘写爆（应用 debug 级别狂打日志）</div></div>
+    <div class="step"><div class="txt"><b>连锁反应确认：</b>kubelet 开始驱逐该节点 Pod（先 BestEffort），被驱逐 Pod 涌向其他节点 → 其他节点 requests 超售、 pending 增多</div></div>
+    <div class="step"><div class="txt"><b>止损与修复：</b>① 清理并轮转日志（配 logrotate/容器日志 maxSize）；② <span class="k">kubectl cordon node-3</span> 先别再调度进来；③ 修应用日志级别；④ uncordon 前确认磁盘水位恢复</div></div>
+    <div class="step"><div class="txt"><b>防复发：</b>磁盘使用率 &gt;80% 告警（别等 100%）；kubelet 配 <span class="k">containerLogMaxSize/maxFiles</span>；核心服务设 Guaranteed QoS 降低驱逐概率</div></div>
+  </div>
+  <div class="callout warn"><b>本案知识点：节点压力的连锁传播、按 QoS 驱逐、磁盘类故障要在节点上找真凶。注意：清磁盘只是止血，不修日志量几天后复发。</b></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看 Pod 状态，不看 Events</div><div class="pd">Pending/CrashLoop 的原因 kube-scheduler 和 kubelet 都写在事件里了。describe pod 先看 Events 段，能省一半时间。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">CrashLoop 看当前日志，一片空白</div><div class="pd">容器重启后旧日志没了，必须 kubectl logs --previous。当前日志为空恰恰说明它起来就挂了。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">DNS 慢，只测“能不能解析”</div><div class="pd">ndots:5 让外部域名查询放大 5 倍，能解析但很慢。要看耗时分布和放大倍数，别用能不能通下结论。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">Service 不通先怪 CNI</div><div class="pd">先 kubectl get endpoints。空 = selector 脱管或后端全不 Ready，跟网络八成没关系。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">apply 了 NetworkPolicy 却没生效</div><div class="pd">CNI 不支持（如纯 Flannel）。策略对象创建成功但没人执行，是最隐蔽的“假安全”。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">PVC Pending 就怀疑存储挂了</div><div class="pd">很可能是 WaitForFirstConsumer 在等 Pod 调度，而 Pod 调度不出去的根源在资源/污点/亲和性。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">为调试给生产镜像装工具</div><div class="pd">改镜像 = 改发布物，风险不可控。用 kubectl debug 临时容器或 netshoot 旁路。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">节点 NotReady 直接重启机器</div><div class="pd">不存证就重启等于销毁现场；磁盘写满重启也没用。先 describe、登录、再决定。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">排障不存证，事后无法复盘</div><div class="pd">get -o yaml 存 Pod、存事件、存日志。Event 只有 1 小时 TTL，凌晨的故障早上就没了。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用 --force --grace-period=0 删 Pod</div><div class="pd">跳过优雅终止，长请求被硬切、PV 的 attachment 可能残留，还可能留下孤儿 finalizer。只在确认卡死时用。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. Pod 状态 ImagePullBackOff，describe 事件里写 manifest unknown。第一件事做什么？</div>
+      <button class="opt">重启 kubelet</button>
+      <button class="opt">给 Pod 加 imagePullSecret</button>
+      <button class="opt">核对 image 名和 tag 是否真实存在</button>
+      <div class="ans">正确答案：<b>核对镜像 tag</b>。manifest unknown 就是仓库里没这个 tag（拼错/没推/删了），与凭证无关（authentication required 才是凭证问题）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 容器进入 CrashLoopBackOff，kubectl logs 当前输出为空。正确的排查命令是？</div>
+      <button class="opt">kubectl exec 进去看</button>
+      <button class="opt">kubectl logs --previous，看上一轮容器的日志</button>
+      <button class="opt">kubectl describe node</button>
+      <div class="ans">正确答案：<b>logs --previous</b>。容器重启后当前日志被清空，上一轮的日志还留着。exitCode + lastState + --previous 日志三件套定位绝大多数启动即崩。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. Service 突然全 502，Pod 全部 Running 且日志正常。第一步查什么？</div>
+      <button class="opt">kubectl get endpoints，看后端列表是否为空</button>
+      <button class="opt">抓包看 TCP 连接</button>
+      <button class="opt">重启 kube-proxy</button>
+      <div class="ans">正确答案：<b>get endpoints</b>。502 + Pod Running 的典型组合是 endpoints 空（selector 与标签脱管，或后端全不 Ready）。先确认有没有后端，再查链路。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 应用访问外部域名时快时慢，全名解析正常但耗时几百毫秒。最可能的根因是？</div>
+      <button class="opt">CoreDNS 完全宕机，靠缓存兜底</button>
+      <button class="opt">ndots:5 导致每个域名先拼 4 个 search 域查询，查询量放大</button>
+      <button class="opt">kube-proxy 的 iptables 规则丢包</button>
+      <div class="ans">正确答案：<b>ndots 放大</b>。默认 ndots:5 + search 域，让外部域名一次解析变 5 次查询，CoreDNS 压力上来后延迟抖动。解法：dnsConfig 调 ndots/searches，CoreDNS 扩容。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. PVC 一直 Pending，事件写 waiting for first consumer。正确的理解是？</div>
+      <button class="opt">存储集群故障，需要重启 CSI 驱动</button>
+      <button class="opt">PV 容量不足，需要手工创建 PV</button>
+      <button class="opt">StorageClass 是 WaitForFirstConsumer，要等使用它的 Pod 先调度成功；应去查 Pod 为什么 Pending</button>
+      <div class="ans">正确答案：<b>等首个消费者</b>。这是延迟绑定特性（保证 PV 与 Pod 同区），不是故障。Pod 调度不出去（资源/污点/亲和性），PVC 就会一直等。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 容器退出码 137、lastState.reason=OOMKilled，意味着什么？</div>
+      <button class="opt">内存超过 limits，被内核 OOM Killer 击杀，应放大 limit 或修内存占用</button>
+      <button class="opt">应用主动调用 exit(137) 退出</button>
+      <button class="opt">liveness 探针失败被 kubelet 重启</button>
+      <div class="ans">正确答案：<b>超 memory limit 被内核杀</b>。137 = 128+9（SIGKILL）。reason=OOMKilled 是权威判定；探针失败不会有这个 reason。解法：放大 limit、修泄漏，JVM 注意 MaxRAMPercentage。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>排障命令速查（按使用频率排序）</h3>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get events -A --sort-by=.lastTimestamp</code><span class="desc">全集群事件按时间排序，排障第一入口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl describe pod &lt;pod&gt;</code><span class="desc">容器状态、重启、探针、事件一页看全</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs &lt;pod&gt; --previous --tail=200</code><span class="desc">看崩溃前一轮的日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get endpoints &lt;svc&gt;</code><span class="desc">Service 真实后端，502 先查它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pod &lt;pod&gt; -o jsonpath='{.status.containerStatuses[0].lastState}'</code><span class="desc">退出码与 OOMKilled 判定</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pvc / pv</code><span class="desc">存储绑定状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl debug &lt;pod&gt; -it --image=busybox --target=&lt;c&gt;</code><span class="desc">临时容器进生产 Pod</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl debug node/&lt;node&gt; -it --image=nicolaka/netshoot</code><span class="desc">特权 Pod 调试节点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get networkpolicy -A</code><span class="desc">排查策略误伤</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl drain &lt;node&gt; --ignore-daemonsets</code><span class="desc">安全腾空节点再维护</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -u kubelet --since "20 min ago"</code><span class="desc">节点上 kubelet 日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ipvsadm -Ln / iptables -t nat -L KUBE-SVC</code><span class="desc">kube-proxy 两种模式的规则检查</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键默认值速记</h3>
+  <pre><span class="c"># 时间相关</span>
+Event TTL = 1h（etcd 默认）          <span class="c"># 排障要趁早，记得存证</span>
+CrashLoopBackOff 退避：10s 起翻倍，上限 300s
+terminationGracePeriodSeconds = 30   <span class="c"># SIGTERM→SIGKILL 宽限期</span>
+<span class="c"># 阈值相关</span>
+ndots = 5（DNS 查询放大的根源）
+node-monitor-grace-period = 40s      <span class="c"># 节点失联多久判 NotReady</span>
+kubelet 硬驱逐：memory.available&lt;100Mi / nodefs.available&lt;10% / imagefs.available&lt;15%</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Pending</b></td><td>Pod 未被调度：资源不够、污点、亲和性、PVC 未绑、配额满</td></tr>
+    <tr><td><b>CrashLoopBackOff</b></td><td>容器反复退出，看 lastState + logs --previous</td></tr>
+    <tr><td><b>ImagePullBackOff</b></td><td>镜像拉取失败：tag 不存在、凭证缺失、仓库限流</td></tr>
+    <tr><td><b>Event</b></td><td>K8s 的事件流，排障第一入口，默认只存 1 小时</td></tr>
+    <tr><td><b>Endpoints</b></td><td>Service 的真实后端 Pod IP 列表，502 先查它</td></tr>
+    <tr><td><b>Selector 脱管</b></td><td>Service selector 与 Pod 标签不再匹配，流量悄无声息地归零</td></tr>
+    <tr><td><b>kube-proxy</b></td><td>实现 Service 负载均衡的节点组件，iptables/ipvs/nftables 三模式</td></tr>
+    <tr><td><b>CoreDNS</b></td><td>集群 DNS 服务，解析慢先看它的副本数与日志</td></tr>
+    <tr><td><b>ndots</b></td><td>resolv.conf 参数，默认 5，决定域名何时走 search 域放大查询</td></tr>
+    <tr><td><b>NetworkPolicy</b></td><td>Pod 级防火墙，需 CNI 支持，多条策略是允许的并集</td></tr>
+    <tr><td><b>PV / PVC</b></td><td>持久卷与声明，动态供给由 StorageClass + provisioner 完成</td></tr>
+    <tr><td><b>WaitForFirstConsumer</b></td><td>延迟绑定：等 Pod 调度成功再创建 PV，保证同拓扑域</td></tr>
+    <tr><td><b>VolumeAttachment</b></td><td>卷挂到节点的附着记录，排查 Multi-Attach 的关键对象</td></tr>
+    <tr><td><b>NotReady</b></td><td>节点失联：kubelet 挂了、资源压力、控制面故障</td></tr>
+    <tr><td><b>驱逐 eviction</b></td><td>节点压力时按 QoS 顺序杀 Pod， BestEffort 最先</td></tr>
+    <tr><td><b>ephemeral container</b></td><td>kubectl debug 注入的临时容器，共享网络排障</td></tr>
+    <tr><td><b>netshoot</b></td><td>装满网络工具的调试镜像（dig/curl/tcpdump/iperf）</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>在 kind 集群上复现三个案例 —— ① 改 Deployment 标签制造 endpoints 清空；② 部署 CPU/内存打满的 Pod 观察 NotReady 与驱逐；③ 起 distroless 镜像用 kubectl debug 进去。把模块 2 的成因树打印贴工位。<br><br>
+    <b>之后值得单独学：</b>集群控制面排障（etcd 慢查询、API Server 限流 flowcontrol）、CNI 深度抓包、CSI 驱动日志体系、以及把排障过程沉淀成 runbook。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Kubernetes 排障实战 · 出事别慌：先看事件，再分层，最后才动手</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（Pod 状态机）和模块 8（三个完整案例）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边 kubectl describe / logs 跟着敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 kind 集群，故意部署几个故障 Pod 跟着敲';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

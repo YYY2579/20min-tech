@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透设备与 DMA</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透设备与 DMA</h1>
+    <p class="sub">CPU 怎么跟网卡说话、网卡怎么把数据塞进内存、一次 <span class="k">sendfile</span> 到底省了几次拷贝 —— 这三个问题串起来，就是整条 IO 路径。理解了它，<span class="k">%util</span> 高但吞吐上不去、网卡有包但进程收不到，这些问题的答案就是显然的。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种 IO 方式</span>
+      <span class="chip"><b>4→2</b> 次拷贝</span>
+      <span class="chip"><b>8</b> 个认知陷阱</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议手边有一台 Linux 机器 —— 这篇大部分观测命令（lspci / ethtool / smartctl）需要 root</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先建立一张全局地图</h2></div>
+  <p class="lead">整篇文章只讲一条主线：<b>数据从设备到进程，要经过哪些搬运工</b>。先记住下面这四类角色，后面所有细节都挂在它们身上。</p>
+  <table>
+    <tr><th style="width:130px">角色</th><th style="width:230px">职责</th><th>能力边界</th></tr>
+    <tr><td><b>CPU</b></td><td>执行指令、读写内存</td><td>很快但只有几个核。<b>让它搬数据是最大的浪费</b></td></tr>
+    <tr><td><b>内存</b></td><td>存放一切</td><td>CPU 和设备共享的唯一的交汇点</td></tr>
+    <tr><td><b>设备</b></td><td>和外部世界交换数据</td><td>只会读写"总线地址"，不懂虚拟内存</td></tr>
+    <tr><td><b>DMA 引擎</b></td><td>代替 CPU 搬数据</td><td>能直接读写内存，但需要有人告诉它"从哪到哪"</td></tr>
+  </table>
+  <pre><span class="c"># 设备拓扑树 / 单设备详情 / MMIO 地址分配</span>
+lspci -t
+lspci -vv -s 02:00.0
+sudo cat /proc/iomem | head -30</pre>
+  <div class="callout">
+    <b>核心结论先给出：</b>所有设备 IO 的性能问题，本质都是<b>同一个资源（内存带宽 / CPU 时间 / 队列深度）被谁占用了</b>。轮询和中断吃 CPU，DMA 吃内存带宽，三者此消彼长。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>CPU 怎么和设备通信</h2></div>
+  <p class="lead">设备上有一些"寄存器"，CPU 要读写它们来配置设备、查询状态。问题是：这些寄存器不在内存里，CPU 怎么访问？有两种历史方案。</p>
+
+  <h3>方案一：端口 IO（Port-Mapped IO，PMIO）</h3>
+  <p>x86 有一条独立的总线空间叫 <b>IO 空间</b>，只有 <b>64KB</b>（16 位地址），用专门的指令 <span class="k">in</span> / <span class="k">out</span> 访问。这是 8086 时代留下的设计。</p>
+  <pre><span class="c"># 内核里的写法（arch/x86/include/asm/io.h）</span>
+u8  val = inb(0x60);        <span class="c"># 从端口 0x60 读一个字节（经典键盘控制器）</span>
+outb(0x41, 0x60);           <span class="c"># 往端口 0x41 写</span>
+u32 v = inl(0xCF8);         <span class="c"># 32 位读，PCI 配置空间就是走这条路</span>
+
+<span class="c"># 用户态看端口占用（需要 root）</span>
+cat /proc/ioports | head -20
+<span class="c">#   0000-001f : dma1</span>
+<span class="c">#   0060-0060 : keyboard</span>
+<span class="c">#   03f8-03ff : serial</span>
+<span class="c">#   cf8-cff   : PCI conf1</span></pre>
+  <p>端口 IO 有三个硬伤：<b>地址空间只有 64KB</b>、<b>只能一次传 1/2/4 字节</b>（不能批量）、<b>只有 x86 系架构有</b>（ARM、RISC-V 根本没有这个概念）。所以现代设备几乎不用它。</p>
+
+  <h3>方案二：内存映射 IO（Memory-Mapped IO，MMIO）</h3>
+  <p>把设备的寄存器<b>映射到物理地址空间</b>里。CPU 用普通的 <span class="k">mov</span> 指令读写这段地址，硬件（北桥 / 内存控制器）发现地址落在设备区间，就把请求转发到设备而不是内存。</p>
+  <pre><span class="c"># 1. 从 PCI 配置空间读 BAR，拿到设备寄存器的物理地址</span>
+lspci -vv -s 02:00.0 | grep -A2 Region
+<span class="c">#   Region 0: Memory at f7c00000 (32-bit, non-prefetchable) [size=16K]</span>
+
+<span class="c"># 2. 驱动里映射到内核虚拟地址</span>
+void __iomem *base = ioremap(0xf7c00000, 16 * 1024);
+
+<span class="c"># 3. 用专用访问函数读写（不能直接解引用指针！）</span>
+u32 status = readl(base + 0x04);
+writel(0x1, base + 0x00);
+u16 v = readw(base + 0x10);
+
+<span class="c"># 4. 用完解除映射</span>
+iounmap(base);</pre>
+  <div class="callout warn">
+    <b>为什么不能直接 <span class="k">*(u32*)base</span>？</b>三个原因：<br>
+    ① <b>编译器会优化掉。</b>它不知道这段地址会被硬件改变，可能把多次读合并成一次，或者干脆缓存到寄存器里。<span class="k">readl/writel</span> 内部有 <span class="k">barrier()</span> 阻止这种优化。<br>
+    ② <b>字节序问题。</b>设备可能是大端，<span class="k">readl</span> 会做转换（<span class="k">readl_be</span> 是显式大端版本）。<br>
+    ③ <b>写合并/乱序。</b>CPU 可能重排 MMIO 写操作的顺序，而设备对寄存器写入顺序有严格要求（先写地址再写数据）。<span class="k">writel</span> 保证顺序。
+  </div>
+
+  <h3>为什么 MMIO 成了主流</h3>
+  <table>
+    <tr><th style="width:180px">维度</th><th style="width:200px">端口 IO</th><th>MMIO</th></tr>
+    <tr><td>地址空间</td><td>64KB，非常紧张</td><td><b>几乎无限</b>（用物理地址空间的一大段）</td></tr>
+    <tr><td>传输粒度</td><td>1/2/4 字节，逐字节搬</td><td><b>可以映射大块内存</b>，甚至把整个显存/设备内存映射进来</td></tr>
+    <tr><td>指令支持</td><td>专用 in/out 指令，编译器难优化</td><td><b>普通 load/store</b>，编译器可以做寄存器分配、批量搬运（配合 SIMD）</td></tr>
+    <tr><td>架构支持</td><td>基本只有 x86</td><td><b>所有架构</b>（ARM 的 Device 内存类型、RISC-V 的 MMIO 都是这个思路）</td></tr>
+    <tr><td>能否被 DMA 共享</td><td>不能</td><td><b>能</b>。这是关键：设备和 CPU 可以访问同一块缓冲区</td></tr>
+    <tr><td>典型用途</td><td>老式串口、PS/2、PCI 配置空间（ECAM 之外的老路径）</td><td><b>现代一切</b>：网卡、NVMe、GPU、USB 控制器</td></tr>
+  </table>
+  <pre><span class="c"># 看一台机器的 MMIO 地址分配（每个设备占了哪段物理地址）</span>
+sudo cat /proc/iomem | grep -A3 -i 'PCI Bus'
+<span class="c">#   f7c00000-f7c03fff : 0000:02:00.0</span>
+<span class="c">#      f7c00000-f7c03fff : nvme</span>
+<span class="c">#   f7d00000-f7d1ffff : 0000:00:1f.6</span>
+<span class="c">#      f7d00000-f7d1ffff : e1000e</span>
+
+<span class="c"># 32 位系统的老问题：MMIO 地址必须落在 4GB 以下</span>
+<span class="c"># 64 位系统没有这个问题，但某些 32 位 PCI 设备仍然只能解码低 32 位地址</span>
+<span class="c"># 这时内核会把那段物理内存"挪走"（memory hole），用 ZONE_DMA32 管理</span></pre>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>三种 IO 方式：轮询、中断、DMA</h2></div>
+  <p class="lead">设备完成一次传输后，CPU 怎么知道？这就是三种方式的全部区别。它们的本质是<b>在"CPU 时间"和"延迟"之间做不同的取舍</b>。</p>
+
+  <h3>轮询（Polling）</h3>
+  <p>CPU 不停地读设备的状态寄存器，看"完成位"有没有置起。</p>
+  <pre>writel(START, base + REG_CMD);
+while (!(readl(base + REG_STATUS) &amp; STATUS_DONE))
+    cpu_relax();          <span class="c"># 空转，不让出 CPU</span>
+data = readl(base + REG_DATA);</pre>
+  <p><b>优点：</b>延迟最低（亚微秒）、实现简单、无中断开销。<b>缺点：</b>等待期间这个核什么都干不了，多设备并发时无法兼顾。</p>
+  <p><b>什么时候仍然用轮询：</b>① 极低延迟场景（高频交易网卡、DPDK 用户态驱动）；② 设备本来就很快（NVMe 的 IO 队列轮询模式，<span class="k">io_poll</span>）；③ 中断风暴时内核会临时切换到轮询（NAPI 就是"中断 + 轮询"的混合体）。</p>
+
+  <h3>中断（Interrupt）</h3>
+  <p>设备完成时拉一根中断线（或发一个 MSI-X 消息），CPU 停下当前工作，跳到中断处理程序。</p>
+  <pre><span class="c"># 驱动注册中断处理</span>
+request_irq(irq, my_handler, IRQF_SHARED, "mydev", dev);
+<span class="c"># 或者 MSI-X（现代设备首选，每个队列一个中断向量）</span>
+pci_alloc_irq_vectors(pdev, 1, 64, PCI_IRQ_MSIX);
+
+<span class="c"># 中断处理分两半（这是 Linux 的核心设计）</span>
+<span class="c"># 上半部 hardirq：关中断上下文，只能做最紧急的事（应答设备、取数据）</span>
+<span class="c"># 下半部 softirq/tasklet/workqueue：开中断，做耗时的后续处理</span>
+
+<span class="c"># 看中断分布（哪个 CPU 在处理哪个设备的中断）</span>
+cat /proc/interrupts
+<span class="c">#            CPU0       CPU1       CPU2       CPU3</span>
+<span class="c">#  32:     123456          0          0          0   IR-PCI-MSI  nvme0q0</span>
+<span class="c">#  33:          0      98234          0          0   IR-PCI-MSI  nvme0q1</span>
+<span class="c">#  45:      54321      54322      54323      54324   IR-PCI-MSI  eth0-TxRx-0</span></pre>
+  <p><b>优点：</b>等待期间 CPU 可以跑别的进程，天然支持多设备并发。<b>缺点：</b>每次中断有 2~10 微秒固定开销，高频小包场景会形成中断风暴。</p>
+  <div class="callout warn">
+    <b>中断开销的量化：</b>一次中断从设备发出到处理程序返回，典型开销 <b>2~5 微秒</b>（含保存寄存器、切换栈、cache 污染）。如果网卡每秒收 100 万个小包，光中断就要吃掉 <b>2~5 秒的 CPU 时间/秒</b> —— 也就是 2~5 个核满载。<br>
+    <b>这就是 NAPI 存在的原因：</b>第一个包来了用中断唤醒，之后关掉中断改用轮询，一次处理一批（默认 budget 64 个包），处理完再开中断。用"批量"摊薄了每次中断的固定开销。
+  </div>
+
+  <h3>DMA（Direct Memory Access）</h3>
+  <p>让一个专门的硬件（DMA 引擎，通常集成在设备控制器里）直接读写内存，CPU 只负责"下命令"和"收通知"。</p>
+  <pre><span class="c"># 1. CPU 准备：把地址、长度、方向写进设备的 DMA 寄存器</span>
+writel(dma_addr,  base + REG_DMA_SRC);
+writel(len,       base + REG_DMA_LEN);
+writel(DMA_START, base + REG_DMA_CMD);
+
+<span class="c"># 2. DMA 引擎搬数据，CPU 去干别的</span>
+<span class="c"># 3. 完成后设备发中断（或 CPU 轮询完成位，追求更低延迟）</span></pre>
+  <p><b>优点：</b>CPU 几乎不参与，吞吐可跑满总线，支持分散/聚集。<b>缺点：</b>占用内存带宽，cache 一致性复杂，地址翻译需要 IOMMU。</p>
+
+  <h3>三者对比</h3>
+  <table>
+    <tr><th style="width:110px">方式</th><th style="width:130px">CPU 占用</th><th style="width:110px">延迟</th><th style="width:120px">吞吐</th><th>适用场景</th></tr>
+    <tr><td><b>轮询</b></td><td>100%（等待期间）</td><td><b>最低</b>，亚微秒</td><td>取决于 CPU 读寄存器的速度</td><td>DPDK、SPDK、极低延迟交易、NVMe io_poll</td></tr>
+    <tr><td><b>中断</b></td><td>与事件数成正比</td><td>2~10 微秒</td><td>低（事件频繁时被中断开销压死）</td><td>低频设备：键盘、串口、管理型事件</td></tr>
+    <tr><td><b>DMA</b></td><td>接近 0（只有配置和完成通知）</td><td>取决于传输量</td><td><b>最高</b>，可跑满总线</td><td>网卡、磁盘、GPU、声卡 —— <b>所有高吞吐设备</b></td></tr>
+    <tr><td><b>DMA + 轮询</b></td><td>1 个核满载</td><td><b>极低</b></td><td>最高</td><td>DPDK 的标准组合</td></tr>
+    <tr><td><b>DMA + 中断</b></td><td>很低</td><td>中等</td><td>高</td><td><b>通用服务器的事实标准</b></td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一句话记忆：</b>轮询是"我一直盯着"，中断是"好了叫我"，DMA 是"你帮我搬，搬完叫我"。<b>现代设备一定是 DMA + 中断</b>，只有在追求极致延迟或中断风暴时才退化成轮询。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>DMA 工作原理</h2></div>
+  <p class="lead">DMA 听起来简单——"设备直接读写内存"。但这里有一个致命问题：<b>设备只认识物理地址，而 CPU 用的是虚拟地址</b>。而且 CPU 有 cache，设备写内存时不会更新 cache。这两个问题构成了 DMA 编程的全部复杂度。</p>
+
+  <h3>问题一：地址翻译</h3>
+  <p>进程的缓冲区在虚拟地址 <span class="k">0x7f0000001000</span>，对应的物理页可能是 <span class="k">0x1a3f000</span>，而且可能根本不连续（分散在多个物理页）。设备不知道这些，它需要一个"总线地址"。</p>
+  <pre><span class="c"># 流式 DMA 的典型流程</span>
+<span class="c"># 1. 拿到虚拟地址对应的 DMA（总线）地址</span>
+dma_addr_t h = dma_map_single(dev, buf, len, DMA_TO_DEVICE);
+if (dma_mapping_error(dev, h)) { <span class="c">/* 处理失败 */</span> }
+
+<span class="c"># 2. 把 dma_handle 写进设备寄存器</span>
+writel(h, base + REG_DMA_ADDR);
+
+<span class="c"># 3. 传输完成后解除映射</span>
+dma_unmap_single(dev, h, len, DMA_TO_DEVICE);
+
+<span class="c"># 多段不连续内存用 scatter-gather 版本，一次映射多段</span>
+int nents = dma_map_sg(dev, sg_list, orig_nents, DMA_FROM_DEVICE);</pre>
+  <p>如果有多段不连续的内存（比如 sk_buff 的线性区 + 多个分片），用 scatter-gather 版本一次映射多段：</p>
+  <pre><span class="c"># 分散/聚集 DMA：一次告诉设备"N 段内存，各自的地址和长度"</span>
+int nents = dma_map_sg(dev, sg_list, orig_nents, DMA_FROM_DEVICE);
+<span class="c"># 设备按 sg_list 里的描述符逐段搬运，不需要 CPU 先把它们拼成连续内存</span>
+<span class="c"># 这是零拷贝能成立的关键硬件能力</span></pre>
+
+  <h3>问题二：cache 一致性</h3>
+  <p>CPU 写数据到缓冲区时，数据可能还在 CPU 的 cache 里没落到内存。如果这时启动 DMA，设备读到的是<b>旧数据</b>。反过来，设备 DMA 写完内存，CPU 读到的可能是 cache 里的<b>旧值</b>。</p>
+  <p>Linux 把 DMA 分成两类来解决这个问题：</p>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:210px">分配接口</th><th>一致性怎么保证</th></tr>
+    <tr><td><b>一致性 DMA<br>（coherent）</b></td><td class="f">dma_alloc_coherent()<br>dma_free_coherent()</td><td>分配的内存<b>默认不做 cache</b>（或 write-combine），CPU 和设备看到的内容永远一致，<b>不需要手动同步</b></td></tr>
+    <tr><td><b>流式 DMA<br>（streaming）</b></td><td class="f">dma_map_single()<br>dma_map_sg()<br>dma_sync_*()</td><td>用<b>普通可 cache 内存</b>，靠 map/unmap 时的 cache 刷新来保证。需要严格的所有权切换</td></tr>
+  </table>
+  <pre><span class="c"># 一致性 DMA：适合长期存在的描述符环、控制结构</span>
+ring = dma_alloc_coherent(dev, RING_SIZE * sizeof(*ring), &amp;ring_dma, GFP_KERNEL);
+<span class="c"># ring 是 CPU 看到的地址，ring_dma 是设备看到的地址，指向同一块物理内存</span>
+
+<span class="c"># 流式 DMA：适合一次性数据缓冲区（性能更好，因为能用 cache）</span>
+<span class="c"># 发送方向：CPU 写 → 刷 cache → 交给设备</span>
+memcpy(buf, data, len);
+dma_map_single(dev, buf, len, DMA_TO_DEVICE);   <span class="c"># 内部会 clean cache</span>
+<span class="c"># ... 启动 DMA，等待完成 ...</span>
+dma_unmap_single(dev, addr, len, DMA_TO_DEVICE);
+
+<span class="c"># 接收方向：设备写 → 无效化 cache → CPU 读</span>
+dma_map_single(dev, buf, len, DMA_FROM_DEVICE);
+<span class="c"># ... 启动 DMA，等待完成 ...</span>
+dma_unmap_single(dev, addr, len, DMA_FROM_DEVICE);  <span class="c"># 内部会 invalidate cache</span>
+<span class="c"># 此时 CPU 才能安全读到设备写入的数据</span></pre>
+  <div class="callout danger">
+    <b>流式 DMA 最容易出的 bug：忘记同步。</b><br>
+    典型症状：设备明明写了数据，CPU 读到的却是全 0 或旧内容；或者 CPU 改了描述符，设备视而不见。<br>
+    <b>规则：</b>缓冲区在"CPU 拥有"和"设备拥有"之间切换时，必须调用 <span class="k">dma_sync_single_for_device()</span> 或 <span class="k">dma_sync_single_for_cpu()</span>。<br>
+    <b>另一个陷阱：</b>在 DMA 进行期间，CPU <b>绝对不能碰这块缓冲区</b>。这不是"最好不要"，而是会读到半新半旧的数据（tearing）。
+  </div>
+
+  <h3>IOMMU：DMA 的地址翻译与保护</h3>
+  <p>没有 IOMMU 时，设备拿到的是<b>物理地址</b>。这带来三个问题：① 32 位设备无法访问 4GB 以上的内存；② 驱动要给设备分配物理连续的大块内存（很难）；③ <b>设备可以 DMA 到任意物理地址</b>，一个恶意或有 bug 的设备能读写整个内存。</p>
+  <p>IOMMU（Input/Output Memory Management Unit）就是给设备用的 MMU：</p>
+  <table>
+    <tr><th style="width:180px">能力</th><th>说明</th></tr>
+    <tr><td><b>地址翻译</b></td><td>设备用 IOVA（IO 虚拟地址），IOMMU 翻译成物理地址。驱动可以给设备"看起来连续"的地址，实际映射到任意分散的物理页</td></tr>
+    <tr><td><b>访问隔离</b></td><td>每个设备只能访问自己页表里映射的地址。越界访问被 IOMMU 拦截，产生 DMA fault 而不是静默损坏内存</td></tr>
+    <tr><td><b>支持 32 位设备</b></td><td>把高地址内存映射到设备可见的低 32 位 IOVA，老设备也能用大内存</td></tr>
+    <tr><td><b>虚拟化直通</b></td><td>把物理设备直接分配给虚拟机（VFIO），IOMMU 保证虚拟机只能访问自己的内存</td></tr>
+  </table>
+  <pre><span class="c"># 检查 IOMMU 是否启用</span>
+dmesg | grep -i -E 'DMAR|IOMMU'
+<span class="c">#  DMAR: IOMMU enabled</span>
+<span class="c">#  DMAR: Intel(R) Virtualization Technology for Directed I/O</span>
+
+<span class="c"># 看 IOMMU 分组（同组设备共享一个地址空间）</span>
+for g in /sys/kernel/iommu_groups/*; do
+  echo "Group $(basename $g):"; ls $g/devices/
+done
+
+<span class="c"># 内核启动参数（要显式开启）</span>
+<span class="c"># Intel: intel_iommu=on    AMD: amd_iommu=on</span>
+<span class="c"># 关闭：intel_iommu=off    （性能敏感场景下有人关掉，但失去了隔离保护）</span></pre>
+  <div class="callout warn">
+    <b>IOMMU 有性能代价。</b>每次 DMA 都要走一遍页表翻译（有 IOTLB 缓存缓解）。所以：① 现代网卡支持 <b>ATS/ATC</b>，把翻译结果缓存在设备侧；② 内核支持 IOVA 大页和懒刷 TLB（<span class="k">iommu.strict=0</span>）；③ 一些高频交易系统直接关掉 IOMMU 换性能，<b>代价是失去 DMA 攻击防护</b>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>零拷贝与 DMA 的关系</h2></div>
+  <p class="lead">"零拷贝"这个词被用得很滥。严格说它<b>不是零次拷贝，而是零次 CPU 拷贝</b>。DMA 拷贝仍然存在，只是不占 CPU。搞清楚这一点，才能判断什么场景该用它。</p>
+
+  <h3>传统 read + write：4 次拷贝，4 次上下文切换</h3>
+  <pre><span class="c"># 应用代码</span>
+n = read(fd, buf, len);        <span class="c"># 系统调用 1</span>
+write(sockfd, buf, len);       <span class="c"># 系统调用 2</span>
+
+<span class="c"># 4 次拷贝：DMA(磁盘→page cache) → CPU(page cache→用户缓冲)</span>
+<span class="c">#           → CPU(用户缓冲→socket 缓冲) → DMA(socket→网卡)</span>
+<span class="c"># 4 次用户态/内核态切换（read 进、read 出、write 进、write 出）</span></pre>
+  <table>
+    <tr><th style="width:60px">步骤</th><th style="width:230px">动作</th><th>谁在搬</th></tr>
+    <tr><td>1</td><td>DMA：磁盘 → 内核 page cache</td><td><b>DMA</b></td></tr>
+    <tr><td>2</td><td>CPU：page cache → 用户缓冲区</td><td><b>CPU</b>（read 返回）</td></tr>
+    <tr><td>3</td><td>CPU：用户缓冲区 → socket 发送缓冲区</td><td><b>CPU</b>（write 调用）</td></tr>
+    <tr><td>4</td><td>DMA：socket 缓冲区 → 网卡</td><td><b>DMA</b></td></tr>
+  </table>
+  <p>共 <b>4 次拷贝</b>（2 次 DMA + <b>2 次 CPU</b>），<b>4 次用户态/内核态切换</b>（read 进、read 出、write 进、write 出）。数据在内存里被搬了 4 遍，其中 2 遍纯属浪费。</p>
+
+  <h3>sendfile：2 次拷贝，2 次切换</h3>
+  <pre><span class="c"># 应用代码</span>
+sendfile(sockfd, filefd, NULL, len);   <span class="c"># 一次系统调用搞定</span>
+
+<span class="c"># 内核内部：数据根本不进用户态</span>
+<span class="c"># 1. DMA：磁盘 → page cache</span>
+<span class="c"># 2. DMA：page cache → 网卡（通过 SG-DMA，网卡直接从 page cache 读）</span></pre>
+  <table>
+    <tr><th style="width:60px">步骤</th><th style="width:230px">动作</th><th>谁在搬</th></tr>
+    <tr><td>1</td><td>DMA：磁盘 → page cache</td><td><b>DMA</b></td></tr>
+    <tr><td>2</td><td>DMA（SG）：page cache → 网卡</td><td><b>DMA</b></td></tr>
+  </table>
+  <p><b>省掉了两次 CPU 拷贝</b>（步骤 2 和 3），也省掉了两次上下文切换。<b>但前提是网卡支持 SG-DMA（scatter-gather DMA）</b> —— 它需要能直接按"物理页列表"去内存里取数据，而不是要求一段连续内存。</p>
+  <div class="callout">
+    <b>为什么 SG-DMA 是关键：</b>page cache 的数据在物理内存里是分散的。网卡若只能读连续内存，内核就得先 CPU 拷贝拼成连续块，零拷贝就不成立。SG-DMA 让网卡按描述符表逐段取，<b>把"拼接"下放给硬件</b>。检查：<span class="k">ethtool -k eth0 | grep scatter-gather</span>
+  </div>
+
+  <h3>其他零拷贝方案对比</h3>
+  <table>
+    <tr><th style="width:150px">方案</th><th style="width:130px">CPU 拷贝次数</th><th>限制</th></tr>
+    <tr><td class="f">read + write</td><td>2</td><td>无（但最慢）</td></tr>
+    <tr><td class="f">sendfile</td><td><b>0</b></td><td>不能修改数据内容；只能文件 → socket</td></tr>
+    <tr><td class="f">MSG_ZEROCOPY</td><td><b>0</b></td><td>发送方向；需要网卡支持；有完成通知的复杂度</td></tr>
+  </table>
+  <pre><span class="c"># 验证 sendfile 的效果（用 strace 看系统调用次数）</span>
+strace -c -e trace=read,write,sendfile ./your_server
+
+<span class="c"># 用 perf 看 CPU 时间花在哪（零拷贝方案里 memcpy 应该显著减少）</span>
+perf top -e cycles -g
+<span class="c"># 搜 __memcpy_avx_unaligned / copy_user_enhanced_fast_string</span>
+
+<span class="c"># Nginx 的配置（sendfile 默认开）</span>
+<span class="c"># sendfile on;</span>
+<span class="c"># tcp_nopush on;    # 配合 sendfile，凑满一个 MSS 再发</span></pre>
+  <div class="callout warn">
+    <b>零拷贝不是万能的。</b>三个边界：<br>
+    ① <b>需要修改数据就不能用。</b>sendfile 要求数据原样转发。要加 HTTP 头、要压缩、要加密，就得回到用户态。<br>
+    ② <b>小文件收益小。</b>省下的 CPU 拷贝时间可能还不如系统调用本身的开销。<br>
+    ③ <b>依赖硬件。</b>没有 SG-DMA 的网卡，内核会退化成"CPU 拷贝到连续缓冲区"，你以为开了零拷贝，实际没开。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>网卡收包全路径</h2></div>
+  <p class="lead">这条路径把 DMA、中断、软中断、NAPI 全串起来了。理解了它，<span class="k">rx_dropped</span> 增长、单核软中断 100%、PPS 上不去这些问题的原因就很清楚。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>网卡收帧。</b>PHY 解出信号，MAC 校验 FCS，确认是发给自己的，放入网卡内部 FIFO。</div></div>
+    <div class="step"><div class="txt"><b>DMA 写入环形缓冲区。</b>按 RX 描述符环里的空闲缓冲区地址，用 DMA 把帧写进内存，<b>完全不经过 CPU</b>。环大小由 <span class="k">ethtool -g</span> 控制，典型 256~4096 个描述符。</div></div>
+    <div class="step"><div class="txt"><b>发中断。</b>更新描述符状态位后发 MSI-X 中断；开了中断合并则攒几个包再发一次。</div></div>
+    <div class="step"><div class="txt"><b>硬中断只做最少的事。</b>关闭该队列中断、标记"有活要干"、调度 NAPI，然后立刻返回。</div></div>
+    <div class="step"><div class="txt"><b>软中断 NAPI 轮询。</b><span class="k">net_rx_action</span> 调驱动的 <span class="k">poll()</span>，一次最多取 <b>budget（默认 64）</b> 个描述符，为每个包分配 <span class="k">sk_buff</span>，取完再开中断。</div></div>
+    <div class="step"><div class="txt"><b>GRO 与协议栈。</b>同流小包先合并，再走 <span class="k">netif_receive_skb</span> → <span class="k">ip_rcv</span> → <span class="k">tcp_v4_rcv</span>，数据进入 socket 接收队列并唤醒进程 —— <b>此时已多了一次拷贝</b>。</div></div>
+  </div>
+  <h3>关键参数与观测点</h3>
+  <table>
+    <tr><th style="width:210px">参数 / 指标</th><th>含义与调优方向</th></tr>
+    <tr><td class="f">ethtool -g eth0</td><td>RX/TX 环形缓冲区大小。<b>丢包时调大</b>（但吃内存：4096 × 2KB ≈ 8MB/队列）</td></tr>
+    <tr><td class="f">ethtool -c eth0</td><td>中断合并。<b>延迟敏感调小，吞吐敏感调大</b></td></tr>
+    <tr><td class="f">net.core.netdev_budget</td><td>一次软中断最多处理多少个包（默认 300）</td></tr>
+    <tr><td class="f">rx_dropped</td><td>驱动层丢弃（环形缓冲区满）→ <b>调大 ring</b></td></tr>
+    <tr><td class="f">rx_missed_errors</td><td>网卡 FIFO 溢出，DMA 来不及写内存 → <b>PCIe / 内存带宽瓶颈</b></td></tr>
+    <tr><td class="f">softnet_stat 第 2 列</td><td>软中断处理不过来（budget 用完丢弃）</td></tr>
+  </table>
+  <pre><span class="c"># 1. 环形缓冲区与丢包计数</span>
+ethtool -g eth0
+ethtool -S eth0 | grep -E 'drop|miss|error|fifo'
+
+<span class="c"># 2. 软中断有没有堆积（第 2 列是 drop 计数，16 进制）</span>
+cat /proc/net/softnet_stat
+
+<span class="c"># 3. 软中断 CPU 占用（si 列高就是它）</span>
+top -d 1
+
+<span class="c"># 4. 中断在各核的分布（是否集中在一个核）</span>
+cat /proc/interrupts | grep eth0
+ethtool -l eth0        <span class="c"># 有几个队列</span>
+
+<span class="c"># 5. 把队列 0 绑到 CPU 2</span>
+echo 4 &gt; /proc/irq/$(cat /proc/interrupts | grep 'eth0-TxRx-0' | cut -d: -f1)/smp_affinity</pre>
+  <div class="callout danger">
+    <b>最常见的网卡性能问题：所有软中断挤在一个核上。</b><br>
+    原因：① 网卡只有一个 RX 队列（没开 RSS）；② 多队列但 <span class="k">irqbalance</span> 把中断都分到 CPU0；③ 容器里看不到真实分布。<br>
+    <b>解法：</b><span class="k">ethtool -L eth0 combined N</span> → 分散中断亲和性 → 配合 RPS（<span class="k">.../queues/rx-0/rps_cpus</span>）。RPS 只分散软中断，<b>硬中断仍在一个核上</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>磁盘 IO 全路径</h2></div>
+  <p class="lead">磁盘路径比网卡多了一层"调度"和"合并"，因为块设备天然随机访问。blk-mq（多队列块层）是 4.20 之后的标准实现。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>VFS + 文件系统。</b><span class="k">vfs_write</span> 找到 inode，ext4/xfs 把"文件偏移"翻译成"块号"。写操作先写 page cache（<b>此时 write 就返回了</b>），读操作先查 cache。</div></div>
+    <div class="step"><div class="txt"><b>回写。</b>脏页由内核线程定期（默认 30 秒）或在脏页比例超阈值时批量落盘。</div></div>
+    <div class="step"><div class="txt"><b>构造 bio 进入 blk-mq。</b>bio 描述"哪些块 ↔ 哪些内存页"，被转换成 request，先进<b>软件队列</b>（每 CPU 一个，无锁），再分发到<b>硬件队列</b>。</div></div>
+    <div class="step"><div class="txt"><b>IO 调度。</b>在软件队列和硬件队列之间做合并与排序。<b>NVMe 通常用 none</b>，机械盘用 mq-deadline 或 bfq。</div></div>
+    <div class="step"><div class="txt"><b>驱动下发。</b>写进设备提交队列（NVMe 的 SQ），按门铃通知设备。设备内部还有 FTL、垃圾回收、磨损均衡 —— <b>这是"盘慢"但系统指标看不出来的地方</b>。</div></div>
+    <div class="step"><div class="txt"><b>完成中断。</b>设备 DMA 写数据、更新完成队列、发 MSI-X；驱动在 <span class="k">BLOCK_SOFTIRQ</span> 里调用 <span class="k">bi_end_io</span> 解锁页面并唤醒进程。</div></div>
+  </div>
+  <h3>四层队列，四个瓶颈点</h3>
+  <table>
+    <tr><th style="width:150px">队列</th><th style="width:130px">位置</th><th>满了会怎样</th></tr>
+    <tr><td><b>page cache 脏页</b></td><td>内存</td><td>达到 <span class="k">dirty_ratio</span> 后写操作<b>同步阻塞</b>等回写（"write 突然变慢"的常见原因）</td></tr>
+    <tr><td><b>硬件队列 / tag</b></td><td>每设备队列</td><td><b>最常见的瓶颈</b>。队列满后新请求排队，表现为 <span class="k">await</span> 与 <span class="k">aqu-sz</span> 上升</td></tr>
+    <tr><td><b>设备内部队列</b></td><td>SSD 控制器</td><td>设备自己排队，系统层面看不出来，只能从延迟推断</td></tr>
+  </table>
+  <pre><span class="c"># 调度器（方括号是当前选中）与队列深度</span>
+cat /sys/block/nvme0n1/queue/scheduler
+<span class="c"># [none] mq-deadline kyber bfq</span>
+cat /sys/block/nvme0n1/queue/nr_requests
+
+<span class="c"># 关键观测指标</span>
+iostat -xz 1
+<span class="c">#  await：平均完成时间（含排队）—— 涨了说明积压</span>
+<span class="c">#  %util：设备忙的占比 —— 对 SSD 意义不大，对机械盘是硬指标</span>
+<span class="c">#  aqu-sz：平均队列长度 —— 持续大于深度一半说明饱和</span>
+
+<span class="c"># 区分"排队"和"设备慢"</span>
+bpftrace -e <span class="y">'
+tracepoint:block:block_rq_issue { @s[args-&gt;dev, args-&gt;sector] = nsecs; }
+tracepoint:block:block_rq_complete /@s[args-&gt;dev, args-&gt;sector]/
+{
+  @us[comm] = hist((nsecs - @s[args-&gt;dev, args-&gt;sector]) / 1000);
+  delete(@s[args-&gt;dev, args-&gt;sector]);
+}'</span></pre>
+  <div class="callout warn">
+    <b>SSD 的 <span class="k">%util</span> 会骗人。</b>一块 NVMe 可以并行处理几十万个 IO，<span class="k">%util</span> 100% 时可能还有余力。判断饱和要看 <b>await 是否随负载线性上升</b>。<br>
+    另外 SSD 用久了会因写放大和垃圾回收变慢，但 <span class="k">iostat</span> 看不出原因 —— 用 <span class="k">smartctl</span> 看 <span class="k">Percentage_Used</span>。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>设备驱动模型：/dev、/sys、udev、设备号</h2></div>
+  <p class="lead">三者的职责完全不同：<b>/dev 是"怎么用这个设备"，/sys 是"这个设备是什么"，udev 是"设备插进来时该做什么"。</b></p>
+
+  <h3>/dev 与 /sys 的分工</h3>
+  <table>
+    <tr><th style="width:130px">位置</th><th style="width:180px">本质</th><th>用途</th></tr>
+    <tr><td><b>/dev</b></td><td>设备节点文件（字符设备 / 块设备）</td><td><b>读写设备</b>。<span class="k">open("/dev/nvme0n1")</span> 就能操作磁盘。<b>只有带设备号的文件，没有属性</b></td></tr>
+    <tr><td><b>/sys</b></td><td>sysfs，内核对象树的映射</td><td><b>查询和配置设备</b>。看设备型号、驱动、电源状态、队列参数；也能写（如调 scheduler）</td></tr>
+    <tr><td><b>/proc</b></td><td>procfs，进程和内核状态</td><td>进程信息 + 部分全局统计（<span class="k">/proc/interrupts</span>、<span class="k">/proc/iomem</span>）</td></tr>
+  </table>
+  <pre><span class="c"># /dev 里是"文件"，ls -l 能看到类型和设备号</span>
+ls -l /dev/nvme0n1
+<span class="c"># brw-rw---- 1 root disk 259, 0 ... /dev/nvme0n1</span>
+<span class="c">#                          ^^^  ^  major / minor</span>
+<span class="c"># brw- = 块设备，crw- = 字符设备</span>
+
+<span class="c"># /sys 是目录树，每个目录是一个内核对象</span>
+cat /sys/class/net/eth0/address     <span class="c"># MAC</span>
+cat /sys/class/net/eth0/speed       <span class="c"># 10000 (Mbps)</span>
+cat /sys/class/net/eth0/statistics/rx_dropped</pre>
+
+  <h3>设备号：major 与 minor</h3>
+  <p>内核用一对数字标识设备：<b>major</b> 决定用哪个驱动，<b>minor</b> 决定是该驱动管理的第几个实例。</p>
+  <pre><span class="c"># 看当前系统的设备号分配</span>
+cat /proc/devices
+<span class="c"># Character devices:</span>
+<span class="c">#   1 mem</span>
+<span class="c">#   4 tty</span>
+<span class="c">#   5 /dev/tty</span>
+<span class="c">#  Block devices:</span>
+<span class="c">#   8 sd</span>
+<span class="c"># 259 blkext          &lt;-- NVMe 走这个"动态分配"的段</span>
+
+<span class="c"># 常见固定分配（记几个有用的）</span>
+<span class="c">#   8:0   = /dev/sda     8:1 = /dev/sda1</span>
+<span class="c">#   8:16  = /dev/sdb     8:17 = /dev/sdb1</span>
+<span class="c">#   1:3   = /dev/null    1:5 = /dev/zero    1:8 = /dev/random</span>
+<span class="c">#   4:0   = /dev/tty0    4:64 = /dev/ttyS0</span>
+
+<span class="c"># 手动创建设备节点（调试时有用，正常由 udev 做）</span>
+mknod /tmp/mydev c 240 0    <span class="c"># c = 字符设备，240 是 major，0 是 minor</span></pre>
+
+  <h3>udev：设备热插拔的响应者</h3>
+  <p>内核发现新设备时，会通过 netlink 发一个 <b>uevent</b>。udev（现在是 systemd-udevd）收到后，按规则文件决定"要创建什么节点、设什么权限、跑什么脚本"。</p>
+  <pre><span class="c"># 规则目录（按文件名排序，先匹配先生效）</span>
+/etc/udev/rules.d/       <span class="c"># 本机自定义，优先级最高</span>
+/usr/lib/udev/rules.d/   <span class="c"># 发行版/软件包提供</span>
+
+<span class="c"># 典型规则：固定名字、权限、符号链接</span>
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1234", ATTRS{idProduct}=="5678", \
+  SYMLINK+="myusb", MODE="0666"
+SUBSYSTEM=="block", KERNEL=="nvme0n1", SYMLINK+="ssd0"
+
+<span class="c"># 调试：写规则前先看设备属性；改完重新加载</span>
+udevadm info -a -n /dev/nvme0n1 | head -40
+udevadm test /sys/class/block/nvme0n1
+udevadm control --reload-rules &amp;&amp; udevadm trigger</pre>
+  <div class="callout">
+    <b>为什么需要 udev：</b>设备名（<span class="k">sda</span>、<span class="k">sdb</span>）是<b>按发现顺序</b>分配的，重启后可能变。如果你在 fstab 里写了 <span class="k">/dev/sdb1</span>，某天加了块盘，系统就起不来了。<br>
+    <b>现代做法：</b>用 <span class="k">/dev/disk/by-uuid/</span>、<span class="k">/dev/disk/by-label/</span>、<span class="k">/dev/disk/by-path/</span> 这些符号链接 —— 它们由 udev 根据设备属性生成，<b>跨重启稳定</b>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>观测设备：四个工具够用了</h2></div>
+  <p class="lead">设备层的问题不需要内核追踪也能查出大半。这四个工具覆盖了"设备是什么、能力如何、现在什么状态、有没有坏"。</p>
+
+  <h3>lspci -vv：设备的能力与链路</h3>
+  <pre><span class="c"># 树状拓扑 / 单设备详情</span>
+lspci -t
+lspci -vv -s 02:00.0
+
+<span class="c"># 最该看的一段：当前链路状态</span>
+        LnkCap: Port #0, Speed 16GT/s, Width x4
+        LnkSta: Speed 16GT/s (ok), Width x4 (ok)
+<span class="c"># 显示 Width x1 或 Speed 5GT/s 就是链路降级 —— 性能问题找到了</span>
+
+<span class="c"># 快速巡检 + NUMA 归属</span>
+lspci -vv | grep -E '^[0-9a-f]|LnkSta'
+cat /sys/bus/pci/devices/0000:02:00.0/numa_node</pre>
+
+  <h3>ethtool -S：网卡的统计计数器</h3>
+  <pre><span class="c"># 驱动层的详细统计（不同网卡字段名不同，但含义类似）</span>
+ethtool -S eth0 | head -40
+
+ethtool -S eth0 | grep -E 'drop|miss|error|fifo|pause|restart'
+<span class="c">#  rx_dropped        驱动丢弃（ring 满）</span>
+<span class="c">#  rx_missed_errors  网卡 FIFO 溢出（DMA 跟不上）</span>
+<span class="c">#  rx_crc_errors     物理层错误（线缆/光模块）</span>
+<span class="c">#  tx_restart_queue  队列重启次数（拥塞迹象）</span>
+
+<span class="c"># 能力与配置</span>
+ethtool eth0        <span class="c"># 速率、双工、链路状态</span>
+ethtool -i eth0     <span class="c"># 驱动与固件版本</span>
+ethtool -k eth0     <span class="c"># offload 开关（tso/gso/gro/sg）</span>
+ethtool -g eth0     <span class="c"># 环形缓冲区大小</span>
+ethtool -c eth0     <span class="c"># 中断合并参数</span>
+ethtool -l eth0     <span class="c"># 队列数量</span>
+ethtool -m eth0     <span class="c"># 光模块温度/功率（万兆以上必看）</span></pre>
+
+  <h3>smartctl：磁盘健康</h3>
+  <pre><span class="c"># 健康状态 + 全部属性</span>
+smartctl -a /dev/sda
+
+<span class="c"># SATA/SAS 最该看的属性</span>
+<span class="c">#   5   Reallocated_Sector_Ct   重映射扇区，&gt;0 要警惕</span>
+<span class="c">#   187 Reported_Uncorrect      不可纠正错误，&gt;0 说明盘在坏</span>
+<span class="c">#   197 Current_Pending_Sector  待映射扇区，&gt;0 是危险信号</span>
+<span class="c">#   198 Offline_Uncorrectable   &gt;0 基本可以换盘了</span>
+
+<span class="c"># 自检与错误日志</span>
+smartctl -t short /dev/sda
+smartctl -l selftest /dev/sda
+smartctl -l error /dev/sda</pre>
+
+  <h3>nvme-cli：NVMe 专用</h3>
+  <pre><span class="c"># 设备列表 / SMART 日志</span>
+nvme list
+nvme smart-log /dev/nvme0
+<span class="c">#  temperature           : 38 C</span>
+<span class="c">#  available_spare       : 100%   &lt;-- 低于 10% 要换盘</span>
+<span class="c">#  percentage_used       : 3%     &lt;-- 寿命消耗</span>
+<span class="c">#  media_errors          : 0      &lt;-- &gt;0 是硬错误</span>
+
+<span class="c"># 控制器能力（队列深度、支持的命令）</span>
+nvme id-ctrl /dev/nvme0 | grep -E 'sqes|cqes|mdts|nn'
+
+<span class="c"># 性能测试（会写数据，别在生产盘上跑）</span>
+fio --name=randread --ioengine=libaio --iodepth=32 --rw=randread \
+    --bs=4k --direct=1 --size=1G --runtime=30 --filename=/dev/nvme0n1</pre>
+  <div class="callout ok">
+    <b>巡检清单（贴到监控里）：</b><br>
+    ① <span class="k">lspci -vv | grep LnkSta</span> —— 有没有设备链路降级；<br>
+    ② <span class="k">ethtool -S</span> 的 <span class="k">rx_dropped</span> / <span class="k">rx_missed_errors</span> —— 有没有丢包；<br>
+    ③ <span class="k">smartctl -H</span> 和 <span class="k">nvme smart-log</span> 的 <span class="k">percentage_used</span> —— 盘还能用多久；<br>
+    ④ <span class="k">cat /proc/interrupts</span> 的分布 —— 中断是否集中在一个核。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个认知陷阱</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">以为 DMA 是"零开销"</div><div class="pd">DMA 省 CPU 时间，占内存带宽。带宽打满时 CPU 也会因为等内存而变慢。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">直接解引用 ioremap 返回的指针</div><div class="pd">必须用 readl/writel。直接读写会被编译器优化掉，或者因为乱序导致设备收到错误的寄存器写入顺序。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">DMA 传输期间 CPU 还去读写缓冲区</div><div class="pd">会读到半新半旧的数据（tearing）。所有权必须严格交接：map 之后 CPU 不碰，unmap 之后设备不碰。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">流式 DMA 忘了 dma_sync</div><div class="pd">设备写了数据，CPU 读到旧值；或者 CPU 改了描述符，设备看不到。凡是缓冲区在两边来回交接，都要显式同步。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">以为 sendfile 一定是零拷贝</div><div class="pd">需要网卡支持 SG-DMA，否则内核退化成 CPU 拷贝到连续缓冲区。用 ethtool -k 确认 scatter-gather 是 on。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到 %util 100% 就认为磁盘到极限了</div><div class="pd">SSD 可以并行处理大量 IO，%util 100% 时可能还有余力。要看 await 是否随负载线性上升，以及 aqu-sz 是否持续高位。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">网卡丢包就只调大 ring buffer</div><div class="pd">rx_dropped 涨是 ring 满，调大有效；但 rx_missed_errors 涨是 PCIe/内存带宽不足，调 ring 没用，要查链路速率和 NUMA 归属。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把 cache 不一致当成驱动 bug</div><div class="pd">设备写了数据 CPU 读到旧值，八成是流式 DMA 少调了 dma_sync，不是驱动写错了。先检查所有权交接。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. MMIO 相比端口 IO 的核心优势不包括？</div>
+      <button class="opt">地址空间大得多，可以映射大块内存</button>
+      <button class="opt">访问速度比普通内存访问更快</button>
+      <button class="opt">用普通 load/store 指令，所有架构都支持</button>
+      <div class="ans">正确答案：<b>"比普通内存更快"是错的</b>。MMIO 访问通常比访问 DRAM <b>更慢</b>（要走总线、不能 cache、有写屏障）。它的优势是空间大、可批量、跨架构、能和 DMA 共享缓冲区。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一致性 DMA（dma_alloc_coherent）和流式 DMA 的关键区别是？</div>
+      <button class="opt">一致性 DMA 只能用于发送方向，流式 DMA 只能用于接收</button>
+      <button class="opt">一致性 DMA 更快，因为它用了 cache</button>
+      <button class="opt">一致性 DMA 的内存默认不做 cache，CPU 和设备永远一致；流式 DMA 用可 cache 内存，靠 map/unmap 时刷 cache</button>
+      <div class="ans">正确答案：<b>cache 策略不同</b>。一致性 DMA 牺牲 cache 换取"不用手动同步"，适合描述符环这类长期共享的结构；流式 DMA 用可 cache 内存（性能更好），但必须在所有权切换时显式 dma_sync。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 传统 read + write 发送文件，一共几次 CPU 拷贝？</div>
+      <button class="opt">2 次（page cache → 用户缓冲区，用户缓冲区 → socket 缓冲区）</button>
+      <button class="opt">4 次，全是 CPU 拷贝</button>
+      <button class="opt">0 次，都是 DMA</button>
+      <div class="ans">正确答案：<b>2 次 CPU 拷贝</b>。全程 4 次拷贝：2 次 DMA + 2 次 CPU。sendfile 把 CPU 拷贝降到 0。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. NAPI 的核心思想是？</div>
+      <button class="opt">完全用轮询替代中断，追求最低延迟</button>
+      <button class="opt">第一个包用中断唤醒，之后关中断批量轮询，处理完再开中断</button>
+      <button class="opt">把中断处理全部移到用户态</button>
+      <div class="ans">正确答案：<b>中断 + 批量轮询的混合</b>。用中断避免空闲时的开销，用轮询摊薄高频场景下每次中断的固定成本。budget 默认 64，控制一次处理多少包。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. IOMMU 不提供下面哪个能力？</div>
+      <button class="opt">让 32 位设备访问 4GB 以上的内存</button>
+      <button class="opt">隔离设备，阻止它 DMA 到不属于自己的内存</button>
+      <button class="opt">提高 DMA 的峰值带宽</button>
+      <div class="ans">正确答案：<b>不提高带宽</b>。IOMMU 做翻译和访问控制，反而引入翻译开销（靠 IOTLB 缓解）。它带来的是安全性、地址灵活性和虚拟化能力。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. ethtool -S 显示 rx_missed_errors 持续增长，最可能的原因是？</div>
+      <button class="opt">PCIe 链路带宽不足或内存带宽被抢占，网卡 FIFO 溢出</button>
+      <button class="opt">环形缓冲区（ring buffer）太小</button>
+      <button class="opt">socket 接收缓冲区太小</button>
+      <div class="ans">正确答案：<b>FIFO 溢出</b>。rx_dropped 是 ring 满（调大 ethtool -g）；rx_missed_errors 是网卡内部 FIFO 溢出，说明 DMA 写内存跟不上收包 —— 查 PCIe 链路（LnkSta）、NUMA、内存带宽。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>设备观测速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>lspci -vv -s 02:00.0</code><span class="desc">单设备详情（含链路状态、BAR）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lspci -vv | grep LnkSta</code><span class="desc">批量巡检链路是否降级</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -S eth0</code><span class="desc">网卡驱动层统计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nvme smart-log /dev/nvme0</code><span class="desc">NVMe 寿命与错误日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/block/nvme0n1/queue/scheduler</code><span class="desc">当前 IO 调度器</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>内核 DMA API 速查</h3>
+  <pre><span class="c"># 一致性 DMA（长期共享，不需要同步）</span>
+void *dma_alloc_coherent(dev, size, &amp;dma_handle, GFP_KERNEL);
+void  dma_free_coherent(dev, size, cpu_addr, dma_handle);
+
+<span class="c"># 流式 DMA（一次性传输，性能更好）</span>
+dma_addr_t dma_map_single(dev, ptr, size, dir);
+void       dma_unmap_single(dev, addr, size, dir);
+int        dma_map_sg(dev, sg, nents, dir);      <span class="c"># 分散聚集</span>
+void       dma_sync_single_for_cpu(dev, addr, size, dir);
+void       dma_sync_single_for_device(dev, addr, size, dir);
+
+<span class="c"># 方向：DMA_TO_DEVICE / DMA_FROM_DEVICE / DMA_BIDIRECTIONAL</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>MMIO</b></td><td>把设备寄存器映射到物理地址空间，用普通 load/store 访问</td></tr>
+    <tr><td><b>DMA</b></td><td>直接内存访问，让设备绕过 CPU 直接读写内存</td></tr>
+    <tr><td><b>一致性 DMA</b></td><td>不做 cache 的 DMA 内存，CPU 与设备视图永远一致</td></tr>
+    <tr><td><b>流式 DMA</b></td><td>用可 cache 内存，靠 map/unmap 时刷 cache 保证一致性</td></tr>
+    <tr><td><b>scatter-gather</b></td><td>一次 DMA 传输多段不连续内存，是零拷贝的硬件基础</td></tr>
+    <tr><td><b>IOMMU</b></td><td>给设备用的 MMU，做 DMA 地址翻译和访问隔离</td></tr>
+    <tr><td><b>NAPI</b></td><td>Linux 网卡的中断+轮询混合机制，用批量处理摊薄中断开销</td></tr>
+    <tr><td><b>环形缓冲区 ring</b></td><td>网卡 RX/TX 描述符数组，大小决定能缓冲多少个未处理包</td></tr>
+    <tr><td><b>中断合并</b></td><td>攒够 N 个包或等 M 微秒再发一次中断，用延迟换 CPU</td></tr>
+    <tr><td><b>blk-mq</b></td><td>Linux 多队列块层，每 CPU 一个软件队列，每设备队列一个硬件队列</td></tr>
+    <tr><td><b>设备号 major/minor</b></td><td>major 决定用哪个驱动，minor 决定是该驱动的第几个实例</td></tr>
+    <tr><td><b>udev</b></td><td>监听内核 uevent，按规则创建设备节点、设权限、建符号链接</td></tr>
+    <tr><td><b>PIO</b></td><td>Programmed IO，CPU 亲自逐字节搬数据，不用 DMA 的老方式</td></tr>
+    <tr><td><b>零拷贝</b></td><td>严格说是"零次 CPU 拷贝"，DMA 拷贝仍在，只是不占 CPU</td></tr>
+    <tr><td><b>中断亲和性</b></td><td>指定某个中断由哪个 CPU 处理，用来把软中断分散到多核</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>在一台 Linux 上做五件事 —— ① 用 <span class="k">lspci -vv</span> 找出所有设备的链路速率，看看有没有跑在 x1 上的；② 用 <span class="k">ethtool -S</span> 和 <span class="k">/proc/net/softnet_stat</span> 判断你的网卡有没有丢包；③ 用 <span class="k">bpftrace</span> 追一次块层 IO 的完整耗时，画出直方图；④ 写一个 udev 规则，给某块盘建一个固定名字的符号链接；⑤ 用 <span class="k">strace -c</span> 对比 <span class="k">read+write</span> 和 <span class="k">sendfile</span> 的系统调用次数与耗时。<br><br>
+    <b>之后值得单独学：</b>DPDK/SPDK 的用户态驱动模型、RDMA 的 verbs 编程、PCIe 的 TLP 与配置空间、以及 virtio 的半虚拟化 IO 路径。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透设备与 DMA · 排查 IO 的顺序永远是：先看计数器，再看队列，最后才上追踪</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（DMA 原理）和模块 5（收包路径）是这套知识的主干，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 打开一个终端，边看边跑 lspci 和 ethtool。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议手边有一台 Linux 机器 —— 这篇大部分观测命令（lspci / ethtool / smartctl）需要 root';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

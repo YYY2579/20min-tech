@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透主从复制与数据一致性</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 11 期 · 高密度版</span>
+    <h1>二十分钟学透主从复制与数据一致性</h1>
+    <p class="sub">主从复制不是"配一次就完事"。这篇讲清楚三种复制模式的取舍、MySQL 半同步的两个 wait point、延迟从哪来、切换前怎么校验，以及脑裂和仲裁——<b>决定故障时丢不丢数据的，就是这几个参数</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>3</b> 种复制模式</span>
+      <span class="chip"><b>5</b> 级一致性模型</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起 MySQL 主从跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的主从环境</h2></div>
+  <pre><span class="c"># MySQL 8.0 主库配置（my.cnf）</span>
+[mysqld]
+server-id = 1
+log-bin = mysql-bin
+binlog_format = ROW                  <span class="c"># 生产必须 ROW，原因见模块 2</span>
+gtid_mode = ON
+enforce-gtid-consistency = ON
+
+<span class="c"># 从库配置（另一台/另一个容器）</span>
+[mysqld]
+server-id = 2
+relay-log = relay-bin
+read_only = 1
+super_read_only = 1                  <span class="c"># 连 root 都不能写，防误操作</span>
+
+<span class="c"># 创建复制账号（主库执行）</span>
+CREATE USER 'repl'@'%' IDENTIFIED BY 'ReplPass123';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'%';
+
+<span class="c"># 从库执行（8.0.23+ 语法）</span>
+CHANGE REPLICATION SOURCE TO
+  SOURCE_HOST='master-ip',
+  SOURCE_PORT=3306,
+  SOURCE_USER='repl',
+  SOURCE_PASSWORD='ReplPass123',
+  SOURCE_AUTO_POSITION=1,            <span class="c"># 用 GTID 自动定位，不用记 binlog 文件名</span>
+  GET_SOURCE_PUBLIC_KEY=1;
+START REPLICA;
+SHOW REPLICA STATUS\G</pre>
+  <div class="callout warn">
+    <b>命令名变迁（看教程时对不上就因为这）：</b>MySQL 8.0.22 起 <span class="k">SHOW SLAVE STATUS</span> → <span class="k">SHOW REPLICA STATUS</span>，8.0.23 起 <span class="k">CHANGE MASTER TO</span> → <span class="k">CHANGE REPLICATION SOURCE TO</span>，8.0.26 起 <span class="k">START SLAVE</span> → <span class="k">START REPLICA</span>。老命令还能用但会打废弃警告，字段名也从 <span class="k">Master_*</span> 变成 <span class="k">Source_*</span>、<span class="k">Slave_*</span> 变成 <span class="k">Replica_*</span>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>三种复制模式：RPO 由什么决定</h2></div>
+  <p class="lead">复制模式的差别只在一点：<b>主库返回"写入成功"给客户端时，从库到底收到没有</b>。这一个差别决定了故障时丢多少数据（RPO）。</p>
+  <table>
+    <tr><th style="width:110px">模式</th><th style="width:210px">行为</th><th>RPO 与取舍</th></tr>
+    <tr><td><b>异步复制</b></td><td>主库写完 binlog 就向客户端确认，不等从库</td><td><b>RPO &gt; 0</b>，主库宕机可能丢已确认的事务。写性能最好，从库故障完全不影响主库</td></tr>
+    <tr><td><b>半同步复制</b></td><td>主库等<b>至少一个</b>从库确认收到 binlog 才向客户端确认</td><td><b>RPO = 0</b>（收到即不丢）。写延迟增加一个网络 RTT，从库无响应会拖慢主库</td></tr>
+    <tr><td><b>同步复制</b></td><td>主库等<b>所有</b>从库都应用完才确认</td><td>最强一致，但任何一个从库卡住整个写入就卡住，生产中几乎不用全同步</td></tr>
+  </table>
+  <h3>MySQL 半同步的关键：wait point 选哪个</h3>
+  <p>MySQL 的半同步有两个等待点，由 <span class="k">rpl_semi_sync_source_wait_point</span> 控制，<b>这是决定"切换丢不丢数据"的参数</b>：</p>
+  <table>
+    <tr><th style="width:150px">wait point</th><th style="width:220px">确认时机</th><th>故障后果</th></tr>
+    <tr><td class="f">AFTER_SYNC<br>（默认，推荐）</td><td>从库<b>收到</b> binlog 事件并写入 relay log（未执行）就确认</td><td>主库宕机时，已确认的事务都已在从库 relay log 里，<b>从库升级后先应用 relay log 再开放写，不丢数据</b></td></tr>
+    <tr><td class="f">AFTER_COMMIT</td><td>主库先在存储引擎提交、再等从库确认</td><td>主库在"已提交但没等到从库确认"时宕机，<b>客户端以为成功其实丢了</b>；且主库提交后无法回滚</td></tr>
+  </table>
+  <pre><span class="c"># 安装插件（MySQL 8.0）</span>
+INSTALL PLUGIN rpl_semi_sync_source SONAME 'semisync_source.so';
+INSTALL PLUGIN rpl_semi_sync_replica SONAME 'semisync_replica.so';
+
+<span class="c"># 主库开启半同步（8.0.23+ 参数名）</span>
+SET GLOBAL rpl_semi_sync_source_enabled = 1;
+SET GLOBAL rpl_semi_sync_replica_enabled = 1;      <span class="c"># 从库也要开！</span>
+SET GLOBAL rpl_semi_sync_source_wait_point = AFTER_SYNC;
+SET GLOBAL rpl_semi_sync_source_timeout = 2000;    <span class="c"># 2 秒等不到就降级为异步，防止从库卡死拖垮主库</span>
+
+<span class="c"># 确认半同步真的在工作（重点看前两个字段）</span>
+SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status';   <span class="c"># ON 才是生效，OFF = 降级了</span>
+SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';  <span class="c"># 有几个半同步从库</span>
+SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_no_tx';    <span class="c"># 降级后写了多少个事务（&gt;0 说明丢过数据）</span></pre>
+  <div class="callout danger">
+    <b>半同步最大的坑：超时后静默降级。</b><span class="k">rpl_semi_sync_source_timeout</span> 到期等不到从库，主库自动切回异步继续服务——<b>不报错、不阻塞</b>，但从这一刻起 RPO 从 0 变成"可能无限"。监控必须盯 <span class="k">Rpl_semi_sync_source_status</span>，变成 OFF 立刻告警。这就是"号称零丢失的架构，故障时丢了几十分钟数据"的标准剧情。
+  </div>
+  <h3>PostgreSQL 的对应物：同步流复制</h3>
+  <table>
+    <tr><th style="width:170px">synchronous_commit</th><th>确认条件</th></tr>
+    <tr><td class="f">remote_apply</td><td>从库<b>应用完</b> WAL 才确认。最强一致，读从库一定读到</td></tr>
+    <tr><td class="f">on</td><td>从库收到并<b>刷盘</b>（flush）WAL 即确认（未应用）。默认值</td></tr>
+    <tr><td class="f">remote_write</td><td>从库收到并写入操作系统缓存即确认（没刷盘）</td></tr>
+    <tr><td class="f">local</td><td>只等本地刷盘。等价于异步复制</td></tr>
+  </table>
+  <pre><span class="c"># PostgreSQL 主库配置</span>
+wal_level = replica
+max_wal_senders = 10
+synchronous_commit = on
+synchronous_standby_names = 'FIRST 2 (s1, s2)'    <span class="c"># 前 2 个在线的同步备库确认即可提交</span>
+<span class="c"># 也常用 'ANY 1 (s1, s2, s3)'：任一个确认即可，比 FIRST 更可用</span>
+
+<span class="c"># 查看同步状态</span>
+SELECT pid, application_name, sync_state, write_lag, flush_lag, replay_lag
+FROM pg_stat_replication;
+<span class="c"># sync_state: async / sync / potential / quorum</span>
+
+<span class="c"># 单条事务单独控制（对账类任务想异步就异步）</span>
+SET synchronous_commit TO local;
+INSERT INTO audit_log ... ;      <span class="c"># 这条不等同步备库</span></pre>
+  <div class="callout ok">
+    <b>PG 的 remote_apply 是个宝：</b>主库提交时同步备库已经应用完了，此时把读流量切到从库<b>不会读到旧数据</b>，是真正的"写完读得到"。MySQL 的半同步（AFTER_SYNC）只保证"收到"不保证"应用完"，主从切换瞬间从库可能还差几秒的 relay log，<b>所以切换脚本必须包含等从库追平（Seconds_Behind_Master=0）这一步</b>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>MySQL 复制链路与 GTID</h2></div>
+  <h4>三个线程的分工</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>主库 dump thread</b>：从库的 IO 线程连上时，主库起一个 dump 线程把 binlog 事件推给它</div></div>
+    <div class="step"><div class="txt"><b>从库 IO thread</b>：接收 binlog 事件，写入本地 relay log</div></div>
+    <div class="step"><div class="txt"><b>从库 SQL thread</b>：读 relay log 并重放（单线程）→ 这就是延迟的根源，多线程并行复制（模块 4）就是优化这个线程</div></div>
+  </div>
+  <h4>binlog_format 为什么必须 ROW</h4>
+  <table>
+    <tr><th style="width:100px">格式</th><th>问题</th></tr>
+    <tr><td class="f">STATEMENT</td><td>记录 SQL 原文。<span class="k">NOW()</span>、<span class="k">RAND()</span>、<span class="k">UUID()</span> 在主从执行结果不同，<b>数据静默不一致</b>。触发器和存储过程也有隐患</td></tr>
+    <tr><td class="f">MIXED</td><td>MySQL 自动判断，大部分情况安全但边界 case 不可控</td></tr>
+    <tr><td class="f">ROW<br>（生产唯一选择）</td><td>记录行变更前后镜像，语义绝对一致。代价是 binlog 体积大（可用 <span class="k">binlog_row_image=minimal</span> 只记变化的列）</td></tr>
+  </table>
+  <pre><span class="c"># 切换 binlog 格式（运行中改，影响之后的事务）</span>
+SET GLOBAL binlog_format = ROW;
+SET GLOBAL binlog_row_image = minimal;    <span class="c"># 只记录修改的列，显著减小 binlog 体积</span>
+
+<span class="c"># 线上检查 replication 健康的核心字段</span>
+SHOW REPLICA STATUS\G
+<span class="c"># 关注：</span>
+<span class="c"># Replica_IO_Running: Yes          —— IO 线程活着</span>
+<span class="c"># Replica_SQL_Running: Yes         —— SQL 线程活着</span>
+<span class="c"># Seconds_Behind_Source: 0         —— 秒级延迟（不可靠，见模块 4）</span>
+<span class="c"># Last_SQL_Errno / Last_SQL_Error  —— 重放失败原因（1062 主键冲突最常见）</span>
+<span class="c"># Retrieved_Gtid_Set / Executed_Gtid_Set —— 收到 vs 执行到的 GTID</span></pre>
+  <h4>GTID：全局事务 ID</h4>
+  <p>GTID 格式：<span class="k">server_uuid:事务号</span>，每台服务器唯一。主从建链时用 <span class="k">SOURCE_AUTO_POSITION=1</span>，从库自动计算自己缺哪些事务，<b>不用再手工记 master_log_file + master_log_pos</b>——这是 GTID 最大的工程价值：主库切换、从库重建、级联复制都不怕位点对不上。</p>
+  <pre><span class="c"># 主库执行</span>
+SHOW GLOBAL VARIABLES LIKE 'gtid_mode';          <span class="c"># ON / OFF</span>
+SELECT @@global.gtid_executed;                   <span class="c"># 已执行的 GTID 集合</span>
+SHOW MASTER STATUS;                             <span class="c"># 当前 binlog 文件和位置</span>
+
+<span class="c"># 从库</span>
+SELECT @@global.gtid_executed;                   <span class="c"># 从库执行到哪了</span>
+
+<span class="c"># 经典故障：主库 binlog 被 purge 但从库还没取</span>
+<span class="c"># 报错：Got fatal error ... 'Cannot replicate because the master purged ...'</span>
+<span class="c"># 恢复思路：看从库缺哪段 GTID，从备份 + binlog 补，或用 pt-slave-restart 跳过损坏事务</span></pre>
+  <div class="callout warn">
+    <b>GTID 跳号问题：</b>从库 <span class="k">sql_slave_skip_counter</span>（GTID 模式下应改用 <span class="k">SET GTID_NEXT='server_uuid:N'</span> + 空事务 + <span class="k">BEGIN;COMMIT;</span>）跳过冲突事务时，如果跳错会把从库数据改脏。<b>跳过事务前必须先用 pt-table-checksum 确认影响范围</b>，或者干脆重建从库——跳过一条 UPDATE 可能就是一次生产事故。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>PostgreSQL 流复制要点</h2></div>
+  <pre><span class="c"># 主库：postgresql.conf</span>
+wal_level = replica                    <span class="c"># logical 表示还要发逻辑变更（逻辑复制）</span>
+max_wal_senders = 10                   <span class="c"># 并发 WAL 发送进程数（从库数 + 余量）</span>
+max_replication_slots = 10             <span class="c"># 复制槽数量</span>
+wal_keep_size = 2048                   <span class="c"># 保留的 WAL 量（MB），防止从库掉线期间 WAL 被清</span>
+synchronous_standby_names = 'ANY 1 (s1, s2)'
+
+<span class="c"># pg_hba.conf：放行复制连接（复制专用条目，不是普通用户条目）</span>
+host replication repl 10.0.0.0/24 scram-sha-256
+
+<span class="c"># 从库：用 pg_basebackup 拉基础备份</span>
+pg_basebackup -h primary -D $PGDATA -U repl -P -R -X stream -S slot_s1
+<span class="c"># -R 自动写 standby.signal 和 primary_conninfo；-S 用复制槽；-X stream 边传边收 WAL</span>
+
+<span class="c"># 从库关键文件与参数</span>
+standby.signal                        <span class="c"># 有这个文件就是备库模式（PG 12+）</span>
+hot_standby = on                       <span class="c"># 备库可读（默认 on）</span>
+max_standby_streaming_delay = 30s      <span class="c"># 备库查询冲突时最多等 30s 再取消查询</span>
+primary_slot_name = slot_s1            <span class="c"># 用哪个复制槽（防 WAL 被清理）</span></pre>
+  <h4>复制槽：WAL 的保险与地雷</h4>
+  <p>复制槽让主库<b>保留</b>从库还没取走的 WAL，从库掉线几天再上线也能续传。但槽不回收，主库 WAL 会无限堆积——<b>复制槽相关事故占 PG 运维事故的很大比例</b>：从库下线忘删槽，几天后主库磁盘满，集群雪崩。</p>
+  <pre><span class="c"># 主库查复制槽状态（重点看 restart_lsn 和 retained_wal）</span>
+SELECT slot_name, active, restart_lsn,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots;
+
+<span class="c"># 查 WAL 总体积和磁盘占用</span>
+SELECT pg_size_pretty(sum(size)) FROM pg_ls_waldir();
+
+<span class="c"># 从库下线：先删槽（确认从库不再回来）再停</span>
+SELECT pg_drop_replication_slot('slot_s1');
+
+<span class="c"># 查复制延迟（PG 12+，比字节差直观）</span>
+SELECT application_name,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS lag_bytes
+FROM pg_stat_replication;</pre>
+  <div class="callout danger">
+    <b>备库查询冲突：</b>备库重放 WAL 时要清理与查询冲突的行（VACUUM 删除的行正在被读），超过 <span class="k">max_standby_streaming_delay</span> 就取消查询并报 <span class="k">canceling statement due to conflict with recovery</span>。长查询被反复取消时，要么调大延迟，要么把重查询路由到主库。这是"从库读数莫名报错"的常见根因。
+  </div>
+  <h4>逻辑复制槽：异构与选择性复制</h4>
+  <p><span class="k">wal_level=logical</span> 后可以建 publication/subscription，按表粒度复制，且从库<b>可写</b>（物理备库只读）。适合：报表库按需订阅几张表、PG 大版本升级（逻辑复制做零停机迁移）、异构数据库间同步。逻辑复制不复制 DDL 和序列值，切流前要手工对齐表结构和自增值。</p>
+  <pre><span class="c"># 主库：发布（PG 10+）</span>
+CREATE PUBLICATION pub_orders FOR TABLE orders, order_items;
+<span class="c"># 订阅端</span>
+CREATE SUBSCRIPTION sub_orders CONNECTION 'host=primary dbname=prod user=repl'
+  PUBLICATION pub_orders WITH (copy_data = true, create_slot = true);
+
+<span class="c"># 查订阅状态和延迟</span>
+SELECT subname, latest_end_lsn, last_msg_send_time, last_msg_receipt_time FROM pg_stat_subscription;</pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>复制延迟：原因与处理</h2></div>
+  <p class="lead">延迟的本质：<b>从库重放速度跟不上主库产生速度</b>。排查先分清是"偶发尖刺"还是"持续追赶不上"。</p>
+  <table>
+    <tr><th style="width:180px">原因</th><th style="width:220px">机制</th><th>处理</th></tr>
+    <tr><td><b>大事务</b></td><td>一个 UPDATE 扫 500 万行，从库重放要 60 秒，从库整体延迟 60 秒</td><td>拆事务（每批 1 万行提交一次）；大表变更走在线工具（pt-osc、gh-ost）</td></tr>
+    <tr><td><b>SQL 线程单线程</b></td><td>从库 SQL thread 一个线程重放所有库的 binlog</td><td>开并行复制（见下）</td></tr>
+    <tr><td><b>无主键/低选择性索引</b></td><td>ROW 格式下从库按主键定位行，全表扫</td><td>补主键；大表加合适索引</td></tr>
+    <tr><td><b>从库硬件差</b></td><td>磁盘 IOPS 跟不上，relay log 重放慢</td><td>主从同规格；SSD；分离读流量</td></tr>
+    <tr><td><b>备库被长查询占用</b></td><td>（PG）热点行冲突导致 WAL 重放被频繁取消/等待</td><td>调 max_standby_streaming_delay；长查询路由主库</td></tr>
+  </table>
+  <pre><span class="c"># MySQL 并行复制（5.7+ 逻辑时钟方案，按库分并发重放）</span>
+slave_parallel_type = LOGICAL_CLOCK
+slave_parallel_workers = 8              <span class="c"># 通常 4~16，超过 CPU 核数无益</span>
+slave_pending_jobs_size_max = 134217728 <span class="c"># 等待队列缓冲上限（128MB），防大事务 OOM</span>
+
+<span class="c"># 确认并行复制生效</span>
+SHOW REPLICA STATUS\G
+<span class="c"># 关注 Slave_parallel_workers &gt; 1</span>
+
+<span class="c"># 大事务治理（源头）</span>
+SET GLOBAL binlog_group_commit_sync_delay = 100;   <span class="c"># 微妙级：等 100μs 攒一批提交，减少 fsync</span>
+<span class="c"># 治标不治本，真正的大事务要在应用层拆</span></pre>
+  <div class="callout danger">
+    <b>Seconds_Behind_Master 是个会撒谎的字段：</b>它的计算方式是"当前时间 - 最后一个重放事件的时间戳"。如果主库 10:00 产生了一个大事务，从库 10:05 开始重放到 10:06 完成，重放期间这个字段显示 <b>0</b>（因为事件时间戳是 10:00），重放完成后突然跳到 300。<b>可靠做法</b>：MySQL 用 <span class="k">Heartbeat</span>（或 pt-heartbeat 表，每秒钟更新一次，从库读表和主库时间差）；PG 用 <span class="k">pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)</span> 按字节算。监控告警必须用可靠指标，否则"切换时从库还差 5 分钟"这种事根本发现不了。
+  </div>
+  <div class="callout ok">
+    <b>降延迟三板斧（按见效速度排序）：</b>① <b>拆大事务</b>（收益最大， bulk insert/update 每 5000~10000 行 COMMIT）；② 开并行复制（slave_parallel_workers=8）；③ 补主键。<b>补一条反直觉的</b>：给主库降写入压力（合并批量、去掉不必要的更新）往往比优化从库更有效——延迟是"产"和"消"的速度差，只优化消不解决产。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>主从切换与数据一致性校验</h2></div>
+  <h4>切换的标准流程（以 MySQL 为例）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>等从库追平</b>：pt-heartbeat 或 GTID 对比确认 <span class="k">Seconds_Behind_Source=0</span> 且持续几秒稳定</div></div>
+    <div class="step"><div class="txt"><b>堵写</b>：主库 <span class="k">SET GLOBAL read_only=ON</span>（等业务连接自然断开，或先摘流量）</div></div>
+    <div class="step"><div class="txt"><b>确认从库无遗漏</b>：对比主从 <span class="k">gtid_executed</span>，从库 ⊇ 主库才算齐</div></div>
+    <div class="step"><div class="txt"><b>提主</b>：从库 <span class="k">STOP REPLICA; RESET REPLICA ALL;</span> → <span class="k">SET GLOBAL read_only=OFF</span> → 业务切连接</div></div>
+    <div class="step"><div class="txt"><b>旧主转从</b>：等旧主恢复后挂到新主下（GTID 模式下直接 CHANGE REPLICATION SOURCE TO + AUTO_POSITION）</div></div>
+  </div>
+  <pre><span class="c"># 对比 GTID 集合（从库执行，主库执行，肉眼比对）</span>
+SELECT @@global.gtid_executed;
+
+<span class="c"># 自动化工具（可选）：MHA / Orchestrator / 自研脚本</span>
+<span class="c"># 云上直接用 RDS 的切换 API，内核已封装上述流程</span></pre>
+  <h4>pt-table-checksum：在线校验主从一致性</h4>
+  <p>原理：在主库上按 chunk（默认 1000 行，用索引切分）计算每块的 CRC32 校验和，通过复制流把校验语句<b>复制到从库执行</b>，再对比两边结果。全程在线、低负载，是业界标准做法。</p>
+  <pre><span class="c"># 校验整个库</span>
+pt-table-checksum \
+  --host=primary --user=root --password=xxx \
+  --databases=order_db \
+  --replicate=percona.checksums \        <span class="c"># 把结果写到主库的这张表，随复制流到从库</span>
+  --recursion-method=dsn \               <span class="c"># 自动发现所有从库（在从库上建 dsns 表或用 processlist）</span>
+  --chunk-time=1                          <span class="c"># 每 chunk 最多跑 1 秒，控制对主库的影响</span>
+
+<span class="c"># 查结果（主库执行，含所有从库的差异行数）</span>
+SELECT db, tbl, chunk, this_crc, master_crc, cnt, this_cnt
+FROM percona.checksums
+WHERE master_cnt &lt;&gt; cnt OR master_crc &lt;&gt; this_crc;
+
+<span class="c"># 只校验最近变更（增量校验，适合定期巡检）</span>
+pt-table-checksum --replicate-check-only --databases=order_db
+
+<span class="c"># 修复差异（先 --dry-run 看，再加 --execute 真修）</span>
+pt-table-sync --execute --print \
+  h=primary,u=root,p=xxx,D=order_db,t=orders \
+  h=replica1,u=root,p=xxx</pre>
+  <div class="callout warn">
+    <b>pt-table-checksum 的三个使用前提：</b>① 表<b>必须有主键或唯一索引</b>（否则按索引切分 chunk 会漏行/重复行）；② binlog_format 必须是 ROW（STATEMENT 下校验语句在从库重放结果不可预期）；③ 大表会跑很久，用 <span class="k">--chunk-size</span> 控制单批行数。<b>只校验不修复等于没做</b>——计划里必须包含修复步骤和修复后的二次校验。
+  </div>
+  <div class="callout ok">
+    <b>PG 的对应做法：</b>逻辑校验用 <span class="k">pg_dump</span> 对比或自写 checksum（按主键范围聚合 <span class="k">md5(string_agg(...))</span>，主备各跑一次对比）；物理一致性由 WAL 的每页 full_page_writes + 校验和机制保证。跨版本升级用逻辑复制（publication/subscription）做双跑校验，比物理流复制更适合异构。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>CAP 与一致性模型谱系</h2></div>
+  <p class="lead">CAP 定理：<b>网络分区（P）发生时，一致性（C）和可用性（A）只能二选一</b>。注意是"分区发生时"，不是常态下的三选二——这是最常被误引用的地方。</p>
+  <table>
+    <tr><th style="width:150px">系统类型</th><th style="width:200px">分区时的选择</th><th>代表</th></tr>
+    <tr><td><b>CP 系统</b></td><td>放弃可用：少数派分区停止服务，等网络恢复</td><td>etcd、ZooKeeper、TiKV、PolarDB 共识层</td></tr>
+    <tr><td><b>AP 系统</b></td><td>放弃一致：继续服务，接受短暂不一致，恢复后合并</td><td>Cassandra、DynamoDB、Redis Cluster</td></tr>
+    <tr><td><b>CA 系统</b></td><td><b>不存在</b>（分区不可避免）。单机数据库是"不需要分区"的特例</td><td>——</td></tr>
+  </table>
+  <h4>一致性模型的强弱谱系</h4>
+  <table>
+    <tr><th style="width:140px">模型</th><th style="width:230px">保证</th><th>例子</th></tr>
+    <tr><td><b>强一致（线性一致）</b></td><td>所有读都读到最新写，像单副本一样</td><td>etcd/ ZooKeeper 的读；Raft apply 后的读</td></tr>
+    <tr><td><b>顺序一致</b></td><td>所有节点看到相同的操作顺序，但不一定是实时顺序</td><td>共识日志的顺序保证</td></tr>
+    <tr><td><b>因果一致</b></td><td>有因果关系的操作保序，无因果的可乱序</td><td>评论回复必须晚于评论出现</td></tr>
+    <tr><td><b>读己之写</b></td><td>自己写完后，自己一定能读到</td><td>刚发的朋友圈刷新后必须可见</td></tr>
+    <tr><td><b>最终一致</b></td><td>不再有新写时，所有副本最终收敛到相同值</td><td>DNS 传播、缓存刷新、异步复制</td></tr>
+  </table>
+  <pre><span class="c"># 工程含义对照（选架构时对着看）</span>
+转账余额          → 强一致（DB 事务 / 共识）
+库存扣减          → 强一致（唯一约束 / 分布式锁）
+订单状态查询      → 读己之写（写后路由主库读，或版本号比对）
+点赞数、粉丝数    → 最终一致（计数器异步聚合）
+配置、功能开关    → 最终一致（可容忍分钟级生效）
+日志、埋点        → 尽力而为（可丢）</pre>
+  <h4>分布式共识：Paxos 与 Raft</h4>
+  <p>共识问题：<b>一组机器如何对某个值达成一致，并且在少数机器故障时仍能工作</b>。两个前提假设：节点会故障（crash）、消息会丢失/延迟但不会篡改（异步网络 + 多数派诚实）。</p>
+  <table>
+    <tr><th style="width:100px">算法</th><th style="width:240px">核心机制</th><th>工程地位</th></tr>
+    <tr><td><b>Paxos</b></td><td>Proposer/Acceptor/Learner 两阶段（Prepare + Accept），多数派持久化即达成</td><td>理论基石，难懂难实现，直接用在生产的很少</td></tr>
+    <tr><td><b>Raft</b></td><td>Leader 选举（term + 心跳）+ 日志复制 + 安全性约束（只复制 leader 日志）</td><td><b>工程主流</b>：etcd、TiKV、Consul、ClickHouse Keeper、OceanBase Paxos（化用）</td></tr>
+  </table>
+  <pre><span class="c"># Raft 的关键数字与规则</span>
+多数派 = N/2 + 1                    <span class="c"># 3 节点容忍 1 故障，5 节点容忍 2 故障</span>
+leader 选举：term 递增 + 随机超时   <span class="c"># 随机化打破选票僵局</span>
+提交条件：多数派持久化即提交      <span class="c"># 这就是"写成功"的定义</span>
+日志连续性：只追加不修改            <span class="c"># 冲突日志整段丢弃，保证安全性</span>
+读操作：默认 leader 读（或 read index 保证线性一致）</pre>
+  <div class="callout">
+    <b>为什么主流数据库都往共识协议上靠：</b>MySQL 半同步是"1 主 1 从确认"的弱共识，故障判定靠超时和人工；PG 的 quorum commit 用 <span class="k">ANY 1</span> 做多数派思想；而 TiKV/OceanBase/CockroachDB 直接用 Multi-Raft，把"不丢数据"从配置参数变成<b>协议保证</b>——这是现代分布式数据库和传统主从架构的分水岭。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>脑裂与仲裁机制</h2></div>
+  <p class="lead">脑裂（split-brain）：<b>网络分区后，两侧都认为自己还是主，都接受写</b>。等网络恢复，两边数据冲突，无法自动合并。所有 HA 设计的核心就是<b>让分区中只有一侧能当主</b>。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>多数派仲裁</div><div class="cd">3 节点集群，2 节点在线才能选举出主。少数派自动降级为只读。<b>etcd/Raft 的标准做法，最可靠</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>仲裁节点/witness</div><div class="cd">引入不存数据的第三节点参与投票，2 节点机房 + 1 个 witness 即可自动仲裁。MySQL MHA、Redis Sentinel 都用类似思路</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>Fencing（隔离）</div><div class="cd">把旧主"杀掉"或"断供"：STONITH（重启对方）、关闭存储访问、撤销网络路由。<b>光"降级"不够，必须让旧主物理上写不进去</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>租约/epoch</div><div class="cd">主带租约（lease），超时失效；每次切换 epoch 递增，旧主写入因 epoch 过期被拒绝</div></div>
+  </div>
+  <pre><span class="c"># MySQL 侧防脑裂的具体手段</span>
+<span class="c"># 1. 半同步 + 只读兜底：主库检测到半同步降级（status=OFF）时自动 set read_only</span>
+<span class="c">#    靠巡检脚本或 group_replication 的 group_replication_switch_to_multi_primary 控制</span>
+<span class="c"># 2. MHA：从库变主后给旧主发 kill 命令（STONITH 思想）</span>
+<span class="c"># 3. 网络层：VIP 只指向一个主，切换时先撤 VIP 再切</span>
+
+<span class="c"># PostgreSQL 侧</span>
+synchronous_standby_names = 'ANY 1 (s1, s2)'     <span class="c"># 至少 1 个同步备确认，多数派思想</span>
+<span class="c"># 配合 repmgr/patroni 的 leader lease + DCS（etcd/ZooKeeper）做自动仲裁</span>
+
+<span class="c"># 判断是否可以安全提主的命令（PG patroni 场景）</span>
+patronictl -c /etc/patroni.yml list        <span class="c"># 看集群状态和 Leader</span>
+patronictl -c /etc/patroni.yml switchover   <span class="c"># 受控切换（先等从库追平）</span></pre>
+  <div class="callout danger">
+    <b>没有仲裁的 HA 等于定时炸弹。</b>最经典的剧本：一主一从 + 异步复制，中间网络抖动，从库被提升为主，业务双写几分钟，网络恢复后两边都有"对方没有"的订单。<b>规则：任何自动切换都必须先回答三个问题</b>——① 少数派怎么阻止自己当主？（read_only/多数派）② 旧主怎么被强制闭嘴？（fencing）③ 出现双写怎么发现、怎么合并？（校验 + 人工决策，自动合并冲突数据基本不现实）。
+  </div>
+  <div class="callout ok">
+    <b>实践建议（按规模递进）：</b>单机房一主两从 → 用半同步 + 脚本化切换（人工确认）；跨机房/不能停机 → 上 MHA、Orchestrator 或 PG 的 Patroni+etcd，<b>让专业工具处理选主和 fencing</b>；对 RPO=0 有硬要求 → 直接选 Multi-Raft 内核的分布式数据库（TiDB/OceanBase/PolarDB-X），别在主从复制上打补丁。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">半同步静默降级成异步，没人发现</div><div class="pd">从库超时后主库自动降级继续服务，RPO 从 0 变无限，故障时丢几十分钟数据。必须监控 Rpl_semi_sync_source_status，OFF 立即告警。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">wait point 用了 AFTER_COMMIT</div><div class="pd">主库已提交但从库没收到时宕机，客户端收到成功但数据丢了，且无法回滚。用默认的 AFTER_SYNC，保证已确认事务都在从库 relay log 里。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">binlog_format 用了 STATEMENT</div><div class="pd">NOW()/RAND()/UUID() 在主从执行结果不同，数据静默不一致，checksum 才能发现。生产一律 ROW。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">拿 Seconds_Behind_Master 当切换依据</div><div class="pd">大事务期间这个值会显示 0（时间戳是旧的），切换过去数据差一大截。用 pt-heartbeat 或 GTID 对比确认追平。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">从库没开 super_read_only</div><div class="pd">read_only 对 root 和 SUPER 权限无效，业务误连从库写了一条 UPDATE，切换时冲突或数据丢。必须 super_read_only=1。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">没开并行复制，一个大事务卡死从库</div><div class="pd">SQL thread 单线程重放，60 秒的大事务让从库延迟 60 秒，期间所有读从库的业务看到旧数据。开 slave_parallel_workers + 拆大事务。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">主库 binlog 过期，从库断线续不上</div><div class="pd">从库宕机几天，主库 log 被 purge，报 "master purged required logs"。根治是 GTID + 自动重建从库，别硬跳 GTID。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">PG 复制槽不监控，主库磁盘被 WAL 打满</div><div class="pd">从库下线忘删槽，主库为它保留 WAL，几天后磁盘满集群雪崩。监控 restart_lsn 和 retained WAL 大小，设告警。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">切换后从不做一致性校验</div><div class="pd">以为"追平了"就一致，其实冲突跳过的 GTID 早已埋雷。定期 pt-table-checksum 巡检，切换后立刻全量校验。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">一主一从异步复制，无任何仲裁</div><div class="pd">网络分区后人工在两个"主"之间决策，双写几分钟才发现。至少一主两从 + 半同步 + 自动切换工具，别赌网络永远不抖。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. MySQL 半同步复制中，rpl_semi_sync_source_wait_point 应该选哪个？为什么？</div>
+      <button class="opt">AFTER_COMMIT，因为先提交能给用户最快响应</button>
+      <button class="opt">无所谓，两个一样安全</button>
+      <button class="opt">AFTER_SYNC，因为主库宕机时已确认事务都已在从库 relay log，升级从库不丢数据</button>
+      <div class="ans">正确答案：<b>AFTER_SYNC</b>。它在从库<b>收到</b> binlog（未执行）时就确认，主库此时尚未提交；万一主库宕机，从库有全部已确认事务的 relay log，应用后即可安全提主。AFTER_COMMIT 是主库先提交再等从库，主库在"已提交未确认"窗口宕机会丢已告知用户成功的数据。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 关于半同步的超时降级，正确的认识是？</div>
+      <button class="opt">rpl_semi_sync_source_timeout 到期等不到从库，主库自动切回异步且不报错，必须监控 status 字段</button>
+      <button class="opt">超时后会报错拒绝写入，保证数据不丢</button>
+      <button class="opt">降级后会自动恢复，无需关心</button>
+      <div class="ans">正确答案：<b>静默降级</b>。超时（默认 10 秒，建议调短到 1~2 秒）后主库以异步模式继续服务，从这一刻 RPO 从 0 变成可能无限，而业务毫无感知。必须监控 <span class="k">Rpl_semi_sync_source_status</span>，OFF 立即告警。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 从库延迟 60 秒，最可能的根因和处理是？</div>
+      <button class="opt">网络带宽不够，扩容网卡</button>
+      <button class="opt">主库有个大事务（如百万行 UPDATE），从库单线程重放慢；拆事务 + 开并行复制</button>
+      <button class="opt">从库内存太小，加内存</button>
+      <div class="ans">正确答案：<b>大事务 + SQL 线程单线程</b>。ROW 格式下从库重放速度取决于事务大小，一个 500 万行的 UPDATE 要重放几十秒，期间从库整体延迟。处理：应用层拆批（每批 1 万行提交）+ <span class="k">slave_parallel_workers=8</span> + 大表变更用 gh-ost/pt-osc。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. PostgreSQL 想让"写完立刻读从库也一定读到"，应该配？</div>
+      <button class="opt">synchronous_commit = remote_apply</button>
+      <button class="opt">synchronous_commit = local</button>
+      <button class="opt">wal_level = logical</button>
+      <div class="ans">正确答案：<b>remote_apply</b>。它要求同步备库<b>应用完</b> WAL 才向主库返回提交成功，此时从库数据已最新，读从库不会读到旧值。<span class="k">on</span> 只保证从库收到并 flush，未应用；<span class="k">local</span> 等于异步。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于 CAP 与共识，说法正确的是？</div>
+      <button class="opt">CAP 指任何时候只能同时满足一致性和可用性</button>
+      <button class="opt">Paxos 是工程主流，Raft 只是理论</button>
+      <button class="opt">CAP 指网络分区发生时 C 和 A 二选一；Raft 通过多数派（N/2+1）实现 CP 系统</button>
+      <div class="ans">正确答案：<b>分区发生时二选一</b>。CAP 常被误引成"平时三选二"，实际 P（分区）不可避免，讨论的是分区期间的选择。Raft 用 leader 选举 + 多数派日志复制实现 CP：少数派分区停止服务保一致，etcd/TiKV 是其工程代表。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 防止脑裂最有效的手段组合是？</div>
+      <button class="opt">提高心跳频率，让故障检测更快</button>
+      <button class="opt">多数派仲裁 + fencing（STONITH/断供/旧主强制作只读）</button>
+      <button class="opt">给主库设更复杂的密码</button>
+      <div class="ans">正确答案：<b>仲裁 + fencing</b>。心跳再快也分不清"对方死了"还是"网络断了"，唯一可靠的区分办法是多数派投票；而光让旧主"知道"自己该退位不够，必须让它<b>物理上写不进去</b>（fencing），否则它可能在收到通知前继续接受写入造成双写。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>SHOW REPLICA STATUS\G</code><span class="desc">MySQL 复制健康总览（IO/SQL 线程、延迟、GTID、错误）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync%'</code><span class="desc">半同步状态（status=ON 才生效、clients 数、降级计数）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CHANGE REPLICATION SOURCE TO ... SOURCE_AUTO_POSITION=1</code><span class="desc">GTID 方式建主从（8.0.23+）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM pg_stat_replication;</code><span class="desc">PG 复制状态（sync_state、lag、LSN）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM pg_replication_slots;</code><span class="desc">PG 复制槽状态（active、retained WAL）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pg_basebackup -h primary -D $PGDATA -U repl -R -X stream -S slot_s1</code><span class="desc">PG 拉基础备份建备库</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pt-table-checksum --databases=db --replicate=percona.checksums</code><span class="desc">在线主从一致性校验</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pt-table-sync --execute --print h=primary,D=db,t=orders h=replica</code><span class="desc">修复主从差异行</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pt-heartbeat --update --interval=1 --database=percona</code><span class="desc">真实延迟测量（替代 Seconds_Behind）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) FROM pg_stat_replication;</code><span class="desc">PG 按字节算复制延迟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SET GLOBAL super_read_only=ON;</code><span class="desc">主库切换前堵写（含 root 也禁写）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT @@global.gtid_executed;</code><span class="desc">对比 GTID 确认从库无遗漏</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置参数对照表</h3>
+  <table>
+    <tr><th style="width:150px">关注点</th><th style="width:220px">MySQL</th><th>PostgreSQL</th></tr>
+    <tr><td>复制格式</td><td class="f">binlog_format=ROW</td><td class="f">wal_level=replica/logical</td></tr>
+    <tr><td>半同步/同步</td><td class="f">rpl_semi_sync_source_wait_point=AFTER_SYNC</td><td class="f">synchronous_commit=remote_apply</td></tr>
+    <tr><td>同步备选择</td><td class="f">rpl_semi_sync_source_wait_for_replica_count</td><td class="f">synchronous_standby_names='ANY 1 (s1,s2)'</td></tr>
+    <tr><td>并行重放</td><td class="f">slave_parallel_type=LOGICAL_CLOCK<br>slave_parallel_workers=8</td><td class="f">（物理复制单进程；靠大查询治理）</td></tr>
+    <tr><td>防 WAL 堆积</td><td class="f">binlog_expire_logs_seconds</td><td class="f">wal_keep_size / 复制槽监控</td></tr>
+    <tr><td>从库只读</td><td class="f">read_only=1 + super_read_only=1</td><td class="f">物理备库天然只读</td></tr>
+    <tr><td>超时降级</td><td class="f">rpl_semi_sync_source_timeout=2000</td><td class="f">synchronous_commit 降级需手工</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>binlog</b></td><td>MySQL 的变更日志，主从复制和 PITR 都基于它</td></tr>
+    <tr><td><b>relay log</b></td><td>从库存放主库传过来的 binlog 事件的本地文件</td></tr>
+    <tr><td><b>WAL</b></td><td>PostgreSQL 的预写日志，崩溃恢复和流复制的载体</td></tr>
+    <tr><td><b>半同步复制</b></td><td>主库等至少一个从库确认收到才向客户端确认</td></tr>
+    <tr><td><b>AFTER_SYNC / AFTER_COMMIT</b></td><td>MySQL 半同步的两个等待点，前者不丢已确认事务</td></tr>
+    <tr><td><b>synchronous_commit</b></td><td>PG 的同步级别：remote_apply &gt; on &gt; remote_write &gt; local</td></tr>
+    <tr><td><b>GTID</b></td><td>全局事务 ID，自动定位主从位点，切换续传不用对坐标</td></tr>
+    <tr><td><b>复制槽</b></td><td>PG 中保留 WAL 的机制，从库掉线期间主库不清日志</td></tr>
+    <tr><td><b>并行复制</b></td><td>从库多线程重放（LOGICAL_CLOCK 按库分组），治延迟</td></tr>
+    <tr><td><b>pt-table-checksum</b></td><td>在线主从一致性校验工具，通过复制流对比 CRC</td></tr>
+    <tr><td><b>RPO / RTO</b></td><td>允许丢多少数据 / 允许停机多久，灾备的两个核心指标</td></tr>
+    <tr><td><b>CAP</b></td><td>分区发生时，一致性和可用性二选一</td></tr>
+    <tr><td><b>线性一致</b></td><td>所有读都读到最新写，对外如同单副本</td></tr>
+    <tr><td><b>最终一致</b></td><td>停止写入后副本最终收敛，异步复制的宿命</td></tr>
+    <tr><td><b>读己之写</b></td><td>自己的写入随后一定能被自己读到</td></tr>
+    <tr><td><b>Raft</b></td><td>leader 选举 + 日志复制的共识协议，工程主流</td></tr>
+    <tr><td><b>多数派 quorum</b></td><td>N 节点中 N/2+1 同意即生效，CP 系统的基石</td></tr>
+    <tr><td><b>脑裂</b></td><td>网络分区后两侧都当主，双写导致数据冲突</td></tr>
+    <tr><td><b>Fencing / STONITH</b></td><td>强制隔离/重启旧主，保证它物理上不能再写</td></tr>
+    <tr><td><b>hot_standby</b></td><td>PG 备库可读，查询可能与 WAL 重放冲突</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一套 MySQL 一主两从，完成这五件事 —— ① 配半同步 AFTER_SYNC，故意停一个从库，观察 status 降级过程；② 执行一个 30 万行 UPDATE 制造延迟，用 pt-heartbeat 看真实延迟，再开并行复制对比；③ 跑一次 pt-table-checksum 全库校验；④ 用 GTID 方式做一次主从切换（堵写→等追平→提主→旧主挂回）；⑤ PG 侧建 publication/subscription，观察复制槽和 retained WAL。<br><br>
+    <b>之后值得单独学：</b>MySQL Group Replication（Paxos 变体）与 MGR 单主/多主模式、PG 的 Patroni+etcd 高可用方案、TiDB/OceanBase 的 Multi-Raft 架构、以及跨地域部署的延迟与一致性权衡。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透主从复制与数据一致性 · 上线前务必检查：半同步生效吗、从库追得平吗、切换时校验了吗</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（复制模式）和模块 7（脑裂与仲裁）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边敲：SHOW REPLICA STATUS\\G 看复制状态。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起 MySQL 主从跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

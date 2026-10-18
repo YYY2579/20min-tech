@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透大模型原理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 21 期 · AI 篇 · 高密度版</span>
+    <h1>二十分钟学透大模型原理</h1>
+    <p class="sub">Transformer 与推理。不讲"怎么调 API"，讲<b>模型内部到底在算什么</b>：QKV 注意力、KV Cache 为什么吃显存、temperature 到底改了什么、RoPE 为什么不能直接外推、量化掉多少精度。全部配可复算的数字。</p>    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">每层参数量 <b>12·d²</b> 估算</span>
+      <span class="chip">KV Cache <b>4</b> 组实测数字</span>      <span class="chip"><b>10</b> 个认知坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+      <span class="chip"><b>19</b> 条术语</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边算：7B 模型（32 层，d=4096，词表 32000）的参数量，和 4k 上下文的 KV Cache。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个心智模型，先立起来</h2></div>
+  <p class="lead">后面所有内容都建立在三个事实上。不接受这三个事实，看什么都会觉得"玄"。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>模型眼里只有一串整数。</b>文本先被切成 token 再映射成词表 id。你看到的"字"和模型看到的"id"不是一回事 —— 一个汉字可能是一个 token 也可能是两个，取决于词表（详见 tokenization 篇）。</div></div>
+    <div class="step"><div class="txt"><b>训练 = 调整参数；推理 = 用参数做前向计算。</b>推理时模型不会产生任何新知识，它只是在"根据上文分布给出下一个 token 的概率"。</div></div>    <div class="step"><div class="txt"><b>整个模型只有三类数学运算：</b>矩阵乘法（占 99% 算力）、softmax（注意力）、逐元素运算（激活、LayerNorm）。没有魔法。</div></div>
+  </div>
+  <h3>30 行代码看懂自注意力</h3>
+  <pre><span class="c"># 不依赖任何框架，把注意力的全过程写出来</span>
+<span class="b">import</span> numpy <span class="b">as</span> np
+
+T, d = 4, 8                        <span class="c"># 序列长 4，隐藏维 8</span>
+X = np.random.randn(T, d)          <span class="c"># 4 个 token 的输入向量 (T,d)</span>
+
+Wq = np.random.randn(d, d) / d**0.5   <span class="c"># 四个投影矩阵，各 d×d</span>
+Wk = np.random.randn(d, d) / d**0.5
+Wv = np.random.randn(d, d) / d**0.5
+Q, K, V = X @ Wq, X @ Wk, X @ Wv      <span class="c"># 线性投影得到 Q/K/V</span>
+
+scores = Q @ K.T / d**0.5             <span class="c"># (T,T)：每个词对每个词的关注分，除以 sqrt(d) 防过大</span>
+causal = np.triu(np.ones((T, T), dtype=bool), k=1)   <span class="c"># 上三角（不含对角线）</span>
+scores = np.where(causal, -np.inf, scores)           <span class="c"># 因果 mask：不许看未来</span>
+
+<span class="b">def</span> <span class="y">softmax</span>(x, axis=-1):
+    x = x - x.max(axis=axis, keepdims=True)   <span class="c"># 减最大值防 exp 溢出</span>
+    e = np.exp(x)
+    <span class="b">return</span> e / e.sum(axis=axis, keepdims=True)
+
+attn = softmax(scores, axis=-1)       <span class="c"># 每行变成一个概率分布（只对可见位置）</span>
+out  = attn @ V                       <span class="c"># 按概率加权求和 V → (T,d)</span>
+<span class="c"># out[i] 就是第 i 个 token "吸收了上下文之后" 的新表示。堆 32~80 层，就是 GPT。</span></pre>
+  <div class="callout">
+    <b>本篇不要求你会训模型，但要求你会三件事：</b>① 会用 <span class="k">12·d²</span> 估算每层参数量；② 会用 <span class="k">2·L·d_kv·bytes</span> 估算 KV Cache；③ 知道 temperature/top-p 各自改变分布的哪一部分。这三件事是选型、排障、算成本的日常。
+  </div></section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Transformer 架构核心</h2></div>
+  <p class="lead">2017 年论文《Attention Is All You Need》的原始结构是 Encoder-Decoder；今天的大语言模型只用其中一半 —— <b>Decoder</b>，而且是带因果 mask 的版本。整栋楼只有一种砖重复 32~80 次。</p>
+  <h3>一栋楼的全貌</h3>
+  <table>
+    <tr><th style="width:200px">部件</th><th style="width:250px">作用</th><th>关键事实</th></tr>
+    <tr><td><b>Token Embedding</b></td><td>token id → d 维向量</td><td>一张 <span class="k">vocab×d</span> 的大表，查表即可，是模型里最大的单张参数表之一</td></tr>
+    <tr><td><b>位置编码</b></td><td>注入顺序信息</td><td>现代方案是 RoPE（模块 6），不再加在 embedding 上，而是加在每层注意力的 Q/K 上</td></tr>
+    <tr><td><b>N × Decoder Layer</b></td><td>每层 = 掩码多头注意力 + FFN，各带残差和 LayerNorm</td><td><b>参数量和计算量的绝对主体</b>，占比 95% 以上</td></tr>
+    <tr><td><b>最终 LayerNorm</b></td><td>稳定数值分布</td><td>现代模型用 Pre-LN：先归一化再进子层，训练更稳</td></tr>
+    <tr><td><b>LM Head</b></td><td>d 维 → vocab 维 logits</td><td>一张 <span class="k">d×vocab</span> 矩阵；与输入 embedding <b>共享权重</b> 能省一份参数（GPT-3 不共享，Llama/Qwen 共享）</td></tr>
+  </table>
+  <h3>自注意力：Q、K、V 分别在干什么</h3>
+  <p>用一句话概括：<b>Q 是"我要找什么"，K 是"我有什么标签"，V 是"我实际提供的内容"。</b>每个 token 用自己的 Q 去和所有（可见的）K 打分，softmax 成权重后加权求和 V。三个矩阵都是可学习的 <span class="k">d×d</span> 线性变换，没有别的。</p>
+  <pre><span class="c"># 单头注意力的完整公式（d_k = 单头维度）</span>
+Attention(Q,K,V) = softmax( Q·Kᵀ / sqrt(d_k) + mask ) · V
+
+<span class="c"># 为什么除以 sqrt(d_k)：q·k 点积的方差随 d_k 线性增长，</span>
+<span class="c"># d_k=128 时打分方差约 128，直接 softmax 会饱和成 one-hot、梯度趋 0。</span>
+<span class="c"># 除以 sqrt(d_k) 把方差压回 1 附近。</span></pre>
+  <div class="callout warn">
+    <b>因果 mask（causal mask）是生成式模型的灵魂。</b>训练时把"未来位置"的打分置为 -inf，模型永远只能看左边。这带来两个后果：① 训练可以并行 —— 一次前向算出所有位置的下一词预测，这也是 teacher forcing 能成立的原因；② 推理时生成第 t 个 token，天然只能依赖前 t-1 个 —— 这就是自回归，也是 KV Cache 存在的原因（模块 4）。
+  </div>
+  <h3>多头注意力：不是"更多参数"，是"更多子空间"</h3>
+  <p>把 d 维切成 h 份，每份 d/h 维，独立做一次注意力，最后拼接再投影。关键认知：<b>QKVO 四个矩阵总参数不变的前提下，头数只改变"分组方式"。</b>8 头 d=512 和 16 头 d=512 参数量完全一样（各头 d_k=64 或 32，投影矩阵都是 512×512）。</p>
+  <table>
+    <tr><th style="width:130px">配置</th><th style="width:160px">典型模型</th><th>头在学什么</th></tr>
+    <tr><td><b>MHA</b> 标准多头</td><td>GPT-2/3、Llama-2 全系</td><td>每头独立 Q/K/V，不同头捕捉不同关系（指代、相邻、语义相似）</td></tr>
+    <tr><td><b>MQA</b> 多查询单值</td><td>部分推理优化模型</td><td>所有头共享同一份 K/V，KV Cache 缩小 h 倍，质量有损</td></tr>
+    <tr><td><b>GQA</b> 分组查询</td><td><b>Llama-3、Qwen2、Mistral</b></td><td>折中：K/V 分 g 组共享。Llama-3-8B：64 个 Q 头分 8 组 KV 头，<b>KV Cache 降到 1/8</b>，质量接近 MHA</td></tr>
+  </table>
+  <h3>FFN：每层里真正"存知识"的地方</h3>
+  <p>注意力负责"搬信息"，FFN 负责"存知识"。业界流行一个粗糙但有依据的观感：<b>FFN 占了每层约 2/3 的参数，更像模型的"记忆体"；注意力更像"寻址电路"。</b>标准 FFN 是 d→4d→d 的两层 MLP，中间用 GELU/SiLU 激活。</p>
+  <pre><span class="c"># 标准 FFN（GPT-2 风格）：两个矩阵，参数 8·d²</span>
+h = gelu(x @ W1 + b1)      <span class="c"># (T,d) → (T,4d)  升维</span>
+y = h @ W2 + b2            <span class="c"># (T,4d) → (T,d)  降维</span>
+
+<span class="c"># SwiGLU（Llama/Qwen/Mistral 主流）：三个矩阵 + 门控</span>
+h = silu(x @ W_gate) * (x @ W_up)   <span class="c"># 门控分支逐元素相乘</span>
+y = h @ W_down
+<span class="c"># 三个矩阵但不让参数量膨胀：隐藏维取 2.7d~3.5d 而非 4d（Llama-3-8B：4096→14336）</span></pre>
+  <h3>残差连接 + LayerNorm：深网络不崩的原因</h3>
+  <ul>
+    <li><b>残差连接</b>（x + Sublayer(x)）：梯度可以"抄近路"回传到浅层，没有它 30 层以上训不动。</li>
+    <li><b>LayerNorm</b>：对每个 token 的 d 维向量做归一化，稳住每层的输入尺度。现代模型用 <b>Pre-LN</b>（先 LN 再进子层）；原始 Transformer 是 Post-LN，训练稳定性差， warmup 要很久。</li>
+    <li><b>RMSNorm</b>（Llama/Qwen）：LayerNorm 去掉均值中心化，只除以均方根，<b>省一次均值计算</b>，效果几乎无损，已是开源默认。</li>
+  </ul>
+  <h3>参数量速算：12·d² 法则</h3>
+  <pre><span class="c"># 每层参数（MHA + 标准 4d FFN）</span>
+<span class="c"># 注意力：Q/K/V/O 四个 d×d 方阵 = 4·d²</span>
+<span class="c"># FFN：d×4d + 4d×d = 8·d²；每层合计 ≈ 12·d²</span>
+
+<span class="b">def</span> <span class="y">count_params</span>(d_model, n_layers, vocab, inter=4*d_model, tied=False):
+    attn = 4 * d_model * d_model          <span class="c"># QKVO</span>
+    ffn  = 2 * d_model * inter            <span class="c"># 标准 FFN 两个矩阵</span>
+    body = (attn + ffn) * n_layers
+    emb  = vocab * d_model                <span class="c"># 输入 embedding</span>
+    head = 0 <span class="b">if</span> tied <span class="b">else</span> vocab * d_model   <span class="c"># 输出头，共享则为 0</span>
+    <span class="b">return</span> body + emb + head
+
+<span class="c"># 验证：一个 7B 的常见配置（d=4096, 32 层, 词表 32000，SwiGLU inter=11008）</span>
+<span class="c"># 用 2 个 FFN 矩阵的公式会低估，实际 = 3×4096×11008×32 + 4×4096²×32 + 2×32000×4096 ≈ 6.7B ✓</span></pre>
+  <table>
+    <tr><th style="width:150px">模型</th><th style="width:90px">d_model</th><th style="width:70px">层数</th><th style="width:80px">词表</th><th>12·d²·L 估算 vs 标称</th></tr>
+    <tr><td class="f">GPT-2 XL</td><td>1600</td><td>48</td><td>50257</td><td>≈1.5B vs 1.5B ✓</td></tr>
+    <tr><td class="f">Llama-2-7B</td><td>4096</td><td>32</td><td>32000</td><td>6.4B + 0.26B 嵌入 ≈ 6.7B ✓</td></tr>
+    <tr><td class="f">Llama-2-13B</td><td>5120</td><td>40</td><td>32000</td><td>12.6B + 0.33B ≈ 12.9B ✓</td></tr>
+    <tr><td class="f">Llama-2-70B</td><td>8192</td><td>80</td><td>32000</td><td>≈64.9B（GQA 让实际略低）✓</td></tr>
+    <tr><td class="f">Llama-3-70B</td><td>8192</td><td>80</td><td>128256</td><td>≈65.5B（GQA + 更大词表）✓</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>计算量去哪了：</b>单 token 前向 FLOPs ≈ <span class="k">2 × 参数量</span>。7B 模型处理 1 个 token ≈ 14 GFLOPs。1k prompt 的 prefill ≈ 14 TFLOPs，且这 1000 个位置可以一起算（并行）；生成阶段每 token 也是 14 GFLOPs，但只能一个一个来（串行）—— 这是模块 4 一切差异的根源。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>预训练目标：只有"下一词预测"</h2></div>
+  <p class="lead">把 GPT、Claude、Llama、Qwen 全部划掉，它们共享同一个训练目标：<b>给定前 t-1 个 token，预测第 t 个 token 的概率分布。</b>就这一句话，没有别的。</p>
+  <h3>损失函数：交叉熵</h3>
+  <pre><span class="c"># 一次前向，模型输出词表 V 上的概率分布 p，真实下一个词是 y</span>
+loss = -log(p[y])          <span class="c"># 交叉熵（负对数似然）</span>
+
+<span class="c"># 训练时对整个语料的每个位置求平均：</span>
+L = (1/N) · Σ_t -log p(x_t | x_&lt;t)</span>
+
+<span class="c"># 直观理解：词表 32000，随机猜的 loss ≈ ln(32000) ≈ 10.37</span>
+<span class="c"># 训练良好的 7B 在英文文本上 loss ≈ 1.5~2.0 nats/token</span>
+<span class="c"># 困惑度 ppl = exp(loss) ≈ e^1.8 ≈ 6 —— 平均每个位置在 ~6 个候选间犹豫</span></pre>
+  <table>
+    <tr><th style="width:160px">指标</th><th>含义与用法</th></tr>
+    <tr><td><b>困惑度 PPL</b></td><td>= exp(loss)。"等效候选数"。<b>只能在同 tokenizer、同测试集</b>之间比较，跨模型比 PPL 意义有限；与下游任务表现相关但不等价</td></tr>
+    <tr><td><b>teacher forcing</b></td><td>训练时永远喂"标准答案前缀"而非模型自己的生成，所有位置可并行计算；推理没有这个待遇，只能一个个生成</td></tr>
+  </table>
+  <h3>训练数据与三阶段流水线</h3>
+  <table>
+    <tr><th style="width:110px">阶段</th><th style="width:220px">目标</th><th>数据与规模</th></tr>
+    <tr><td><b>预训练</b></td><td>下一词预测，学世界知识和语言规律</td><td>万亿 token 级网页/代码/书籍，去重、清洗、过滤。Llama-3：15T tokens</td></tr>
+    <tr><td><b>SFT 监督微调</b></td><td>学会"对话格式"、遵循指令</td><td>万~十万条人工撰写示范。目标不变，还是下一词预测，只是数据变成对话</td></tr>
+    <tr><td><b>对齐 RLHF/DPO</b></td><td>更符合人类偏好：有用、无害、不啰嗦</td><td>人类对多个回答排序，训奖励模型；再用 RL（PPO）或直接偏好优化（DPO）微调</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>必须建立的认知：模型没有"理解模块"，也没有"检索模块"。</b>对话能力是 SFT 把"续写"特化成了"问答"；幻觉来自训练目标本身 —— 它优化的是"像不像人话"，不是"真不真"。问模型不知道的事实，它依然会给出<b>概率上最像答案的 token 序列</b>。这就是为什么 RAG、工具调用（见 context-engineering 篇）不是可选项而是必需品。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>规模定律（Scaling Law）与涌现</h2></div>
+  <p class="lead">2020 年两篇论文给出了大模型时代的"工程公式"：<b>模型效果随参数量、数据量、算力的增长呈平滑的幂律提升</b>。这件事的革命性在于 —— 在小规模上测几个点，就能外推大模型的表现，不用真的把大模型训出来。</p>
+  <h3>两代 Scaling Law</h3>
+  <table>
+    <tr><th style="width:150px">论文</th><th style="width:260px">核心结论</th><th>工程含义</th></tr>
+    <tr><td><b>Kaplan 2020</b><br>（OpenAI）</td><td>L(N) ∝ N^(-0.076)，N=参数量；数据量、步数的指数更小</td><td>早期结论：堆参数优先。<b>后来被证明低估了数据的重要性</b></td></tr>
+    <tr><td><b>Chinchilla 2022</b><br>（DeepMind）</td><td>L(N,D) = E + A/N^α + B/D^β（α≈0.34, β≈0.28）。<b>算力最优 ≈ 每参数 20 个训练 token</b></td><td>70B×1.4T 的 Chinchilla 打败 280B×300B 的 Gopher，且推理更便宜</td></tr>
+  </table>
+  <h3>真实的 token / 参数比例</h3>
+  <table>
+    <tr><th style="width:150px">模型</th><th style="width:90px">参数量</th><th style="width:110px">训练 tokens</th><th style="width:90px">tokens/参数</th><th>备注</th></tr>
+    <tr><td class="f">Gopher</td><td>280B</td><td>300B</td><td>≈1.1</td><td>Chinchilla 之前的"堆参数"路线，被证明训练不足</td></tr>
+    <tr><td class="f">Chinchilla</td><td>70B</td><td>1.4T</td><td>20</td><td>论文主张的算力最优比例</td></tr>
+    <tr><td class="f">Llama-2-7B</td><td>7B</td><td>2.0T</td><td>≈286</td><td>开源模型普遍"超配"数据</td></tr>
+    <tr><td class="f">Llama-3-8B</td><td>8B</td><td>15T</td><td>≈1875</td><td><b>远超 Chinchilla 比例</b></td></tr>
+  </table>
+  <div class="callout">
+    <b>为什么现在都超配数据？</b>因为 Chinchilla 优化的是"训练算力成本"，而开源模型的真实约束是<b>推理成本</b>：模型要部署到别人的显卡上，每 token 推理都要花钱。训练是一次性的，推理是永远的。所以业界选择"往死里喂数据，把模型压小"—— 这是 2023 年之后所有开源基座模型的共同选择（Llama-3、Qwen2.5、Mistral 都是 tokens/参数 &gt; 1000）。
+  </div>
+  <h3>涌现能力（Emergent Abilities）</h3>
+  <p>指某些能力在小模型上"几乎为零"，超过某个规模后突然出现：少样本学习（in-context learning）、思维链（chain-of-thought）、指令遵循。Wei et al. 2022 年系统描述了这一现象，典型阈值在 <b>10²²~10²³ 训练 FLOPs</b> 量级（大致对应 10B 参数以上的成熟训练）。</p>
+  <div class="callout warn">
+    <b>争议要知道：</b>Schaeffer et al. 2023 提出涌现可能是<b>评价指标的伪影</b> —— 用"精确匹配"这类 0/1 指标衡量曲线很陡，换成连续指标（如编辑距离）曲线就平滑了。稳妥口径：<b>能力提升大部分是连续的，但确实存在少数"开关式"能力；不要在小模型上验证有效的 prompt 策略，假设大模型一定更好。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>推理：自回归、KV Cache 与显存账</h2></div>
+  <p class="lead">推理分两个阶段，瓶颈完全不同。<b>搞混这两个阶段的瓶颈，是线上性能问题里最常见的误判。</b></p>
+  <h3>Prefill / Decode 两阶段</h3>
+  <table>
+    <tr><th style="width:130px">阶段</th><th style="width:250px">做什么</th><th>瓶颈</th></tr>
+    <tr><td><b>Prefill</b></td><td>把整段 prompt 一次前向，算出所有位置的 K/V 并缓存，产出第一个 token</td><td><b>算力 bound</b>。1k prompt ≈ 14 TFLOPs（7B），可以吃满 GPU</td></tr>
+    <tr><td><b>Decode</b></td><td>每生成 1 个 token，就要把全部权重从显存搬到计算单元一遍</td><td><b>显存带宽 bound</b>。每 token 读一遍 14GB 权重（7B fp16）</td></tr>
+  </table>
+  <h3>KV Cache：为什么必须存在</h3>
+  <p>没有缓存时，生成第 t 个 token 要对前 t-1 个 token 全部重算 K/V，第 1000 个 token 要重算 1000 次，O(n²) 浪费。缓存后每个位置的 K/V 只算一次，之后直接查表。<b>代价是显存：KV Cache 大小 = 上下文长度 × 每 token 的 KV 字节数。</b></p>
+  <pre><span class="c"># KV Cache 显存公式（fp16 = 2 字节）</span>
+<span class="c"># 每 token KV 字节 = 2(K和V) × 层数L × KV头数 × 每头维度 × 2字节</span>
+
+<span class="b">def</span> <span class="y">kv_cache_gb</span>(n_layers, n_kv_heads, head_dim, ctx, batch=1, dtype_bytes=2):
+    per_token = 2 * n_layers * n_kv_heads * head_dim * dtype_bytes
+    <span class="b">return</span> round(per_token * ctx * batch / 1024**3, 2)
+
+<span class="c"># Llama-2-7B（MHA：32 KV 头 × 128 维）</span>
+kv_cache_gb(32, 32, 128, 4096)     <span class="c"># → 2.0 GB</span>
+kv_cache_gb(32, 32, 128, 32768)    <span class="c"># → 16 GB（32k 上下文！）</span>
+<span class="c"># Llama-3-8B（GQA：8 KV 头，缩到 1/4）</span>
+kv_cache_gb(32, 8, 128, 8192)      <span class="c"># → 1.0 GB</span>
+<span class="c"># Llama-2-70B（80 层，GQA 8 头）</span>
+kv_cache_gb(80, 8, 128, 4096)      <span class="c"># → 1.25 GB</span></pre>
+  <table>
+    <tr><th style="width:150px">模型（注意力类型）</th><th style="width:110px">每 token KV</th><th style="width:100px">4k 上下文</th><th style="width:100px">32k 上下文</th><th>说明</th></tr>
+    <tr><td class="f">Llama-2-7B（MHA）</td><td>512 KB</td><td>2.0 GB</td><td>16 GB</td><td>无 GQA，长上下文最吃亏</td></tr>
+    <tr><td class="f">Llama-3-8B（GQA-8）</td><td>128 KB</td><td>0.5 GB</td><td>4 GB</td><td>GQA 把 KV 压到 1/4</td></tr>
+    <tr><td class="f">Llama-2-70B（GQA-8）</td><td>320 KB</td><td>1.25 GB</td><td>10 GB</td><td>层数 80，但 KV 头少</td></tr>
+    <tr><td class="f">Qwen2-72B（GQA-8）</td><td>320 KB</td><td>1.25 GB</td><td>10 GB</td><td>同构，思路一致</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>把 batch 乘回去，才是线上爆炸的原因：</b>32 并发 × 8k 上下文 × Llama-3-8B（GQA）= 1.0 GB × 32 = <b>32 GB 纯 KV Cache</b>，还没算 16 GB 模型权重和激活值，<b>一台 A100-80G 直接吃光</b>。这就是 vLLM 的 PagedAttention 要像操作系统管内存页一样管理 KV Cache 的原因：按需分页、序列间共享（system prompt 前缀复用能省一大截）、满了抢占换出。
+  </div>
+  <h3>Decode 速度上限：先算带宽，再谈算力</h3>
+  <pre><span class="c"># 单条生成的理论上限 = 显存带宽 ÷ 模型体积</span>
+<span class="c"># A100 80GB：HBM2e 带宽 2039 GB/s；7B fp16 权重 14 GB</span>
+<span class="c"># 上限 ≈ 2039 / 14 ≈ 145 token/s（单流）</span>
+
+<span class="c"># 推论 1：batch 是吞吐的解药 —— 权重读一次服务整个 batch，</span>
+<span class="c">#   聚合吞吐可达单流几十倍，但单条速度不会超过带宽上限。</span>
+<span class="c"># 推论 2：INT4（7B → 3.9GB）把单流上限拉到 ≈520 tok/s，量化最大的收益场景。</span></pre>
+  <div class="callout ok">
+    <b>排障口诀：</b>首 token 慢（TTFT 300ms~3s+）→ prompt 长度和 prefill，算力问题；出词慢（TPOT 7~15ms）→ batch 和 KV Cache 占用，带宽/显存问题；吞吐低 → continuous batching 开没开、序列长度是否参差。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>采样策略：temperature、top-p 与 beam search</h2></div>
+  <p class="lead">模型每步输出的是<b>词表上的概率分布</b>，采样策略就是"怎么从这个分布里挑一个词"。它只改变<b>分布的用法</b>，不改变分布本身，更不改变模型的知识。</p>
+  <h3>五个主流旋钮</h3>
+  <table>
+    <tr><th style="width:130px">参数</th><th style="width:230px">作用机制</th><th>推荐值与坑</th></tr>
+    <tr><td><b>temperature</b></td><td>logits 先除以 T 再 softmax。T&lt;1 分布变尖锐（更确定），T&gt;1 变平坦（更随机）</td><td>0 = 贪心；创意任务 0.8~1.0；<b>T→0 与贪心等价，多数 API 直接禁 T=0 而用 greedy 参数</b></td></tr>
+    <tr><td><b>top-k</b></td><td>只在概率最高的 k 个候选里采样，其余置零</td><td>k=1 就是贪心；常用 20~50。<b>k 是绝对数，不随分布形状自适应</b></td></tr>
+    <tr><td><b>top-p</b><br>（nucleus）</td><td>按概率降序累加，累计超过 p 的候选集合为采样池</td><td>常用 0.9~0.95。<b>分布尖锐时池子小，平坦时池子大 —— 自适应，通常比 top-k 更优</b></td></tr>
+    <tr><td><b>重复惩罚</b></td><td>对出现过的 token 的 logit 打折（presence/frequency penalty）或除以其概率幂</td><td>治复读机；<b>调太大会伤害正常的名词重复和代码生成</b></td></tr>
+  </table>
+  <h3>完整采样实现（可直接跑）</h3>
+  <pre><span class="b">import</span> numpy <span class="b">as</span> np
+
+<span class="b">def</span> <span class="y">sample</span>(logits, temperature=1.0, top_k=0, top_p=1.0):
+    logits = np.asarray(logits, dtype=np.float64)
+    <span class="b">if</span> temperature &lt;= 0:                 <span class="c"># 贪心：直接取最大</span>
+        <span class="b">return</span> int(logits.argmax())
+    logits = logits / temperature            <span class="c"># ① 温度重塑分布</span>
+    logits = logits - logits.max()           <span class="c"># 数值稳定</span>
+    p = np.exp(logits); p /= p.sum()
+
+    <span class="b">if</span> top_k &gt; 0:                        <span class="c"># ② top-k 截断</span>
+        idx = np.argpartition(p, -top_k)[-top_k:]
+        mask = np.zeros_like(p, dtype=bool); mask[idx] = <span class="b">True</span>
+        p = np.where(mask, p, 0.0); p /= p.sum()
+
+    <span class="b">if</span> top_p &lt; 1.0:                       <span class="c"># ③ top-p 截断（按累计概率）</span>
+        order = np.argsort(p)[::-1]
+        cum = np.cumsum(p[order])
+        cutoff = np.searchsorted(cum, top_p) + 1     <span class="c"># 累计首次超过 p 的位置</span>
+        keep = order[:cutoff]
+        mask = np.zeros_like(p, dtype=bool); mask[keep] = <span class="b">True</span>
+        p = np.where(mask, p, 0.0); p /= p.sum()
+
+    <span class="b">return</span> int(np.random.choice(len(p), p=p))
+
+<span class="c"># 常见组合：代码/抽取 → greedy；对话/写作 → T=0.7, top_p=0.9；</span>
+<span class="c"># 头脑风暴 → T=1.0, top_k=40。注意顺序：先温度、后截断</span></pre>  <h3>Beam Search 为什么在开放生成里被淘汰</h3>
+  <table>
+    <tr><th style="width:180px">原因</th><th>说明</th></tr>
+    <tr><td><b>似然 ≠ 质量</b></td><td>beam 优化整句概率，但概率最高的句子往往<b>最平庸、最安全</b>（"这是一个很好的问题……"）。人类评价与似然的相关性在长文本上很弱</td></tr>
+    <tr><td><b>退化问题</b></td><td>Holtzman et al. 2019 实测：beam 生成多样性显著低于采样，长文本更易复读</td></tr>
+    <tr><td><b>算力与显存 k 倍</b></td><td>k=4 就要维护 4 条序列的 KV Cache 和 4 倍 decode 计算，服务成本翻几倍</td></tr>
+  </table>
+  <div class="callout">
+    <b>稳妥口径：</b>beam search 在<b>封闭式任务</b>（机器翻译、语音识别、有唯一正确答案的序列标注）仍有价值；在<b>开放式生成</b>（对话、写作、代码）已被采样全面取代，主流推理框架默认路径都是单序列 + temperature 采样。
+  </div>
+  <div class="callout warn">
+    <b>两个高频误解：</b>① <b>temperature=0 不等于完全确定</b> —— 浮点非结合性、batch 内序列相互影响、硬件差异都可能导致同一输入两次输出不同；要求可复现的抽取任务要用 API 的 seed 参数（支持与否以厂商文档为准）。② <b>temperature 不改变"懂多少"，只改变"敢不敢说"</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>位置编码与上下文长度外推</h2></div>
+  <p class="lead">注意力本身对<b>顺序是盲的</b>（打乱输入序列，注意力结果只随内容变）—— 必须显式注入位置信息。这一块是 2023~2024 年长上下文竞赛的主战场，也是线上"上下文明明没超窗口却答非所问"的根因高发区。</p>
+  <h3>四代方案</h3>
+  <table>
+    <tr><th style="width:150px">方案</th><th style="width:170px">代表模型</th><th>机制与局限</th></tr>
+    <tr><td><b>正弦位置编码</b></td><td>原始 Transformer</td><td>用不同频率的 sin/cos 函数编码绝对位置。理论可外推，实测外推效果差</td></tr>
+    <tr><td><b>可学习绝对位置</b></td><td>BERT、GPT-2</td><td>一张 (max_len × d) 的可学习矩阵。<b>训练时没见过的位置没有定义</b>，无法外推</td></tr>
+    <tr><td><b>RoPE</b><br>旋转位置编码</td><td><b>Llama 全系、Qwen、Mistral、GLM</b></td><td>对 Q/K 按维度对施加与位置相关的旋转，q·k 内积天然只依赖<b>相对位移</b>，长上下文友好，开源主流</td></tr>
+    <tr><td><b>ALiBi</b></td><td>MPT、部分 Bloom 变体</td><td>不改 Q/K，直接在注意力分数上加与距离成正比的线性惩罚。外推性极好，生态已被 RoPE 占领</td></tr>
+  </table>
+  <h3>RoPE 为什么不能"直接喂更长"</h3>
+  <p>RoPE 把第 m 个位置的 Q/K 向量按角度 <span class="k">m·θ_i</span> 旋转，θ_i = base^(-2i/d)。模型训练时只见过 m ∈ [0, 4096) 的旋转角度，推理时直接喂 m = 8192 相当于进入<b>训练中从未出现的角度区间</b>，注意力分数分布崩坏，输出质量断崖式下跌（外推崩坏）。</p>
+  <table>
+    <tr><th style="width:170px">扩展方法</th><th>做法</th><th>代价</th></tr>
+    <tr><td><b>位置插值 PI</b></td><td>把所有位置除以缩放因子 s（4096→8192 就 ÷2），把新位置压回训练区间</td><td>简单免训练；但高频信息被压缩，短文本性能略降</td></tr>
+    <tr><td><b>NTK-aware</b></td><td>不均匀缩放：低频少缩、高频多缩，修正插值的频率失真</td><td>免训练，比 PI 平滑</td></tr>
+    <tr><td><b>YaRN</b></td><td>按频率分段处理 + 注意力温度修正，少量数据继续训练</td><td>效果最好的无痛扩展方案之一，长上下文微调模型广泛采用</td></tr>
+    <tr><td><b>长上下文继续训练</b></td><td>用长文本数据继续预训练/微调，直接教会模型用新长度</td><td>效果最好，成本最高（Llama-3 的 128k 版即此路线）</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>选型红线：</b>模型卡上的 128k 是在特定评测和配置下达成的。① 别把 8k 模型硬喂 100k，输出会以"复读、跑题、突然结束"的形式崩掉；② 同一模型的不同量化版、不同推理框架（llama.cpp 的 rope scaling、vLLM 的 --rope-scaling）行为有差异，长上下文必须用<b>生产实际部署的那一套</b>验证；③ "能跑"和"跑得准"是两回事，长文档问答要做自己的检索测试。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>分词与词表：架构层面的影响</h2></div>
+  <p class="lead">分词看似是"预处理细节"，实际上直接影响<b>参数量、显存、延迟、计费、中英文能力平衡</b>五件大事。算法细节在 tokenization 篇，这里只讲它对架构和工程的三重影响。</p>
+  <h3>影响一：词表大小 = 两张大参数表</h3>
+  <pre><span class="c"># embedding（输入）和 lm_head（输出）各占 vocab × d 个参数</span>
+<span class="c"># 词表从 32000 扩到 128256（Llama-3），d=4096：</span>
+<span class="c"># 32000×4096×2  = 262M 参数</span>
+<span class="c"># 128256×4096×2 = 1.05B —— 多出 0.8B，占 8B 模型的 10%</span>
+
+<span class="c"># 另一笔隐性成本：最后一步 softmax 对 vocab 内每个候选算 exp</span>
+<span class="c"># 词表 128k 时每生成 1 token 多算 12.8 万次 exp，是 decode 的第二大固定开销</span></pre>
+  <h3>影响二：中文 token 效率决定"同一窗口能塞多少内容"</h3>
+  <table>
+    <tr><th style="width:150px">词表</th><th style="width:110px">词表大小</th><th style="width:150px">中文 1 字 ≈</th><th>工程含义</th></tr>
+    <tr><td class="f">cl100k_base<br>（GPT-3.5/4）</td><td>100277</td><td>≈1.0~1.5 token</td><td>中文单字大量进表，效率显著改善</td></tr>
+    <tr><td class="f">Llama-3</td><td>128256</td><td>≈0.7~1.2 token</td><td>100+ 语言平衡设计，中文常见词整词入表</td></tr>
+    <tr><td class="f">Qwen2.5</td><td>151936</td><td>≈0.6~1.0 token</td><td>中英双强设计，中文整词覆盖率高，中文任务性价比突出</td></tr>
+  </table>
+  <pre><span class="c"># 同一句话，两种词表的 token 数（近似值，以实际编码为准）</span>
+<span class="b">import</span> tiktoken
+enc = tiktoken.get_encoding(<span class="g">"cl100k_base"</span>)
+enc.encode(<span class="g">"你好，这是一个测试。"</span>)      <span class="c"># 约 10~11 个 token</span>
+enc.encode(<span class="g">"Hello, this is a test."</span>)  <span class="c"># 约 7 个 token</span>
+<span class="c"># 推论：128k 窗口的中文文档实际能读的"字数"约 10~15 万，</span>
+<span class="c"># 远小于按"字"的直觉估算。RAG 预算和计费都必须按 token 算。</span></pre>
+  <h3>影响三：词表决定"什么对模型是难的"</h3>
+  <ul>
+    <li><b>数字</b>被切成多位片段，长串数字（身份证、订单号）算术和复制都容易错 —— 数字两侧加空格能缓解。</li>
+    <li><b>罕见中文词、姓氏、专业术语</b>被切碎，模型对该词的"词级理解"变弱，生成时也可能拼错。</li>
+    <li><b>代码</b>里的缩进、罕见符号、base64 是 token 放大器，1KB base64 ≈ 1300+ token。</li>
+  </ul>
+  <div class="callout">
+    <b>与 tokenization 篇的分工：</b>那里讲"BPE 怎么训、token 怎么数、怎么省钱"，这里讲"词表是架构的一部分"—— 换模型 = 换词表，<b>用 A 模型 tokenizer 预计算的一切（缓存、索引、价格模型）在 B 模型上全部作废</b>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>量化基础：INT8/INT4/GPTQ/AWQ</h2></div>
+  <p class="lead">量化 = 用更少的比特表示权重，换来显存和带宽下降。对 decode 阶段（带宽 bound）来说，<b>量化几乎等于直接提速</b>。这是把 7B 模型塞进消费级显卡、把 70B 塞进单卡 A100 的唯一实用路径。</p>
+  <h3>位宽与内存账</h3>
+  <table>
+    <tr><th style="width:110px">格式</th><th style="width:90px">位宽</th><th style="width:110px">7B 模型内存</th><th>质量与用途</th></tr>
+    <tr><td><b>FP16/BF16</b></td><td>16 bit</td><td>14 GB</td><td>推理默认基线。BF16 动态范围大，训练更稳</td></tr>
+    <tr><td><b>FP8</b></td><td>8 bit</td><td>7 GB</td><td>Hopper/Ada 架构硬件加速；H100 推理常见</td></tr>
+    <tr><td><b>INT8</b></td><td>8 bit</td><td>7.3 GB</td><td><b>几乎无损</b>（困惑度 +0.01 量级），首选加速方案</td></tr>
+    <tr><td><b>INT4</b>（GPTQ/AWQ）</td><td>4 bit</td><td>3.9~4.5 GB</td><td>主流极限压缩。多数任务可用，长尾任务（数学、代码、小语种）有可见损失</td></tr>
+  </table>
+  <h3>四大技术路线</h3>
+  <table>
+    <tr><th style="width:140px">技术</th><th style="width:250px">核心思路</th><th>适用场景</th></tr>
+    <tr><td><b>GPTQ</b></td><td>逐层量化，用 Hessian 逆矩阵补偿量化误差，权重分组（group size 常为 128）配 scale/zero</td><td>GPU 推理。4bit 下速度接近理论值，生态成熟（AutoGPTQ、Marlin kernel）</td></tr>
+    <tr><td><b>AWQ</b></td><td><b>激活感知</b>：约 1% 的"显著权重"通道对输出影响巨大，保护它们、按激活幅度缩放</td><td>GPU 推理。3~4bit 下常比 GPTQ 略稳</td></tr>
+    <tr><td><b>GGUF + llama.cpp</b></td><td>CPU/混合推理的分块量化格式（Q4_K_M、Q5_K_M 等，不同层用不同位宽）</td><td>Mac/无独显场景。<b>Q4_K_M 是质量/体积的民间甜点</b></td></tr>
+    <tr><td><b>KV Cache 量化</b></td><td>把缓存里的 K/V 也压成 FP8/INT8</td><td>长上下文 + 高并发。显存收益巨大，注意力分数精度略降</td></tr>
+  </table>
+  <pre><span class="c"># 量化收益的算术（7B 模型，A100 2039 GB/s 带宽）</span>
+<span class="c"># FP16：14GB ÷ 2039GB/s ≈ 145 tok/s（单流上限）</span>
+<span class="c"># INT4：3.9GB ÷ 2039GB/s ≈ 520 tok/s —— 理论上限 ×3.6，一台卡能扛的并发也按 3~4 倍放大</span></pre>
+  <div class="callout warn">
+    <b>量化选型的稳妥口径：</b>① <b>INT8 几乎无损，能上就上</b>；② INT4 是显存受限时的正确选择，但<b>必须用你自己的任务集评测</b> —— 社区量化版本质量参差，同规格不同作者差 5~10 个点不稀奇；③ 数学推理、代码、罕见语言是量化重灾区；④ 各框架实现演进很快，<b>以 vLLM/TensorRT-LLM/llama.cpp 当前文档为准</b>；⑤ 别在 INT4 权重上再叠"长上下文 + 高 batch"却不做 KV Cache 量化 —— 显存会先死在 Cache 上。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">收尾</span><h2>十个认知坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把注意力的 O(n²d) 理解错</div><div class="pd">n 是序列长度，d 是隐藏维度 —— <b>不是词表大小</b>。词表只出现在 embedding 查表和最后一步 softmax 里。注意力的 n² 是长上下文成本爆炸的根源。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">参数量估算漏掉 embedding 和输出头</div><div class="pd">只算 12·d²·L 会系统性偏小。词表 128k、d=4096 时，输入 + 输出两张表就是 1B 参数，占 8B 模型的 12.5%。现代模型多用权重共享省一份，但不共享的更多。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">KV Cache 估算漏乘三个因子</div><div class="pd">最容易漏的是 batch。正确公式：2（K和V）× 层数 × KV维度 × 字节数 × 序列长度 × batch。漏一个就低估几倍到几十倍，上线直接 OOM。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">以为"窗口 128k"就等于"实际能读 128k"</div><div class="pd">窗口是训练 + 架构上限，中间信息的利用率会衰减（lost in the middle）。关键信息要放头部或尾部，且必须用自己的数据测有效上下文。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">以为 temperature 改变模型的知识或"智能"</div><div class="pd">它只改分布的尖锐程度。温度调高不会让模型更聪明，只会让输出更多样 —— 包括更多样的错误。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为 temperature=0 输出完全可复现</div><div class="pd">浮点非结合性、batch 组成变化、不同硬件都会让结果有差异。要求逐字节可复现，要么用 seed 参数（以厂商文档为准），要么接受"近似贪心"。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">给 RoPE 模型直接喂超长序列</div><div class="pd">位置角度超出训练区间，注意力分布崩坏，输出表现为复读和跑题。要么用长上下文版本，要么按模型卡要求配置 rope scaling / YaRN。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">以为多头数越多参数量越大</div><div class="pd">d 固定时 QKVO 四个矩阵总参数恒为 4d²，与头数无关。头数只改变切分方式。真正影响 KV Cache 的是 KV 头数（GQA），不是 Q 头数。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用困惑度跨模型比较"谁更聪明"</div><div class="pd">PPL 依赖 tokenizer 和测试集，词表不同的两个模型的 loss 没有可比性。PPL 只在同 tokenizer 同测试集下有意义，且与下游任务表现只是相关不是等价。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">优化推理只盯着 GPU 算力，不看带宽和显存</div><div class="pd">decode 阶段是显存带宽 bound：单流速度上限 = 带宽 ÷ 模型体积。算力再强，带宽跟不上就是慢。这也是量化（缩小体积）比升级算法更直接有效的原因。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个标准 Decoder 层（MHA + 4 倍升维 FFN，d_model=4096）的参数量约为多少？</div>
+      <button class="opt">约 4×4096² ≈ 67M</button>
+      <button class="opt">约 8×4096² ≈ 134M</button>
+      <button class="opt">约 12×4096² ≈ 201M</button>
+      <div class="ans">正确答案：<b>约 12·d² ≈ 2.01 亿</b>。注意力 4d²（QKVO 四个方阵）+ FFN 8d²（d×4d 和 4d×d）= 12d²。只算注意力会漏掉 2/3。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. Llama-2-7B（32 层，MHA，d=4096，fp16）在 4k 上下文、batch=1 时的 KV Cache 约为？</div>
+      <button class="opt">约 0.5 GB</button>
+      <button class="opt">约 2 GB</button>
+      <button class="opt">约 16 GB</button>
+      <div class="ans">正确答案：<b>约 2 GB</b>。2(K,V) × 32 层 × 4096 维 × 2 字节 = 512 KB/token，× 4096 token = 2 GB。16 GB 是同一配置下 32k 上下文的量，别把上下文搞混。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 temperature 与 top-p，哪个说法正确？</div>
+      <button class="opt">temperature 重塑整个分布形状，top-p 在重塑后的分布上按累计概率截断</button>
+      <button class="opt">top-p 先执行，temperature 在保留下来的候选上重新归一化</button>
+      <button class="opt">两者等价，只是参数形式不同</button>
+      <div class="ans">正确答案：<b>先 temperature 后截断</b>。顺序反了 top-p 的语义就变了。而且 temperature=0.5 时分布变尖锐，top-p=0.9 保留下来的候选可能只剩一两个。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 为什么开放式生成（对话、写作）基本不用 beam search？</div>
+      <button class="opt">因为 beam search 在数学上已被证明不收敛</button>
+      <button class="opt">因为所有推理框架都不再实现它</button>
+      <button class="opt">因为句子的似然与人类评价质量相关性弱，beam 输出平庸且多样性差，还要 k 倍算力</button>
+      <div class="ans">正确答案：<b>似然 ≠ 质量</b>。概率最高的句子往往最平庸（"这是个好问题……"），且 beam 有退化（复读）问题、k 倍 KV Cache 和计算成本。它在翻译、识别等封闭任务仍有价值。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 把 RoPE 模型的上下文从 4k 直接拉到 32k 使用，会发生什么？</div>
+      <button class="opt">完全正常，RoPE 天生支持任意长度外推</button>
+      <button class="opt">位置旋转角度进入训练未见区间，注意力分布崩坏，表现为复读、跑题、质量断崖</button>
+      <button class="opt">只会变慢，输出质量不受影响</button>
+      <div class="ans">正确答案：<b>外推崩坏</b>。位置 m 对应旋转角 m·θ，超长位置的角度组合训练时从未出现。解法是位置插值/NTK/YaRN 或长上下文继续训练，且必须以实际部署的框架配置验证。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 7B 模型单流 decode 速度约为 145 tok/s（A100，fp16），把它 INT4 量化后理论上限约为？</div>
+      <button class="opt">约 500+ tok/s，因为权重体积缩到约 1/3.6，而 decode 是带宽 bound</button>
+      <button class="opt">约 150 tok/s，量化不影响速度，只省显存</button>
+      <button class="opt">约 50 tok/s，量化引入额外反量化计算</button>
+      <div class="ans">正确答案：<b>约 500+ tok/s</b>。decode 每 token 都要把全部权重从显存读一遍，是显存带宽 bound：2039 GB/s ÷ 3.9 GB ≈ 520 tok/s。量化是 decode 阶段最直接的提速手段。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>估算公式速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>每层参数 ≈ 12·d²（MHA+4d FFN）</code><span class="desc">SwiGLU 版约 10.5d²~12.8d²，看中间维取值</span><button class="copy">复制</button></div>
+    <div class="crow"><code>总参数 = 12·d²·L + vocab·d·(1 或 2)</code><span class="desc">2 = 输入输出不共享；1 = 共享</span><button class="copy">复制</button></div>
+    <div class="crow"><code>KV Cache = 2·L·n_kv_heads·head_dim·bytes·ctx·batch</code><span class="desc">GQA 让后两项乘组数；÷1024³ 得 GB</span><button class="copy">复制</button></div>
+    <div class="crow"><code>单 token 前向 FLOPs ≈ 2 × 参数量</code><span class="desc">7B ≈ 14 GFLOPs/token</span><button class="copy">复制</button></div>
+    <div class="crow"><code>decode 单流上限 = 显存带宽 ÷ 模型字节数</code><span class="desc">A100：2039 ÷ 14 ≈ 145 tok/s（7B fp16）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>量化内存 = 参数量 × 位宽 ÷ 8</code><span class="desc">7B：fp16=14GB，INT8=7.3GB，INT4≈3.9GB</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>采样参数速查</h3>
+  <table>
+    <tr><th style="width:170px">任务类型</th><th style="width:200px">推荐组合</th><th>说明</th></tr>
+    <tr><td>分类 / 抽取 / 代码补全</td><td class="f">temperature=0（greedy）</td><td>要确定性，seed 视 API 支持</td></tr>
+    <tr><td>对话 / 通用助手</td><td class="f">temperature≈0.7, top_p≈0.9</td><td>大多数 API 的默认值附近</td></tr>
+    <tr><td>创意写作 / 头脑风暴</td><td class="f">temperature≈1.0, top_k≈40</td><td>配合 repetition penalty 治复读</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Token</b></td><td>模型处理文本的最小单位，词表里的一个 id。一个汉字约 0.6~2 个 token，取决于词表</td></tr>
+    <tr><td><b>Q / K / V</b></td><td>查询、键、值。Q 决定"关注谁"，K 决定"被谁关注"，V 是被搬运的内容。自注意力 = 序列内两两打分再加权求和，O(n²·d)</td></tr>
+    <tr><td><b>因果 mask</b></td><td>把未来位置的注意力分数置 -inf，保证只依赖左侧上下文，生成式模型的前提</td></tr>
+    <tr><td><b>多头注意力 MHA</b></td><td>把 d 维切分多组独立做注意力。参数量与头数无关（d 固定时）</td></tr>
+    <tr><td><b>GQA</b></td><td>分组查询注意力：多个 Q 头共享一组 K/V，KV Cache 缩小数倍，长上下文主流</td></tr>
+    <tr><td><b>FFN</b></td><td>每层里的两层 MLP，d→4d→d，被认为存储事实性知识的主体</td></tr>
+    <tr><td><b>SwiGLU</b></td><td>带门控的 FFN 变体，三个矩阵 + SiLU 门控，Llama/Qwen 默认</td></tr>
+    <tr><td><b>LayerNorm / RMSNorm</b></td><td>按隐藏维归一化稳住数值分布；RMSNorm 去均值中心化，开源默认</td></tr>
+    <tr><td><b>下一词预测</b></td><td>唯一的预训练目标：给定上文预测下一个 token 的概率分布；损失为交叉熵 -log p(真实词)</td></tr>
+    <tr><td><b>困惑度 PPL</b></td><td>exp(loss)，"等效候选数"，仅同 tokenizer 同测试集可比</td></tr>
+    <tr><td><b>Scaling Law</b></td><td>损失随参数/数据/算力按幂律下降，可小规模外推大规模表现；Chinchilla 结论：算力最优约每参数 20 token，开源模型为省推理成本普遍超配</td></tr>
+    <tr><td><b>涌现能力</b></td><td>某些能力超规模阈值后突然出现（CoT、少样本）；是否度量伪影有争议</td></tr>
+    <tr><td><b>Prefill / Decode</b></td><td>推理两阶段：处理 prompt（算力 bound）和逐 token 生成（带宽 bound）</td></tr>
+    <tr><td><b>KV Cache</b></td><td>缓存历史 K/V 避免重算，显存随 上下文×batch 线性增长，长上下文主要成本</td></tr>
+    <tr><td><b>RoPE</b></td><td>旋转位置编码：按位置旋转 Q/K，内积天然依赖相对位移，开源主流</td></tr>
+    <tr><td><b>Temperature</b></td><td>logits/T 后 softmax，&lt;1 尖锐 &gt;1 平坦；只改分布不改知识</td></tr>
+    <tr><td><b>Top-p / Top-k</b></td><td>按累计概率 / 固定个数截断候选池的采样约束</td></tr>
+    <tr><td><b>Beam Search</b></td><td>保留 k 条最优序列的解码法，封闭任务用；开放生成已被采样取代</td></tr>
+    <tr><td><b>量化</b></td><td>用低比特表示权重降显存和带宽。INT8 近无损，INT4 主流极限</td></tr>
+    <tr><td><b>GPTQ / AWQ</b></td><td>两种 INT4 路线：Hessian 误差补偿 / 激活感知保护显著权重；GGUF 是 llama.cpp 的分块量化格式</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 <span class="k">12·d²</span> 估算你正在用的模型的参数量，和模型卡对答案；② 跑一遍 KV Cache 计算器，算你的模型在 8k/32k/128k、batch=1/16 下的显存；③ 用同一 prompt 以 temperature=0/0.7/1.2 各生成 3 次，直观感受分布形状；④ 把本文的 numpy 注意力扩写成 2 头版本，验证输出 shape。<br><br>
+    <b>之后值得单独学：</b>PagedAttention 与 continuous batching 的实现细节、推测解码（speculative decoding）、MoE 架构（Mixtral/DeepSeek 的稀疏激活）、推理框架调度策略（vLLM/SGLang/TensorRT-LLM 对比）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透大模型原理 · 参数估算、KV Cache 公式、采样顺序，值得刻在心里</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（12·d² 估算）、模块 4（KV Cache 公式）、模块 5（采样顺序）最值得回头再算一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边算参数量和 KV Cache。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议拿计算器跟着算：一个 7B 模型，32 层，d_model=4096，词表 32000，算它的参数量和 4k 上下文的 KV Cache。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

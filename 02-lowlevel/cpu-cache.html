@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 CPU 与缓存层次</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透 CPU 与缓存层次</h1>
+    <p class="sub">大多数"程序变慢了"的结论，最后都落在这三件事上：<b>指令没发出去（分支预测失败）、数据没取回来（缓存缺失）、两个核在抢同一行缓存（伪共享）</b>。这篇讲清楚 CPU 到底怎么跑代码，以及为什么改一个结构体字段顺序能让吞吐翻倍。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 模块</span>
+      <span class="chip"><b>6</b> 组延迟数据</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议先跑一次 lscpu 和 getconf LEVEL1_DCACHE_LINESIZE，看着自己机器的数字读</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>把机器的底牌翻出来</h2></div>
+  <p class="lead">这篇的所有结论都依赖具体硬件参数。读之前先花两分钟把自己的数字打出来，后面的表格你就能对上号。</p>
+  <pre><span class="c"># 1. 拓扑、频率、各级缓存容量</span>
+lscpu
+lscpu | grep -i cache
+
+<span class="c"># 2. 缓存行大小（x86 一律 64 字节；ARM 上可能是 64 或 128）</span>
+getconf LEVEL1_DCACHE_LINESIZE
+
+<span class="c"># 3. 确认 perf 能用（大多数发行版要单独装 linux-tools）</span>
+perf stat -e cycles,instructions true
+
+<span class="c"># 4. 看 NUMA 布局（多路机器必看）</span>
+numactl --hardware
+
+<span class="c"># 5. 编译器版本，决定你能不能复现下面的向量化例子</span>
+gcc --version</pre>
+  <div class="callout warn">
+    <b>三个容易忽略的前提：</b><br>
+    ① 在虚拟机里跑 <span class="k">perf stat</span>，<span class="k">cycles</span> 和 <span class="k">cache-misses</span> 常常读不到（PMU 未透传），会显示 <span class="k">&lt;not supported&gt;</span>。要测硬件计数器请用物理机或开启 vPMU 的实例。<br>
+    ② 云厂商的"vCPU"是超线程出来的逻辑核，两个 vCPU 共享一个物理核的 L1/L2。<b>算"核数"时要看清楚是物理核还是逻辑核</b>，否则线程池会开多一倍。<br>
+    ③ 容器里 <span class="k">lscpu</span> 看到的是宿主机全部 CPU，不是 cgroup 配额。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>一条指令怎么执行</h2></div>
+  <p class="lead">先建立一个准确的心智模型。教科书上的"取指 → 译码 → 执行 → 写回"是<b>一条指令</b>的生命周期，不是 CPU 的工作方式。真实 CPU 是同时有几十上百条指令处在不同阶段。</p>
+
+  <h3>四个阶段各自在干什么</h3>
+  <table>
+    <tr><th style="width:110px">阶段</th><th style="width:230px">动作</th><th>真正的瓶颈在哪</th></tr>
+    <tr><td><b>取指 Fetch</b></td><td>按 PC（程序计数器）从 L1I 取指令字节，推进 PC</td><td>指令缓存缺失、跨缓存行的长指令、分支目标算不出来</td></tr>
+    <tr><td><b>译码 Decode</b></td><td>x86 把变长的 CISC 指令翻译成定长的微操作（μop，micro-op）</td><td><b>x86 译码宽度是硬限制</b>，现代大核 4~6 条/周期；复杂指令会拆成多条 μop</td></tr>
+    <tr><td><b>执行 Execute</b></td><td>乱序调度到空闲的执行单元（ALU / FPU / LSU / 向量单元）</td><td>执行单元数量、数据依赖、操作数没就绪</td></tr>
+    <tr><td><b>写回 Writeback</b></td><td>结果写进寄存器堆，标记 ROB（重排序缓冲）条目完成</td><td>通常不是瓶颈，但要等前面所有指令都完成才能提交</td></tr>
+  </table>
+
+  <h3>流水线与超标量</h3>
+  <p>流水线（pipeline）是把上面四个阶段拆成更细的十几级，让不同指令占据不同级，像工厂流水线一样重叠。理想情况下每周期完成一条指令，这就是 <b>CPI = 1</b>。</p>
+  <p>但现代 CPU 不止一条流水线，而是<b>超标量（superscalar）</b>：一个周期同时译码 4~6 条、同时发射、有 4 个以上的 ALU。理论上每周期能完成 4~6 条指令。</p>
+  <p>衡量指标是 <b>IPC（Instructions Per Cycle，每周期完成指令数）</b>：</p>
+  <pre>IPC = 完成的指令数 / 消耗的周期数
+CPI = 1 / IPC
+
+<span class="c"># 一颗 3.0 GHz、IPC = 2 的核</span>
+每秒指令数 = 3.0e9 × 2 = 60 亿条/秒
+
+<span class="c"># 实测经验值（通用业务代码，非纯计算内核）</span>
+<span class="g">IPC ≈ 2.0 ~ 3.0</span>   <span class="c">紧凑循环、数据在 L1</span>
+<span class="y">IPC ≈ 1.0 ~ 2.0</span>   <span class="c">普通业务逻辑、有一定分支</span>
+<span class="r">IPC ≈ 0.2 ~ 0.8</span>   <span class="c">指针追逐、大数组随机访问、频繁 cache miss</span></pre>
+  <div class="callout">
+    <b>为什么 IPC 上不去：</b>理论宽度 4~6 是"发射能力"，不是"完成能力"。真正卡住的是三件事 —— ① <b>数据依赖</b>：下一条要用上一条的结果，只能等；② <b>缓存缺失</b>：执行单元空转等数据；③ <b>分支预测失败</b>：前端取错了指令，整条流水线要清空重来。这三者合起来，才是 IPC 的真实上限。
+  </div>
+
+  <h3>为什么单核频率停在 4~5 GHz</h3>
+  <p>2005 年之前，频率每 18 个月翻一倍，靠的是 <b>Dennard 缩放</b>（特征尺寸缩小，电压同比降低，功耗密度保持不变）。这个规律在 130nm~90nm 附近失效了：<b>电压不能再线性下降，漏电流开始指数上升</b>。</p>
+  <table>
+    <tr><th style="width:150px">约束</th><th>具体机制</th></tr>
+    <tr><td><b>动态功耗 ∝ C·V²·f</b></td><td>频率翻倍，功耗也翻倍。3.0 GHz 到 6.0 GHz 意味着同样的芯片要散发两倍热量，风冷压不住</td></tr>
+    <tr><td><b>电压墙</b></td><td>继续降压会让晶体管无法可靠区分 0 和 1，3~5 GHz 附近需要 ~1V 以上，再往上功耗爆炸</td></tr>
+    <tr><td><b>漏电功耗</b></td><td>工艺越先进，静态漏电占比越高。即使不跑东西，芯片也在发热</td></tr>
+    <tr><td><b>互连延迟</b></td><td>信号在硅里的传播速度有限，一个时钟周期内信号只能走约 1~2 mm。芯片越大，全局同步越难</td></tr>
+  </table>
+  <p>所以 2006 年之后，厂商转向<b>多核 + 更宽的发射 + SIMD</b>：不提高频率，而是每周期做更多事，或者干脆堆核。这就是为什么今天的单核性能相比 2010 年只提升了 2~3 倍，而不是 10 倍。</p>
+  <div class="callout warn">
+    <b>对写代码的直接推论：</b>单线程性能的提升空间已经很窄。如果你的服务是单线程瓶颈，靠"换更好的 CPU"最多拿到 20%~30%，靠"优化算法 / 减少内存访问 / 并行化"才能拿到数量级。反过来，<b>如果你的热点函数 IPC 只有 0.5，先别急着多线程</b> —— 先看它是不是在等内存。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>为什么必须有缓存</h2></div>
+  <p class="lead">因为 CPU 和内存的速度差已经从"几倍"变成了"两个数量级"，而且这个差距还在扩大。这个现象有个专门的名字：<b>内存墙（Memory Wall）</b>。</p>
+
+  <h3>六组延迟数据</h3>
+  <p>下面按数量级排列。以 3 GHz 的核为基准，<b>一个周期 ≈ 0.33 ns</b>。</p>
+  <table>
+    <tr><th style="width:150px">层级</th><th style="width:110px">典型延迟</th><th style="width:100px">折算周期</th><th>说明</th></tr>
+    <tr><td><b>寄存器</b></td><td>~0.3 ns</td><td>1 周期</td><td>没有延迟，直接参与运算</td></tr>
+    <tr><td><b>L1 数据缓存</b></td><td>~1 ns</td><td>4~5 周期</td><td>每核私有，32~48 KB。命中率通常 90%+</td></tr>
+    <tr><td><b>L2 缓存</b></td><td>~3~4 ns</td><td>12~14 周期</td><td>每核私有，256 KB~1 MB</td></tr>
+    <tr><td><b>L3 缓存</b></td><td>~10~20 ns</td><td>30~60 周期</td><td>多核共享，8~32 MB。跨 die 访问更慢</td></tr>
+    <tr><td><b>DRAM 内存</b></td><td>~80~100 ns</td><td>250~300 周期</td><td>容量大但慢，是"内存墙"的本体</td></tr>
+    <tr><td><b>NVMe SSD</b></td><td>~100 μs</td><td>30 万周期</td><td>随机读一次，CPU 能执行几十万条指令</td></tr>
+    <tr><td><b>机械硬盘</b></td><td>~10 ms</td><td>3000 万周期</td><td>一次寻道，相当于 CPU 干了一秒钟的活</td></tr>
+  </table>
+  <p>把 L1 和 DRAM 放在一起看：<b>一次内存访问的时间，够 CPU 执行 250 条左右的简单指令</b>。如果这些指令因为等数据而无法执行，执行单元就完全空转。</p>
+
+  <h3>内存墙有多严重</h3>
+  <pre><span class="c"># 一个直观的换算：光在 1 纳秒里走 30 厘米</span>
+3 GHz 的一个周期 = 0.33 ns  →  光走 <span class="g">10 厘米</span>
+一次 DRAM 访问 100 ns        →  光走 <span class="r">30 米</span>
+
+<span class="c"># 也就是说，CPU 等一次内存的时间里，信号理论上可以绕机房一圈</span>
+<span class="c"># 这不是比喻，这是物理约束：电信号在硅里的速度约是真空中一半</span>
+
+<span class="c"># 历史趋势（量级，非精确值）</span>
+1990 年：CPU 周期 ≈ 内存延迟 × <span class="g">10</span>
+2000 年：CPU 周期 ≈ 内存延迟 × <span class="y">100</span>
+今天  ：CPU 周期 ≈ 内存延迟 × <span class="r">250 ~ 300</span></pre>
+  <p>缓存的全部意义，就是用"小但快"的存储，把这 250 个周期的等待<b>在大多数情况下藏起来</b>。藏得住靠的是局部性原理，藏不住的部分就是性能损耗的来源。</p>
+
+  <h3>为什么不用 SRAM 做整个内存</h3>
+  <table>
+    <tr><th style="width:130px">存储类型</th><th style="width:140px">单元面积</th><th style="width:130px">速度</th><th>用途</th></tr>
+    <tr><td><b>SRAM</b></td><td>6 个晶体管/bit</td><td>最快</td><td>缓存。贵、密度低、静态功耗高</td></tr>
+    <tr><td><b>DRAM</b></td><td>1 个晶体管 + 1 个电容</td><td>慢 100 倍</td><td>主存。便宜、密度高，但需要定期刷新</td></tr>
+  </table>
+  <p>SRAM 的单元面积是 DRAM 的 6 倍以上，同样的容量成本高一个数量级。<b>用 SRAM 做 64 GB 内存，成本会高到无法商用</b>。所以层次结构不是设计选择，是物理和经济的必然结果。</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>缓存层次与局部性</h2></div>
+
+  <h3>三级的组织方式</h3>
+  <table>
+    <tr><th style="width:90px">层级</th><th style="width:150px">典型容量</th><th style="width:120px">归属</th><th>关键特征</th></tr>
+    <tr><td><b>L1</b></td><td>32~48 KB（数据）<br>+ 32 KB（指令）</td><td><b>每核私有</b></td><td>哈佛结构，指令和数据分开。4~8 路组相联，访问延迟 4~5 周期</td></tr>
+    <tr><td><b>L2</b></td><td>256 KB~1 MB</td><td><b>每核私有</b></td><td>统一缓存（指令+数据）。8~16 路组相联，延迟 12~14 周期</td></tr>
+    <tr><td><b>L3</b></td><td>8~32 MB</td><td><b>全核共享</b><br>（分片）</td><td>物理上切成多个 slice，用环形/网格互连。跨核访问比本地慢</td></tr>
+    <tr><td><b>TLB</b></td><td>L1: 64 项<br>L2: 1536~2048 项</td><td>每核</td><td>地址翻译缓存，<b>它 miss 的代价和 cache miss 一样大</b>，很多人忘了它</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>三个常被忽略的细节：</b><br>
+    ① <b>L3 不是"一个大池子"</b>。它被切成每核一块的 slice，靠环形总线连接。核 A 访问核 B 旁边的 slice，延迟比访问自己旁边的 slice 高 50% 以上。这就是为什么 NUMA 机器上要绑核。<br>
+    ② <b>L1/L2 是 inclusive 还是 exclusive</b>：Intel 传统上 L3 是 inclusive（L3 包含 L1/L2 的内容），好处是 L3 可以直接做探听过滤；AMD Zen 的 L3 是 victim cache（victim cache，被 L2 淘汰的块放进 L3），更省容量。<b>行为不同，优化策略也不同。</b><br>
+    ③ <b>超线程的两个逻辑核共享同一份 L1/L2</b>。所以"2 vCPU"不等于"2 份 L1"，同物理核上的两个线程会互相踢缓存。
+  </div>
+
+  <h3>局部性：缓存能起作用的唯一原因</h3>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:230px">含义</th><th>代码里的表现</th></tr>
+    <tr><td><b>时间局部性</b></td><td>刚访问过的地址，很可能马上再访问</td><td>循环变量、累加器、热点函数、小范围的查找表</td></tr>
+    <tr><td><b>空间局部性</b></td><td>访问了地址 X，很可能马上访问 X+1</td><td>数组顺序遍历、结构体连续字段、顺序执行的指令</td></tr>
+    <tr><td><b>顺序局部性</b></td><td>空间局部性的特例：指令和数组天然顺序</td><td>硬件预取器（prefetcher）专门吃这个，能提前 4~10 个缓存行把数据拉进来</td></tr>
+  </table>
+  <p>缓存行是 64 字节。这意味着<b>你读一个 4 字节的 int，硬件实际搬了 64 字节</b>。如果接下来用的数据在这 64 字节里，这次搬运就赚了；如果跳到 1 MB 之外，这 60 字节就白搬了 —— 这就是"空间局部性差"的真实成本。</p>
+
+  <h3>平均访问延迟怎么算</h3>
+  <p>核心公式是 <b>AMAT（Average Memory Access Time，平均内存访问时间）</b>：</p>
+  <pre><span class="b">AMAT = 命中时间 + 缺失率 × 缺失代价</span>
+
+<span class="c"># 只有一级缓存时</span>
+AMAT = T_L1 + (1 - H_L1) × T_mem
+
+<span class="c"># 两级（L1 缺失后再看 L2）</span>
+AMAT = T_L1 + (1 - H_L1) × [ T_L2 + (1 - H_L2) × T_mem ]
+
+<span class="c"># 代入真实数字：T_L1 = 1ns, H_L1 = 95%, T_L2 = 4ns, H_L2 = 80%, T_mem = 100ns</span>
+AMAT = 1 + 0.05 × [ 4 + 0.20 × 100 ]
+     = 1 + 0.05 × [ 4 + 20 ]
+     = 1 + 0.05 × 24
+     = <span class="g">2.2 ns</span>
+
+<span class="c"># 对比：假设完全没有 L2，全部 L1 缺失都打到内存</span>
+AMAT = 1 + 0.05 × 100 = <span class="r">6.0 ns</span>
+<span class="c"># 一个 L2 把平均延迟从 6.0ns 降到 2.2ns，接近 3 倍</span></pre>
+
+  <h4>命中率是高度非线性的</h4>
+  <pre><span class="c"># 固定 T_L1 = 1ns, T_mem = 100ns，只改命中率</span>
+H = 99.9%  →  AMAT = 1 + 0.001 × 100 = <span class="g">1.10 ns</span>
+H = 99.0%  →  AMAT = 1 + 0.010 × 100 = <span class="g">2.00 ns</span>
+H = 95.0%  →  AMAT = 1 + 0.050 × 100 = <span class="y">6.00 ns</span>
+H = 90.0%  →  AMAT = 1 + 0.100 × 100 = <span class="r">11.0 ns</span>
+
+<span class="c"># 关键观察：命中率从 99% 掉到 90%，只掉了 9 个百分点</span>
+<span class="c"># 但平均延迟从 2.0ns 涨到 11.0ns —— 5.5 倍</span>
+<span class="c"># 因为缺失率从 1% 变成 10%，是 10 倍</span></pre>
+  <div class="callout ok">
+    <b>工程含义：</b>优化缓存要看<b>缺失率</b>，不是命中率。命中率 99% 听起来很好，但缺失率 1% 意味着每 100 次访问就有一次要等 100 ns。如果这段代码本来只要 10 ns 就能算完，那一次缺失就把整体拖慢了 10 倍。<br>
+    <b>所以：</b>把"最热的那 1% 访问"从内存挪进缓存，收益远大于"把命中率从 95% 提到 96%"。前者是消除长尾，后者是优化平均值。
+  </div>
+
+  <h3>组相联与冲突缺失</h3>
+  <p>缓存不是全相联的（那样比较器成本爆炸），而是<b>组相联（set-associative）</b>：地址被切成 tag / index / offset 三段，index 决定落到哪一组，组内用 tag 并行比较。</p>
+  <pre><span class="c"># 64 字节缓存行、8 路组相联、32 KB L1 的地址切分</span>
+offset = 低 6 位      <span class="c"># 64 = 2^6，行内偏移</span>
+index  = 中间 6 位    <span class="c"># 32KB / 64B / 8路 = 64 组 = 2^6</span>
+tag    = 剩余高位
+
+<span class="c"># 冲突缺失：两个地址的 index 相同但 tag 不同</span>
+<span class="c"># 如果映射到同一组且该组只有 8 个位置，第 9 个就会踢掉一个</span>
+<span class="c"># 经典案例：按 2 的幂做步长遍历二维数组</span>
+<span class="c"># 4096 × 4 字节 = 16 KB 步长 → 每次都落到同一组</span></pre>
+  <p>这就是为什么有时候"数组大小改成 4096 的倍数之后突然变慢"。解法是把数组维度加个偏移（比如 <span class="k">[N][N+1]</span>），破坏 2 的幂对齐。</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>缓存行与伪共享</h2></div>
+  <p class="lead">这是多线程性能问题里最隐蔽、也最容易修的一类。它的可怕之处在于：<b>代码里没有任何共享变量，两个线程改的是完全不同的字段，性能却掉了 5~10 倍</b>。</p>
+
+  <h3>64 字节缓存行与 MESI</h3>
+  <p>缓存和内存之间以 <b>缓存行（cache line）</b>为单位传输，x86 上固定 64 字节。多核之间要保证一致性，靠的是 <b>MESI 协议</b>（Modified / Exclusive / Shared / Invalid，四种状态）。</p>
+  <table>
+    <tr><th style="width:90px">状态</th><th style="width:200px">含义</th><th>写操作时发生什么</th></tr>
+    <tr><td><b>M</b> 已修改</td><td>本核独占，且与内存不一致（脏）</td><td>直接写，无需通知</td></tr>
+    <tr><td><b>E</b> 独占</td><td>本核独占，与内存一致</td><td>静默升级为 M，<b>零通信</b></td></tr>
+    <tr><td><b>S</b> 共享</td><td>多个核都有副本，与内存一致</td><td><b>必须先发 Invalidate 让其他核作废</b>，等 ACK 才能升级为 M</td></tr>
+    <tr><td><b>I</b> 无效</td><td>本核的副本已作废</td><td>要重新从 L3/内存取</td></tr>
+  </table>
+  <p>关键在 S → M 这一步：<b>要跨核通信，等对方把缓存行作废并回 ACK</b>。这个往返在同一个 socket 内约 40~70 周期，跨 socket 要 100~200 周期。</p>
+
+  <h3>伪共享是怎么发生的</h3>
+  <p>两个线程分别修改两个<b>逻辑上无关</b>的变量，但这两个变量恰好落在同一个 64 字节缓存行里。于是：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>核 0 要写变量 A</b>，发现缓存行是 S 状态（核 1 也有一份），发 Invalidate。</div></div>
+    <div class="step"><div class="txt"><b>核 1 的副本作废</b>，回 ACK，核 0 升级为 M，写入成功。</div></div>
+    <div class="step"><div class="txt"><b>核 1 要写变量 B</b>（同一行），发现是 I 状态，必须重新取整行（从核 0 或 L3）。</div></div>
+    <div class="step"><div class="txt"><b>核 1 取到后发 Invalidate 给核 0</b>，核 0 作废，核 1 升级为 M。</div></div>
+    <div class="step"><div class="txt"><b>两个核就这样来回抢同一行</b>，每次写都要一次跨核往返。这就是"缓存行乒乓"（cache line ping-pong）。</div></div>
+  </div>
+
+  <h3>代码对比</h3>
+  <pre><span class="c">/* ===== 版本 A：伪共享 ===== */</span>
+<span class="b">struct</span> counters {
+    <span class="b">long</span> hits;   <span class="c">// 偏移 0</span>
+    <span class="b">long</span> miss;   <span class="c">// 偏移 8，和 hits 同属一个 64 字节缓存行</span>
+};
+<span class="b">struct</span> counters c;
+
+<span class="c">// 线程 0</span>
+<span class="b">for</span> (<span class="b">long</span> i = 0; i &lt; N; i++) c.hits++;
+<span class="c">// 线程 1</span>
+<span class="b">for</span> (<span class="b">long</span> i = 0; i &lt; N; i++) c.miss++;
+
+<span class="c">// 结果：两个线程在抢同一行，每次自增都是一次跨核往返</span>
+<span class="c">// 实测常见：比单线程还慢，或者只有单线程的 30%~50%</span>
+
+
+<span class="c">/* ===== 版本 B：手工填充（padding）===== */</span>
+<span class="b">struct</span> padded {
+    <span class="b">long</span> hits;
+    <span class="b">char</span> pad[56];   <span class="c">// 8 + 56 = 64，下一个字段强制落到新的一行</span>
+    <span class="b">long</span> miss;
+};
+<span class="c">// 代价：结构体从 16 字节涨到 128 字节</span>
+<span class="c">// 收益：两个线程各写各的行，互不干扰，接近线性加速</span>
+
+
+<span class="c">/* ===== 版本 C：对齐到缓存行（更严谨）===== */</span>
+<span class="c">// C11 / C++17 标准写法，不用手算 pad 大小</span>
+<span class="b">struct</span> aligned_counter {
+    <span class="b">_Alignas</span>(64) <span class="b">long</span> value;
+};
+<span class="c">// C++17 用 alignas(64)，并配合 std::hardware_destructive_interference_size</span>
+<span class="c">// 注意：这个常量在不同编译器上可能给出不同值，跨平台时不要硬编码 64</span></pre>
+
+  <h4>Java 的 @Contended</h4>
+  <pre><span class="c">// JDK 内部注解，位于 jdk.internal.vm.annotation 包</span>
+<span class="c">// 作用是让 JVM 在字段前后自动插入 padding</span>
+<span class="c">// 第三方代码要生效，必须加 JVM 参数 -XX:-RestrictContended</span>
+<span class="c">// （默认只对 JDK 内部类生效，防止滥用导致堆膨胀）</span>
+
+<span class="c">// 更通用的做法：直接用 long 数组 + 索引错开，靠数组元素间距拉开</span>
+<span class="c">// 或者用 AtomicLongArray，每个线程用不同的下标</span>
+<span class="c">// 最土但最有效的做法：每个线程一个独立的 ThreadLocal 计数器，最后汇总</span></pre>
+
+  <h3>怎么检测伪共享</h3>
+  <pre><span class="c"># perf c2c 是专门为伪共享设计的工具（Linux 4.10+）</span>
+perf c2c record -a -- sleep 10
+perf c2c report
+
+<span class="c"># 报告里重点看两列</span>
+<span class="c">#   HITM（Hit Modified）：某核访问的行在别的核里是 M 状态 → 就是伪共享</span>
+<span class="c">#   LLC Load Hitm：按缓存行聚合，哪一行被抢得最凶一目了然</span>
+
+<span class="c"># 没有 perf c2c 时的替代判断</span>
+<span class="c"># 1. 多线程版本比单线程还慢，且 CPU 利用率很高（不是阻塞）</span>
+<span class="c"># 2. perf stat 显示 cache-misses 异常高，但数据量明明很小</span>
+<span class="c"># 3. 把线程数从 2 加到 4，吞吐不升反降</span></pre>
+  <div class="callout danger">
+    <b>伪共享最坑的一点：它不会报错，也不会阻塞，只会让 CPU 空转。</b><br>
+    从 <span class="k">top</span> 上看，CPU 是 100% 忙的，你以为是"算得多"，实际是"抢缓存抢得多"。这时候加机器、加线程都没用，只会让争抢更激烈。<br>
+    <b>经验法则：</b>任何被多个线程高频写入的计数器、状态标志、引用计数，都要检查它和邻居是不是在同一行。尤其是<b>结构体里"读多"和"写多"的字段混排</b>时，几乎必然出问题。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>分支预测与乱序执行</h2></div>
+
+  <h3>为什么需要分支预测</h3>
+  <p>流水线有十几级。如果取指阶段不知道下一条指令在哪（因为要等前面的条件判断算出来），流水线就会停下来等十几个周期。<b>为了不让流水线停，CPU 干脆猜</b>：猜完继续往下取，猜错了再回滚。</p>
+  <table>
+    <tr><th style="width:160px">预测器</th><th style="width:200px">原理</th><th>准确率</th></tr>
+    <tr><td><b>静态预测</b></td><td>固定规则，比如"向后跳转猜 taken"（循环继续）</td><td>~70%</td></tr>
+    <tr><td><b>两级自适应</b></td><td>用历史位记录每个分支最近几次的结果</td><td>~90%</td></tr>
+    <tr><td><b>TAGE</b></td><td>多条不同长度的历史表投票，现代大核标配</td><td>~95%~97%</td></tr>
+  </table>
+  <p>看起来 95% 已经很高了。但算一下：<b>每 20 条指令有 1 个分支，5% 猜错，就是每 400 条指令错一次</b>。每次错的代价是 15~20 周期（要清空流水线，从正确的地址重新取指）。</p>
+  <pre><span class="c"># 预测失败的代价计算</span>
+假设：IPC 理想值 = 3，每 20 条指令一个分支，预测准确率 95%
+
+无预测失败时：1000 条指令 / 3 = 333 周期
+失败次数：1000 / 20 × 5% = 2.5 次
+额外周期：2.5 × 18 = 45 周期
+实际周期：333 + 45 = 378 周期
+实际 IPC：1000 / 378 = <span class="y">2.65</span>   <span class="c">// 掉了 12%</span>
+
+<span class="c"># 如果预测准确率掉到 80%（数据随机分布的分支）</span>
+失败次数：1000 / 20 × 20% = 10 次
+额外周期：10 × 18 = 180 周期
+实际周期：333 + 180 = 513 周期
+实际 IPC：1000 / 513 = <span class="r">1.95</span>   <span class="c">// 掉了 35%</span></pre>
+
+  <h3>经典例子：分支 vs 无分支</h3>
+  <pre><span class="c">// 版本 A：有分支。如果数组是随机数据，预测准确率约 50%</span>
+<span class="b">long</span> sum = 0;
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; n; i++)
+    <span class="b">if</span> (a[i] &gt;= 128) sum += a[i];
+
+<span class="c">// 版本 B：无分支，用掩码消除条件跳转</span>
+<span class="b">long</span> sum = 0;
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; n; i++) {
+    <span class="b">int</span> mask = -(a[i] &gt;= 128);   <span class="c">// 条件成立时 mask = 0xFFFFFFFF，否则 0</span>
+    sum += a[i] &amp; mask;
+}
+
+<span class="c">// 数据已排序时：A 和 B 差不多（分支高度可预测）</span>
+<span class="c">// 数据随机时：B 明显更快（A 有 50% 预测失败率）</span>
+<span class="c">// 编译器 -O2 有时能自动做这个转换，但不是总能</span></pre>
+  <div class="callout warn">
+    <b>别过度迷信"消除分支"。</b>现代编译器和 CPU 已经很强，手写掩码有时反而阻碍向量化。正确做法是：<b>先测，确认分支确实是瓶颈，再改</b>。用 <span class="k">perf stat -e branch-misses,branches</span> 看失败率，如果低于 1%，改它没意义。
+  </div>
+
+  <h3>乱序执行：为什么有序的代码会乱序跑</h3>
+  <p>程序的语义是顺序的，但 CPU 可以在<b>不改变单线程可见结果</b>的前提下，打乱实际执行顺序。三个关键机制：</p>
+  <table>
+    <tr><th style="width:170px">机制</th><th>作用</th></tr>
+    <tr><td><b>寄存器重命名</b><br>register renaming</td><td>架构寄存器只有 16 个，但物理寄存器有 180+ 个。每条写寄存器的指令分配一个新的物理寄存器，<b>消除了假依赖（WAW / WAR）</b>。这样 <span class="k">a = b + c; a = d + e;</span> 两条指令可以并行</td></tr>
+    <tr><td><b>乱序发射</b><br>out-of-order issue</td><td>指令进入保留站（reservation station）排队，<b>谁的操作数先就绪谁先执行</b>，不看程序顺序</td></tr>
+    <tr><td><b>ROB 顺序提交</b><br>in-order retire</td><td>执行可以乱序，但<b>结果必须按程序顺序提交</b>。ROB（重排序缓冲）保证：要么全部生效，要么（异常/预测失败时）全部丢弃</td></tr>
+  </table>
+  <p>所以"有序代码乱序执行"的本质是：<b>执行阶段完全乱序，提交阶段严格有序</b>。对单线程来说，你永远观察不到乱序的结果。但对多线程，另一个核看到的是<b>内存的中间状态</b>，这就是模块 6 要讲的问题。</p>
+  <p>乱序窗口是有限的：现代大核的 ROB 大约 200~500 项。如果一条 cache miss 的指令卡在 ROB 头部，后面的指令填满 ROB 后就无法再进来，整个窗口停滞。这叫 <b>ROB 阻塞</b>，是内存延迟影响 IPC 的主要路径。</p>
+
+  <h3>推测执行的安全代价</h3>
+  <p>分支预测 + 乱序执行意味着 CPU 会执行"可能不该执行"的指令。这些指令的结果会被丢弃，但<b>它们对缓存的影响不会完全消失</b>。Spectre / Meltdown（2018 年披露的侧信道攻击）就是利用这一点：通过测量缓存命中时间，推断出本不该被访问的内存内容。</p>
+  <p>缓解措施（微码更新、KPTI 页表隔离、retpoline 等）都带来了性能损失，典型在 5%~30% 之间，视负载而定。这也解释了为什么同一台机器打补丁前后跑分会有差异。</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>内存屏障与可见性</h2></div>
+  <p class="lead">这是"为什么我的双重检查锁会出问题"的根因。要讲清楚，得先知道 store buffer 这个东西的存在。</p>
+
+  <h3>store buffer：写为什么不是立刻可见</h3>
+  <p>核要写一个变量，如果这个缓存行不在自己手里（I 状态），就得先发 Invalidate、等 ACK。这个往返几十个周期，写指令不能干等 —— 所以 CPU 加了一个<b>写缓冲（store buffer）</b>：写操作先扔进 buffer，指令立即返回，后台慢慢同步。</p>
+  <pre><span class="c"># 经典 litmus test（石蕊测试）：Store Buffering</span>
+初始：x = 0, y = 0
+
+线程 1              线程 2
+x = 1;              y = 1;
+r1 = y;             r2 = x;
+
+<span class="c"># 问题：r1 == 0 且 r2 == 0 可能吗？</span>
+
+<span class="c"># 在 x86（TSO）上：不可能。x86 禁止 StoreLoad 重排</span>
+<span class="c"># 在 ARM / POWER（弱内存序）上：</span>
+<span class="c">#   完全可能！因为 x=1 还在 store buffer 里没刷出去，</span>
+<span class="c">#   线程 1 就已经执行了 r1 = y（读到 0）</span></pre>
+
+  <h3>x86 TSO vs ARM 弱内存序</h3>
+  <table>
+    <tr><th style="width:150px">重排类型</th><th style="width:130px">x86 (TSO)</th><th style="width:130px">ARMv8</th><th>含义</th></tr>
+    <tr><td>Load → Load</td><td><b>禁止</b></td><td>允许</td><td>两次读，后面的不能跑到前面</td></tr>
+    <tr><td>Load → Store</td><td><b>禁止</b></td><td>允许</td><td>读后面的写不能提前</td></tr>
+    <tr><td>Store → Store</td><td><b>禁止</b></td><td>允许</td><td>两次写保持顺序</td></tr>
+    <tr><td>Store → Load</td><td><b>允许</b></td><td>允许</td><td><b>唯一允许的重排</b>，由 store buffer 造成</td></tr>
+  </table>
+  <p><b>TSO（Total Store Order，全存储序）</b>是 x86 的内存模型：除了 Store→Load，其他顺序都保证。这让 x86 上写无锁代码"看起来"很容易，但也埋了坑 —— <b>在 x86 上测通的代码，搬到 ARM 上（比如 Graviton、Apple Silicon、鲲鹏）就可能出错</b>。</p>
+
+  <h3>编译器重排：比 CPU 更早的那一层</h3>
+  <pre><span class="c">// 你以为的顺序</span>
+data = 42;
+ready = 1;
+
+<span class="c">// 编译器看到的：两个不相关的全局变量，可以随便换</span>
+<span class="c">// -O2 下很可能生成：先写 ready，再写 data</span>
+<span class="c">// 因为编译器不知道另一个线程在等 ready</span>
+
+<span class="c">// 修复：编译屏障，告诉编译器"这里不许跨越重排"</span>
+data = 42;
+<span class="b">asm volatile</span>("" ::: "memory");
+ready = 1;
+
+<span class="c">// 但编译屏障只管编译器，不管 CPU</span>
+<span class="c">// 要同时管住 CPU，必须用硬件屏障或原子操作</span></pre>
+
+  <h3>正确的写法</h3>
+  <pre><span class="c">// ===== C11 / C++11 原子操作（推荐，可移植）=====</span>
+<span class="c">// 线程 1</span>
+data = 42;
+atomic_store_explicit(&amp;ready, 1, memory_order_release);
+<span class="c">// release 语义：保证这条 store 之前的所有内存操作，</span>
+<span class="c">// 对"读到这个值的线程"都可见</span>
+
+<span class="c">// 线程 2</span>
+<span class="b">while</span> (!atomic_load_explicit(&amp;ready, memory_order_acquire)) { }
+assert(data == 42);   <span class="c">// 一定成立</span>
+<span class="c">// acquire 语义：保证这条 load 之后的所有内存操作，</span>
+<span class="c">// 不会跑到它前面</span>
+
+<span class="c">// release + acquire 配对，就构成了 happens-before 关系</span>
+<span class="c">// 这是比"加个 barrier"更准确的思维模型</span>
+
+
+<span class="c">// ===== 硬件屏障指令（了解即可，别手写）=====</span>
+x86:   mfence (全屏障) / lfence (读) / sfence (写)
+       <span class="c">// 实际上 x86 的 lock 前缀指令自带全屏障效果</span>
+ARMv8: dmb ish   <span class="c">// 数据内存屏障，inner shareable 域</span>
+       dsb ish   <span class="c">// 更强的数据同步屏障，等所有操作完成</span>
+       isb       <span class="c">// 指令同步屏障，用于修改代码后刷新流水线</span></pre>
+  <div class="callout danger">
+    <b>三个必须纠正的认知：</b><br>
+    ① <b><span class="k">volatile</span> 不是同步原语。</b>C/C++ 的 volatile 只保证"不被优化掉、每次都从内存读"，<b>不保证原子性，也不保证顺序</b>。Java 的 volatile 语义更强（有 acquire/release 效果），但依然不保证复合操作的原子性（<span class="k">i++</span> 仍然不是原子的）。<br>
+    ② <b>"x86 不会重排，所以不用加屏障"是错的。</b>x86 允许 Store→Load 重排，而且编译器重排是另一回事。<br>
+    ③ <b>双重检查锁（DCL）在 Java 里必须给实例字段加 volatile。</b>否则可能拿到一个"引用已赋值但构造函数还没跑完"的半初始化对象。
+  </div>
+  <div class="callout ok">
+    <b>工程上的正确姿势：</b>不要手写屏障。用语言提供的同步原语 —— 互斥锁、条件变量、<span class="k">std::atomic</span>、<span class="k">java.util.concurrent</span>、Go 的 channel 和 <span class="k">sync</span> 包。这些原语已经把内存序封装好了。<b>只有在写无锁数据结构（lock-free queue、RCU）时才需要关心 memory_order</b>，而这类代码的正确性验证成本极高，没有充分理由不要自己写。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>写缓存友好的代码</h2></div>
+  <p class="lead">前面六节是"知道"，这一节是"能改"。三个最有效的动作：改布局、改顺序、改分块。</p>
+
+  <h3>遍历顺序：行优先 vs 列优先</h3>
+  <pre><span class="c">// C 的二维数组是行优先存储（row-major）：a[i][j] 的地址 = base + (i*N + j)*sizeof(T)</span>
+<span class="b">#define</span> N 4096
+<span class="b">static int</span> a[N][N];   <span class="c">// 4096 × 4096 × 4B = 64 MB，远超 L3</span>
+
+<span class="c">// 版本 A：行优先遍历 —— 内存连续，每 16 个 int 用满一个缓存行</span>
+<span class="b">long</span> sum = 0;
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; N; i++)
+    <span class="b">for</span> (<span class="b">int</span> j = 0; j &lt; N; j++)
+        sum += a[i][j];
+
+<span class="c">// 版本 B：列优先遍历 —— 每次跨越 4096*4 = 16 KB</span>
+<span class="b">long</span> sum = 0;
+<span class="b">for</span> (<span class="b">int</span> j = 0; j &lt; N; j++)
+    <span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; N; i++)
+        sum += a[i][j];</pre>
+  <table>
+    <tr><th style="width:180px">版本</th><th style="width:150px">每次访问的缓存行利用率</th><th>量级</th></tr>
+    <tr><td><b>A 行优先</b></td><td>16 个 int / 64B，100%</td><td>基准，比如 30~50 ms</td></tr>
+    <tr><td><b>B 列优先</b></td><td>1 个 int / 64B，6.25%</td><td><b>慢 5~10 倍</b>，而且 TLB 也会被打爆（每次跨页）</td></tr>
+  </table>
+  <p>这不是理论。同样 1600 万次加法，B 版本要额外搬 <b>64 MB × 16 = 1 GB</b> 的数据（每个元素都单独拉一整行），而 A 版本只搬 64 MB。</p>
+  <div class="callout">
+    <b>为什么很多人感觉不到：</b>小数组（比如 512×512 = 1 MB）整个塞得进 L2/L3，列优先也只是多几次 L3 命中，差距不明显。<b>一旦数组超过 L3 容量，差距立刻出现</b>。所以压测要用真实规模的数据。
+  </div>
+
+  <h3>分块（blocking / tiling）</h3>
+  <p>如果算法必须同时访问两个维度（比如矩阵乘法 C = A×B），单纯改顺序救不了。解法是<b>分块</b>：把大矩阵切成能塞进 L1/L2 的小块，在小块内部做完全部计算，再移动到下一块。</p>
+  <pre><span class="c">// 朴素矩阵乘法：内层循环每次跳 B 的一整行，缓存全废</span>
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; N; i++)
+  <span class="b">for</span> (<span class="b">int</span> j = 0; j &lt; N; j++)
+    <span class="b">for</span> (<span class="b">int</span> k = 0; k &lt; N; k++)
+      C[i][j] += A[i][k] * B[k][j];
+
+<span class="c">// 分块版：块大小取到 L1 装得下（例如 64×64 的 float 块 = 16 KB）</span>
+<span class="b">#define</span> BS 64
+<span class="b">for</span> (<span class="b">int</span> ii = 0; ii &lt; N; ii += BS)
+ <span class="b">for</span> (<span class="b">int</span> jj = 0; jj &lt; N; jj += BS)
+  <span class="b">for</span> (<span class="b">int</span> kk = 0; kk &lt; N; kk += BS)
+   <span class="b">for</span> (<span class="b">int</span> i = ii; i &lt; ii+BS; i++)
+    <span class="b">for</span> (<span class="b">int</span> j = jj; j &lt; jj+BS; j++) {
+      <span class="b">float</span> s = C[i][j];
+      <span class="b">for</span> (<span class="b">int</span> k = kk; k &lt; kk+BS; k++)
+        s += A[i][k] * B[k][j];
+      C[i][j] = s;
+    }
+
+<span class="c">// 块大小怎么定：让 A 的一个块 + B 的一个块 + C 的一个块</span>
+<span class="c">// 尽量塞进 L2（256KB~1MB）。64×64×4B = 16KB，三块 48KB，很宽裕</span>
+<span class="c">// 再配合编译器 -O3 -march=native 的自动向量化，能有 5~20 倍提升</span></pre>
+
+  <h3>AoS vs SoA</h3>
+  <pre><span class="c">// AoS（Array of Structs）：一个对象的所有字段连续</span>
+<span class="b">struct</span> Particle { <span class="b">float</span> x, y, z, mass; };   <span class="c">// 16 字节</span>
+<span class="b">struct</span> Particle ps[1000000];                 <span class="c">// 16 MB</span>
+
+<span class="c">// 只更新 x 时：每读 16 字节只用 4 字节，利用率 25%</span>
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; n; i++) ps[i].x += vx[i];
+
+
+<span class="c">// SoA（Struct of Arrays）：按字段拆成多个数组</span>
+<span class="b">struct</span> Particles {
+    <span class="b">float</span> *x, *y, *z, *mass;
+};
+<span class="c">// 只更新 x 时：连续读 4 字节数组，利用率 100%</span>
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; n; i++) X[i] += vx[i];
+<span class="c">// 而且编译器能把这段自动向量化成 8 路 AVX2 或 16 路 AVX-512</span></pre>
+  <table>
+    <tr><th style="width:110px">布局</th><th style="width:230px">优势</th><th>什么时候用</th></tr>
+    <tr><td><b>AoS</b></td><td>单个对象的字段在一起，访问一个对象的多个字段时局部性好；代码直观</td><td>面向对象建模、对象整体读写、字段数少</td></tr>
+    <tr><td><b>SoA</b></td><td>批量处理单个字段时带宽利用率 100%；易向量化；便于 SIMD</td><td>数值计算、批处理、只更新部分字段、需要 SIMD</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一个判断方法：</b>看你的循环是"遍历很多对象，每个对象只碰 1~2 个字段"还是"遍历很多对象，每个对象的所有字段都要用"。<b>前者用 SoA，后者用 AoS</b>。数据库的列存 vs 行存是同一个道理。
+  </div>
+
+  <h3>其他几个立刻能用的技巧</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>用连续容器</div><div class="cd">优先 <span class="k">vector</span> / <span class="k">array</span>，别用 <span class="k">list</span> / 链表。链表每次 next 都是一次潜在的 cache miss（指针追逐），遍历 100 万个节点可能是数组的 10 倍慢</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>小对象用值语义</div><div class="cd">指针多一层间接就多一次访存。热点路径上的小结构体（&lt; 64 字节）直接按值传递，别用 <span class="k">shared_ptr</span> 包一层</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>预取</div><div class="cd">硬件预取器能识别固定步长。实在不行用 <span class="k">__builtin_prefetch(p, 0, 3)</span> 手动提示，但要提前 100~200 周期，太早太晚都没用</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>避免热字段混排</div><div class="cd">结构体里"每个线程都会写"的字段，和"只读"的字段分开。参考内核的 <span class="k">____cacheline_aligned_in_smp</span></div></div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>怎么观测</h2></div>
+  <p class="lead">没有测量就没有优化。这一节给的是判断路径：<b>先分清是"算得多"还是"等得多"，再决定往哪优化</b>。</p>
+
+  <h3>第一步：perf stat 拿基础指标</h3>
+  <pre><span class="c"># 最常用的一组</span>
+perf stat -e cycles,instructions,cache-references,cache-misses,branch-misses ./app
+
+<span class="c"># 输出示例（数字是编的，看结构）</span>
+    12,000,000,000  cycles
+    30,000,000,000  instructions     <span class="c"># IPC = 2.5</span>
+     2,000,000,000  cache-references
+       100,000,000  cache-misses     <span class="c"># 缺失率 5%</span>
+       400,000,000  branch-misses
+
+<span class="c"># 更细的：-d 会展开到 L1/L2/L3/LLC 各级</span>
+perf stat -d ./app
+
+<span class="c"># 看停顿在哪（最有用的一组）</span>
+perf stat -e stalled-cycles-frontend,stalled-cycles-backend ./app
+<span class="c"># frontend stall：取指/译码跟不上（分支预测失败、指令缓存缺失、代码太大）</span>
+<span class="c"># backend stall ：执行单元等操作数（cache miss、除法、依赖链）</span></pre>
+
+  <h3>第二步：从指标判断瓶颈类型</h3>
+  <table>
+    <tr><th style="width:130px">现象</th><th style="width:170px">IPC</th><th style="width:150px">cache-misses</th><th>结论与下一步</th></tr>
+    <tr><td><b>计算密集</b></td><td>&gt; 2.5</td><td>低（&lt; 1%）</td><td>已经很快了。想更快只能上 SIMD、多线程，或者换算法</td></tr>
+    <tr><td><b>访存密集</b></td><td>&lt; 1.0</td><td>高（&gt; 5%）</td><td>backend stall 高。改数据布局、加缓存、分块、减少指针追逐</td></tr>
+    <tr><td><b>分支密集</b></td><td>1.0~2.0</td><td>低</td><td>frontend stall 高、branch-misses 占比高。消除不可预测分支、查表替代</td></tr>
+    <tr><td><b>锁竞争</b></td><td>低</td><td>可能不高</td><td>CPU 利用率高但吞吐低。用 <span class="k">perf c2c</span> 或 <span class="k">perf lock</span> 看争抢</td></tr>
+    <tr><td><b>系统调用多</b></td><td>低</td><td>低</td><td>用 <span class="k">perf trace</span> 或 <span class="k">strace -c</span> 看 syscall 次数</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>IPC 要跟自己的基线比，不要跟别人的数字比。</b>同一个程序在不同 CPU 上的 IPC 本来就不一样（宽度、缓存、频率都不同）。有意义的比较是：<b>改动前 vs 改动后</b>，同一台机器，同样的输入。</div>
+
+  <h3>第三步：定位到具体函数和代码行</h3>
+  <pre><span class="c"># 采样，看热点函数</span>
+perf record -g ./app
+perf report
+
+<span class="c"># 直接看汇编级的热点（哪个指令在等）</span>
+perf record -e cycles:pp ./app
+perf annotate
+
+<span class="c"># 只看 cache miss 发生在哪</span>
+perf record -e cache-misses:pp ./app
+perf report
+
+<span class="c"># 伪共享专项</span>
+perf c2c record -a -- sleep 10
+perf c2c report
+
+<span class="c"># 锁竞争专项</span>
+perf lock record ./app
+perf lock report</pre>
+
+  <h3>第四步：确认缓存行与拓扑</h3>
+  <div class="cmds">
+    <div class="crow"><code>getconf LEVEL1_DCACHE_LINESIZE</code><span class="desc">缓存行字节数，x86 恒为 64</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lscpu | grep -i cache</code><span class="desc">L1d/L1i/L2/L3 的容量与关联度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/cpu/cpu0/cache/index*/size</code><span class="desc">逐级缓存大小，脚本里更好解析</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numactl --hardware</code><span class="desc">NUMA 节点、每节点内存、节点间距离</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numastat -p &lt;pid&gt;</code><span class="desc">进程的内存分布在各 NUMA 节点的比例</span><button class="copy">复制</button></div>
+    <div class="crow"><code>taskset -c 0-3 ./app</code><span class="desc">绑核，减少跨核迁移导致的缓存失效</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e cache-misses,LLC-load-misses ./app</code><span class="desc">区分 L1/L2 缺失和最后一级缺失</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf bench mem memcpy</code><span class="desc">测本机内存带宽基线，判断是否已打满</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout danger">
+    <b>一个高频误判：看到 cache-misses 绝对值大就认为有问题。</b><br>
+    绝对值大不代表有问题 —— 一个跑 10 分钟的服务当然会有几亿次 miss。<b>要看的是"缺失率"和"每次缺失的代价占比"</b>。正确做法：<span class="k">cache-misses / cache-references</span> 得到缺失率，再结合 IPC 判断它有没有真的拖慢程序。<br>
+    另一个误判：<b>用 wall clock 测微基准，却没做 warm-up</b>。第一次跑必然全是 cold miss，测出来的数字没有意义。至少跑 3 次取后两次。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">以为缓存行是 32 字节</div><div class="pd">x86 从 Pentium 4 起就是 64 字节，ARM 主流也是 64（部分 Apple 芯片的 L1 是 128 字节）。按 32 算 padding 会导致仍然伪共享，或者浪费一倍内存。用 <span class="k">getconf LEVEL1_DCACHE_LINESIZE</span> 确认。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">多线程计数器放在同一个结构体里</div><div class="pd">这是伪共享的教科书案例。每个线程高频写的计数器，必须各自对齐到独立缓存行，或者干脆用 ThreadLocal 本地累加、最后汇总。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 volatile 当同步原语用</div><div class="pd">C/C++ 的 volatile 不保证原子性、不保证顺序，只保证不被优化掉。Java 的 volatile 有内存序语义，但 <span class="k">i++</span> 依然不是原子操作。要同步就用锁或 atomic。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">认为"x86 不会重排，所以不用管内存序"</div><div class="pd">x86 允许 Store→Load 重排（store buffer 造成），而且编译器重排跟架构无关。在 x86 上测通的代码搬到 ARM 服务器上可能直接出错。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">列优先遍历大矩阵</div><div class="pd">C/C++ 是行优先存储。按列遍历时每次跨一整行，缓存行利用率只有 1/16，还可能每次触发 TLB miss。实测慢 5~10 倍。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">AoS 布局却只遍历一个字段</div><div class="pd">比如 <span class="k">struct {x,y,z,mass}</span> 数组只更新 x，带宽利用率 25%。改成 SoA 或拆成独立数组，通常能快 2~4 倍，还能被自动向量化。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">热点路径上用链表 / 树 / 哈希表做指针追逐</div><div class="pd">每次 <span class="k">node = node-&gt;next</span> 都可能是一次 cache miss，而且无法预取（地址依赖）。100 万节点的链表遍历可能是数组的 10 倍慢。能用数组就用数组。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">二维数组维度取 2 的幂</div><div class="pd">4096×4096 的数组，按列访问时步长 16 KB，所有访问都映射到同一组缓存，产生冲突缺失。把维度改成 <span class="k">[N][N+1]</span> 破坏对齐，可能直接快一倍。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">在容器 / 云主机上跑 perf 得出错误结论</div><div class="pd">vCPU 是超线程出来的逻辑核，两个 vCPU 共享 L1/L2；PMU 常常不透传，cache-misses 读数不可信；<span class="k">lscpu</span> 看到的是宿主机全部 CPU。性能结论必须在目标规格的机器上验证。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">盲目加 padding 导致内存暴涨</div><div class="pd">把 100 万个 16 字节的结构体全部 pad 到 64 字节，内存直接涨 4 倍，反而把原本能进 L3 的数据挤出去了。padding 只该用在"被多线程高频写"的少数热点字段上。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 两个线程分别自增结构体里相邻的两个 <span class="k">long</span> 字段，程序比单线程还慢。最可能的原因是？</div>
+      <button class="opt">两个线程在争同一把锁</button>
+      <button class="opt">伪共享：两个字段在同一缓存行，写操作触发缓存行来回失效</button>
+      <button class="opt">编译器没有做循环展开</button>
+      <div class="ans">正确答案：<b>伪共享</b>。两个 <span class="k">long</span> 占 16 字节，必然在同一个 64 字节缓存行里。每次写都要让对方核的副本失效并等 ACK，形成缓存行乒乓。修法是 padding 到 64 字节对齐，或用 <span class="k">@Contended</span> / ThreadLocal 累加。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. L1 命中时间 1 ns，L1 缺失率 5%，内存延迟 100 ns，没有 L2。平均访问延迟约是？</div>
+      <button class="opt">1 ns</button>
+      <button class="opt">2.2 ns</button>
+      <button class="opt">6 ns</button>
+      <div class="ans">正确答案：<b>6 ns</b>。AMAT = 1 + 0.05 × 100 = 6 ns。如果中间加一级 L2（4 ns 延迟、80% 命中），AMAT = 1 + 0.05 × (4 + 0.2 × 100) = 2.2 ns。注意缺失率从 5% 降到 1% 时，AMAT 从 6 ns 降到 2 ns —— 收益来自缺失率，不是命中率。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 x86 的内存序（TSO），哪个说法正确？</div>
+      <button class="opt">x86 允许 Store→Load 重排，其余三种顺序都保证</button>
+      <button class="opt">x86 完全顺序执行，不存在任何重排</button>
+      <button class="opt">x86 允许所有四种重排，和 ARM 一样弱</button>
+      <div class="ans">正确答案：<b>只允许 Store→Load 重排</b>。原因是 store buffer：写操作进缓冲后指令立即返回，后续的 load 可以先执行。这也意味着在 x86 上写无锁代码"看起来"很容易，但搬到 ARM（弱内存序，四种重排都允许）上就会出问题。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. <span class="k">perf stat</span> 显示 IPC = 0.4，cache-misses 占 cache-references 的 12%。下一步最该做什么？</div>
+      <button class="opt">加线程数，用并行掩盖延迟</button>
+      <button class="opt">优化数据布局：减少指针追逐、改遍历顺序、分块、提高局部性</button>
+      <button class="opt">换更高频率的 CPU</button>
+      <div class="ans">正确答案：<b>优化数据布局</b>。IPC 0.4 说明大部分周期在等，缺失率 12% 说明等的是内存。加线程只会让多个核一起等内存，带宽反而更紧张；换 CPU 提升不到 20%。这类问题的数量级收益只能来自"少访问内存"。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 4096×4096 的 <span class="k">int</span> 二维数组，按列遍历比按行遍历慢很多，根本原因是？</div>
+      <button class="opt">按列遍历的循环次数更多</button>
+      <button class="opt">按列遍历无法使用 CPU 的乘法指令</button>
+      <button class="opt">每次访问跨 16 KB，缓存行 64 字节里只用 4 字节，且容易触发冲突缺失和 TLB miss</button>
+      <div class="ans">正确答案：<b>空间局部性被破坏</b>。C 是行优先存储，<span class="k">a[i][j]</span> 按列走时地址步长是 16 KB。每次只用一个 int 却拉了整行 64 字节（利用率 6.25%），而且 16 KB 的步长会让大量访问映射到同一缓存组。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 双重检查锁（DCL）单例，为什么实例字段必须加 <span class="k">volatile</span>（Java）？</div>
+      <button class="opt">防止"引用已赋值但构造函数未完成"的半初始化对象被另一个线程看到</button>
+      <button class="opt">让字段访问变快</button>
+      <button class="opt">防止内存泄漏</button>
+      <div class="ans">正确答案：<b>防止半初始化对象逸出</b>。<span class="k">instance = new Singleton()</span> 实际是三步：分配内存、调用构造、赋值引用。没有 volatile 时，赋值引用可能被重排到构造之前，另一个线程在第一次判空时就会拿到一个字段全是默认值的对象。volatile 的 release 语义禁止这个重排。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+
+  <h3>延迟与容量速查</h3>
+  <table>
+    <tr><th style="width:130px">层级</th><th style="width:110px">延迟</th><th style="width:110px">周期@3GHz</th><th style="width:130px">容量</th><th>归属</th></tr>
+    <tr><td>L1d</td><td>~1 ns</td><td>4~5</td><td>32~48 KB</td><td>每核私有</td></tr>
+    <tr><td>L2</td><td>~3~4 ns</td><td>12~14</td><td>256 KB~1 MB</td><td>每核私有</td></tr>
+    <tr><td>L3</td><td>~10~20 ns</td><td>30~60</td><td>8~32 MB</td><td>全核共享（分片）</td></tr>
+    <tr><td>DRAM</td><td>~80~100 ns</td><td>250~300</td><td>GB 级</td><td>全机共享</td></tr>
+    <tr><td>NVMe SSD</td><td>~100 μs</td><td>~30 万</td><td>TB 级</td><td>持久化</td></tr>
+    <tr><td>HDD</td><td>~10 ms</td><td>~3000 万</td><td>TB 级</td><td>持久化</td></tr>
+  </table>
+
+  <h3>观测命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>perf stat -e cycles,instructions ./app</code><span class="desc">算 IPC：instructions / cycles</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -d ./app</code><span class="desc">展开到 L1/L2/L3/LLC 各级缺失</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e branch-misses,branches ./app</code><span class="desc">分支预测失败率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e stalled-cycles-frontend,stalled-cycles-backend ./app</code><span class="desc">区分前端/后端停顿</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf record -g ./app &amp;&amp; perf report</code><span class="desc">采样找热点函数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf annotate</code><span class="desc">看热点指令级分布</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf c2c record -a -- sleep 10</code><span class="desc">伪共享专项，看 HITM 列</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf lock record ./app</code><span class="desc">锁竞争专项</span><button class="copy">复制</button></div>
+    <div class="crow"><code>getconf LEVEL1_DCACHE_LINESIZE</code><span class="desc">缓存行大小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numastat -p &lt;pid&gt;</code><span class="desc">进程内存的 NUMA 分布</span><button class="copy">复制</button></div>
+    <div class="crow"><code>taskset -c 0-3 ./app</code><span class="desc">绑核，减少迁移开销</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf bench mem memcpy</code><span class="desc">测本机内存带宽基线</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>公式</h3>
+  <pre><span class="c"># 平均内存访问时间</span>
+AMAT = T_L1 + (1 - H_L1) × [ T_L2 + (1 - H_L2) × T_mem ]
+
+<span class="c"># IPC 与加速比</span>
+IPC = instructions / cycles
+加速比 = (IPC_new × f_new) / (IPC_old × f_old)
+
+<span class="c"># 预测失败的影响</span>
+额外周期 = 分支数 × 失败率 × 惩罚周期   <span class="c"># 惩罚约 15~20 周期</span>
+
+<span class="c"># 有效带宽（考虑缓存行浪费）</span>
+有效带宽 = 实际带宽 × (有用字节 / 缓存行字节)
+
+<span class="c"># 伪共享的通信成本</span>
+每次写 ≈ 一次跨核缓存行所有权转移 ≈ 40~200 周期</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>IPC</b></td><td>Instructions Per Cycle，每周期完成的指令数，衡量 CPU 效率的核心指标</td></tr>
+    <tr><td><b>CPI</b></td><td>Cycles Per Instruction，IPC 的倒数</td></tr>
+    <tr><td><b>流水线 pipeline</b></td><td>把指令执行拆成多级重叠进行，提高吞吐但不降低单条延迟</td></tr>
+    <tr><td><b>超标量 superscalar</b></td><td>一个周期发射多条指令，需要多套执行单元</td></tr>
+    <tr><td><b>μop</b></td><td>微操作，x86 把变长指令译码成的定长内部指令</td></tr>
+    <tr><td><b>乱序执行 OoO</b></td><td>按操作数就绪顺序执行，按程序顺序提交结果</td></tr>
+    <tr><td><b>ROB</b></td><td>重排序缓冲，保证乱序执行的结果按序提交，容量决定乱序窗口</td></tr>
+    <tr><td><b>寄存器重命名</b></td><td>用物理寄存器消除 WAW/WAR 假依赖，让指令能真并行</td></tr>
+    <tr><td><b>缓存行 cache line</b></td><td>缓存与内存间传输的最小单位，x86 为 64 字节</td></tr>
+    <tr><td><b>组相联 set-associative</b></td><td>缓存按组划分，组内多路并行比较，兼顾成本和命中率</td></tr>
+    <tr><td><b>MESI</b></td><td>四态缓存一致性协议（Modified/Exclusive/Shared/Invalid）</td></tr>
+    <tr><td><b>伪共享 false sharing</b></td><td>不同变量落在同一缓存行，多核写时互相踢缓存</td></tr>
+    <tr><td><b>HITM</b></td><td>perf c2c 里的关键指标：访问的行在别的核里处于 M 状态，伪共享的直接证据</td></tr>
+    <tr><td><b>store buffer</b></td><td>写缓冲，让写指令不必等缓存行所有权转移，是 Store→Load 重排的根源</td></tr>
+    <tr><td><b>TSO</b></td><td>Total Store Order，x86 的内存模型，只允许 Store→Load 重排</td></tr>
+    <tr><td><b>内存屏障 barrier</b></td><td>限制编译器和 CPU 重排的指令，分 acquire / release / full 语义</td></tr>
+    <tr><td><b>happens-before</b></td><td>两个操作之间的可见性保证，比"加屏障"更准确的思维模型</td></tr>
+    <tr><td><b>TLB</b></td><td>地址翻译缓存，缓存虚拟页到物理页的映射，miss 代价等同 cache miss</td></tr>
+    <tr><td><b>NUMA</b></td><td>非统一内存访问，跨 socket 访问内存比本地慢 1.5~2 倍</td></tr>
+    <tr><td><b>SIMD</b></td><td>单指令多数据，一条指令处理 4/8/16 个数据（SSE/AVX/NEON）</td></tr>
+    <tr><td><b>内存墙 memory wall</b></td><td>CPU 与内存速度差距持续扩大导致的结构性瓶颈</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个两线程计数器，对比"同结构体"和"padding 到 64 字节"两种写法的耗时，用 <span class="k">perf c2c</span> 验证 HITM；② 用 4096×4096 数组跑行优先和列优先，测出倍数差距；③ 把一个 AoS 粒子结构改成 SoA，对比 <span class="k">perf stat</span> 的 IPC 变化；④ 用 <span class="k">perf stat -d</span> 分析你线上服务的一个热点接口，判断它是计算密集还是访存密集；⑤ 在 x86 和 ARM（如果有）上各跑一次同一个无锁队列，观察内存序差异。<br><br>
+    <b>之后值得单独学：</b>NUMA 绑核与内存亲和、huge page 对大数组遍历的影响、SIMD intrinsics 与自动向量化、无锁数据结构的内存序证明（RCU / hazard pointer）、以及 eBPF 在用户态的性能剖析。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 CPU 与缓存层次 · 优化前先测量，测量前先确认你在物理机上</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（伪共享）和模块 7（数据布局）最值得回看。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在自己的机器上跑 perf stat。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议先跑一次 lscpu 和 getconf LEVEL1_DCACHE_LINESIZE，看着自己机器的数字读';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透社交系统设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 高密度版</span>
+    <h1>二十分钟学透社交系统设计</h1>
+    <p class="sub">社交系统的技术主线只有一条：<b>关系链怎么存、内容怎么分、互动怎么计数</b>。大 V 热点、计数竞争、关系深查询是三个反复出事的地方，这篇直接讲机制、表结构和坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种 Timeline 分发模式</span>
+      <span class="chip"><b>6</b> 张核心表 DDL</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起 MySQL + Redis，把 follow 表和 Timeline 敲一遍。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>社交核心模型：四类实体</h2></div>
+  <p class="lead">所有社交产品拆开都是四类实体，以及它们之间的连接方式。先建立这个骨架，后面所有设计都是往骨架上挂肉。</p>
+  <table>
+    <tr><th style="width:110px">实体</th><th style="width:180px">存什么</th><th>关键特征</th></tr>
+    <tr><td><b>用户 user</b></td><td>资料、设置、计数器（关注数/粉丝数）</td><td>读多写极少，可重缓存</td></tr>
+    <tr><td><b>关系 follow</b></td><td>A 是否关注 B、何时关注、分组</td><td><b>写扩散的源头</b>，决定内容分发的形状</td></tr>
+    <tr><td><b>内容 post</b></td><td>正文/图片/视频、可见范围、互动计数</td><td>读远大于写，热点极度不均（大 V）</td></tr>
+    <tr><td><b>互动 interaction</b></td><td>点赞、评论、转发、收藏</td><td><b>高并发小写</b>，计数竞争重灾区</td></tr>
+    <tr><td><b>私信 message</b></td><td>2 人会话内的消息序列</td><td>本质是单聊 IM，可复用 IM 能力</td></tr>
+  </table>
+  <h3>一张图看清连接关系（文字版）</h3>
+  <pre>user ──follow──&gt; user        <span class="c">（关系链，社交的骨架）</span>
+user ──publish──&gt; post       <span class="c">（内容，1 对 N）</span>
+user ──like/comment/share──&gt; post   <span class="c">（互动，N 对 N）</span>
+user ──send──&gt; message ──&gt; user     <span class="c">（私信，2 人会话）</span>
+
+<span class="c">核心矛盾：关系是"多对多图"，内容是"按作者查"，互动是"按内容计数"。</span>
+<span class="c">三种查询模式完全不同，所以存储选型也完全不同 —— 这是本篇的主线。</span></pre>
+  <div class="callout">
+    <b>设计社交系统先问三个问题：</b>① 关系是单向还是双向（决定 follow 表结构和 Timeline 模型）；② 内容分发是推还是拉（决定写扩散的规模）；③ 互动计数允许多少秒的不一致（决定计数走库还是走缓存）。这三个答案定了，架构就出来了。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>关注模型：单向、双向与密友</h2></div>
+  <p class="lead">"关注"不是一个功能，是一组权限模型。选错模型，后面的 Timeline 和隐私体系都要返工。</p>
+  <table>
+    <tr><th style="width:110px">模型</th><th style="width:150px">语义</th><th>技术实现</th></tr>
+    <tr><td><b>单向关注</b></td><td>A 关注 B，B 不需要同意。微博/Twitter/B 站</td><td>一条 follow 记录即可，立即生效</td></tr>
+    <tr><td><b>双向关注</b></td><td>互为好友。早期 QQ/微信/朋友圈</td><td>申请 → 同意 → 写<b>两条</b>记录；拒绝不写</td></tr>
+    <tr><td><b>密友</b></td><td>关注之上的白名单，内容只给密友看</td><td>follow 表加 is_close 标记，或独立白名单表</td></tr>
+    <tr><td><b>特别关注</b></td><td>内容实时推送优先、Timeline 置顶</td><td>follow 表加 is_special 标记，推送走优先队列</td></tr>
+    <tr><td><b>分组/圈子</b></td><td>关注列表分组管理，可按组看内容</td><td>follow 表加 group_id，或独立分组表</td></tr>
+  </table>
+  <h3>表设计上的差异</h3>
+  <pre><span class="c">-- 单向模型：一条记录就是全部</span>
+INSERT INTO follow(user_id, target_id) VALUES (100, 200);
+
+<span class="c">-- 双向模型：申请/同意状态机（多了 status 与确认时间）</span>
+<span class="c">-- status: 0 待同意  1 已关注  2 已拒绝  3 已拉黑</span>
+INSERT INTO follow(user_id, target_id, status) VALUES (100, 200, 0);
+UPDATE follow SET status = 1 WHERE user_id = 100 AND target_id = 200;
+<span class="c">-- 同意时双向写入（200 也关注 100），保证双向查询都是 O(1)</span>
+
+<span class="c">-- 密友/特别关注：加标记位，不要建新表</span>
+ALTER TABLE follow ADD COLUMN is_close TINYINT DEFAULT 0;   <span class="c">-- 密友</span>
+ALTER TABLE follow ADD COLUMN is_special TINYINT DEFAULT 0; <span class="c">-- 特别关注</span></pre>
+  <div class="callout warn">
+    <b>双向模型的性能陷阱：</b>每次关注/取关要维护两条记录和两个计数器，且"申请-同意"跨了时间，中间状态（待同意）要考虑取消、过期、被拒绝后再申请。工程上把关注做成<b>异步状态机</b>：请求先写待处理记录，同意后发消息给申请方，由申请方完成双向写入。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>关系链存储：关系表 vs 图数据库</h2></div>
+  <p class="lead">关系查询有三类：关注列表、粉丝列表、共同关注。前两类关系表轻松搞定，第三类（以及二度人脉）才是选型分水岭。</p>
+  <h3>方案对比</h3>
+  <table>
+    <tr><th style="width:130px">方案</th><th style="width:160px">代表</th><th>优势</th><th>劣势</th></tr>
+    <tr><td><b>关系表</b></td><td>MySQL / TiDB</td><td>简单可靠、运维成熟、可事务；关注/粉丝列表 O(1) 索引查询</td><td>共同关注靠 JOIN，大表慢；多跳遍历行数爆炸</td></tr>
+    <tr><td><b>图数据库</b></td><td>Neo4j、TAO、JanusGraph</td><td>多跳遍历、共同关注原生支持（一跳聚合）</td><td>运维重、生态小、大厂（如 Meta TAO）自建门槛高</td></tr>
+    <tr><td><b>混合架构</b><br>（主流）</td><td>MySQL 关系 + Redis 计数 + 离线图计算</td><td>各取所长：关系存表、计数走缓存、共同关注异步预计算</td><td>组件多，一致性靠最终一致</td></tr>
+  </table>
+  <h3>核心表 DDL</h3>
+  <pre><span class="c">-- 关注关系表：整个社交系统的骨架</span>
+CREATE TABLE follow (
+  user_id    BIGINT       NOT NULL                COMMENT '关注方',
+  target_id  BIGINT       NOT NULL                COMMENT '被关注方',
+  status     TINYINT      DEFAULT 1               COMMENT '1 关注 0 已取消',
+  is_close   TINYINT      DEFAULT 0               COMMENT '密友标记',
+  created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, target_id),
+  KEY idx_target_time (target_id, created_at)     <span class="c">-- 反查粉丝列表</span>
+) COMMENT '关注关系';
+
+<span class="c">-- 查询我关注的人（分页）：</span>
+SELECT target_id, created_at FROM follow
+WHERE user_id = 100 AND status = 1
+ORDER BY created_at DESC LIMIT 20 OFFSET 0;
+
+<span class="c">-- 查询我的粉丝（分页）：</span>
+SELECT user_id, created_at FROM follow
+WHERE target_id = 100 AND status = 1
+ORDER BY created_at DESC LIMIT 20 OFFSET 0;
+
+<span class="c">-- 计数单独放 Redis，不要 COUNT(*) 全表扫</span>
+<span class="b">INCR</span> follow:count:100        <span class="c"># 我的关注数</span>
+<span class="b">INCR</span> fans:count:200         <span class="c"># 200 的粉丝数</span></pre>
+  <h3>共同关注：三种实现的代价</h3>
+  <pre><span class="c">-- 方案一：实时 SQL JOIN（小号可行）</span>
+SELECT f1.target_id
+FROM follow f1 JOIN follow f2 ON f1.target_id = f2.target_id
+WHERE f1.user_id = 100 AND f2.user_id = 200
+LIMIT 20;
+
+<span class="c">-- 代价：以"关注数较小的一方"驱动。</span>
+<span class="c">-- 双方各关注 200 人 → 最多 200 次索引探测，可接受；</span>
+<span class="c">-- 一方关注 5000 人 → 5000 次探测，慢查询。</span>
+
+<span class="c">-- 方案二：Redis Set 交集（关注列表已缓存的场景）</span>
+<span class="b">SINTER</span> following:100 following:200
+
+<span class="c">-- 方案三：异步预计算（主流）</span>
+<span class="c"># 定时任务/消息触发：把共同关注算好写缓存 key = mutual:100:200，TTL 1 小时</span>
+<span class="c"># 用户关注新人时，增量反查对方关注列表与本列表取交集，只更新差量</span>
+
+<span class="c">-- 图数据库写法（Neo4j Cypher）：</span>
+<span class="c"># MATCH (a:User {id:100})-[:FOLLOW]-&gt;(x)&lt;-[:FOLLOW]-(b:User {id:200})</span>
+<span class="c"># RETURN x LIMIT 20</span>
+<span class="c"># 一跳遍历，但 Neo4j 在千亿边规模下的运维成本极高，多数团队用混合方案</span></pre>
+  <h3>二度人脉与深查询的爆炸</h3>
+  <pre><span class="c"># 平均每人关注 200 人，遍历规模：</span>
+一跳（关注的人）      = 200
+两跳（二度人脉）      = 200 × 200 = 4 万
+三跳                  = 4 万 × 200 = <span class="y">800 万</span>
+
+<span class="c"># 工程红线：</span>
+<span class="c"># ① 深度硬限制 2~3 跳，超过直接拒绝或降级为抽样</span>
+<span class="c"># ② 遍历必须设超时（如 200ms）和结果上限（如 1000 节点）</span>
+<span class="c"># ③ "可能认识的人"用离线批量算（每天一次），不要在线实时遍历</span></pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>内容分发：Timeline 的三种模式</h2></div>
+  <p class="lead">Timeline 是社交系统的吞吐命门。核心决策：<b>发帖时把内容推进粉丝收件箱（推），还是读取时聚合关注对象的内容（拉）</b>。</p>
+  <table>
+    <tr><th style="width:100px">模式</th><th style="width:120px">读 / 写成本</th><th>延迟</th><th>致命问题</th></tr>
+    <tr><td><b>推 push</b></td><td>读 O(1)<br>写 O(粉丝数)</td><td>低</td><td><b>大 V 发帖 = fanout 爆炸</b>。1000 万粉 = 1000 万次收件箱写</td></tr>
+    <tr><td><b>拉 pull</b></td><td>读 O(关注数)<br>写 O(1)</td><td>中</td><td>关注 2000 人时聚合超时；读路径压力大</td></tr>
+    <tr><td><b>推拉结合</b><br>（主流）</td><td>大部分 O(1)</td><td>低</td><td>实现复杂，要维护两套路径</td></tr>
+  </table>
+  <h3>推模式：写扩散</h3>
+  <pre><span class="c"># 发帖后的异步 fanout（关键：异步 + 分片 + 削峰）</span>
+用户发帖 ──&gt; 写 post 表 ──&gt; 发 MQ 消息 ──&gt; fanout worker 消费
+                                        │
+        for 粉丝 in 粉丝列表(按 uid 范围分片, 每片 1000):
+            写 timeline_inbox(粉丝, post_id, 时间戳)
+            Redis: ZADD inbox:{粉丝} {时间戳} {post_id}
+
+<span class="c"># 收件箱表（每用户只保留最近 500~1000 条）</span>
+CREATE TABLE timeline_inbox (
+  user_id    BIGINT NOT NULL,
+  post_id    BIGINT NOT NULL,
+  author_id  BIGINT NOT NULL,
+  created_at BIGINT NOT NULL COMMENT '毫秒时间戳',
+  PRIMARY KEY (user_id, created_at, post_id)
+);
+
+<span class="c"># 读 Timeline：一次索引扫描拿最新 20 条，再批量查 post 详情（避免 N+1）</span>
+SELECT post_id, author_id, created_at FROM timeline_inbox
+WHERE user_id = 100 ORDER BY created_at DESC LIMIT 20;</pre>
+  <h3>拉模式：读扩散</h3>
+  <pre><span class="c"># 读时聚合关注对象的最新内容</span>
+SELECT id, user_id, content, created_at FROM post
+WHERE user_id IN (我关注的 200 个 uid)
+ORDER BY created_at DESC LIMIT 20;
+
+<span class="c"># 问题：IN 列表 200 个 uid 时 MySQL 可用，2000 个就危险；</span>
+<span class="c"># 优化：关注列表走缓存；或改为主键范围查询 + 应用层归并；</span>
+<span class="c"># 再激进：每个关注对象最近 20 条各自缓存，读时内存归并排序。</span></pre>
+  <h3>推拉结合：业界标准答案</h3>
+  <div class="steps">
+    <div class="txt"><b>普通用户（粉丝 &lt; 阈值）走推</b>：发帖时写所有粉丝收件箱，读 O(1)。阈值通常取 1000~10000</div>
+    <div class="txt"><b>大 V（粉丝 ≥ 阈值）走拉</b>：发帖只写自己的 post 表，读 Timeline 时额外拉取"关注的大 V 最新 N 条"，与收件箱归并</div>
+    <div class="txt"><b>大 V 列表单独缓存</b>：每个用户维护"我关注的大 V"列表（通常 &lt; 100 人），读时一次聚合，成本可控</div>
+    <div class="txt"><b>未读水位</b>：每用户存 last_read 游标（时间戳或 seq），下拉时只取更新的，避免重复读</div>
+  </div>
+  <div class="callout danger">
+    <b>纯推模式的经典事故：</b>某千万粉大 V 深夜发帖，fanout worker 瞬间产生 1000 万次收件箱写，Redis 主库带宽打满、从库延迟飙升，全站 Timeline 读取超时。修复方案就是推拉结合 + fanout 分片限速。大 V 的判断必须在架构期做，不能等出事再加。
+  </div>
+  <div class="callout ok">
+    <b>收件箱清理策略：</b>每用户 inbox 保留最近 500~1000 条即可（没人翻到一年前）。超出的异步删除，Redis ZSet 用 <span class="k">ZREMRANGEBYRANK inbox:100 0 -1001</span> 截断。永远不要给 inbox 设"永久保留"。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>互动计数架构：点赞、评论、转发</h2></div>
+  <p class="lead">计数是社交系统里写最频繁、竞争最激烈的数据。核心矛盾：<b>热点内容的计数竞争</b>和<b>读放大的成本</b>。</p>
+  <h3>三个典型错误</h3>
+  <pre><span class="c">-- 错误一：读出来 +1 再写回（非原子，并发少计）</span>
+int n = SELECT like_count FROM post WHERE id = 100;
+UPDATE post SET like_count = n + 1 WHERE id = 100;
+
+<span class="c">-- 错误二：直接 UPDATE ... = ... + 1（原子，但热点内容行锁串行化）</span>
+UPDATE post SET like_count = like_count + 1 WHERE id = 100;
+<span class="c"># 热点内容几千 TPS 打同一行，行锁排队，整表写入变慢</span>
+
+<span class="c">-- 错误三：每次都 COUNT(*) 实时算</span>
+SELECT COUNT(*) FROM post_like WHERE post_id = 100;  <span class="c"># 百万级点赞直接超时</span></pre>
+  <h3>正确架构：Redis 原子计数 + 异步落库</h3>
+  <pre><span class="c"># 写路径（点赞）：</span>
+<span class="b">SADD</span> liked:100 88482391            <span class="c"># 去重：已点过返回 0，直接拒绝</span>
+<span class="b">INCR</span> like:count:100               <span class="c"># 原子 +1，微秒级返回</span>
+发布 LikeEvent 到 MQ ──&gt; 消费方每秒批量合并 ──&gt; UPDATE post SET like_count = n
+
+<span class="c"># 读路径：</span>
+<span class="b">GET</span> like:count:100                <span class="c"># 直接读 Redis，不打库</span>
+Redis 未命中时回源数据库并回填缓存
+
+<span class="c"># 取消点赞：</span>
+<span class="b">SREM</span> liked:100 88482391
+<span class="b">DECR</span> like:count:100</pre>
+  <h3>计数分片：百万级点赞的热点解</h3>
+  <pre><span class="c"># 单个计数器仍可能成为热点（爆款内容 10 万+ TPS）</span>
+<span class="c"># 分 16 个槽，写时随机落一个槽，读时求和：</span>
+<span class="b">INCR</span> like:count:100:7              <span class="c"># slot = hash(uid) % 16</span>
+<span class="b">SUM</span> = Σ <span class="b">GET</span> like:count:100:0 .. 15   <span class="c"># 读 16 次，Pipeline 一次网络往返</span>
+
+<span class="c"># 落库时同样分段累加，最后合并为一行；</span>
+<span class="c"># 用户侧感知：点赞数本身允许秒级不一致（用户看不出 100 万和 100 万 +5 的差别）</span></pre>
+  <h3>最终一致的兜底</h3>
+  <table>
+    <tr><th style="width:150px">问题</th><th>解法</th></tr>
+    <tr><td>Redis 重启丢计数</td><td>MQ 消费方定时（每分钟）把增量落库；启动时从库预热回填</td></tr>
+    <tr><td>落库延迟导致数字回跳</td><td>落库用"覆盖写"（取 Redis 快照值），不要用累加</td></tr>
+    <tr><td>取消点赞的竞态</td><td>先 SREM 成功再 DECR，顺序保证；或改用"事件溯源 + 重放"</td></tr>
+    <tr><td>前端重复点击</td><td>按钮级防抖 + 乐观更新（先 +1 渲染，失败回滚）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>评论/转发的计数比点赞更重</b>：它们是"内容型互动"，本身要建表、要走审核、要触发通知。计数只是附属。设计时把"互动"分成两类：<b>轻互动</b>（点赞收藏，只计数）+ <b>重互动</b>（评论转发，写内容），两类走不同链路，别混在一个表里。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>私信：复用 IM 能力</h2></div>
+  <p class="lead">社交私信本质是<b>2 人单聊</b>，不需要自研消息系统。复用 IM 能力的三个关键点：会话模型、seq 对齐、已读机制。</p>
+  <h3>会话与消息模型</h3>
+  <pre><span class="c"># 会话 ID 生成：两个 uid 拼接，保证双向唯一且无状态可算</span>
+conv_id = min(a, b) + "_" + max(a, b)      <span class="c"># 如 100_200</span>
+
+<span class="c">-- 会话表</span>
+CREATE TABLE dm_conversation (
+  conv_id      VARCHAR(32) PRIMARY KEY,
+  user_a       BIGINT NOT NULL,
+  user_b       BIGINT NOT NULL,
+  last_seq     BIGINT DEFAULT 0,           <span class="c">-- 最新消息 seq</span>
+  updated_at   TIMESTAMP
+);
+
+<span class="c">-- 消息表（按 conv_id 分库分表，seq 会话内自增）</span>
+CREATE TABLE dm_message (
+  conv_id    VARCHAR(32) NOT NULL,
+  seq        BIGINT       NOT NULL,        <span class="c">-- 会话内自增，不是全局消息 ID</span>
+  sender_id  BIGINT       NOT NULL,
+  msg_type   TINYINT      NOT NULL,        <span class="c">-- 1 文本 2 图片 3 语音 4 视频</span>
+  content    TEXT,                          <span class="c">-- 文本直接存；媒体存 URL</span>
+  status     TINYINT      DEFAULT 0,        <span class="c">-- 0 正常 1 已撤回 2 已焚</span>
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (conv_id, seq)
+);
+
+<span class="c">-- 收件箱（每用户视角：未读、最近会话）</span>
+CREATE TABLE dm_inbox (
+  user_id      BIGINT NOT NULL,
+  conv_id      VARCHAR(32) NOT NULL,
+  last_read_seq BIGINT DEFAULT 0,           <span class="c">-- 已读水位</span>
+  unread       INT DEFAULT 0,
+  PRIMARY KEY (user_id, conv_id)
+);</pre>
+  <h3>seq 机制：IM 的心脏</h3>
+  <ul>
+    <li><b>会话内 seq 自增</b>（Redis INCR），作为消息唯一标识和排序依据。全局消息 ID 会引入分片问题，会话内 seq 天然有序</li>
+    <li><b>客户端对齐</b>：收到 seq=105，说明 104 之前都该有；缺了就拿 last_seq 向服务端补拉</li>
+    <li><b>断线重连</b>：客户端上报 last_seq，服务端从该点续传，不重发历史</li>
+    <li><b>未读计算</b>：unread = last_seq - last_read_seq，无需逐条计数</li>
+  </ul>
+  <h3>与陌生人社交的风控差异</h3>
+  <table>
+    <tr><th style="width:130px">场景</th><th>策略</th></tr>
+    <tr><td>陌生人首条私信</td><td>先审后发：内容过反垃圾才投递；新注册/低信用用户每日私信上限（如 20 条）</td></tr>
+    <tr><td>未回复轰炸</td><td>对方未回复前最多发 1~2 条，之后的进"折叠区"不通知</td></tr>
+    <tr><td>已读回执</td><td>双向开关。关闭时不更新 last_read_seq 的对外可见性</td></tr>
+    <tr><td>离线推送</td><td>走厂商通道（APNs / FCM / 各安卓厂商），内容脱敏（"你有一条新消息"）</td></tr>
+  </table>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>反垃圾与关系风控</h2></div>
+  <p class="lead">社交的反垃圾是<b>双线作战</b>：内容线（发什么）+ 关系线（和谁连接）。多数团队只做内容线，关系线失守会被薅成骗子的温床。</p>
+  <h3>内容审核链路</h3>
+  <pre><span class="c">用户发布 ──&gt; 实时机审（&lt; 100ms） ──&gt; 命中?</span>
+                    │
+        ┌───────────┴───────────┐
+       否                    是/不确定
+        │                     │
+   直接发布              先发后审 或 先审后发
+                              │
+                    ┌─────────┴─────────┐
+                  人审队列（按优先级）  自动处置（删除/限流/禁言）</pre>
+  <table>
+    <tr><th style="width:130px">层</th><th>手段</th><th>典型参数</th></tr>
+    <tr><td><b>敏感词</b></td><td>DFA/Trie 树匹配，支持变体（拼音、拆字、谐音）</td><td>词库百万级，匹配耗时 &lt; 5 ms</td></tr>
+    <tr><td><b>文本分类</b></td><td>预训练模型（BERT 类）判违规类别</td><td>GPU 推理 10~30 ms/条</td></tr>
+    <tr><td><b>图片/视频</b></td><td>OCR 抽文字 + 分类模型；视频抽帧（每 2 秒 1 帧）</td><td>抽帧 5~10 张/视频</td></tr>
+    <tr><td><b>人审</b></td><td>机审不确定（置信度 0.3~0.8）进队列</td><td>队列延迟 &lt; 5 分钟；高危秒级</td></tr>
+  </table>
+  <h3>关系风控：查"连接行为"</h3>
+  <table>
+    <tr><th style="width:140px">风险</th><th>识别手段</th><th>处置</th></tr>
+    <tr><td><b>批量关注</b></td><td>速率检测：1 分钟关注 &gt; 30 人、每天 &gt; 500 人即异常</td><td>限流、验证码、关系链降级（隐藏）</td></tr>
+    <tr><td><b>僵尸粉</b></td><td>特征：无头像、无内容、关注/粉丝比 &gt; 50、注册时间集中</td><td>批量标记、不计入粉丝数</td></tr>
+    <tr><td><b>机器注册</b></td><td>设备指纹 + IP 聚类：同设备/同网段批量注册</td><td>注册环节拦截、短信/人验升级</td></tr>
+    <tr><td><b>垃圾私信</b></td><td>相同内容高频群发、含外链/联系方式</td><td>先审后发、折叠、封号</td></tr>
+  </table>
+  <div class="callout">
+    <b>ShadowBan（影子封禁）是社交产品的核心技术。</b>不告诉用户他被限制了，只是他的内容/关注不再分发给别人。这样骗子无法感知、无法快速换号重试，而正常用户完全无感。实现上就是在分发链路加一个"发布者信用分"过滤，不在前端暴露。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>隐私与容量估算</h2></div>
+  <p class="lead">隐私功能的技术本质是<b>读路径上的可见性过滤</b>；容量估算的方法论是<b>从 DAU 推导读写 QPS 和存储</b>。两个都给你完整过程。</p>
+  <h3>隐私三件套的实现</h3>
+  <pre><span class="c"># 1. 拉黑：双向即时生效，缓存必须双删</span>
+写 block 表(user_id, target_id) ──&gt; 删双方关系缓存
+                                    ──&gt; 解除关注关系（双向）
+                                    ──&gt; 内容分发链路加黑名单过滤
+<span class="c"># 坑：只删库不删缓存 → 拉黑后对方内容仍可见几分钟。必须"改库 + 删缓存 + 延迟双删"</span>
+
+<span class="c"># 2. 可见范围：读时校验，不要靠写时隔离</span>
+post.visibility: 0 公开 | 1 粉丝可见 | 2 密友可见 | 3 仅自己
+读内容时: 校验 关注关系 + is_close + 黑名单，三个条件都过才返回
+
+<span class="c"># 3. 阅后即焚：物理删除，不留任何副本</span>
+消息 status = 2（已焚）+ TTL 到点物理 DELETE
+媒体文件：对象存储设 lifecycle 规则自动删除
+<span class="c"># 红线：不进缓存、不进 binlog 备份、不做离线归档。只"标记删除"等于没焚</span></pre>
+  <h3>容量估算（完整过程）</h3>
+  <pre><span class="c"># 假设条件：DAU 500 万；人均关注 200；5% 日活用户发帖；</span>
+<span class="c">#           每人每天刷 Timeline 20 次，每次 20 条；发帖粉丝平均 200</span>
+
+<span class="c"># ① 日发帖量</span>
+500 万 × 5% = <span class="y">25 万帖/日</span> ≈ 2.9 帖/秒（平均），峰值按 3 倍 ≈ <span class="y">9 帖/秒</span>
+
+<span class="c"># ② 推模式收件箱写（假设 90% 是普通用户，走推）</span>
+25 万 × 90% × 200 粉丝 = <span class="y">4500 万次写/日</span> ≈ 520 TPS，峰值 ×3 ≈ <span class="y">1560 TPS</span>
+
+<span class="c"># ③ Timeline 读</span>
+500 万 × 20 次 × 20 条 = <span class="y">20 亿条/日</span>
+QPS = 20 亿 ÷ 86400 ≈ <span class="y">2.3 万 QPS（平均）</span>，峰值 ×3 ≈ <span class="y">7 万 QPS</span>
+<span class="c"># 结论：读远大于写，inbox 用 Redis ZSet 缓存，DB 只做持久化</span>
+
+<span class="c"># ④ 互动写（点赞/评论/转发）</span>
+<span class="c"># 假设 30% 帖子被点赞，人均点 10 个赞/日：</span>
+500 万 × 10 = <span class="y">5000 万赞/日</span> ≈ 580 TPS，峰值 ×3 ≈ <span class="y">1740 TPS</span>
+<span class="c"># 全部走 Redis INCR，落库异步合并</span>
+
+<span class="c"># ⑤ 存储（只算增量，不含媒体）</span>
+帖子内容：25 万 × 2KB = <span class="y">500 MB/日</span>
+收件箱索引：4500 万 × 32B = <span class="y">1.4 GB/日</span>
+Redis 收件箱缓存：只缓存活跃用户（近 7 天登录，按 30% 算）
+  150 万用户 × 500 条 × 32B ≈ <span class="y">24 GB</span>（常驻内存）
+关系表：日增关注关系按 DAU×5% = 25 万行/日 ≈ <span class="y">7.5 GB/年</span>
+
+<span class="c"># ⑥ 私信（假设 10% DAU 每天发 10 条）</span>
+500 万 × 10% × 10 = <span class="y">500 万条/日</span> ≈ 58 TPS，峰值 ×3 ≈ <span class="y">174 TPS</span>
+消息表按 conv_id 分 1024 张表，单表日增 5000 行</pre>
+  <div class="callout ok">
+    <b>容量估算的三条经验：</b>① <b>峰值按平均 3 倍估</b>（晚高峰、热点事件可能到 10 倍，单独评估）；② <b>读永远比写多 1~2 个数量级</b>，缓存优先保读路径；③ 存储算增量不算存量，但<b>必须算 5 年存量</b>——25 万帖/日 × 365 × 5 = 4.5 亿帖，单表 5 亿行就该分表了。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">点赞用"查出来 +1 再写回"</div><div class="pd">并发下必少计，且超卖的点赞数永远对不上。用 Redis INCR 原子操作，落库用覆盖写不用累加。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">热点内容计数行锁竞争</div><div class="pd">爆款内容几千 TPS 打同一行 UPDATE，行锁排队拖垮整表。计数必须外置到 Redis；极端热点用 16 槽分片。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">纯推模式遇上大 V 发帖</div><div class="pd">1000 万粉 = 1000 万次收件箱写，Redis 带宽瞬间打满，全站 Timeline 超时。必须推拉结合：粉丝超阈值走拉。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">拉模式关注列表过大</div><div class="pd">用户关注 5000 人，IN 列表爆炸，聚合查询超时。关注列表缓存 + 内存归并；超 2000 关注强制部分转推。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">共同关注实时 JOIN 大表</div><div class="pd">一方关注 5000+ 人时，JOIN 扫描几千行，慢查询。用"小号驱动 + 结果上限 + 异步预计算缓存"。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">关系链深查询无限制</div><div class="pd">三度人脉 = 800 万节点遍历，直接拖垮库。深度硬限制 2~3 跳、设超时和结果上限、可能认识的人离线算。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">阅后即焚只做标记删除</div><div class="pd">数据进缓存、binlog、离线备份，永久可恢复。必须物理删除 + TTL + 对象存储 lifecycle，且不进备份链路。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">拉黑不删缓存，内容残留</div><div class="pd">拉黑后对方内容还可见几分钟，投诉重灾区。拉黑要"改库 + 删缓存 + 延迟双删"，分发链路加黑名单过滤。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">私信用全局消息 ID 当 seq</div><div class="pd">分库分表后全局 ID 乱序，客户端按 seq 补拉全乱。必须用会话内自增 seq，全局 ID 只做寻址。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">计数缓存无兜底，重启全归零</div><div class="pd">Redis 重启丢失全部计数，点赞数显示 0。必须定时（每分钟）落库 + 启动回填，接受秒级不一致。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一个 1000 万粉丝的大 V 发帖，纯推模式会发生什么？</div>
+      <button class="opt">读 Timeline 变慢，因为内容变多了</button>
+      <button class="opt">瞬间产生 1000 万次收件箱写，可能打满写链路</button>
+      <button class="opt">什么都不会发生，Redis 能轻松扛住</button>
+      <div class="ans">正确答案：<b>1000 万次 fanout 写</b>。推模式的写成本是 O(粉丝数)，大 V 发帖就是写扩散事故。解法是推拉结合：粉丝数超阈值（如 5000）的用户走拉模式，读时聚合。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 计算"我和某人的共同关注"，最高效稳妥的做法是？</div>
+      <button class="opt">无条件实时 JOIN，让数据库算</button>
+      <button class="opt">把双方全部关注列表拉到内存里遍历</button>
+      <button class="opt">小号驱动 + 限制结果条数，并异步预计算缓存热点结果</button>
+      <div class="ans">正确答案：<b>小号驱动 + 预计算缓存</b>。JOIN 的代价取决于关注数大的一方，大 V 参与时实时 JOIN 会慢查询。工程主流是混合：小号实时算、热点组合异步预计算 + 缓存，图数据库适合多跳遍历但运维重。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 高并发下的点赞计数，正确的架构是？</div>
+      <button class="opt">Redis INCR 原子计数，MQ 异步批量落库</button>
+      <button class="opt">UPDATE post SET like_count = like_count + 1</button>
+      <button class="opt">每次 COUNT(*) 实时统计</button>
+      <div class="ans">正确答案：<b>Redis 计数 + 异步落库</b>。直接 UPDATE 有热点行锁竞争；COUNT(*) 在百万级点赞上直接超时。配套：SADD 去重防重复点赞、定时落库兜底、落库用覆盖写不用累加。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 推拉结合的 Timeline 中，大 V 的内容走哪条路径？</div>
+      <button class="opt">推：发帖时写进所有粉丝的收件箱</button>
+      <button class="opt">拉：只写自己的 post 表，粉丝读时聚合大 V 最新内容</button>
+      <button class="opt">既推又拉，写两遍保底</button>
+      <div class="ans">正确答案：<b>拉</b>。大 V 发帖只写自己的 post 表；粉丝读 Timeline 时，把收件箱内容与"关注的大 V 最新 N 条"归并。这样大 V 发帖成本 O(1)，读端只增加一次可控的聚合。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 实现"阅后即焚"，技术上的关键要求是？</div>
+      <button class="opt">消息表 status 改成"已焚"，前端不再展示</button>
+      <button class="opt">把消息移到归档表，前端查不到</button>
+      <button class="opt">TTL 到点物理删除，且不进缓存、备份和离线链路</button>
+      <div class="ans">正确答案：<b>物理删除 + 全链路不留副本</b>。只标记删除的话，数据仍在缓存、binlog、备份里，等于没焚。媒体文件要用对象存储 lifecycle 自动删，消息表设 TTL 物理 DELETE。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关系链存储的业界主流选型是？</div>
+      <button class="opt">MySQL 关系表 + Redis 计数 + 共同关注异步预计算</button>
+      <button class="opt">全量上图数据库 Neo4j</button>
+      <button class="opt">全部塞 Redis，不落库</button>
+      <div class="ans">正确答案：<b>混合架构</b>。关系本身用关系表（关注/粉丝列表 O(1)），计数走 Redis，共同关注和二度人脉异步预计算。图数据库在多跳遍历上有优势但运维成本高，适合已有图基础设施的团队。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>核心操作速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>SELECT target_id FROM follow WHERE user_id=? ORDER BY created_at DESC LIMIT 20</code><span class="desc">查我的关注列表（分页）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT f1.target_id FROM follow f1 JOIN follow f2 ON f1.target_id=f2.target_id WHERE f1.user_id=? AND f2.user_id=?</code><span class="desc">共同关注（小号驱动）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZADD inbox:{uid} {ts} {post_id} + ZREMRANGEBYRANK inbox:{uid} 0 -1001</code><span class="desc">收件箱写入 + 截断到 1000 条</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SADD liked:{post_id} {uid} + INCR like:count:{post_id}</code><span class="desc">点赞去重 + 原子计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>INCR like:count:{post_id}:{hash(uid)%16}</code><span class="desc">热点计数分 16 槽</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SINTER following:a following:b</code><span class="desc">Redis 求共同关注</span><button class="copy">复制</button></div>
+    <div class="crow"><code>conv_id = min(a,b) + "_" + max(a,b)</code><span class="desc">私信会话 ID 无状态生成</span><button class="copy">复制</button></div>
+    <div class="crow"><code>unread = last_seq - last_read_seq</code><span class="desc">未读数计算，不逐条 count</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>容量估算公式速查</h3>
+  <table>
+    <tr><th style="width:200px">指标</th><th>公式</th></tr>
+    <tr><td>日发帖量</td><td class="f">DAU × 发帖率</td></tr>
+    <tr><td>推模式收件箱写</td><td class="f">发帖量 × 平均粉丝数（大 V 除外）</td></tr>
+    <tr><td>Timeline 读 QPS</td><td class="f">DAU × 刷新次数 × 每页条数 ÷ 86400</td></tr>
+    <tr><td>峰值</td><td class="f">平均值 × 3（热点事件 × 10 单独评估）</td></tr>
+    <tr><td>互动写 QPS</td><td class="f">DAU × 人均互动次数 ÷ 86400</td></tr>
+    <tr><td>Redis 缓存占用</td><td class="f">活跃用户数 × 每用户条数 × 单条字节</td></tr>
+    <tr><td>分表时机</td><td class="f">单表预估 5 年行数 &gt; 5 亿</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:140px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>单向关注</b></td><td>A 关注 B 不需对方同意，微博/Twitter 模型</td></tr>
+    <tr><td><b>双向关注</b></td><td>互为好友，需申请-同意，写两条关系记录</td></tr>
+    <tr><td><b>密友</b></td><td>关注之上的白名单，内容只对密友可见</td></tr>
+    <tr><td><b>特别关注</b></td><td>内容实时推送优先、Timeline 置顶的关注</td></tr>
+    <tr><td><b>Timeline</b></td><td>按时间排序的内容流，分关注/推荐/同城几种</td></tr>
+    <tr><td><b>推模式</b></td><td>发帖时把内容写进所有粉丝收件箱，读 O(1) 写 O(N)</td></tr>
+    <tr><td><b>拉模式</b></td><td>读取时聚合关注对象的内容，读 O(N) 写 O(1)</td></tr>
+    <tr><td><b>推拉结合</b></td><td>普通用户推、大 V 拉，业界主流 Timeline 架构</td></tr>
+    <tr><td><b>fanout</b></td><td>写扩散，一次发帖扇出到所有粉丝的操作量</td></tr>
+    <tr><td><b>收件箱 inbox</b></td><td>每个用户的 Timeline 数据源，只保留最近 500~1000 条</td></tr>
+    <tr><td><b>共同关注</b></td><td>两人关注列表的交集，社交关系链的经典查询</td></tr>
+    <tr><td><b>二度人脉</b></td><td>关注的人关注的人，多跳遍历行数指数爆炸</td></tr>
+    <tr><td><b>图数据库</b></td><td>以节点和边存储关系的数据库，遍历多跳有优势</td></tr>
+    <tr><td><b>计数分片</b></td><td>把单个计数器拆成多槽缓解热点竞争，读时求和</td></tr>
+    <tr><td><b>最终一致</b></td><td>计数允许秒级不一致，靠定时落库收敛</td></tr>
+    <tr><td><b>会话 seq</b></td><td>私信会话内自增序号，用于排序、补拉和未读计算</td></tr>
+    <tr><td><b>ShadowBan</b></td><td>影子封禁：用户无感知但内容不再分发给他人</td></tr>
+    <tr><td><b>设备指纹</b></td><td>聚合设备硬件特征生成的唯一 ID，用于反批量注册</td></tr>
+    <tr><td><b>可见范围</b></td><td>内容的访问控制：公开/粉丝/密友/仅自己</td></tr>
+    <tr><td><b>阅后即焚</b></td><td>消息查看后 TTL 到点物理删除，全链路不留副本</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 建 follow / post / timeline_inbox 三张表，灌 10 万用户、人均 100 关注，用 EXPLAIN 看关注列表和共同关注两条 SQL 的执行计划；② 用 Redis ZSet 实现收件箱，灌 100 万用户 × 500 条，测内存占用和 ZREVRANGE 延迟；③ 用 Redis INCR + SADD 实现点赞，压测单 key 5 万 TPS 感受热点，再改 16 槽分片对比；④ 实现推拉结合 Timeline：普通用户写 inbox，大 V 读时归并。<br><br>
+    <b>之后值得单独学：</b>推荐系统的召回/粗排/精排链路、Feed 的排序模型（多目标）、分库分表中间件（ShardingSphere）实践、以及关系链的增量图计算（如 Flink 做实时二度人脉）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透社交系统设计 · 上线前检查：大 V 是否走了拉模式、计数是否外置、拉黑是否删缓存</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（Timeline 三种模式）和模块 5（计数架构）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 建议边看边把 follow 表建出来。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起 MySQL + Redis，把 follow 表和 Timeline 敲一遍。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

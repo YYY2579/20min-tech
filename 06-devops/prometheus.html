@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Prometheus 监控体系</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 第 2 期 · 监控篇</span>
+    <h1>二十分钟学透 Prometheus 监控体系</h1>
+    <p class="sub">Prometheus 的部署只要 5 分钟，难的是<b>指标怎么设计、PromQL 怎么不写错、告警怎么不炸</b>。这篇讲 Pull 架构、四种指标类型、PromQL 实战、告警链路和高可用，以及标签基数爆炸这类真实事故。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种指标类型</span>
+      <span class="chip"><b>15+</b> 条 PromQL</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条 docker-compose 起 Prometheus + node_exporter + Alertmanager</span>
+<span class="c"># docker-compose.yml</span>
+services:
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports: ["9090:9090"]
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./rules:/etc/prometheus/rules
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    ports: ["9100:9100"]
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports: ["9093:9093"]
+
+<span class="c"># 验证三件套</span>
+curl localhost:9090/-/healthy        <span class="c"># Prometheus 健康检查</span>
+curl localhost:9090/api/v1/targets    <span class="c"># 看抓取目标状态（JSON）</span>
+curl localhost:9100/metrics           <span class="c"># node_exporter 暴露的原始指标</span>
+curl localhost:9093/-/healthy         <span class="c"># Alertmanager 健康检查</span></pre>
+  <div class="callout">
+    <b>版本说明：</b>Prometheus 2.x 是当前主流（2.53 为 2024 年稳定版），3.0 于 2024 年底发布，去掉了部分废弃 flag、原生支持 UTF-8 指标名，但配置格式和 PromQL 基本兼容。下文示例按 2.x 写，3.x 同样适用。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>架构：Pull 模型与 TSDB</h2></div>
+  <p class="lead">Prometheus 是<b>主动拉取（Pull）</b>指标的时序数据库。它定期 HTTP GET 目标的 <span class="k">/metrics</span> 端点，解析成时间序列存进本地 TSDB。</p>
+  <h3>核心组件</h3>
+  <table>
+    <tr><th style="width:150px">组件</th><th>职责</th></tr>
+    <tr><td><b>Prometheus Server</b></td><td>抓取 + 存储 + 查询 + 规则评估，一个二进制搞定全部</td></tr>
+    <tr><td><b>Exporter</b></td><td>部署在被测对象旁，把内部指标翻译成 HTTP 文本格式（node_exporter、mysqld_exporter）</td></tr>
+    <tr><td><b>Pushgateway</b></td><td>给短生命周期任务（批处理、CI）临时推指标用的中转站，<b>不是消息队列</b></td></tr>
+    <tr><td><b>Alertmanager</b></td><td>接收告警，做分组、抑制、静默，再发到邮件/钉钉/Slack/PagerDuty</td></tr>
+    <tr><td><b>Client Library</b></td><td>应用内埋点库（Java/Python/Go），直接暴露 /metrics</td></tr>
+  </table>
+  <h3>Pull 模型的工作流</h3>
+  <div class="steps">
+    <div class="txt"><b>Service Discovery 发现目标</b>：从静态配置、文件或 K8s/Consul/AWS API 拿到 target 列表</div>
+    <div class="txt"><b>按 scrape_interval 抓取</b>（默认 15s~1m），GET /metrics，超时由 <span class="k">scrape_timeout</span> 控制</div>
+    <div class="txt"><b>解析 exposition 格式</b>，附加 target 的标签（job、instance），写入 TSDB</div>
+    <div class="txt"><b>规则引擎</b>周期性评估 recording rules（预计算）和 alerting rules（产生告警）</div>
+    <div class="txt"><b>Alertmanager</b>收到告警后按 route 配置分组、去重、通知</div>
+  </div>
+  <pre><span class="c"># prometheus.yml 最小可用配置</span>
+global:
+  scrape_interval: 15s          <span class="c"># 全局抓取间隔</span>
+  scrape_timeout: 10s           <span class="c"># 单次抓取超时，必须小于 interval</span>
+  evaluation_interval: 15s      <span class="c"># 规则评估间隔</span>
+  external_labels:
+    cluster: prod-01            <span class="c"># 联邦/远程存储时标识来源，很重要</span>
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['10.0.0.1:9100', '10.0.0.2:9100']
+        labels:
+          env: production       <span class="c"># 给这组目标统一打标</span>
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']</pre>
+  <h3>Service Discovery：静态配置只是起点</h3>
+  <table>
+    <tr><th style="width:170px">SD 机制</th><th>适用场景</th></tr>
+    <tr><td class="f">static_configs</td><td>机器固定的物理机/虚拟机，最简单</td></tr>
+    <tr><td class="f">file_sd_configs</td><td>目标列表放 JSON/YAML 文件，由 CMDB/Ansible 生成，Prometheus 热加载</td></tr>
+    <tr><td class="f">kubernetes_sd_configs</td><td>K8s 场景标配：自动发现 Service/Endpoints/Pod/Node</td></tr>
+    <tr><td class="f">consul_sd / dns_sd</td><td>已有服务注册中心时直接对接</td></tr>
+    <tr><td class="f">ec2_sd / azure_sd / gce_sd</td><td>云上自动伸缩的实例组</td></tr>
+  </table>
+  <pre><span class="c"># file_sd：改文件即生效（配合 --web.enable-lifecycle 或 SIGHUP）</span>
+- job_name: 'file-sd'
+  file_sd_configs:
+    - files: ['/etc/prometheus/targets/*.json']
+      refresh_interval: 30s
+
+<span class="c"># targets/app.json 长这样</span>
+[{
+  "targets": ["10.0.0.5:9100"],
+  "labels": {"app": "api", "env": "prod"}
+}]</pre>
+  <h3>TSDB 存储原理</h3>
+  <ul>
+    <li><b>每个时间序列</b> = 指标名 + 标签集 + 采样点（时间戳, 值）。一条序列约 2~4 字节/采样，15s 间隔下一个序列一天约 17KB</li>
+    <li><b>head block</b>：最近 2 小时的数据在内存里，同时写 WAL（预写日志）防崩溃丢失</li>
+    <li><b>持久 block</b>：2 小时后压缩成不可变 block（含 index、chunks、meta.json），后台 compaction 合并小 block</li>
+    <li><b>retention</b>：默认 15 天，<span class="k">--storage.tsdb.retention.time=30d</span>；超期数据删除不是立即释放磁盘，要等 compaction</li>
+    <li><b>staleness</b>：目标消失后，序列被打 staleness marker，查询时不再返回（避免"僵尸数据"）</li>
+  </ul>
+  <div class="callout warn">
+    <b>Push 模型的正确用法：</b>Pushgateway 只适合<b>批处理任务</b>（cron、CI job 跑完才退出，Prometheus 来不及抓）。把它当普通推送网关用会丢一大特性：Prometheus 的 up 指标（目标健康检查）对 Pushgateway 永远显示正常，实例挂了你不知道。正常服务一律用 Pull。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>四种指标类型</h2></div>
+  <p class="lead">指标类型决定了查询姿势。选错类型，PromQL 怎么写都是错的。</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:150px">行为</th><th>正确用法</th></tr>
+    <tr><td><b>Counter</b></td><td>只增不减（进程重启归零）</td><td>必须配 <span class="k">rate()</span> / <span class="k">increase()</span> 看增速；<b>永远不要对原始值直接告警</b>，要用变化率</td></tr>
+    <tr><td><b>Gauge</b></td><td>任意增减的瞬时值</td><td>直接查询、avg/max 聚合、阈值告警（内存、队列长度、温度）</td></tr>
+    <tr><td><b>Histogram</b></td><td>累积直方图：_bucket（累积计数）、_sum、_count</td><td><span class="k">histogram_quantile()</span> 算分位数；<b>可跨实例聚合</b>；bucket 边界要提前设计</td></tr>
+    <tr><td><b>Summary</b></td><td>客户端算好的分位数：{quantile="0.99"}</td><td>单实例看分位数可以；<b>分位数不能跨实例平均</b>，多实例场景用 Histogram</td></tr>
+  </table>
+  <pre><span class="c"># 四种类型的 exposition 格式对照（node_exporter 真实片段）</span>
+
+<span class="c"># Counter：只增的累计值</span>
+node_network_receive_bytes_total{device="eth0"} 1.8238472e+10
+
+<span class="c"># Gauge：瞬时值，可增可减</span>
+node_memory_MemAvailable_bytes 3.41721088e+09
+node_load1 0.32
+
+<span class="c"># Histogram：注意 bucket 是累积的（le="上限"），不是每桶独立计数</span>
+http_request_duration_seconds_bucket{le="0.005"} 24054
+http_request_duration_seconds_bucket{le="0.01"}  33444
+http_request_duration_seconds_bucket{le="0.025"} 100392
+http_request_duration_seconds_bucket{le="+Inf"}  144320
+http_request_duration_seconds_sum 5970.94
+http_request_duration_seconds_count 144320
+
+<span class="c"># Summary：分位数在客户端算好，直接以 label 暴露</span>
+go_gc_duration_seconds{quantile="0"}    1.2099e-05
+go_gc_duration_seconds{quantile="0.99"} 0.000105837
+go_gc_duration_seconds_sum 0.049683566
+go_gc_duration_seconds_count 471</pre>
+  <h3>Histogram vs Summary：怎么选</h3>
+  <table>
+    <tr><th style="width:150px">维度</th><th>Histogram</th><th>Summary</th></tr>
+    <tr><td><b>分位数计算位置</b></td><td>服务端（PromQL）</td><td>客户端（埋点库）</td></tr>
+    <tr><td><b>跨实例聚合</b></td><td><b>可以</b>（先 rate 再 histogram_quantile）</td><td><b>不行</b>（两个 P99 求平均没有意义）</td></tr>
+    <tr><td><b>灵活性</b></td><td>事后能算任意分位、能改分位不用重新部署</td><td>分位点在代码里写死，改了要重新发布</td></tr>
+    <tr><td><b> cardinality</b></td><td>每个 bucket 一条序列，bucket 多则序列多</td><td>每个 quantile 一条序列，量可控</td></tr>
+    <tr><td><b>结论</b></td><td><b>默认选 Histogram</b></td><td>仅单实例、分位点固定的老代码</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最常见的指标设计错误：用 Gauge 存累计值。</b>比如把 <span class="k">total_requests</span> 做成 Gauge，重启归零时监控曲线出现假摔；而且无法用 rate() 正确计算速率。<b>累计值一律用 Counter</b>，名字带 <span class="k">_total</span> 后缀是社区规范（promlint 会检查）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>PromQL 实战</h2></div>
+  <p class="lead">PromQL 是 Prometheus 的灵魂。核心心智：<b>瞬时向量（当前值）、区间向量（一段时间）、标量（数字）</b>三种数据类型，大部分报错都是混用导致的。</p>
+  <h3>rate / irate / increase 三兄弟</h3>
+  <pre><span class="c"># rate(v[5m])：区间内平均每秒增量，平滑抗抖动 —— 生产首选</span>
+rate(http_requests_total[5m])
+
+<span class="c"># irate(v[1m])：用最后两个样本算瞬时速率，灵敏但噪音大</span>
+irate(http_requests_total[1m])
+
+<span class="c"># increase(v[1h])：区间内总增量 = rate * 秒数，语法糖</span>
+increase(http_requests_total[1h])     <span class="c"># 等价 rate(...[1h]) * 3600</span>
+
+<span class="c"># 实战：按接口分组的 QPS（去掉 instance 维度做聚合）</span>
+sum by (path) (rate(http_requests_total[5m]))
+
+<span class="c"># 实战：错误率（5xx 占比）</span>
+sum(rate(http_requests_total{status=~"5.."}[5m]))
+  / sum(rate(http_requests_total[5m]))
+
+<span class="c"># 实战：P99 延迟（先 rate 再 quantile，顺序不能反）</span>
+histogram_quantile(0.99,
+  sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+)
+
+<span class="c"># 实战：Top 5 最忙接口</span>
+topk(5, sum by (path) (rate(http_requests_total[5m])))</pre>
+  <div class="callout warn">
+    <b>rate 的窗口铁律：窗口至少覆盖 2 个采集间隔。</b>15s 抓取时 <span class="k">rate(x[15s])</span> 大概率返回空（窗口里可能只有 1 个样本）。常用搭配：15s 抓取配 <span class="k">[1m]</span>~<span class="k">[5m]</span>，1m 抓取配 <span class="k">[5m]</span>。窗口越长越平滑但越迟钝，窗口越短越灵敏但越容易被单点尖刺带偏。
+  </div>
+  <h3>聚合与向量匹配</h3>
+  <pre><span class="c"># 聚合运算符：sum / min / max / avg / count / stddev / quantile / topk / bottomk</span>
+sum(rate(node_cpu_seconds_total{mode="idle"}[5m])) by (instance)   <span class="c"># 保留 instance</span>
+sum without (instance, pod) (rate(...))                            <span class="c"># 去掉这些维度，保留其余</span>
+
+<span class="c"># 向量匹配：两个指标相乘/相除时，标签要对得上</span>
+node_memory_MemTotal_bytes
+  * on (instance) group_left
+  (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+
+<span class="c"># label_replace：动态造维度（把 pod 名提取成 app 名）</span>
+label_replace(
+  up,
+  "app", "$1",
+  "pod", "(.+)-[a-z0-9]+"
+)</pre>
+  <h3>常用函数速查</h3>
+  <table>
+    <tr><th style="width:170px">函数</th><th>用途</th></tr>
+    <tr><td class="f">rate / irate / increase / delta</td><td>速率与增量，delta 适合可增可减的 Gauge</td></tr>
+    <tr><td class="f">histogram_quantile(φ, v)</td><td>从 bucket 算分位数，<b>必须在 rate 之后</b></td></tr>
+    <tr><td class="f">sum / avg / max / min / count / quantile</td><td>聚合，配 by / without 控制维度</td></tr>
+    <tr><td class="f">topk / bottomk</td><td>取前/后 N 条序列</td></tr>
+    <tr><td class="f">absent(v)</td><td>序列不存在时返回 1 —— <b>监控"监控不到"的关键</b></td></tr>
+    <tr><td class="f">predict_linear(v[1h], 3600)</td><td>线性预测 1 小时后的值，磁盘容量告警神器</td></tr>
+    <tr><td class="f">clamp_max / clamp_min</td><td>钳制上下限，防异常值打爆图表</td></tr>
+    <tr><td class="f">vector(s) / scalar(v)</td><td>标量与向量互转，做阈值线</td></tr>
+    <tr><td class="f">time() / offset 5m</td><td>当前 Unix 时间；查询 5 分钟前的数据，做环比</td></tr>
+    <tr><td class="f">changes / resets</td><td>序列变化次数 / Counter 重置次数</td></tr>
+  </table>
+  <h3>Recording Rules：把复杂查询预计算</h3>
+  <pre><span class="c"># rules/node.yml</span>
+groups:
+  - name: instance-rules
+    interval: 30s
+    rules:
+      - record: instance:node_cpu_utilization:rate5m
+        expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))
+
+      - record: job:request_errors:ratio_rate5m
+        expr: |
+          sum by (job) (rate(http_requests_total{status=~"5.."}[5m]))
+          / sum by (job) (rate(http_requests_total[5m]))
+
+<span class="c"># 好处：Grafana 查预计算序列毫秒级返回；告警规则引用稳定</span>
+<span class="c"># 命名规范：level:metric:operations，见官方最佳实践</span></pre>
+  <div class="callout ok">
+    <b>排查查询问题的三步：</b>① 去 Graph 页面（/graph）逐层拆解 —— 先 <span class="k">up</span> 确认目标活着；② 只查原始指标 <span class="k">http_requests_total</span> 看有没有数据、标签长什么样；③ 再套 rate、再套 sum。90% 的"查不出来"是标签选择器写错（大小写、正则没转义）或维度被聚合掉了。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Exporter 生态</h2></div>
+  <p class="lead">Exporter 是"把不支持 Prometheus 的系统指标翻译成 Prometheus 格式"的代理。原则：<b>一个 exporter 对应一类被测系统，部署在被测对象旁边</b>。</p>
+  <table>
+    <tr><th style="width:150px">Exporter</th><th>监控对象</th><th>关键点</th></tr>
+    <tr><td><b>node_exporter</b></td><td>Linux 主机</td><td>textfile collector 可放自定义指标；几乎每台机器都装</td></tr>
+    <tr><td><b>windows_exporter</b></td><td>Windows 主机</td><td>以 Windows 服务运行，收集器可开关</td></tr>
+    <tr><td><b>mysqld_exporter</b></td><td>MySQL</td><td>配 DSN 只读账号；支持 multi-target 模式</td></tr>
+    <tr><td><b>redis_exporter</b></td><td>Redis</b></td><td>可导出 key 空间、慢日志统计；需要 monitor 权限看部分指标</td></tr>
+    <tr><td><b>blackbox_exporter</b></td><td>HTTP/DNS/TCP/ICMP 拨测</td><td><b>从外部探测可用性</b>，补充白盒监控</td></tr>
+    <tr><td><b>snmp_exporter</b></td><td>网络设备（交换机/路由器）</td><td>用 MIB 生成配置，抓 ifHCInOctets 等</td></tr>
+    <tr><td><b>jmx_exporter</b></td><td>JVM 应用</td><td>Java agent 内嵌，暴露 MBean</td></tr>
+    <tr><td><b>process-exporter</b></td><td>进程级资源</td><td>按进程名 pattern 统计，老牌方案</td></tr>
+    <tr><td><b>nginx/vault/haproxy exporter</b></td><td>对应中间件</td><td>多数中间件已有官方或社区 exporter</td></tr>
+    <tr><td><b>应用自身 /metrics</b></td><td>业务指标</td><td>用 client library 埋点，<b>最有价值的指标来源</b></td></tr>
+  </table>
+  <pre><span class="c"># 抓取配置示例：node_exporter + blackbox 拨测</span>
+scrape_configs:
+  - job_name: 'node'
+    static_configs:
+      - targets: ['10.0.0.1:9100']
+
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['https://api.example.com/health']
+        labels:
+          service: api-gateway
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115   <span class="c"># 真正去访问 blackbox</span>
+
+<span class="c"># relabel 是 Prometheus 的魔法：抓取前改写 target 和 label</span>
+<span class="c"># 经典用途：K8s Pod 标签提炼、丢弃高基数 label、只抓部分 Pod</span>
+metric_relabel_configs:
+  - source_labels: [__name__]
+    regex: 'go_.*'                 <span class="c"># 丢掉所有 go_ 运行时指标，降基数</span>
+    action: drop</pre>
+  <div class="callout">
+    <b>没有 exporter 怎么办？</b>三条路：① 用 blackbox_exporter 做黑盒探测（至少知道通不通）；② 如果目标能输出 JSON，写个几十行的转换服务；③ 谨慎使用 Pushgateway 给批处理任务。<b>不要为了监控去改业务代码导出一堆低价值指标</b> —— 指标在精不在多。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>告警规则与 Alertmanager</h2></div>
+  <p class="lead">Prometheus 负责"发现问题"（rules），Alertmanager 负责"通知对人"（路由/分组/抑制）。两者分离是刻意的设计。</p>
+  <h3>告警规则</h3>
+  <pre><span class="c"># rules/alerts.yml</span>
+groups:
+  - name: instance-alerts
+    rules:
+      - alert: InstanceDown
+        expr: up == 0
+        for: 2m                    <span class="c"># 持续 2 分钟才触发，防抖动</span>
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 下线"
+          description: "job={{ $labels.job }} 已连续 2 分钟抓取失败"
+          runbook_url: "https://wiki/runbook/instance-down"
+
+      - alert: HighErrorRate
+        expr: |
+          sum by (job) (rate(http_requests_total{status=~"5.."}[5m]))
+          / sum by (job) (rate(http_requests_total[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+
+      - alert: DiskWillFillIn4Hours
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[1h], 4 * 3600) &lt; 0
+        for: 15m
+        labels:
+          severity: warning</pre>
+  <h3>Alertmanager 配置：分组/抑制/静默</h3>
+  <pre><span class="c"># alertmanager.yml</span>
+global:
+  resolve_timeout: 5m              <span class="c"># 告警恢复后多久发 resolve 通知</span>
+
+route:                             <span class="c"># 路由树：根节点，未匹配的走这里</span>
+  receiver: 'default-webhook'
+  group_by: ['alertname', 'cluster']      <span class="c"># 同组标签的告警合成一条通知</span>
+  group_wait: 30s                  <span class="c"># 组内先等 30s，凑齐一批再发</span>
+  group_interval: 5m               <span class="c"># 组内新告警的最短发送间隔</span>
+  repeat_interval: 4h              <span class="c"># 同样的告警最多 4h 提醒一次，防轰炸</span>
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: 'pagerduty-oncall'  <span class="c"># P0 走电话</span>
+      continue: true               <span class="c"># 匹配后继续往下匹配（多发几个渠道）</span>
+    - matchers:
+        - service =~ "payment.*"
+      receiver: 'dingtalk-payment-team'
+
+inhibit_rules:                     <span class="c"># 抑制：A 报警时闭嘴 B，降噪核心</span>
+  - source_matchers:
+      - severity = critical
+      - alertname = InstanceDown
+    target_matchers:
+      - severity = warning
+    equal: ['instance']            <span class="c"># 同实例的 warning 被 critical 抑制</span>
+
+receivers:
+  - name: 'default-webhook'
+    webhook_configs:
+      - url: 'http://alert-bridge:8080/alert'
+  - name: 'pagerduty-oncall'
+    pagerduty_configs:
+      - service_key: 'xxx'
+  - name: 'dingtalk-payment-team'
+    webhook_configs:
+      - url: 'http://dingtalk-bot/xxx'
+
+<span class="c"># 静默（维护窗口、已知故障）：临时闭嘴，不改配置</span>
+amtool silence add alertname=HighErrorRate service=payment \
+  --duration=2h --comment="支付网关维护窗口" --author=ops</pre>
+  <table>
+    <tr><th style="width:110px">机制</th><th style="width:150px">解决什么</th><th>粒度</th></tr>
+    <tr><td><b>group_by</b></td><td>告警风暴：100 台机器同时 CPU 高，合成 1 条</td><td>按标签分组</td></tr>
+    <tr><td><b>inhibit</b></td><td>级联噪音：实例挂了，它上面的"延迟高/错误多"都闭嘴</td><td>源抑制目标</td></tr>
+    <tr><td><b>silence</b></td><td>已知问题、计划维护，临时静音</td><td>按 matcher + 时间段</td></tr>
+    <tr><td><b>for</b></td><td>瞬时抖动：CPU 尖刺 5 秒不该报警</td><td>规则级持续时间</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>告警设计的黄金法则：每一条告警都必须有明确的响应动作。</b>没人看、看了不知道干嘛的告警，就是狼来了的排练。severity 建议分三级：<b>critical</b>（影响用户，立即处理，电话）、<b>warning</b>（趋势恶化，工作时间处理，IM）、<b>info</b>（记录用，不通知）。配套要求：annotations 里带 runbook 链接和排查命令。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>联邦、远程存储与长期方案</h2></div>
+  <p class="lead">单机 Prometheus 的硬上限：单节点 TB 级数据、15~30 天保留。要全局视图和长期存储，有三条路。</p>
+  <h3>联邦（Federation）：老牌的跨集群汇总</h3>
+  <pre><span class="c"># 上层 Prometheus 拉下层 Prometheus 的 /federate</span>
+scrape_configs:
+  - job_name: 'federate'
+    honor_labels: true              <span class="c"># 保留下层原始 label，不被覆盖</span>
+    metrics_path: /federate
+    params:
+      match[]:
+        - '{job="api"}'             <span class="c"># 只汇总需要的指标，别全量拉</span>
+        - '{__name__=~"job:.*"}'    <span class="c"># 或只拉 recording rule 结果</span>
+    static_configs:
+      - targets: ['prometheus-prod-01:9090', 'prometheus-prod-02:9090']</pre>
+  <h3>远程读写（remote_write/read）：接外部存储</h3>
+  <pre><span class="c"># 把样本实时写到长期存储（VictoriaMetrics、Thanos、Mimir、InfluxDB）</span>
+remote_write:
+  - url: http://vminsert:8480/insert/0/prometheus
+    queue_config:
+      capacity: 10000               <span class="c"># 内存队列容量</span>
+      max_shards: 50                <span class="c"># 并发写分片</span>
+      max_samples_per_send: 500
+    write_relabel_configs:          <span class="c"># 只写高价值指标，省流量和存储</span>
+      - source_labels: [__name__]
+        regex: 'go_.*|process_.*'
+        action: drop</pre>
+  <table>
+    <tr><th style="width:170px">方案</th><th style="width:140px">定位</th><th>特点</th></tr>
+    <tr><td><b>VictoriaMetrics</b></td><td>单机/集群长期存储</td><td>单二进制也能集群，压缩率高，兼容 PromQL，<b>中小规模性价比之王</b></td></tr>
+    <tr><td><b>Thanos</b></td><td>多集群全局视图</td><td>Sidecar + 对象存储（S3），全局查询 + 长期保留，组件多</td></tr>
+    <tr><td><b>Cortex / Mimir</b></td><td>多租户大规模</td><td>Grafana 生态，水平扩展，微服务化，运维重</td></tr>
+    <tr><td><b>InfluxDB 2.x</b></td><td>自有生态</td><td>Flux 查询语言，与 Prom 生态需桥接，新项目不建议</td></tr>
+  </table>
+  <h3>高可用：双栈 + Alertmanager 集群</h3>
+  <pre><span class="c"># 方案一（最常用）：两个 Prometheus 抓同样的目标，数据各存一份</span>
+<span class="c"># - Grafana 数据源配两个，或前置 VictoriaMetrics 去重</span>
+<span class="c"># - Alertmanager 跑 3 实例集群（--cluster.listen-address），gossip 同步静默/通知状态</span>
+<span class="c"># - 后果：同样的告警可能发两份，Alertmanager 集群会去重，但双 Prometheus</span>
+<span class="c">#   都可能给 Alertmanager 发同样的 alert，靠 group_by 的指纹去重</span>
+
+<span class="c"># 方案二（Thanos）：Sidecar 边存边传对象存储，全局无重复视图</span>
+<span class="c"># thanos sidecar --prometheus.url=http://prom:9090 --objstore.config-file=...</span>
+<span class="c"># thanos query --endpoint=sidecar1:10901 --endpoint=sidecar2:10901</span></pre>
+  <div class="callout ok">
+    <b>选型建议：</b>单集群 + 15 天够用 → 单 Prometheus。要多集群全局仪表盘 → VictoriaMetrics 集群版或 Thanos Query。要多年留存 + 预算敏感 → VictoriaMetrics + S3。<b>不要一上来就堆 Thanos 全家桶</b>，Sidecar/Store/Query/Compact/Ruler 五个组件的运维成本，比监控系统本身还高。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>运维操作速查</h2></div>
+  <div class="cmds">
+    <div class="crow"><code>promtool check config prometheus.yml</code><span class="desc">配置语法检查，CI 里必跑</span><button class="copy">复制</button></div>
+    <div class="crow"><code>promtool check rules rules/*.yml</code><span class="desc">规则文件检查，能测出 PromQL 错误</span><button class="copy">复制</button></div>
+    <div class="crow"><code>promtool test rules test.yml</code><span class="desc">单元测试规则：给定输入序列，断言告警触发</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -X POST localhost:9090/-/reload</code><span class="desc">热加载配置（需 --web.enable-lifecycle）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl localhost:9090/api/v1/targets</code><span class="desc">看所有抓取目标健康状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl localhost:9090/api/v1/query?query=up</code><span class="desc">API 查询，可脚本化</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl localhost:9090/api/v1/status/tsdb</code><span class="desc">看序列总数（head series），基数监控</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -G localhost:9090/api/v1/query --data 'query=count(up)'</code><span class="desc">快速查目标数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>amtool alert --alertmanager.url=http://localhost:9093</code><span class="desc">看当前 firing 的告警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>amtool silence add/pause/expire</code><span class="desc">命令行管理静默，比 UI 快</span><button class="copy">复制</button></div>
+    <div class="crow"><code>amtool config routes test</code><span class="desc">测试某条告警会路由到哪个 receiver</span><button class="copy">复制</button></div>
+    <div class="crow"><code>promtool tsdb analyze /data</code><span class="desc">分析 TSDB：最占资源的 label、序列分布</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tsdb status /data</code><span class="desc">看 block、WAL、保留时间</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>健康巡检四指标：</b>① <span class="k">up</span> —— 目标是否活着（ absent(up) 或 up == 0 必须告警，否则监控瞎了都不知道）；② <span class="k">prometheus_tsdb_head_series</span> —— 内存序列数，涨太快要查标签基数；③ <span class="k">scrape_duration_seconds</span> —— 抓取耗时，接近 timeout 说明目标太多或太慢；④ <span class="k">prometheus_notifications_total</span> / <span class="k">alertmanager_notifications_failed_total</span> —— 通知链路是否健康。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">坑库</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 user_id / pod_name 等高基数值做成 label</div><div class="pd">一万个用户就是一万条序列，TSDB 内存和磁盘爆炸，查询全表变慢。<b>label 只放低基数维度</b>（job、instance、env、status_code），高基数信息放 trace 或日志。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">rate 窗口小于 2 倍采集间隔，结果时有时无</div><div class="pd">15s 抓取配 <span class="k">rate(x[15s])</span>，窗口里经常只有 1 个样本，rate 返回空，告警假阴性。窗口取间隔的 4 倍以上，如 <span class="k">[1m]</span>。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">histogram bucket 边界设计不合理，分位数全是插值猜的</div><div class="pd">bucket 太少（只有 3 个）→ quantile 精度差；边界和真实分布不匹配 → 误差更大。按业务延迟预期设计（如 API 用 .005/.01/.025/.05/.1/.25/.5/1/2.5/5/+Inf），覆盖 P50 到 P999。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">histogram_quantile 套在原始 bucket 上，不先 rate</div><div class="pd">bucket 是单调递增的 Counter，直接 quantile 算出来永远是 +Inf 附近。必须先 <span class="k">sum by (le) (rate(...[5m]))</span> 再 quantile。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">sum 聚合把关键维度聚合掉了，看不出是哪台机器的问题</div><div class="pd"><span class="k">sum(rate(...))</span> 全局求和，10 台里 1 台错误率 100% 也被平均掉。聚合时用 <span class="k">by (instance, job)</span> 保留排查维度，Grafana 里再下钻。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">告警没有 for 持续时间，一点抖动就炸群</div><div class="pd">瞬时尖刺触发 critical 告警，值班被反复呼叫。至少 <span class="k">for: 2m</span>；对 CPU/内存这类波动指标用 10m 以上 + warning 级别。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">没监控 up 指标，抓取全挂了还以为一切正常</div><div class="pd">Prometheus 自己或目标全挂时，Grafana 曲线空白，容易被当成"没流量"。必须配 <span class="k">up == 0</span> 和 <span class="k">absent(up{job="api"})</span> 两条告警。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Counter 重置（重启）被当成暴跌，触发误报</div><div class="pd">进程重启后 Counter 归零，原始值曲线断崖下跌。<b>rate()/increase() 会自动处理重置</b>（外推补偿），所以永远用 rate 看 Counter，别直接看原始值，也别对原始值做阈值告警。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">retention 太短或磁盘不打理，TSDB 写满挂掉</div><div class="pd">默认 15 天，磁盘满后 Prometheus 直接崩溃。设 <span class="k">--storage.tsdb.retention.time=30d</span> 并监控 <span class="k">prometheus_tsdb_size_bytes</span>；空间不够上 remote_write 到 VictoriaMetrics。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">Grafana 面板直接写复杂 PromQL，刷新一次几秒</div><div class="pd">每次查询实时算 7 天的 rate 聚合，CPU 打满。用 recording rules 把常用查询预计算成序列，Grafana 只查结果；仪表盘时间范围别默认 30 天。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 要监控"过去 5 分钟 HTTP 5xx 错误占比"，正确的 PromQL 是？</div>
+      <button class="opt">sum(http_requests_total{status=~"5.."}) / sum(http_requests_total)</button>
+      <button class="opt">sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))</button>
+      <button class="opt">histogram_quantile(0.05, http_requests_total{status=~"5.."})</button>
+      <div class="ans">正确答案：<b>先 rate 再相除</b>。http_requests_total 是 Counter 累计值，直接相除得到的是"历史累计错误率"，不是近 5 分钟的。用 rate() 算每秒增量才是实时速率。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 为什么跨多个实例算 P99 延迟要用 Histogram 而不是 Summary？</div>
+      <button class="opt">因为 Summary 的采样精度不够</button>
+      <button class="opt">因为 Summary 的 quantile 在客户端算好，无法跨实例正确聚合；Histogram 的 bucket 可以先 rate 再 histogram_quantile</button>
+      <button class="opt">因为 Histogram 比 Summary 更省内存</button>
+      <div class="ans">正确答案：<b>Summary 的分位数在客户端已经算完</b>，两个实例的 P99 求平均在数学上无意义。Histogram 保留原始 bucket 分布，PromQL 可以先把各实例 bucket 速率相加，再统一算分位数。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 一个批处理任务跑 30 秒就退出，Prometheus 抓不到它，最合适的方式是？</div>
+      <button class="opt">任务结束时把指标推送到 Pushgateway</button>
+      <button class="opt">把任务拉长到超过一个 scrape_interval</button>
+      <button class="opt">把 scrape_interval 调到 5 秒</button>
+      <div class="ans">正确答案：<b>Pushgateway</b>。它就是为短命任务设计的：任务退出前把指标推上去，Prometheus 抓 Pushgateway。<b>注意 Pushgateway 的 up 永远为真</b>，别把常驻服务也往里推。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. Alertmanager 里 "抑制（inhibit）" 的作用是？</div>
+      <button class="opt">把重复的告警邮件合并成一封</button>
+      <button class="opt">在维护窗口内静音所有告警</button>
+      <button class="opt">当 InstanceDown 触发时，同实例的 HighLatency 等 warning 不再通知</button>
+      <div class="ans">正确答案：<b>级联降噪</b>。实例挂了，它上面的延迟/错误告警都是派生噪音，没有排查价值。合并同类告警是 group_by 的职责，维护窗口静音是 silence 的职责，别混淆。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 下面哪种做法最可能引发"标签基数爆炸"？</div>
+      <button class="opt">给所有指标统一打 env="prod" 和 cluster="bj" 两个标签</button>
+      <button class="opt">给指标打上 user_id 和 trace_id 标签，方便按用户排查</button>
+      <button class="opt">用 relabel_configs 把 Pod 名从标签里删掉</button>
+      <div class="ans">正确答案：<b>user_id / trace_id 做 label</b>。序列数 = 指标数 × 各标签取值组合，一万个用户就是一万条序列。<b>排查维度走日志和 trace</b>（Loki/Tempo 就是干这个的），指标 label 只放低基数维度。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 磁盘容量告警想做到"预测 4 小时后写满"，应该用哪个函数？</div>
+      <button class="opt">predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[1h], 4*3600) &lt; 0</button>
+      <button class="opt">node_filesystem_avail_bytes{mountpoint="/"} &lt; 4 * 3600</button>
+      <button class="opt">increase(node_filesystem_avail_bytes[4h]) &lt; 0</button>
+      <div class="ans">正确答案：<b>predict_linear</b>。它用最小二乘法把过去 1 小时的趋势外推 4 小时，预测值小于 0 说明会写满。直接拿当前剩余空间和 4×3600 比是数量级错误；avail 是 Gauge 不是 Counter，increase 也不适用。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>PromQL 场景速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>rate(http_requests_total[5m])</code><span class="desc">QPS：Counter 每秒增速，生产标配</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum by (job) (rate(http_requests_total[5m]))</code><span class="desc">按 job 聚合 QPS，保留排查维度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>histogram_quantile(0.99, sum by (le) (rate(x_bucket[5m])))</code><span class="desc">P99 延迟，必须先 rate</span><button class="copy">复制</button></div>
+    <div class="crow"><code>topk(5, sum by (path) (rate(http_requests_total[5m])))</code><span class="desc">Top N 接口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))</code><span class="desc">CPU 使用率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>predict_linear(node_filesystem_avail_bytes[1h], 4*3600) &lt; 0</code><span class="desc">磁盘 4 小时后写满预测</span><button class="copy">复制</button></div>
+    <div class="crow"><code>up == 0 / absent(up{job="api"})</code><span class="desc">目标下线告警，两条都要配</span><button class="copy">复制</button></div>
+    <div class="crow"><code>changes(process_start_time_seconds[10m]) &gt; 0</code><span class="desc">进程 10 分钟内重启过</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rate(x[5m]) offset 5m</code><span class="desc">环比：和 5 分钟前比</span><button class="copy">复制</button></div>
+    <div class="crow"><code>label_replace(up, "app", "$1", "pod", "(.+)-[a-z0-9]+")</code><span class="desc">从 Pod 名提取 app 维度</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>告警规则模板</h3>
+  <pre><span class="c"># 一条完整的生产级告警应有的要素</span>
+- alert: HighErrorRate
+  expr: |
+    sum by (job) (rate(http_requests_total{status=~"5.."}[5m]))
+    / sum by (job) (rate(http_requests_total[5m])) > 0.05
+  for: 10m                        <span class="c"># 持续 10 分钟，防抖动</span>
+  labels:
+    severity: warning             <span class="c"># critical / warning / info</span>
+    team: backend
+  annotations:
+    summary: "{{ $labels.job }} 错误率 {{ $value | humanizePercentage }}"
+    description: "job={{ $labels.job }} 近 5 分钟 5xx 占比超过 5%"
+    runbook_url: "https://wiki.example.com/runbook/high-error-rate"
+
+<span class="c"># Alertmanager 降噪三件套的记忆口诀：</span>
+<span class="c"># group_by 管"批量合并"，inhibit 管"级联闭嘴"，silence 管"计划维护"</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Pull 模型</b></td><td>Prometheus 主动 GET 目标的 /metrics，与推送相反</td></tr>
+    <tr><td><b>Exporter</b></td><td>把被测系统指标翻译成 Prometheus 格式的代理进程</td></tr>
+    <tr><td><b> exposition format</b></td><td>纯文本指标格式：name{labels} value timestamp</td></tr>
+    <tr><td><b>时间序列</b></td><td>指标名 + 标签集 + 按时间排列的采样点</td></tr>
+    <tr><td><b>TSDB</b></td><td>Prometheus 的时序存储：内存 head block + 磁盘压缩 block</td></tr>
+    <tr><td><b>WAL</b></td><td>预写日志，崩溃后重放恢复未落盘数据</td></tr>
+    <tr><td><b>Cardinality 基数</b></td><td>label 取值组合数，序列数 = 基数，爆炸的元凶</td></tr>
+    <tr><td><b>Counter</b></td><td>只增不减的累计指标，必须配 rate() 使用</td></tr>
+    <tr><td><b>Gauge</b></td><td>可增可减的瞬时值指标</td></tr>
+    <tr><td><b>Histogram</b></td><td>累积桶直方图，可跨实例算分位数</td></tr>
+    <tr><td><b>Summary</b></td><td>客户端预计算分位数，不能跨实例聚合</td></tr>
+    <tr><td><b>PromQL</b></td><td>Prometheus 查询语言，四大数据类型：瞬时/区间向量、标量、字符串</td></tr>
+    <tr><td><b>Recording Rule</b></td><td>预计算规则，把复杂 PromQL 结果存成新序列</td></tr>
+    <tr><td><b>Alerting Rule</b></td><td>周期性评估表达式，满足条件产生告警</td></tr>
+    <tr><td><b>for</b></td><td>告警持续多久才触发，防抖关键参数</td></tr>
+    <tr><td><b>Alertmanager</b></td><td>告警路由器：分组、抑制、静默、多渠道通知</td></tr>
+    <tr><td><b>inhibit / silence</b></td><td>抑制（级联降噪）/ 静默（临时静音）</td></tr>
+    <tr><td><b>Federation</b></td><td>联邦：上层 Prometheus 拉下层的 /federate 汇总</td></tr>
+    <tr><td><b>remote_write</b></td><td>实时外写样本到长期存储（VictoriaMetrics/Thanos）</td></tr>
+    <tr><td><b>Thanos / Cortex</b></td><td>Prometheus 的多集群全局查询与长期存储方案</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 docker-compose 起 Prometheus + node_exporter + Alertmanager —— ① 写一个含 3 个 job 的 prometheus.yml，用 promtool check config 验证；② 写 5 条 recording rule（CPU/内存/QPS/错误率/P99）和 3 条 alert；③ 在 Graph 页把 rate → sum by → histogram_quantile 三层逐层拆开看结果；④ 用 amtool silence 给一条告警加 1 小时静默；⑤ 故意停掉一个 exporter，观察 up == 0 告警和 inhibit 效果。<br><br>
+    <b>之后值得单独学：</b>K8s 里的 Prometheus Operator 与 ServiceMonitor、recording rule 命名规范、基于 SLO 的告警（多窗口多燃率）、以及 OpenTelemetry Metrics 与 Prometheus 的关系。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Prometheus · 上线前务必检查：标签基数、rate 窗口、up 告警、通知渠道</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

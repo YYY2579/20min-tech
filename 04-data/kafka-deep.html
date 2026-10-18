@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟深入 Kafka</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 消息与存储篇 · 高密度版</span>
+    <h1>二十分钟深入 Kafka</h1>
+    <p class="sub">命令谁都会敲，这篇讲的是<b>决定数据丢不丢、乱不乱、卡不卡的机制</b>：ISR 与水位、acks 语义、幂等与事务、rebalance 协议、零拷贝，以及 KRaft 去 ZooKeeper 之后的变化。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">副本协议 <b>ISR / HW / LEO</b></span>
+      <span class="chip">Producer 语义 <b>acks / 幂等 / 事务</b></span>
+      <span class="chip">协议 <b>eager vs cooperative</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 Kafka 跟着敲：docker run -d --name kafka -p 9092:9092 apache/kafka:4.0.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 官方镜像（4.x 只有 KRaft 模式，单节点 combined 模式，开箱即用）</span>
+docker run -d --name kafka -p 9092:9092 apache/kafka:4.0.0
+
+<span class="c"># 若启动日志提示需要格式化存储（老镜像常见），先执行：</span>
+docker exec -it kafka /opt/kafka/bin/kafka-storage.sh random-cluster-id
+docker exec -it kafka /opt/kafka/bin/kafka-storage.sh format \
+  -t &lt;上一步的 cluster-id&gt; --config /opt/kafka/config/kraft/server.properties
+docker restart kafka
+
+<span class="c"># 建 topic（3 分区 1 副本，单机练习够用）</span>
+docker exec -it kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 \
+  --create --topic demo --partitions 3 --replication-factor 1
+
+<span class="c"># 生产/消费各开一个终端</span>
+docker exec -it kafka /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic demo
+docker exec -it kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic demo --from-beginning --group demo-g1</pre>
+  <div class="callout warn">
+    <b>一个高频困惑：单机 docker 起 Kafka 经常连不上。</b>原因几乎都是 advertised.listener：容器内部监听地址和宿主机访问地址不是一回事。练习时全程在<b>容器内</b>执行命令（上面都用了 <span class="k">docker exec</span>）就能绕开；宿主机应用要连，得映射 <span class="k">KAFKA_ADVERTISED_LISTENERS</span> 或用 compose 配 PLAINTEXT_HOST。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>核心概念：五件事必须刻在脑子里</h2></div>
+  <table>
+    <tr><th style="width:120px">概念</th><th style="width:230px">是什么</th><th>工程含义</th></tr>
+    <tr><td><b>Topic 主题</b></td><td>消息的分类管道，如 orders、logs</td><td>生产者往 topic 写，消费者从 topic 读</td></tr>
+    <tr><td><b>Partition 分区</b></td><td>topic 的物理分片，<b>有序不可变的日志</b></td><td><b>并行单位和顺序单位</b>。一个分区只被同组一个消费者消费</td></tr>
+    <tr><td><b>Offset 偏移</b></td><td>分区内消息的序号，从 0 单调递增</td><td>消费者靠 offset 定位进度，<b>过期数据按 offset 之前的整体删除</b></td></tr>
+    <tr><td><b>Consumer Group</b></td><td>一组消费者共同消费一个 topic</td><td>组内<b>分区水平分摊</b>；不同组各自独立收到全量（广播）</td></tr>
+    <tr><td><b>Replica 副本</b></td><td>分区的多个拷贝，分布在不同 broker</td><td>一个 leader 对外服务，follower 异步拉取，故障时选举</td></tr>
+  </table>
+  <h4>两条铁律</h4>
+  <ul>
+    <li><b>顺序只保分区内：</b>同一个分区内 offset 递增即有序；跨分区、跨 topic 没有任何顺序保证。"消息乱序"类事故 90% 是因为业务把需要顺序的消息发到了不同 key</li>
+    <li><b>消费者数 > 分区数就浪费：</b>组内消费者比分区多时，多出的消费者<b>空转</b>（分不到分区）。分区数是消费并行度的天花板</li>
+  </ul>
+  <pre><span class="c"># 看 topic 全貌：分区、副本分布、leader 是谁</span>
+docker exec -it kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic demo
+
+<span class="c"># 输出字段解读</span>
+<span class="c"># PartitionCount:3        分区数（只能加不能减）</span>
+<span class="c"># ReplicationFactor:1     副本因子</span>
+<span class="c"># Leader:1               该分区 leader 所在 broker</span>
+<span class="c"># Isr:1                  同步副本列表（in-sync replicas）</span>
+<span class="c"># Configs                该 topic 级别的配置覆盖</span>
+
+<span class="c"># 看每个分区的首尾 offset（数据量 = 末尾 - 开头）</span>
+docker exec -it kafka /opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic demo</pre>
+  <h4>保留策略</h4>
+  <table>
+    <tr><th style="width:150px">参数</th><th style="width:150px">默认值</th><th>说明</th></tr>
+    <tr><td class="f">log.retention.hours</td><td>168（7 天）</td><td>到期删除整个 segment 文件</td></tr>
+    <tr><td class="f">log.retention.bytes</td><td>-1（不限）</td><td>按大小保留，超了删最老 segment</td></tr>
+    <tr><td class="f">log.segment.bytes</td><td>1GB</td><td>单 segment 文件大小，滚动生成新文件</td></tr>
+    <tr><td class="f">cleanup.policy</td><td>delete</td><td>改成 compact 则<b>按 key 保留最新值</b>（changelog 场景）</td></tr>
+  </table>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>副本机制与 ISR</h2></div>
+  <p class="lead">这是 Kafka"不丢数据"语义的核心。三个缩写必须分清：<b>LEO、HW、ISR</b>。</p>
+  <table>
+    <tr><th style="width:80px">缩写</th><th style="width:220px">全称</th><th>含义</th></tr>
+    <tr><td><b>LEO</b></td><td>Log End Offset</td><td>日志末端偏移——<b>下一条消息的写入位置</b>。每个副本各自维护</td></tr>
+    <tr><td><b>HW</b></td><td>High Watermark</td><td>高水位 = <b>ISR 中最小的 LEO</b>。<b>消费者只能读到 HW 以下的消息</b>，之上的属于"未提交"数据</td></tr>
+    <tr><td><b>ISR</b></td><td>In-Sync Replicas</td><td>与 leader 保持同步的副本集合。落后超过 <span class="k">replica.lag.time.max.ms</span>（默认 30s）就被踢出</td></tr>
+  </table>
+  <h4>同步流程</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>生产者写入 leader</b>：消息追加到 leader 日志，LEO 前进</div></div>
+    <div class="step"><div class="txt"><b>follower 拉取</b>：follower 向 leader 发 fetch 请求，补齐数据，自身 LEO 前进</div></div>
+    <div class="step"><div class="txt"><b>HW 推进</b>：leader 发现所有 ISR 副本都追上了，把 HW 推到新的 LEO</div></div>
+    <div class="step"><div class="txt"><b>消费者可见</b>：只有 offset &lt; HW 的消息对消费者可见。没进 ISR 同步的消息，消费者看不到</div></div>
+    <div class="step"><div class="txt"><b>故障恢复</b>：leader 挂了，从 ISR 中选新 leader（要求 HW 一致，防止数据回退）；旧 leader 恢复后<b>按 HW 截断</b>掉多余部分</div></div>
+  </div>
+  <h4>关键 broker 配置</h4>
+  <pre><span class="c"># server.properties 里和数据安全直接相关的几项</span>
+default.replication.factor=3          <span class="c"># 自动建 topic 的默认副本数（默认 1，生产必须显式建 topic）</span>
+min.insync.replicas=2                 <span class="c"># 配合 acks=all：至少 2 个副本同步才允许写。默认 1</span>
+unclean.leader.election.enable=false  <span class="c"># 默认 false：不允许 ISR 外副本当 leader</span>
+replica.lag.time.max.ms=30000         <span class="c"># follower 落后 30s 被踢出 ISR</span>
+offsets.topic.replication.factor=3    <span class="c"># __consumer_offsets 的副本数，默认 3</span>
+transaction.state.log.replication.factor=3
+transaction.state.log.min.isr=2       <span class="c"># 事务状态主题的最小 ISR，默认 2</span>
+auto.create.topics.enable=false       <span class="c"># 生产建议关掉：防手滑拼错 topic 名自动建成 1 分区 1 副本</span></pre>
+  <h4>acks 与 min.insync.replicas 的组合语义</h4>
+  <table>
+    <tr><th style="width:210px">组合</th><th>语义</th></tr>
+    <tr><td class="f">acks=0</td><td>发出去就不管。<b>不确认、可丢失</b>。只适合 metrics 日志</td></tr>
+    <tr><td class="f">acks=1</td><td>leader 写入即回。<b>leader 随即崩溃且未复制时会丢数据</b></td></tr>
+    <tr><td class="f">acks=all</td><td>等所有 ISR 副本确认。配合 <span class="k">min.insync.replicas=2</span> = 至少两处落盘</td></tr>
+    <tr><td class="f">acks=all + min.isr=1</td><td><b>名存实亡</b>：只剩 leader 也允许写，等价于 acks=1 的丢失风险</td></tr>
+    <tr><td class="f">ISR 不足时</td><td>写请求报 <span class="k">NOT_ENOUGH_REPLICAS</span> 错误——<b>这是系统在保护你，不是故障</b>，客户端应重试</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>unclean.leader.election.enable=true 是"拿数据换可用性"的开关。</b>开启后，ISR 之外的落后副本也能当选 leader，服务不中断，但该副本上缺失的消息<b>永久丢失</b>（且消费者毫无感知）。默认 false 意味着：宁可暂时不可用（等 ISR 恢复），也不丢已确认的消息。<b>除非你做的是可丢数据的日志管道，否则别开。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Producer 语义：acks、幂等、事务</h2></div>
+  <h4>三档投递语义</h4>
+  <table>
+    <tr><th style="width:120px">语义</th><th style="width:200px">配置</th><th>风险</th></tr>
+    <tr><td><b>至多一次</b></td><td class="f">acks=0，或 acks=1 + 不重试</td><td>发送失败不重试，直接丢</td></tr>
+    <tr><td><b>至少一次</b></td><td class="f">acks=all + retries 拉满（默认行为）</td><td>重试可能<b>重复</b>，消费端要幂等</td></tr>
+    <tr><td><b>精确一次</b></td><td class="f">enable.idempotence=true（+ 事务）</td><td>有性能代价，且事务版有额外开销</td></tr>
+  </table>
+  <pre><span class="c"># Java 生产者：推荐的生产基线配置</span>
+Properties props = <span class="b">new</span> Properties();
+props.put(<span class="y">"bootstrap.servers"</span>, <span class="y">"kafka-1:9092,kafka-2:9092,kafka-3:9092"</span>);
+props.put(<span class="y">"key.serializer"</span>, <span class="y">"org.apache.kafka.common.serialization.StringSerializer"</span>);
+props.put(<span class="y">"value.serializer"</span>, <span class="y">"org.apache.kafka.common.serialization.StringSerializer"</span>);
+
+props.put(<span class="y">"acks"</span>, <span class="y">"all"</span>);                      <span class="c">// 3.0 起默认就是 all</span>
+props.put(<span class="y">"enable.idempotence"</span>, <span class="y">"true"</span>);     <span class="c">// 3.0 起默认 true，防重试重复</span>
+props.put(<span class="y">"max.in.flight.requests.per.connection"</span>, <span class="y">"5"</span>);  <span class="c">// 幂等允许下最多 5，兼顾并行与顺序</span>
+props.put(<span class="y">"retries"</span>, <span class="y">"2147483647"</span>);        <span class="c">// 幂等开启时默认值，配好重连退避即可</span>
+props.put(<span class="y">"linger.ms"</span>, <span class="y">"20"</span>);               <span class="c">// 攒 20ms 凑批，吞吐换微小延迟</span>
+props.put(<span class="y">"batch.size"</span>, <span class="y">"65536"</span>);          <span class="c">// 64KB 批次，默认 16KB</span>
+props.put(<span class="y">"compression.type"</span>, <span class="y">"lz4"</span>);       <span class="c">// none/gzip/snappy/lz4/zstd，压缩比换 CPU</span>
+props.put(<span class="y">"buffer.memory"</span>, <span class="y">"33554432"</span>);    <span class="c">// 32MB 发送缓冲，默认值</span>
+props.put(<span class="y">"delivery.timeout.ms"</span>, <span class="y">"120000"</span>); <span class="c">// 2 分钟总超时（含重试），默认值</span></pre>
+  <h4>幂等生产者：原理就两点</h4>
+  <p>开启 <span class="k">enable.idempotence=true</span> 后，broker 为每个生产者实例分配 <b>PID</b>，每条消息带<b>分区内单调递增的序列号</b>。broker 缓存每个 (PID, partition) 最近提交的序号：<b>重复序号直接丢弃、乱序序号拒绝</b>。这解决了"网络超时重试导致同一条消息写两次"和"重试乱序"。</p>
+  <div class="callout warn">
+    <b>幂等的边界：</b>它只保证<b>单会话内单分区</b>不重不丢。生产者重启会拿新 PID，跨会话去重做不到——那需要业务层的业务 ID 去重或事务。<b>幂等也不解决消费者重复</b>，端到端 exactly-once 要靠事务 + read_committed。
+  </div>
+  <h4>事务：跨分区原子写</h4>
+  <pre><span class="c">// 事务生产者：多条消息要么全部可见，要么全部不可见</span>
+props.put(<span class="y">"transactional.id"</span>, <span class="y">"order-service-1"</span>);   <span class="c">// 固定且唯一，崩溃恢复靠它</span>
+KafkaProducer&lt;String, String&gt; producer = <span class="b">new</span> KafkaProducer&lt;&gt;(props);
+producer.initTransactions();                        <span class="c">// 初始化事务状态</span>
+
+producer.beginTransaction();
+producer.send(<span class="b">new</span> ProducerRecord&lt;&gt;(<span class="y">"orders"</span>, orderId, payload));
+producer.send(<span class="b">new</span> ProducerRecord&lt;&gt;(<span class="y">"order-events"</span>, orderId, event));
+producer.commitTransaction();                       <span class="c">// 失败则 abortTransaction()</span>
+
+<span class="c">// 消费者必须显式隔离事务消息，否则仍会读到未提交的</span>
+props.put(<span class="y">"isolation.level"</span>, <span class="y">"read_committed"</span>);   <span class="c">// 默认 read_uncommitted</span></pre>
+  <p>事务消息在日志里是普通消息 + 特殊标记（COMMIT/ABORT 控制记录）。<b>只有 read_committed 消费者会跳过 ABORT 事务的消息</b>；默认的 read_uncommitted 照单全收。</p>
+  <div class="callout danger">
+    <b>事务不是免费的：</b>事务消息要走事务状态 topic（<span class="k">__transaction_state</span>）协调，<b>吞吐大约打对折、尾延迟升高</b>。判断标准：你的"多分区原子写"需求是真的（下游会把半成品当成事实），还是伪的（其实消费端能容忍）？伪需求别用事务，用业务 ID 去重更轻。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Consumer rebalance 协议</h2></div>
+  <p class="lead">消费者组的分区分配不是客户端私聊，而是由 <b>group coordinator</b>（broker 端组件）统一编排的。<b>rebalance 期间整个组停止消费</b>，这就是"消费卡顿"的头号来源。</p>
+  <h4>两个线程、两个超时</h4>
+  <table>
+    <tr><th style="width:170px">机制</th><th style="width:170px">参数/默认值</th><th>作用</th></tr>
+    <tr><td><b>心跳线程</b></td><td class="f">heartbeat.interval.ms=3000</td><td>后台线程周期性发心跳，证明"我还活着"</td></tr>
+    <tr><td><b>会话超时</b></td><td class="f">session.timeout.ms=45000</td><td>45 秒（3.0 起，此前 10s）没收到心跳 → coordinator 判定死亡 → 踢出组 → rebalance</td></tr>
+    <tr><td><b>轮询线程</b></td><td class="f">max.poll.interval.ms=300000</td><td>两次 <span class="k">poll()</span> 之间处理逻辑超过 5 分钟 → 主动退出组 → rebalance</td></tr>
+    <tr><td><b>单次拉取量</b></td><td class="f">max.poll.records=500</td><td>一次 poll 最多返回 500 条，控制单轮处理时长</td></tr>
+  </table>
+  <h4>eager vs cooperative sticky</h4>
+  <table>
+    <tr><th style="width:160px">协议</th><th style="width:250px">工作方式</th><th>影响</th></tr>
+    <tr><td><b>Eager（贪婪式）</b><br>RangeAssignor / RoundRobin</td><td><b>全局停摆</b>：所有消费者先撤销<b>全部分区</b>，再按新成员列表重新分配</td><td>每次成员变化全体停顿一次；分配完成后才能继续消费</td></tr>
+    <tr><td><b>Cooperative Sticky</b>（2.4+，推荐）</td><td><b>增量移交</b>：两阶段——只撤销"需要移动的分区"，分配给新主人，其余分区不动</td><td>未受影响的分区<b>全程不停</b>；停顿窗口小一个数量级</td></tr>
+  </table>
+  <pre><span class="c">// 切 cooperative sticky：Java 消费者一行配置</span>
+props.put(<span class="y">"partition.assignment.strategy"</span>,
+          <span class="y">"org.apache.kafka.clients.consumer.CooperativeStickyAssignor"</span>);
+
+<span class="c"># 命令行看组的实时状态</span>
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 \
+  --describe --group demo-g1
+
+<span class="c"># 关键列：</span>
+<span class="c">#   CURRENT-OFFSET  已消费到的 offset</span>
+<span class="c">#   LOG-END-OFFSET  分区末尾 offset（滞后量 = 末尾 - 当前）</span>
+<span class="c">#   LAG             消费滞后 —— 生产监控的第一指标</span>
+<span class="c">#   CONSUMER-ID     持有该分区的消费者实例</span>
+<span class="c"># 组状态 Empty / PreparingBalance / Stable / CompletingRebalance / Dead</span></pre>
+  <h4>消费循环的正确姿势</h4>
+  <pre><span class="c">// 手动提交 offset：至少一次语义的标配</span>
+props.put(<span class="y">"enable.auto.commit"</span>, <span class="y">"false"</span>);        <span class="c">// 关掉自动提交，自己掌握时机</span>
+props.put(<span class="y">"isolation.level"</span>, <span class="y">"read_committed"</span>); <span class="c">// 配合事务生产者</span>
+
+consumer.subscribe(topics);
+<span class="b">while</span> (running) {
+  ConsumerRecords&lt;String, String&gt; records = consumer.poll(Duration.ofMillis(200));
+  <span class="b">for</span> (ConsumerRecord&lt;String, String&gt; r : records) {
+    process(r);                      <span class="c">// 业务处理，必须能在 max.poll.interval.ms 内完成</span>
+  }
+  consumer.commitSync();             <span class="c">// 处理完再提交：崩了重来 = 重复消费（至少一次）</span>
+}
+
+<span class="c">// 长耗时处理（如调用外部 API）拆两轮 poll，中间用 resume 暂停分区，</span>
+<span class="c">// 避免超过 max.poll.interval.ms 被踢出组</span></pre>
+  <div class="callout warn">
+    <b>"先提交后处理"是丢消息陷阱，"先处理后提交"是重复陷阱。</b>没有完美解，只有取舍：金融类选至少一次 + 业务幂等（先处理后提交）；日志类选至多一次省心（先提交后处理）。<b>rebalance 风暴的根源通常是 max.poll.interval.ms 设太小，或消费逻辑偶发变慢</b>——调大超时 + 用 cooperative sticky，比加消费者数量更管用。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>零拷贝与页缓存</h2></div>
+  <p class="lead">Kafka 高吞吐不是靠玄学，是两个朴素事实：<b>磁盘顺序读写够快 + 数据尽量不复制</b>。</p>
+  <h4>零拷贝（sendfile）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>传统读文件发网络</b>：磁盘 → 内核页缓存 → 用户缓冲区 → socket 缓冲区 → 网卡。<b>4 次拷贝、4 次上下文切换</b></div></div>
+    <div class="step"><div class="txt"><b>Kafka 的 sendfile 路径</b>：数据从页缓存<b>直接</b>进 socket 缓冲区，CPU 只做 DMA 搬运描述符。<b>2 次拷贝、2 次切换</b></div></div>
+    <div class="step"><div class="txt"><b>生产者侧同理</b>：消息先进内存 buffer，攒批后顺序 append 到 segment 文件，几乎全是顺序 IO</div></div>
+  </div>
+  <h4>页缓存是主力，磁盘是兜底</h4>
+  <table>
+    <tr><th style="width:150px">事实</th><th>推论</th></tr>
+    <tr><td>消费热点数据（最近写入）基本命中 OS page cache</td><td><b>不要给 Kafka 配太小内存</b>； broker 自身堆 6GB 常够，其余留给页缓存</td></tr>
+    <tr><td>Kafka <b>不逐条 fsync</b>，靠多副本冗余保证持久</td><td>单 broker 掉电丢尾部消息是设计内的，用 acks=all + RF=3 兜底</td></tr>
+    <tr><td>消费滞后到 retention 外的老数据会真实读盘</td><td>追积压时吞吐会掉，提前扩容/加分区，别等 LAG 告警</td></tr>
+    <tr><td>压缩在 producer 侧做，<b>端到端压缩</b>透传</td><td>开 compression.type=lz4/zstd，带宽和磁盘双省</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>磁盘选型经验：</b>多块普通 HDD 做日志盘 + 页缓存，往往比单块高价 SSD 更划算——顺序写把 HDD 的顺序带宽用满即可。<b>真正吃随机 IO 的是 page cache 未命中的旧数据追读</b>，那是偶发场景。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Kafka Streams 与 Connect</h2></div>
+  <p class="lead">两个官方生态组件，定位完全不同：<b>Streams 是"你的应用里的流计算库"，Connect 是"Kafka 与外部系统的搬运工"。</b>都不需要额外集群。</p>
+  <h4>Kafka Streams（流处理库）</h4>
+  <table>
+    <tr><th style="width:130px">抽象</th><th>说明</th></tr>
+    <tr><td><b>KStream</b></td><td>不可变记录流，每条都是 insert 语义</td></tr>
+    <tr><td><b>KTable</b></td><td>changelog 流，同 key 后者覆盖前者（物化视图）</td></tr>
+    <tr><td><b>窗口</b></td><td>滚动（tumbling）、跳跃（hopping）、会话（session）窗口</td></tr>
+    <tr><td><b>状态存储</b></td><td>本地 <b>RocksDB</b> + changelog topic 备份，故障自动恢复</td></tr>
+    <tr><td><b>exactly-once</b></td><td><span class="k">processing.guarantee=exactly_once_v2</span>（2.6+，默认 at_least_once）</td></tr>
+  </table>
+  <pre><span class="c">// 30 秒滚动窗口统计每用户订单数</span>
+StreamsBuilder builder = <span class="b">new</span> StreamsBuilder();
+KStream&lt;String, String&gt; orders = builder.stream(<span class="y">"orders"</span>);
+
+orders.groupByKey()
+      .windowedBy(TimeWindows.ofSizeWithNoGrace(Duration.ofSeconds(30)))
+      .count()
+      .toStream()
+      .to(<span class="y">"order-counts-30s"</span>, Produced.with(stringSerde, longSerde));
+
+Properties props = <span class="b">new</span> Properties();
+props.put(<span class="y">"processing.guarantee"</span>, <span class="y">"exactly_once_v2"</span>);  <span class="c">// EOS v2，开销小于 v1</span>
+props.put(<span class="y">"num.stream.threads"</span>, <span class="y">"4"</span>);                <span class="c">// 并行度 = 消费的分区数</span>
+<span class="b">new</span> KafkaStreams(builder.build(), props).start();</pre>
+  <h4>Kafka Connect（数据管道）</h4>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:220px">作用</th><th>典型连接器</th></tr>
+    <tr><td><b>Source</b></td><td>外部系统 → Kafka</td><td>JDBC、Debezium（数据库 CDC）、S3、MongoDB</td></tr>
+    <tr><td><b>Sink</b></td><td>Kafka → 外部系统</td><td>Elasticsearch、JDBC、S3、HDFS</td></tr>
+  </table>
+  <pre><span class="c"># 常见 CDC 场景：Debezium 把 MySQL binlog 变成 Kafka topic</span>
+<span class="c"># 数据库每行变更（insert/update/delete）一条消息，下游消费做缓存刷新/数仓</span>
+
+<span class="c"># connector 配置文件（distributed 模式，REST API 提交）</span>
+{
+  <span class="y">"name"</span>: <span class="y">"es-sink-orders"</span>,
+  <span class="y">"config"</span>: {
+    <span class="y">"connector.class"</span>: <span class="y">"io.confluent.connect.elasticsearch.ElasticsearchSinkConnector"</span>,
+    <span class="y">"topics"</span>: <span class="y">"orders"</span>,
+    <span class="y">"connection.url"</span>: <span class="y">"http://es:9200"</span>,
+    <span class="y">"key.ignore"</span>: <span class="y">"false"</span>,
+    <span class="y">"errors.tolerance"</span>: <span class="y">"all"</span>,
+    <span class="y">"errors.deadletterqueue.topic.name"</span>: <span class="y">"dlq-orders"</span>
+  }
+}</pre>
+  <div class="callout warn">
+    <b>Connect 的运维盲区：</b>① 死信队列（DLQ）一定要配 <span class="k">errors.tolerance=all</span> + DLQ topic，否则一条毒消息能让 connector 无限重启；② connector 内部有自己的消费者组（<span class="k">connect-{name}</span>），offset 存在内部 topic，别和业务组混为一谈；③ 配置改了要重启 task 才生效，发布窗口要评估。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>KRaft：Kafka 没有 ZooKeeper 之后</h2></div>
+  <p class="lead">KIP-500 用 <b>Kafka 自己的 Raft 协议</b>管理元数据，替代 ZooKeeper。<b>4.0 起 ZooKeeper 模式已被移除</b>——这是近两年 Kafka 最大的架构变化。</p>
+  <h4>版本节奏（排坑必背）</h4>
+  <table>
+    <tr><th style="width:110px">版本</th><th>状态</th></tr>
+    <tr><td><b>2.8</b></td><td>KRaft 早期预览（early access），别上生产</td></tr>
+    <tr><td><b>3.3</b></td><td><b>KRaft 生产就绪</b>（新集群）</td></tr>
+    <tr><td><b>3.5 ~ 3.9</b></td><td>提供 ZK → KRaft 在线迁移工具，双写过渡</td></tr>
+    <tr><td><b>4.0</b></td><td><b>移除 ZooKeeper 模式</b>，只保留 KRaft；新一代消费者重平衡协议（KIP-848）就绪</td></tr>
+  </table>
+  <h4>架构变化</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:240px">ZooKeeper 模式</th><th>KRaft</th></tr>
+    <tr><td>元数据存哪</td><td>外部 ZK 集群（znode）</td><td>broker 内的 <b>__cluster_metadata</b> 日志 topic</td></tr>
+    <tr><td>谁来当管家</td><td>ZK 选出一个 controller</td><td>controller quorum（3 或 5 个节点）Raft 共识</td></tr>
+    <tr><td>故障转移</td><td>秒级到几十秒，依赖 ZK 会话超时</td><td><b>秒级</b>，Raft 选举更快</td></tr>
+    <tr><td>运维组件</td><td>Kafka + ZK 两套</td><td>只有 Kafka，部署简化</td></tr>
+    <tr><td>元数据规模</td><td>ZK 全量 znode 在内存，万级分区吃力</td><td>日志快照 + 流式拉取，可扩展性更好</td></tr>
+  </table>
+  <pre><span class="c"># KRaft 模式关键配置（config/kraft/server.properties）</span>
+process.roles=broker,controller        <span class="c"># combined 模式：单节点既当 broker 又当 controller</span>
+node.id=1
+controller.quorum.voters=1@localhost:9093   <span class="c"># 生产：3 个 voter，如 1@k1:9093,2@k2:9093,3@k3:9093</span>
+listeners=PLAINTEXT://:9092,CONTROLLER://:9093
+advertised.listeners=PLAINTEXT://localhost:9092
+
+<span class="c"># 元数据日志相关</span>
+metadata.log.segment.bytes=1073741824
+metadata.log.max.snapshot.interval.ms=3600000
+metadata.max.idle.interval.ms=5000     <span class="c"># 提高 broker 间元数据传播频率（降低延迟，费点流量）</span>
+
+<span class="c"># 初始化存储（首次启动前必须做一次）</span>
+/opt/kafka/bin/kafka-storage.sh format -t &lt;cluster-id&gt; --config config/kraft/server.properties
+
+<span class="c"># 首选 leader 选举（KRaft 下用这个命令，不再走 ZK）</span>
+/opt/kafka/bin/kafka-leader-election.sh --bootstrap-server localhost:9092 --election-type PREFERRED --topic demo</pre>
+  <div class="callout ok">
+    <b>行动建议：</b>新集群直接用 KRaft（4.x 没得选）。存量 ZK 集群：3.x 版本用官方迁移工具（KIP-866 双写阶段）滚动升级，先在预发跑通元数据校验再动生产。<b>迁移期间两套系统并存，回滚预案要提前写好。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>三大顽疾：分区倾斜、消息乱序、rebalance 风暴</h2></div>
+  <h4>分区倾斜</h4>
+  <p>某些分区数据量/流量远超其他分区。后果：消费组里负责该分区的消费者 LAG 永远降不下来，<b>整体消费进度被最慢的一个分区卡死</b>。</p>
+  <ul>
+    <li><b>根因</b>：key 分布不均（少量超级用户贡献大部分流量）、key 为 null（轮询但负载实际不均）、自定义 partitioner 有偏</li>
+    <li><b>解法</b>：① 重新设计 key（加二级散列后缀）；② 热点 key 单独拆 topic；③ 加分区后注意 <b>key 到分区的映射会变</b>，有顺序要求的业务要评估</li>
+  </ul>
+  <pre><span class="c"># 诊断：看每个分区的 LOG-END-OFFSET 差距</span>
+kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic demo --time -1
+<span class="c"># 最大分区 offset ÷ 平均 offset 明显大于 1，就是倾斜</span></pre>
+  <h4>消息乱序</h4>
+  <ul>
+    <li><b>根因 1</b>：重试。acks≠all 或未开幂等时，重试可能把旧消息写到新位置之后</li>
+    <li><b>根因 2</b>：多个生产者实例并发写同一分区（各自缓冲攒批节奏不同）</li>
+    <li><b>根因 3</b>：业务上需要顺序的消息用了不同 key，落到了不同分区</li>
+    <li><b>解法</b>：同 key 进同分区（默认行为）+ <span class="k">enable.idempotence=true</span> + <span class="k">max.in.flight.requests.per.connection ≤ 5</span>；跨分区顺序要求 = 单分区串行，牺牲并行度</li>
+  </ul>
+  <h4>rebalance 风暴</h4>
+  <ul>
+    <li><b>现象</b>：日志里 rebalance 一条接一条，消费几乎停滞，LAG 持续上涨</li>
+    <li><b>根因</b>：① <span class="k">max.poll.interval.ms</span> 太小，业务偶尔超时；② 频繁发布重启（每次进出都是一次成员变更）；③ GC 停顿超过 session.timeout.ms</li>
+    <li><b>解法</b>：切 CooperativeStickyAssignor、调大 max.poll.interval.ms（如 600000）、poll 循环里暂停/恢复分区、用静态组成员（<span class="k">group.instance.id</span>）让重启不触发 rebalance</li>
+  </ul>
+  <pre><span class="c">// 静态组成员：进程重启后凭 group.instance.id 认领回原分区，不触发 rebalance</span>
+props.put(<span class="y">"group.instance.id"</span>, <span class="y">"order-consumer-3"</span>);   <span class="c">// 每个实例唯一且固定</span></pre>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">分区倾斜，消费 LAG 只降一个分区</div><div class="pd">热点 key 把流量灌进少数分区，负责它的消费者成瓶颈。重新设计 key 或单独拆 topic；加分区能缓解但要重算 key 映射，顺序业务先评估。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为 Kafka 全局有序</div><div class="pd">顺序只在分区内成立。需要顺序的消息没用同一个 key，跨分区必然乱。要么同 key，要么业务自带序号在消费端排序。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">没开幂等就狂重试</div><div class="pd">网络抖动触发重试，同一条消息写进去两遍，且可能乱序。enable.idempotence=true（3.0+ 默认开）+ max.in.flight ≤ 5。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">acks=all 但 min.insync.replicas=1</div><div class="pd">配置看着安全实则裸奔：只剩 leader 一个副本也允许写，leader 挂了照样丢。acks=all 必须配 min.insync.replicas=2 以上。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">开启 unclean leader election 换可用性</div><div class="pd">落后副本当选 leader，缺失的消息永久丢失且消费者无感知。默认 false 是对的，别为了"服务不中断"把它打开。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">max.poll.interval.ms 设太小</div><div class="pd">业务偶发变慢（调外部接口、GC）就超过间隔被踢出组，触发 rebalance，越慢越踢、越踢越慢。调到 5~10 分钟，或长任务拆多轮 poll。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">还在用 eager 分配器</div><div class="pd">RangeAssignor 每次成员变化都全体撤销全部分区再重分，停顿明显。2.4+ 换 CooperativeStickyAssignor，增量移交不停全组。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">offset 提交时机搞反</div><div class="pd">先 commit 后处理：处理失败消息永久丢失；先处理后 commit：崩溃后重复消费（至少一次，需业务幂等）。按业务取舍，别无意中混用。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">分区数拍脑袋，消息超 1MB 硬发</div><div class="pd">分区过多（几千）拖垮 broker 文件句柄和内存，消费者还空转；max.message.bytes 默认约 1MB，大消息报 RecordTooLargeException，应外置存储传引用。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">不看消费者 LAG，事务当糖豆撒</div><div class="pd">LAG 涨了没人发现，业务延迟几小时才暴露；事务生产者让吞吐约减半，非原子写需求别用。监控 kafka-consumer-groups 的 LAG 并配告警。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 关于 Kafka 的 HW（高水位）和 LEO，哪个说法正确？</div>
+      <button class="opt">HW 是 leader 的 LEO，消费者能读到 leader 的最新消息</button>
+      <button class="opt">HW 等于 ISR 中最小的 LEO，消费者只能读到 HW 以下的消息，之上的数据尚未被多数副本确认</button>
+      <button class="opt">HW 是 follower 的 LEO，leader 写满 HW 就切换新 segment</button>
+      <div class="ans">正确答案：<b>HW = ISR 中最小 LEO</b>。它划出"已提交"与"未提交"的界线：消费者只能消费 HW 以下的消息。leader 故障时也按 HW 截断旧 leader 的多余数据，防止已提交数据回滚。LEO 只是各副本自己的日志末端。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. acks=all 配合 min.insync.replicas=2、副本因子 3 的语义是？</div>
+      <button class="opt">写入只需 leader 确认，其他副本异步同步</button>
+      <button class="opt">至少 2 个副本（含 leader）同步才允许写；若 ISR 不足 2 个，生产者收到 NOT_ENOUGH_REPLICAS 错误</button>
+      <button class="opt">3 个副本全部确认才返回，否则写入失败</button>
+      <div class="ans">正确答案：<b>至少 2 个同步副本</b>。min.insync.replicas 是下限而非全员：acks=all 要求等所有 ISR 副本确认，但 ISR 最少必须有 2 个，否则直接拒绝写入（保护数据不丢）。三个副本可以容忍 1 个故障仍正常写入。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. eager 协议和 cooperative sticky 协议的核心区别是？</div>
+      <button class="opt">eager 全体撤销全部分区再重分，全组停顿；cooperative 只增量移交需要移动的分区，未受影响的分区不停</button>
+      <button class="opt">cooperative 不需要 group coordinator 参与，客户端自己协商</button>
+      <button class="opt">eager 支持跨组分配分区，cooperative 只支持组内</button>
+      <div class="ans">正确答案：<b>全组停摆 vs 增量移交</b>。两者都由 group coordinator 编排，都只在组内分配。eager（Range/RoundRobin）每次成员变化所有消费者先 revoke 全部分区再重新 assign，停顿窗口大；cooperative sticky（2.4+）分两轮只动该动的分区，生产推荐。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 消费者偶发处理一批消息超过 5 分钟，最可能发生什么？</div>
+      <button class="opt">broker 自动扩容该消费者的分区</button>
+      <button class="opt">超过 max.poll.interval.ms（默认 5 分钟）未再 poll，被判定死亡退出组，触发 rebalance</button>
+      <button class="opt">session.timeout.ms 超时，消息自动重投到其他消费者</button>
+      <div class="ans">正确答案：<b>超过 max.poll.interval.ms 触发 rebalance</b>。注意区分两个超时：session.timeout.ms（默认 45s）管"心跳线程有没有活着"，max.poll.interval.ms（默认 5 分钟）管"业务处理有没有卡住"。前者不触发主动退出，后者才是处理慢的杀手，也是 rebalance 风暴的常见根因。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 幂等生产者的去重原理是？</div>
+      <button class="opt">broker 按消息内容做哈希，重复内容直接丢弃</button>
+      <button class="opt">生产者给每条消息加 UUID，消费者按 UUID 去重</button>
+      <button class="opt">broker 为生产者分配 PID，消息带分区内递增序列号；broker 按 (PID, 分区) 缓存序号，重复/乱序的直接拒绝</button>
+      <div class="ans">正确答案：<b>PID + 分区内序列号</b>。去重在 broker 侧完成，不需要消费者参与、也不依赖消息内容（内容相同的两条业务消息仍会都写入）。注意幂等只覆盖单会话单分区；生产者重启拿新 PID，跨会话去重需要业务 ID 或事务。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 发现某 topic 有一个分区 offset 远高于其他分区，消费组 LAG 只降这个分区，应该？</div>
+      <button class="opt">重新设计 key 让流量打散（或热点 key 单独拆 topic），评估加分区对 key 映射的影响</button>
+      <button class="opt">给该分区单独加一个消费者组并行消费</button>
+      <button class="opt">把该分区的 retention 调短，让旧消息早点删掉</button>
+      <div class="ans">正确答案：<b>解决 key 分布</b>。这是典型分区倾斜：整体进度被最慢分区卡死。单开消费者组没用（同一条消息会被两组都消费，且组内仍是单消费者拿这个分区）；缩短 retention 只会丢数据。加分区能缓解但要重新计算 key→分区映射，有顺序要求的业务先评估。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查配置</h3>
+  <div class="cmds">
+    <div class="crow"><code>acks=all + enable.idempotence=true</code><span class="desc">生产者安全基线（3.0+ 默认）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>min.insync.replicas=2</code><span class="desc">broker 侧，acks=all 的配套下限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>linger.ms=20 + batch.size=64KB</code><span class="desc">攒批换吞吐</span><button class="copy">复制</button></div>
+    <div class="crow"><code>compression.type=lz4</code><span class="desc">端到端压缩，省带宽省磁盘</span><button class="copy">复制</button></div>
+    <div class="crow"><code>transactional.id=xxx + read_committed</code><span class="desc">跨分区原子写组合</span><button class="copy">复制</button></div>
+    <div class="crow"><code>enable.auto.commit=false + commitSync()</code><span class="desc">手动提交，至少一次语义</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CooperativeStickyAssignor</code><span class="desc">增量 rebalance，替代 eager 协议</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max.poll.interval.ms=300000</code><span class="desc">两次 poll 的最大间隔，调大防被踢</span><button class="copy">复制</button></div>
+    <div class="crow"><code>session.timeout.ms=45000</code><span class="desc">心跳超时（3.0 起默认 45s）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>group.instance.id=consumer-3</code><span class="desc">静态组成员，重启不触发 rebalance</span><button class="copy">复制</button></div>
+    <div class="crow"><code>unclean.leader.election.enable=false</code><span class="desc">禁止 ISR 外副本当选，防丢数据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>auto.create.topics.enable=false</code><span class="desc">生产关掉，防自动建成 1 分区 topic</span><button class="copy">复制</button></div>
+    <div class="crow"><code>retention.ms=604800000</code><span class="desc">topic 级保留 7 天</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cleanup.policy=compact</code><span class="desc">按 key 保留最新值（changelog）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>运维命令速查</h3>
+  <pre><span class="c"># topic 管理</span>
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic orders --partitions 6 --replication-factor 3 --config retention.ms=604800000
+kafka-topics.sh --bootstrap-server localhost:9092 --alter --topic orders --partitions 12      <span class="c"># 只能加不能减</span>
+kafka-topics.sh --bootstrap-server localhost:9092 --describe
+
+<span class="c"># 消费组与 LAG（生产监控第一现场）</span>
+kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group order-group
+kafka-consumer-groups.sh --bootstrap-server localhost:9092 --reset-offsets --group order-group --to-latest --topic orders --execute
+
+<span class="c"># 查看分区数据（排查消息内容）</span>
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic orders --partition 0 --offset 100 --max-messages 10
+kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic orders
+
+<span class="c"># 配置与首领选举（KRaft）</span>
+kafka-configs.sh --bootstrap-server localhost:9092 --entity-type topics --entity-name orders --describe
+kafka-leader-election.sh --bootstrap-server localhost:9092 --election-type PREFERRED --topic orders</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Topic</b></td><td>消息的分类管道，生产者写、消费者读</td></tr>
+    <tr><td><b>Partition</b></td><td>topic 的有序日志分片，并行单位和顺序单位</td></tr>
+    <tr><td><b>Offset</b></td><td>分区内消息序号，单调递增，消费进度坐标</td></tr>
+    <tr><td><b>ISR</b></td><td>与 leader 同步的副本集合，超过 lag 阈值被踢出</td></tr>
+    <tr><td><b>LEO</b></td><td>日志末端偏移，即下一条写入位置</td></tr>
+    <tr><td><b>HW</b></td><td>高水位，ISR 中最小 LEO，消费者可见边界</td></tr>
+    <tr><td><b>acks</b></td><td>生产者确认级别：0 不管 / 1 leader / all 全部 ISR</td></tr>
+    <tr><td><b>min.insync.replicas</b></td><td>acks=all 时的最小同步副本数</td></tr>
+    <tr><td><b>幂等生产者</b></td><td>PID + 分区序列号，broker 侧去重防乱序</td></tr>
+    <tr><td><b>Consumer Group</b></td><td>共同消费一个 topic 的消费者集合，分区组内分摊</td></tr>
+    <tr><td><b>group coordinator</b></td><td>broker 里管理组成员、分区分配、offset 的组件</td></tr>
+    <tr><td><b>rebalance</b></td><td>组成员变化时的分区重分配，期间消费暂停</td></tr>
+    <tr><td><b>eager 协议</b></td><td>全体撤销全部分区再重分的停摆式分配</td></tr>
+    <tr><td><b>cooperative sticky</b></td><td>增量移交式分配，只动该动的分区</td></tr>
+    <tr><td><b>__consumer_offsets</b></td><td>内部 topic，存消费组的 offset 与元数据</td></tr>
+    <tr><td><b>页缓存</b></td><td>OS 级文件缓存，Kafka 热数据基本命中它</td></tr>
+    <tr><td><b>零拷贝</b></td><td>sendfile 直传，数据不经过用户态</td></tr>
+    <tr><td><b>KRaft</b></td><td>用 Kafka Raft 管元数据，4.0 起移除 ZooKeeper</td></tr>
+    <tr><td><b>read_committed</b></td><td>消费者隔离级别，只读已提交事务消息</td></tr>
+    <tr><td><b>消费者 LAG</b></td><td>LOG-END-OFFSET 减 CURRENT-OFFSET，消费滞后量</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 KRaft 单节点，完成这五件事 —— ① 建一个 3 分区 topic，用带 key 的消息验证"同 key 进同分区"；② 开两个 console-consumer 同组，观察分区在两组消费者间的分配，再杀一个看 rebalance；③ 配 min.insync.replicas=2 + acks=all，停掉一个 broker 观察 NOT_ENOUGH_REPLICAS；④ 用 Java 写幂等生产者重试场景，对比开/关幂等时 broker 里的重复消息数；⑤ 故意让消费逻辑 sleep 6 分钟，观察 max.poll.interval.ms 触发 rebalance。<br><br>
+    <b>之后值得单独学：</b>KIP-848 新一代消费者协议、MirrorMaker 2 跨集群同步、exactly_once_v2 的底层实现、Schema Registry 与 Avro 演进兼容，以及基于 LAG 的自动扩缩容方案。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟深入 Kafka · 上线前务必检查：acks 与 min.insync.replicas、rebalance 协议、消费者 LAG 监控</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（ISR/HW）和模块 4（rebalance 协议）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在容器里敲命令。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 Kafka 跟着敲：docker run -d --name kafka -p 9092:9092 apache/kafka:4.0.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

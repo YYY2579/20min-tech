@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 RAG 进阶</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · AI 篇 · 第 2 期 · 高密度版</span>
+    <h1>二十分钟学透 RAG 进阶</h1>
+    <p class="sub">入门 RAG 是"切块 + 向量 + 检索 + 塞进提示词"。进阶 RAG 的战场在<b>切分策略、混合检索、重排、查询理解和评测</b>——效果差的系统，问题 80% 出在检索而不在生成。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 个 pipeline 环节</span>
+      <span class="chip"><b>3</b> 类切分策略</span>
+      <span class="chip"><b>10</b> 个常见坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边拿自己的文档试：同一问题，分别用纯向量、纯 BM25、混合检索，对比命中结果。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先搭一个最小可跑环境</h2></div>
+  <p class="lead">本篇代码以当前主流库的稳定 API 为准（具体版本行为以各库官方文档为准）。</p>
+  <pre><span class="c"># 最小依赖（Python 生态示例）</span>
+pip install sentence-transformers rank-bm25 faiss-cpu numpy
+
+<span class="c"># 快速验证 embedding 模型能跑</span>
+python3 -c <span class="y">"
+from sentence_transformers import SentenceTransformer
+m = SentenceTransformer('BAAI/bge-small-zh-v1.5')
+print(m.encode(['如何重置密码']).shape)   # 期望 (1, 512) 之类，维度与模型有关
+"</span>
+
+<span class="c"># 检索组件速查</span>
+<span class="c"># 向量库：FAISS / Milvus / pgvector / Qdrant —— 原型用 FAISS，生产按运维能力选</span>
+<span class="c"># 关键词：rank_bm25 的 BM25Okapi（纯 Python，十万文档内够用）</span>
+<span class="c"># 重排：sentence-transformers 的 CrossEncoder</span></pre>
+  <div class="callout warn">
+    <b>一个前置认知：</b>RAG 系统是"检索系统 + 生成系统"的串联，<b>检索没召回到正确答案，生成再强也白搭</b>。所以优化顺序永远是：先修检索（看命中率和召回位置），再调生成。数据不对齐就换模型，是最常见的浪费。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Pipeline 全链路</h2></div>
+  <p class="lead">一条完整的 RAG 链路，离线建库 + 在线查询两段。每一段都有独立的故障模式和评测方法。</p>
+  <pre><span class="c"># ===== 离线：建库（Indexing） =====</span>
+原始文档(PDF/HTML/Word/MD)
+   │  ① 解析：抽出正文 + 结构（标题层级、表格、页码）
+   ▼
+结构化文档块(document tree)
+   │  ② 切分：按策略切成 chunk，保留元数据（来源、标题路径）
+   ▼
+chunk 列表 ──┬─▶ ③ 向量化：embedding 模型 → 稠密向量 ─▶ 向量索引
+              └─▶ 关键词索引：BM25 / 倒排（不分词的中文先分词）
+
+<span class="c"># ===== 在线：查询（Retrieval &amp; Generation） =====</span>
+用户问题
+   │  ④ 查询理解：改写 / 扩展 / HyDE / 多查询
+   ▼
+查询（可多个）
+   │  ⑤ 检索：向量检索 + BM25 多路召回 ─▶ RRF 融合
+   ▼
+候选 chunk 集合（top 50~100）
+   │  ⑥ 重排：cross-encoder 精排 ─▶ top 3~10
+   ▼
+   ┌───────────────┐
+   │ ⑦ 上下文组装  │  长度预算：system + 历史 + 检索块 + 问题 ≤ 模型窗口
+   └───────┬───────┘
+           ▼
+   生成答案（带引用编号）──▶ ⑧ 评测/观测：命中率、忠实度、延迟、成本</pre>
+  <table>
+    <tr><th style="width:110px">环节</th><th style="width:170px">核心决策</th><th>常见实现</th></tr>
+    <tr><td><b>① 解析</b></td><td>表格、图片、页眉页脚怎么处理</td><td>PDF: PyMuPDF/pdfplumber；结构化: Unstructured、MinerU 类工具</td></tr>
+    <tr><td><b>② 切分</b></td><td>多大、按什么边界、重叠多少</td><td>固定大小 / 递归 / 语义 / table-aware</td></tr>
+    <tr><td><b>③ 向量化</b></td><td>选哪个模型、维度与成本</td><td>BGE / GTE / OpenAI text-embedding 系列（以厂商文档为准）</td></tr>
+    <tr><td><b>⑤ 检索</b></td><td>单路还是多路、怎么融合</td><td>向量 + BM25 + RRF</td></tr>
+    <tr><td><b>⑥ 重排</b></td><td>精排模型选型、延迟预算</td><td>CrossEncoder（bge-reranker 系列）</td></tr>
+    <tr><td><b>⑦ 组装</b></td><td>放几个 chunk、怎么排、带不带历史</td><td>按相关性排序 + 编号 + 截断策略</td></tr>
+  </table>
+  <div class="callout">
+    <b>架构决策点：</b>链路越长效果越好，但延迟和复杂度也线性上升。务实路线：<b>v1 做好切分 + 混合检索（不做重排）→ v2 加重排 → v3 加查询改写</b>。每一步都用评测集量化收益，不做"感觉有提升"的优化。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>解析与切分策略</h2></div>
+  <p class="lead">切分是 RAG 里<b>影响最大、最容易被随意决定</b>的环节。原则：一个 chunk 应该是一个<b>语义自包含</b>的单元。</p>
+  <h3>三种切分策略对比</h3>
+  <table>
+    <tr><th style="width:130px">策略</th><th style="width:230px">做法</th><th>优劣</th></tr>
+    <tr><td><b>固定大小</b></td><td>按字符/token 数硬切（如 512 token + 50 重叠）</td><td>简单、快。<b>但会从句子中间砍断</b>，语义破碎；重叠只能部分缓解</td></tr>
+    <tr><td><b>结构感知</b></td><td>按 Markdown 标题、HTML 标签、章节边界切</td><td>保留文档结构，chunk 自带"标题路径"上下文。<b>结构化文档的首选</b></td></tr>
+    <tr><td><b>语义切分</b></td><td>按 embedding 相似度在句边界处断句聚类</td><td>边界最自然，但慢（要先算向量）、参数敏感</td></tr>
+    <tr><td><b>table-aware</b></td><td>表格整体作为一个 chunk；大表按行分组并<b>携带表头</b></td><td>表格被拆散 = 信息报废。含表格的文档必须单独处理表格</td></tr>
+  </table>
+  <pre><span class="c"># LangChain 的递归切分（按分隔符优先级递归，示意）</span>
+<span class="b">from</span> langchain_text_splitters <span class="b">import</span> RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,          <span class="c"># 目标 chunk 大小（字符）</span>
+    chunk_overlap=80,        <span class="c"># 重叠，缓解跨块信息丢失；通常 10%~20%</span>
+    separators=[<span class="y">"\n## "</span>, <span class="y">"\n### "</span>, <span class="y">"\n\n"</span>, <span class="y">"\n"</span>, <span class="y">"。"</span>, <span class="y">""</span>],
+    <span class="c"># 优先按二级标题切，切不动再退到段落、句子、硬切</span>
+)
+chunks = splitter.split_text(document_text)
+
+<span class="c"># 表格处理：表格单独成 chunk，行分组时带上表头</span>
+<span class="c"># ┌──────────┬──────┐</span>
+<span class="c"># │ 产品 | 价格 │  ← 每个分片都重复这行表头</span>
+<span class="c"># ├──────────┼──────┤</span>
+<span class="c"># │ A      | 100  │  ← 分片1：A、B 两行</span>
+<span class="c"># │ B      | 200  │</span>
+<span class="c"># │ C      | 300  │  ← 分片2：C、D 两行 + 重复表头</span>
+<span class="c"># └──────────┴──────┘</span></pre>
+  <h3>chunk 大小怎么定</h3>
+  <ul>
+    <li><b>不是越大越好，也不是越小越好。</b>大 chunk 语义全但向量"主题被稀释"（一段话讲三件事，向量谁都像）；小 chunk 语义聚焦但缺上下文（"该产品支持退款"——哪个产品？）</li>
+    <li><b>经验起点：</b>中文 300~500 字/块，重叠 10%~20%；然后按评测集上的命中率调。<b>没有放之四海皆准的参数</b></li>
+    <li><b>元数据补偿：</b>给小 chunk 补上"标题路径"和"文档摘要"再向量化，缓解缺上下文问题（检索时也能按元数据过滤）</li>
+    <li><b>父子块（small-to-big）：</b>检索用小 chunk（定位准），生成时把它的父块（更大范围）喂给模型。两全其美，代价是索引设计复杂一点</li>
+  </ul>
+  <div class="callout danger">
+    <b>血泪教训：</b>把 Markdown 文档按 512 字符硬切，标题"## 退款政策"留在了上一块末尾，下一块是"7 天内可退，运费自理"。用户问"退款政策"，检索到的 chunk 没有标题也没有主语——生成模型只能瞎猜。这就是"切分破坏语义"的典型现场。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>向量化与索引</h2></div>
+  <table>
+    <tr><th style="width:130px">决策</th><th>要点</th></tr>
+    <tr><td><b>模型选型</b></td><td><b>查询和文档必须用同一个模型</b>（含相同的前缀/指令约定，部分模型对查询侧有特殊 prompt 前缀，以模型文档为准）。中文场景优先选中文语料训练的模型（如 BGE 系列），英文场景 MTEB 榜单可参考但别盲信</td></tr>
+    <tr><td><b>维度与量化</b></td><td>维度越高语义越细但存储和计算越贵。百万级 chunk 可考虑 PQ/INT8 量化，十万级全量精度没压力</td></tr>
+    <tr><td><b>相似度</b></td><td>余弦相似度是主流；注意归一化（多数模型输出已归一化，用内积 = 余弦）</td></tr>
+    <tr><td><b>元数据索引</b></td><td>来源、标题路径、时间、权限标签必须入库。<b>权限过滤靠元数据在检索层实现</b>——"先检索再过滤"会导致 top-k 全是无权内容</td></tr>
+    <tr><td><b>更新策略</b></td><td>文档变更的增量索引 vs 全量重建。chunk 粒度 + 内容哈希去重，删旧插新；向量库选型时确认支持按元数据删除</td></tr>
+  </table>
+  <pre><span class="c"># 索引结构示意（记录长这样）</span>
+{
+  <span class="y">"id"</span>: <span class="y">"doc42#chunk7"</span>,
+  <span class="y">"text"</span>: <span class="y">"退款需在签收后 7 天内申请，运费由买家承担……"</span>,
+  <span class="y">"vector"</span>: [0.012, -0.034, ...],          <span class="c"># 与 text 同模型产出</span>
+  <span class="y">"metadata"</span>: {
+    <span class="y">"source"</span>: <span class="y">"policy/refund.md"</span>,
+    <span class="y">"title_path"</span>: <span class="y">"售后政策 &gt; 退款"</span>,
+    <span class="y">"doc_type"</span>: <span class="y">"policy"</span>,
+    <span class="y">"visibility"</span>: [<span class="y">"public"</span>, <span class="y">"vip"</span>],       <span class="c"># 权限标签</span>
+    <span class="y">"updated_at"</span>: <span class="y">"2026-10-01"</span>
+  }
+}
+
+<span class="c"># 检索时带过滤（伪代码）</span>
+results = vector_store.search(
+    query_vec,
+    top_k=50,
+    filter={<span class="y">"visibility"</span>: {<span class="y">"$in"</span>: user_groups}}   <span class="c"># 权限前置到检索层</span>
+)</pre>
+  <div class="callout warn">
+    <b>模型不匹配是静默杀手：</b>索引用模型 A 建的，查询时用了模型 B——不报错，只是检索质量莫名其妙地差（两个向量空间的语言不通）。CI 里要固化"索引模型名"配置，升级 embedding 模型 = <b>全量重建索引 + 全量回归评测</b>，不能只改一半。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>检索优化：混合检索与 RRF</h2></div>
+  <p class="lead">向量检索抓"语义相似"，BM25 抓"关键词精确匹配"。<b>两者失败模式互补，混合检索是性价比最高的一步优化。</b></p>
+  <table>
+    <tr><th style="width:130px">召回方式</th><th style="width:200px">擅长</th><th>失败场景</th></tr>
+    <tr><td><b>纯向量</b></td><td>同义改写、跨语言、概念相关</td><td>专有名词、型号、错误码、缩写——"ERR_CONN_REFUSED"向量上离"连接被拒绝"并不近</td></tr>
+    <tr><td><b>纯 BM25</b></td><td>关键词精确匹配、稀有词（ID、编号）</td><td>同义替换、口语化提问完全失效</td></tr>
+    <tr><td><b>混合 + RRF</b></td><td>两者并集，融合排序</td><td>几乎无（除了复杂度和延迟）</td></tr>
+  </table>
+  <pre><span class="c"># RRF（Reciprocal Rank Fusion）融合：只看排名不看分数</span>
+<span class="b">def</span> rrf_fuse(rankings, k=60):
+    <span class="c">"""rankings: {检索器名: [doc_id, ...] 按相关度降序}"""</span>
+    scores = defaultdict(float)
+    <span class="b">for</span> docs <span class="b">in</span> rankings.values():
+        <span class="b">for</span> rank, doc_id <span class="b">in</span> enumerate(docs, start=1):
+            scores[doc_id] += 1.0 / (k + rank)   <span class="c"># 排名第 1 加分最多，衰减平缓</span>
+    <span class="b">return</span> sorted(scores.items(), key=lambda x: -x[1])
+
+<span class="c"># 用法</span>
+vec_rank = [d.id <span class="b">for</span> d <span class="b">in</span> vector_search(q, top_k=50)]
+bm25_rank = [d <span class="b">for</span> d <span class="b">in</span> bm25.get_top_n(q, corpus, n=50)]
+fused = rrf_fuse({<span class="y">"vector"</span>: vec_rank, <span class="y">"bm25"</span>: bm25_rank}, k=60)
+
+<span class="c"># 为什么 RRF 比"分数加权求和"好用：</span>
+<span class="c"># 1. 不依赖不同检索器分数尺度一致（余弦 0.8 和 BM25 12.3 没法直接加）</span>
+<span class="c"># 2. 只用排名，对头部结果友好、对尾部差距不敏感，鲁棒</span>
+<span class="c"># 3. k=60 是原论文的常用值，一般不需要调</span></pre>
+  <h3>多路召回（Multi-channel Recall）</h3>
+  <ul>
+    <li><b>按内容类型分路：</b>正文向量一路、表格一路、FAQ（问句对问句）一路——FAQ 用"问题"向量化而不是"答案"，匹配用户 query 更准</li>
+    <li><b>按权限/业务域分路：</b>每路带不同 metadata 过滤</li>
+    <li><b>每路 top-k 放大（如各 50~100）再融合</b>，融合后交给重排。直接每路只取 top-5 就融合，会丢掉大量候选</li>
+  </ul>
+  <div class="callout ok">
+    <b>最小可用方案：</b>向量 top-50 + BM25 top-50 → RRF 融合 → 取 top-20 进重排。<b>这套组合不需要训练、不需要调参，对绝大多数中文知识库都是立竿见影的提升。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>重排与查询理解</h2></div>
+  <h3>Cross-Encoder 重排</h3>
+  <p>双塔（bi-encoder）模型：文档和查询<b>分别</b>编码成向量，只能算相似度，看不到交互。Cross-Encoder 把"查询 + 文档"拼在一起过模型，直接输出相关度分数——<b>精度高一个量级，但无法预计算，只能对候选集逐个推理，慢。</b></p>
+  <pre><span class="c"># CrossEncoder 重排（sentence-transformers，示意）</span>
+<span class="b">from</span> sentence_transformers <span class="b">import</span> CrossEncoder
+
+reranker = CrossEncoder(<span class="y">"BAAI/bge-reranker-base"</span>)   <span class="c"># 选型以当前可用的中/英模型为准</span>
+
+pairs = [[query, chunk.text] <span class="b">for</span> chunk <span class="b">in</span> candidates]   <span class="c"># 候选来自混合召回 top-20</span>
+scores = reranker.predict(pairs)                    <span class="c"># 每条 0~1 相关度</span>
+ranked = sorted(zip(candidates, scores), key=lambda x: -x[1])
+top_docs = [c <span class="b">for</span> c, s <span class="b">in</span> ranked[:5]]               <span class="c"># 精排后只取 top 5 进生成</span>
+
+<span class="c"># 延迟账：20 个候选 × 单次推理几 ms~几十 ms（取决于模型和硬件）= 几十到几百 ms</span>
+<span class="c"># 值得。检索阶段省下的 top-5 直接进生成，常把答案质量拉一个档</span></pre>
+  <table>
+    <tr><th style="width:150px">方案</th><th>延迟</th><th>精度</th><th>适用</th></tr>
+    <tr><td>双塔向量（bi-encoder）</td><td>ms 级</td><td>中</td><td>大规模初筛，索引可预计算</td></tr>
+    <tr><td>Cross-Encoder</td><td>十~百 ms</td><td><b>高</b></td><td>候选集精排（20~100 条）</td></tr>
+    <tr><td>ColBERT（晚期交互）</td><td>介于两者</td><td>较高</td><td>要精度又要速度的折中，实现复杂度高</td></tr>
+  </table>
+  <h3>查询理解三招</h3>
+  <pre><span class="c"># ① 查询改写（Query Rewrite）：把口语/缺主语的问题改写成检索友好的形式</span>
+用户：那个退款要多久啊
+改写：退款申请处理需要多长时间？退款到账时效
+<span class="c"># 多轮对话里尤其重要：把"它多少钱"改写成"Pro 套餐多少钱"（先补全指代）</span>
+
+<span class="c"># ② HyDE（Hypothetical Document Embeddings）：</span>
+<span class="c"># 让模型先生成一个"假设答案"，用假设答案的向量去检索</span>
+<span class="c"># ——答案与答案在向量空间里比"问题与答案"更近</span>
+假设答案 = llm(<span class="y">"请写一段可能回答该问题的文字，不需要准确：{question}"</span>)
+query_vec = embed(假设答案)        <span class="c"># 用假设答案检索，而非原始问题</span>
+
+<span class="c"># ③ 多查询（Multi-Query）：一个问题生成多个角度的检索式</span>
+queries = llm(<span class="y">"把这个问题改写成 3 个不同角度的检索查询：{question}"</span>)
+all_results = concat([search(q) <span class="b">for</span> q <span class="b">in</span> queries])   <span class="c"># 各自召回后统一融合</span></pre>
+  <div class="callout warn">
+    <b>HyDE 不是银弹：</b>假设答案里的错误信息会把检索带偏（"生成错误答案 → 检索到错文档 → 生成更错的答案"）。事实型查询慎用；对"观点/解释型"问题效果更好。<b>上任何查询改写都必须用评测集对比，主观感觉"变顺了"不算数。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>上下文组装、长度预算与引用</h2></div>
+  <p class="lead">检索到的 top-k chunk 不是一股脑塞进去就行。组装策略直接影响生成质量。</p>
+  <h3>长度预算分配</h3>
+  <pre><span class="c"># 模型上下文窗口 8K token 的分配示意（按自己模型调整）</span>
+system 提示（规则、输出格式）          ~300 token   <span class="c"># 固定成本，尽量精简</span>
+对话历史（最近 N 轮，超出就摘要）      ~500 token
+检索上下文（top-k chunk）              ~4000 token   <span class="c"># 主体，给足</span>
+用户问题                              ~50 token
+生成预留                             ~800 token   <span class="c"># 别让输出被窗口截断</span>
+────────────────────────────────────────────
+合计                                 ~5650 token，留足安全余量
+
+<span class="c"># 原则：</span>
+<span class="c"># 1. 先减历史和 system，再减 chunk 数量；chunk 从相关性最低的开始砍</span>
+<span class="c"># 2. 超长文档： chunk 截断到句边界，别从单词中间砍</span>
+<span class="c"># 3. 预算要代码化：组装时按预算动态选 top-k，而不是写死 k=5</span></pre>
+  <h3>组装顺序与引用</h3>
+  <ul>
+    <li><b>按相关性降序排列</b>，最相关的放最后（靠近问题，利用模型对末尾的注意力优势）——这一点各家说法不一，以你自己评测集的结论为准</li>
+    <li><b>每个 chunk 带编号 [1][2][3]</b>，提示词要求"回答末尾用 [n] 标注来源"；前端把编号渲染成可点击链接，直达原文位置（精确到锚点）</li>
+    <li><b>来源元数据进提示词</b>（文档名、章节、更新时间），模型可以据此回答"这个信息来自哪里、可能过时"</li>
+    <li><b>冲突处理：</b>多个 chunk 说法不一致时，提示词明确要求"列出分歧"而不是自己选一个——这比让模型和稀泥可靠得多</li>
+  </ul>
+  <pre><span class="c"># 组装后的提示词骨架</span>
+你是知识库助手。严格基于 <span class="b">&lt;context&gt;&lt;/context&gt;</span> 回答，禁止使用外部知识。
+
+<span class="b">&lt;context&gt;</span>
+[1] （来源：售后政策.md / 退款规则 / 更新于 2026-09）
+    退款需在签收后 7 天内申请……
+[2] （来源：会员权益.pdf / 第 3 页 / 更新于 2026-08）
+    VIP 会员退款时效延长至 15 天……
+<span class="b">&lt;/context&gt;</span>
+
+<span class="b">&lt;question&gt;</span>VIP 用户退款期限是多久？<span class="b">&lt;/question&gt;</span>
+
+<span class="b">&lt;rules&gt;</span>
+回答末尾标注引用的资料编号；资料间冲突时列出分歧；资料未覆盖输出"资料未覆盖"。
+<span class="b">&lt;/rules&gt;</span></pre>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>评测：检索与生成分开看</h2></div>
+  <p class="lead">RAG 的评测必须分层，端到端指标掩盖问题位置。<b>检索指标回答"找没找到"，生成指标回答"答得好不好"。</b></p>
+  <table>
+    <tr><th style="width:150px">指标</th><th style="width:220px">定义</th><th>合格线参考</th></tr>
+    <tr><td><b>Recall@K</b></td><td>正确答案在 top-K 检索结果中的比例</td><td>RAG 场景 K=5 时通常要求 ≥ 90%</td></tr>
+    <tr><td><b>MRR</b></td><td>第一个正确答案排名的倒数均值，衡量"排得靠前"</td><td>越高越好，关注长尾</td></tr>
+    <tr><td><b>nDCG@K</b></td><td>考虑多相关文档分级位置的排序质量</td><td>精排优化的直接观测指标</td></tr>
+    <tr><td><b>忠实度<br>Faithfulness</b></td><td>答案中的陈述能被检索内容支持的比例（反幻觉核心指标）</td><td>≥ 95%，低于此先查检索再查提示词</td></tr>
+    <tr><td><b>答案相关性<br>Answer Relevancy</b></td><td>答案是否切题、不啰嗦</td><td>结合人工抽检</td></tr>
+    <tr><td><b>延迟 / 成本</b></td><td>p95 延迟、单次 token 成本</td><td>检索 + 重排通常应 &lt; 1s</td></tr>
+  </table>
+  <pre><span class="c"># 检索评测：黄金问答对（问题 → 已知应命中的 chunk 或文档）</span>
+<span class="c"># eval_set.jsonl 每行：{"q": "...", "gold_doc_ids": ["doc42"], "gold_answer": "..."}</span>
+
+<span class="b">def</span> evaluate_retrieval(eval_set, retrieve_fn, k=5):
+    hits = 0
+    <span class="b">for</span> item <span class="b">in</span> eval_set:
+        results = retrieve_fn(item[<span class="y">"q"</span>], top_k=k)
+        <span class="b">if</span> any(r.doc_id <span class="b">in</span> item[<span class="y">"gold_doc_ids"</span>] <span class="b">for</span> r <span class="b">in</span> results):
+            hits += 1
+    <span class="b">return</span> {<span class="y">"recall@k"</span>: hits / len(eval_set)}
+
+<span class="c"># 判读方法：</span>
+<span class="c"># Recall 低 → 问题在切分/embedding/索引，别动生成</span>
+<span class="c"># Recall 高但答案差 → 问题在重排/组装/提示词/模型</span>
+<span class="c"># 忠实度低 → 检索内容没约束住模型，或检索到的内容本身冲突/过时</span></pre>
+  <div class="callout ok">
+    <b>评测集从哪来：</b>① 真实用户日志里采样（最有价值）；② 业务专家写 30~50 条黄金问答对（覆盖高频+易错）；③ 用"问题 → 文档"的现成结构反推。冷启动 50 条足够开始，之后随数据飞轮扩充（详见《AI 应用评估体系》）。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个常见坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">切分破坏语义</div><div class="pd">按固定字符数硬切，标题和主语被切断，chunk 离开上下文就无法理解。按结构边界切；给小 chunk 补标题路径；表格必须 table-aware 处理。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">embedding 模型不匹配</div><div class="pd">索库用一个模型、查询用另一个；或升级模型只改了查询侧没重建索引。不报错，效果莫名差。索引模型名进配置固化，换模型 = 全量重建 + 回归。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只评测端到端</div><div class="pd">"答案不好"是个无法行动的信号。不拆分层看：Recall@5 掉了是检索问题，忠实度掉了是生成问题。没有分层评测，优化就是盲人摸象。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">纯向量检索</div><div class="pd">错误码、型号、专有名词的查询向量检索全线崩溃。上 BM25 混合 + RRF，这是零训练成本的最大单项提升。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">权限在检索后过滤</div><div class="pd">先向量检索 top-10 再过滤权限，用户看到的经常不足 10 条甚至为空；更糟的是过滤逻辑漏了造成越权。权限标签必须作为检索条件（metadata filter）前置。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">上下文无限膨胀</div><div class="pd">top-20 chunk 全塞进提示词，token 成本爆炸、延迟劣化、噪声稀释关键信息。做长度预算，动态选 k；重排后只取 top-3~5 进生成。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">表格被拆散</div><div class="pd">Markdown 表格按字符切断，表头和数据分家，检索到半张表。表格整块成 chunk，大表按行分组且每组带表头。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">多轮对话不带指代消解</div><div class="pd">第二轮问"它多少钱"，检索的是"它"的向量，结果全文乱飘。查询改写时先把指代补全（结合历史），再进检索。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">无引用，答案无法溯源</div><div class="pd">用户不敢信、出争议无法仲裁、幻觉无法定位。chunk 编号 + 来源元数据 + 提示词强制引用标注，前端渲染可点击溯源。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">文档更新了索引没更新</div><div class="pd">知识库改了三轮政策，答案还在引用旧版。索引要有增量更新机制（内容哈希检测变更），知识库变更触发重建受影响的 chunk，评测集定期用最新文档校准。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 为什么混合检索（向量 + BM25 + RRF）通常优于纯向量检索？</div>
+      <button class="opt">因为向量模型对中文支持不好，BM25 补位</button>
+      <button class="opt">因为两者失败模式互补：向量抓语义相似，BM25 抓关键词精确匹配（型号、错误码、专有名词）</button>
+      <button class="opt">因为 BM25 比向量检索更快，混合是为了省算力</button>
+      <div class="ans">正确答案：<b>失败模式互补</b>。向量检索对同义改写强，但对"ERR_CONN_REFUSED"这类精确 token 反而弱（它语义上离"连接被拒绝"并不近）；BM25 正好相反。RRF 用排名融合，回避了两种分数尺度不可比的问题。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. RRF（Reciprocal Rank Fusion）相比"向量分数加权求和"的核心优势是？</div>
+      <button class="opt">计算量更小，不需要排序</button>
+      <button class="opt">对头部结果的权重更高，精度一定更好</button>
+      <button class="opt">不依赖不同检索器分数尺度一致，只用排名，鲁棒且无需调权重</button>
+      <div class="ans">正确答案：<b>只用排名、不依赖分数尺度</b>。余弦相似度 0.82 和 BM25 分数 12.3 没法直接相加；RRF 的 1/(k+rank) 形式让任何两个榜单都能融合，k=60 是原论文常用值，基本不用调。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. RAG 系统 Recall@5 很高，但生成的答案经常幻觉。问题最可能出在哪？</div>
+      <button class="opt">重排/组装/提示词环节，以及模型是否被约束在检索内容内</button>
+      <button class="opt">embedding 模型选错了，应该换模型</button>
+      <button class="opt">BM25 分词词典不够大</button>
+      <div class="ans">正确答案：<b>生成侧。</b>Recall 高说明内容找到了，答案还错 = 重排没把最相关的排前面、组装时塞了噪声、或提示词没有严格约束"只基于资料回答"。判读方法：Recall 低修检索，Recall 高答案差修生成。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于 chunk 切分，哪种做法是对的？</div>
+      <button class="opt">统一按 512 字符硬切，简单一致最可靠</button>
+      <button class="opt">按结构边界（标题/章节）切，表格整块处理，小 chunk 补充标题路径元数据</button>
+      <button class="opt">chunk 越大越好，保证语义完整</button>
+      <div class="ans">正确答案：<b>结构感知 + table-aware + 元数据补偿</b>。硬切会从句子中间砍断；大 chunk 会稀释向量主题（一段讲三件事，跟谁都不像）。300~500 字按评测调，检索用小 chunk、生成用父子块是成熟折中。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 企业知识库按权限分级（公开/内部/机密），正确的做法是？</div>
+      <button class="opt">检索时用 metadata filter 把用户可见范围作为检索条件前置</button>
+      <button class="opt">检索 top-10 后在应用层过滤掉无权内容</button>
+      <button class="opt">给每个权限建独立索引，查询时并发查全部索引</button>
+      <div class="ans">正确答案：<b>权限前置到检索层</b>。后过滤会导致有效结果不足（top-10 过滤后剩 2 条），且过滤逻辑一旦漏判就是越权事故。多索引方案在权限维度少时也可行，但维护成本随权限类型线性增长。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 关于 Cross-Encoder 重排，哪个说法是对的？</div>
+      <button class="opt">它可以预计算所有文档的向量，检索时直接算相似度</button>
+      <button class="opt">它和双塔向量模型原理相同，只是名字不同</button>
+      <button class="opt">它把查询和文档拼接过模型直接输出相关度，精度高但不能预计算，只适合对候选集精排</button>
+      <div class="ans">正确答案：<b>拼接推理、精度高、不可预计算</b>。这正是它只能做重排的原因：混合召回 top-20~50 后逐对打分，取 top-3~5 进生成。延迟几十到几百毫秒，通常值得。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>Pipeline 各环节速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>解析</code><span class="desc">抽正文 + 结构；表格、图注单独处理</span><button class="copy">复制</button></div>
+    <div class="crow"><code>切分</code><span class="desc">结构边界优先；中文 300~500 字；重叠 10~20%；表格整块</span><button class="copy">复制</button></div>
+    <div class="crow"><code>向量化</code><span class="desc">查询/文档同模型；元数据（来源/权限/时间）一起入库</span><button class="copy">复制</button></div>
+    <div class="crow"><code>检索</code><span class="desc">向量 top-50 + BM25 top-50 → RRF(k=60) 融合</span><button class="copy">复制</button></div>
+    <div class="crow"><code>重排</code><span class="desc">CrossEncoder 对 top-20~50 精排，取 top-3~5</span><button class="copy">复制</button></div>
+    <div class="crow"><code>查询理解</code><span class="desc">指代消解 → 改写；多查询慎用 HyDE</span><button class="copy">复制</button></div>
+    <div class="crow"><code>组装</code><span class="desc">长度预算动态选 k；编号 + 来源元数据；冲突要列分歧</span><button class="copy">复制</button></div>
+    <div class="crow"><code>评测</code><span class="desc">Recall@5 / MRR / nDCG（检索）+ 忠实度 / 相关性（生成）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>RRF 最小实现</h3>
+  <pre><span class="c"># 十行代码的混合检索融合</span>
+<span class="b">def</span> rrf_fuse(rankings, k=60):
+    scores = defaultdict(float)
+    <span class="b">for</span> docs <span class="b">in</span> rankings.values():
+        <span class="b">for</span> rank, doc_id <span class="b">in</span> enumerate(docs, 1):
+            scores[doc_id] += 1.0 / (k + rank)
+    <span class="b">return</span> sorted(scores.items(), key=lambda x: -x[1])
+
+fused = rrf_fuse({
+    <span class="y">"vector"</span>: [d.id <span class="b">for</span> d <span class="b">in</span> vector_search(q, 50)],
+    <span class="y">"bm25"</span>: bm25_top50(q),
+})</pre>
+
+  <h3>评测指标速查</h3>
+  <table>
+    <tr><th style="width:150px">层</th><th style="width:170px">指标</th><th>不合格时先修什么</th></tr>
+    <tr><td><b>检索</b></td><td>Recall@K、MRR、nDCG</td><td>切分 → embedding 模型 → 混合检索</td></tr>
+    <tr><td><b>重排</b></td><td>nDCG@K、top-1 命中率</td><td>换/加重排模型、扩候选集</td></tr>
+    <tr><td><b>生成</b></td><td>忠实度、答案相关性</td><td>提示词约束 → 组装策略 → 基座模型</td></tr>
+    <tr><td><b>系统</b></td><td>p95 延迟、单次成本</td><td>缓存、动态 k、更小的重排模型</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>RAG</b></td><td>检索增强生成：先检索相关知识再生成答案的架构</td></tr>
+    <tr><td><b>Chunk</b></td><td>文档切分后的最小检索单元</td></tr>
+    <tr><td><b>Embedding</b></td><td>把文本编码为稠密向量的模型/过程</td></tr>
+    <tr><td><b>双塔模型</b></td><td>查询和文档分别编码的模型，可预计算文档向量</td></tr>
+    <tr><td><b>Cross-Encoder</b></td><td>查询文档拼接后联合推理的相关度模型，精度高不可预计算</td></tr>
+    <tr><td><b>ColBERT</b></td><td>晚期交互架构：token 级向量匹配，精度与速度的折中</td></tr>
+    <tr><td><b>BM25</b></td><td>经典关键词相关性排序算法，TF-IDF 的改进版</td></tr>
+    <tr><td><b>RRF</b></td><td>倒数排名融合：用排名而非分数融合多路检索结果</td></tr>
+    <tr><td><b>多路召回</b></td><td>多个检索通道（向量/BM25/FAQ/表格）并行召回再融合</td></tr>
+    <tr><td><b>Recall@K</b></td><td>正确答案出现在 top-K 结果中的比例</td></tr>
+    <tr><td><b>MRR</b></td><td>第一个正确答案排名的倒数均值</td></tr>
+    <tr><td><b>nDCG</b></td><td>考虑分级相关性的排序质量指标</td></tr>
+    <tr><td><b>忠实度</b></td><td>答案陈述被检索内容支持的比例（反幻觉核心指标）</td></tr>
+    <tr><td><b>HyDE</b></td><td>假设答案嵌入：先生成假设答案再用它检索</td></tr>
+    <tr><td><b>查询改写</b></td><td>把口语/带指代的问题改写成检索友好的形式</td></tr>
+    <tr><td><b>table-aware 切分</b></td><td>表格整体成块、分组携带表头的切分策略</td></tr>
+    <tr><td><b>父子块</b></td><td>检索用小 chunk 定位、生成用其父块提供上下文的策略</td></tr>
+    <tr><td><b>上下文预算</b></td><td>对 system/历史/检索块/输出做 token 分配的组装约束</td></tr>
+    <tr><td><b>引用溯源</b></td><td>答案标注来源编号并可跳转原文的机制</td></tr>
+    <tr><td><b>黄金问答对</b></td><td>问题 → 应命中文档/标准答案的评测数据集</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>拿自己的文档库做一个对照实验 —— ① 分别实现纯向量、纯 BM25、混合 + RRF 三套检索，在同一组 30 个测试问题上比 Recall@5；② 把混合检索的 top-20 接一个 CrossEncoder 重排，看 nDCG 变化；③ 故意把一篇文档的表格拆散，观察问答质量掉多少（理解 table-aware 的价值）；④ 给组装环节加长度预算和引用编号，验证溯源链路。<br><br>
+    <b>之后值得单独学：</b>向量数据库选型（pgvector vs Milvus vs 托管服务）、文档解析的表格/版面还原、GraphRAG（知识图谱增强）、以及评测集的自动构建与数据飞轮（见《AI 应用评估体系》）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 RAG 进阶 · 效果差先修检索：切分、混合召回、重排，最后才轮到换模型</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（混合检索与 RRF）和模块 5（重排）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对比三种检索方式的命中结果。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边拿自己的文档试：同一问题，分别用纯向量、纯 BM25、混合检索，对比命中结果。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

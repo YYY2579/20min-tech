@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 API 安全（REST/GraphQL/gRPC）</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 25 期 · 高密度版</span>
+    <h1>二十分钟学透 API 安全（REST/GraphQL/gRPC）</h1>
+    <p class="sub">API 是现在最大的攻击面：每个接口都是一次"信任的传递"。这篇以 <b>OWASP API Security Top 10 (2023)</b> 为骨架，讲透 BOLA 越权、批量赋值、GraphQL 四件套、gRPC 安全面，以及网关/JWT/限流的落地配置。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>10</b> 项 OWASP API 风险</span>
+      <span class="chip"><b>3</b> 种 API 形态</span>
+      <span class="chip"><b>10</b> 个真实坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个本地服务跟着敲：python -m http.server 只能看静态，配个 Flask/Express 更有体感</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一次 API 请求，安全边界在哪</h2></div>
+  <pre><span class="c"># 一个最普通的请求，背后有四层信任传递</span>
+GET /api/v1/orders/1001 HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+
+<span class="c"># 请求经过的每一环都可能被绕过：</span>
+<span class="c"># 客户端 → CDN/WAF → 网关(认证/限流) → 业务服务(授权/校验) → DB</span>
+<span class="c"># 任何一环"以为别人会查"，最终就是没人查</span></pre>
+  <table>
+    <tr><th style="width:120px">层</th><th>该管的事</th><th>典型失守</th></tr>
+    <tr><td><b>网关</b></td><td>认证 token 合法性、API key、限流、WAF、请求体大小</td><td>只验签不验权，越权请求畅通无阻</td></tr>
+    <tr><td><b>业务服务</b></td><td><b>对象级授权</b>、字段级授权、输入校验、业务流管控</td><td>把鉴权全推给网关，BOLA 遍地</td></tr>
+    <tr><td><b>数据层</b></td><td>查询天然带租户/属主条件</td><td>SQL 不带 owner 条件，改 ID 就脱裤</td></tr>
+    <tr><td><b>客户端</b></td><td>不保存任何秘密（菜单隐藏不是权限控制）</td><td>把"按钮置灰"当安全边界</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>API 安全的铁律：</b>授权判断必须发生在<b>最靠近数据的那一层</b>。网关能回答"你是谁、调得多不多"，回答不了"这个订单是不是你的"。凡是"网关验过 token 就放行"的设计，BOLA 一定存在。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>API 安全全景：OWASP API Top 10 (2023)</h2></div>
+  <p class="lead">OWASP API Security Top 10 是 API 安全审计的事实标准。2023 版把"大量赋值"和"过度数据暴露"合并成了 <b>BOPLA（对象属性级授权失效）</b>，并新增了"不受限的业务流访问"。</p>
+  <table>
+    <tr><th style="width:60px">编号</th><th style="width:230px">风险</th><th>防御要点</th></tr>
+    <tr><td><b>API1</b></td><td><b>BOLA</b> 对象级授权失效</td><td>每个对象查询强制带属主/租户条件；用 UUID 替代自增 ID 只是缓解不是修复</td></tr>
+    <tr><td><b>API2</b></td><td><b>认证失效</b></td><td>不暴露弱 token；登录/刷新限流；token 短过期 + 撤销机制</td></tr>
+    <tr><td><b>API3</b></td><td><b>BOPLA</b> 属性级授权失效（旧"批量赋值+过度暴露"）</td><td>输入用 DTO 白名单绑定；输出只暴露必要字段</td></tr>
+    <tr><td><b>API4</b></td><td><b>资源消耗不受限</b></td><td>分页上限、深度/复杂度限制、频率限制、响应体上限</td></tr>
+    <tr><td><b>API5</b></td><td><b>BFLA</b> 功能级授权失效</td><td>管理接口独立路由 + 角色校验；默认拒绝，显式授权</td></tr>
+    <tr><td><b>API6</b></td><td><b>业务流不受限</b></td><td>对"买票/抢券/转账"类流程做行为级风控，不只是频率限制</td></tr>
+    <tr><td><b>API7</b></td><td><b>SSRF</b></td><td>见 SSRF 篇：白名单、解析后校验、禁 gopher</td></tr>
+    <tr><td><b>API8</b></td><td><b>安全配置错误</b></td><td>CORS 收敛、错误页不泄露堆栈、调试接口生产关闭</td></tr>
+    <tr><td><b>API9</b></td><td><b>库存管理不当</b></td><td>API 资产台账：旧版本、影子 API、测试端点定期下线</td></tr>
+    <tr><td><b>API10</b></td><td><b>不安全地消费第三方 API</b></td><td>对接方响应按不可信输入处理：校验 schema、限响应大小、设超时</td></tr>
+  </table>
+  <h3>五条横切防线</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>认证 AuthN</div><div class="cd">你是谁。JWT/OAuth2/API Key/mTLS。重点在 token 生命周期管理，不只是"能不能登进去"</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>授权 AuthZ</div><div class="cd">你能动哪些对象和字段。对象级（这条订单是你的吗）+ 功能级（你能调管理接口吗）+ 属性级（你能改 role 吗）</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>输入校验</div><div class="cd">白名单 schema 校验，拒绝即报错。重点防批量赋值、类型混淆、超长/超深结构</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>限流</div><div class="cd">按用户/IP/接口多维配额，防爆破、防爬、防资源耗尽。429 + Retry-After 是标准姿势</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>审计</div><div class="cd">谁、何时、对哪个对象、做了什么、结果如何。事后溯源和风控的地基，出事时唯一的线索</div></div>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>REST 常见问题：BOLA 与它的三个亲戚</h2></div>
+  <h3>BOLA（API1）：改个 ID 就看别人的数据</h3>
+  <pre><span class="c"># 漏洞请求：登录用户 A 拿到自己的订单</span>
+curl -H "Authorization: Bearer &lt;tokenA&gt;" https://api.example.com/api/v1/orders/1001
+
+<span class="c"># 攻击请求：把 1001 改成 1002，服务端没有任何属主校验</span>
+curl -H "Authorization: Bearer &lt;tokenA&gt;" https://api.example.com/api/v1/orders/1002
+<span class="c"># → 返回了用户 B 的订单。遍历 1001~99999 就是一次全量脱裤</span></pre>
+  <pre><span class="c">// ✗ 漏洞代码：只按 ID 查，不问归属</span>
+@GetMapping("/api/v1/orders/{id}")
+public Order get(@PathVariable Long id) {
+    return orderRepo.findById(id).orElseThrow();   <span class="c">// 谁都能查任何单</span>
+}
+
+<span class="c">// ✓ 修复：查询强制带属主条件（当前用户从 token 取，不从参数取）</span>
+@GetMapping("/api/v1/orders/{id}")
+public Order get(@PathVariable Long id) {
+    Long uid = CurrentUser.id();                    <span class="c">// 服务端从 token 解析</span>
+    return orderRepo.findByIdAndUserId(id, uid)
+            .orElseThrow(NotFoundException::new);  <span class="c">// 查不到就 404，不提示"存在但不属于你"</span>
+}</pre>
+  <div class="callout warn">
+    <b>UUID 不是 BOLA 的解药：</b>把 <span class="k">/orders/1002</span> 换成 <span class="k">/orders/3f8a...uuid</span>，只是让枚举变难，授权缺失本身没变 —— 邮件里的订单链接、爬虫、日志截图照样泄露 UUID。<b>唯一正确的修复是对象级授权</b>：每个数据访问都验证"当前主体对该对象有权限"。
+  </div>
+  <h3>批量赋值（API3）：POST 里夹带私货</h3>
+  <pre><span class="c"># 攻击请求：注册接口里夹带 role 和 balance</span>
+curl -X POST https://api.example.com/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"a","email":"a@x.com","role":"admin","balance":999999,"isVerified":true}'
+
+<span class="c"># ✗ 直接绑 ORM 实体，Spring 的 BeanUtils/Jackson 会把每个字段都塞进去</span>
+<span class="c">// @PostMapping public User create(@RequestBody User user)</span>
+<span class="c">// User 实体上有 role/balance 字段 → 一并落库</span>
+
+<span class="c"># ✓ 用专用 DTO，只暴露可填字段</span>
+public record CreateUserRequest(
+        @NotBlank String name,
+        @Email String email,
+        @Size(min = 8) String password) { }   <span class="c">// 没有 role，就没有批量赋值的入口</span></pre>
+  <h3>过度数据暴露（API3 的另一半）：响应夹带私货</h3>
+  <pre><span class="c"># 响应里出现不该出现的字段</span>
+{"id":1,"name":"张三","password_hash":"$2a$10$...","phone":"138****","idCard":"3301..."}
+
+<span class="c"># ✓ 输出也用 DTO，显式列出字段（@JsonIgnore 只对实体生效，DTO 更稳）</span>
+public record UserVO(Long id, String name, String avatar) { }</pre>
+  <h3>BFLA（API5）：功能级越权</h3>
+  <table>
+    <tr><th style="width:220px">请求</th><th>问题</th></tr>
+    <tr><td class="f">GET /api/v1/admin/users</td><td>普通 token 调管理员端点 —— 管理接口要独立前缀 + 角色注解双重保护</td></tr>
+    <tr><td class="f">PUT /api/v1/users/5/role</td><td>水平越权改他人角色 —— 属主校验 + 角色变更走独立审批流</td></tr>
+    <tr><td class="f">POST /api/v1/orders/1001/refund</td><td>状态机漏洞：跳过前置状态直接退款 —— 服务端必须校验状态流转合法性</td></tr>
+  </table>
+  <h3>缺乏限流（API4）：认证之外的裸奔</h3>
+  <ul>
+    <li>登录接口不限速 → 撞库（每秒几千次尝试，密码字典跑一遍）</li>
+    <li>短信/邮箱接口不限速 → 轰炸机 + 短信账单爆炸</li>
+    <li>列表接口无分页上限 → <span class="k">?pageSize=1000000</span> 一次拖全表</li>
+    <li>GraphQL/gRPC 的查询成本不限 → 一个请求打满 CPU（见模块 3、4）</li>
+  </ul>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>GraphQL 特有风险：四件套</h2></div>
+  <h3>1. 内省（introspection）泄露</h3>
+  <pre><span class="c"># 生产环境如果开着内省，一个请求拿到全部 schema</span>
+curl -X POST https://api.example.com/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ __schema { types { name fields { name } } } }"}'
+<span class="c"># 返回所有类型、字段、参数 —— 等于把接口文档和隐藏字段拱手送人</span>
+<span class="c"># 修复：生产环境禁用内省（Apollo Server: introspection: false）</span></pre>
+  <h3>2. 深度嵌套查询 DoS</h3>
+  <pre><span class="c"># 恶意查询：friends 套 friends 套 friends，深度每 +1，数据量指数膨胀</span>
+query {
+  user(id: 1) {
+    friends {
+      friends {
+        friends {
+          friends { id name email }
+        }
+      }
+    }
+  }
+}
+<span class="c"># 深度 10 就能把数据库连接池打干。修复：depth-limit（建议 ≤ 10）</span></pre>
+  <h3>3. 批量查询（aliases）攻击</h3>
+  <pre><span class="c"># 一个请求体里塞 1000 个别名查询，绕开"每个请求限一次"的粗粒度限制</span>
+query {
+  a: user(id: 1) { email }
+  b: user(id: 2) { email }
+  c: user(id: 3) { email }
+  ...  # 直到 z 之后接着 aa, ab...
+}
+<span class="c"># 修复：complexity/cost analysis —— 给每个字段定价，整查询预算封顶</span>
+<span class="c"># graphql-cost-analysis: maximumCost 1000, defaultCost 1, multipliers</span></pre>
+  <h3>4. 字段级授权</h3>
+  <p>GraphQL 的授权粒度是<b>字段</b>，REST 那套"端点级"中间件不够用。必须在解析器（resolver）里逐字段校验：</p>
+  <pre><span class="c">// ✗ 只要登录就能查任何用户的手机号</span>
+Query: { user: (_, {id}) =&gt; db.user.find(id) }
+
+<span class="c">// ✓ 解析器级授权</span>
+Query: {
+  user: (_, {id}, ctx) =&gt; {
+    if (id !== ctx.userId &amp;&amp; !ctx.hasScope("user:read:any")) {
+      throw new ForbiddenError("not your object");   <span class="c">// 对象级</span>
+    }
+    return db.user.find(id);
+  }
+}
+User: {
+  phone: (parent, _, ctx) =&gt; {
+    if (!ctx.hasScope("user:read:phone")) return null;   <span class="c">// 属性级：没权限返回 null 或不返回</span>
+    return parent.phone;
+  }
+}</pre>
+  <h3>GraphQL 加固清单</h3>
+  <table>
+    <tr><th style="width:200px">措施</th><th>配置示例</th></tr>
+    <tr><td><b>禁内省</b></td><td class="f">introspection: false（仅生产）</td></tr>
+    <tr><td><b>深度限制</b></td><td class="f">graphql-depth-limit(10)</td></tr>
+    <tr><td><b>复杂度/成本分析</b></td><td class="f">graphql-cost-analysis { maximumCost: 1000 }</td></tr>
+    <tr><td><b>持久化查询</b></td><td class="f">persisted queries 白名单，只允许注册过的查询</td></tr>
+    <tr><td><b>分页上限</b></td><td class="f">first/last 参数硬上限 100，服务端强制</td></tr>
+    <tr><td><b>N+1 防护</b></td><td class="f">DataLoader 批量化，防被利用放大查询量</td></tr>
+    <tr><td><b>错误脱敏</b></td><td class="f">生产只返回 "Internal server error"，不带堆栈和 SQL</td></tr>
+  </table>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>gRPC 安全面</h2></div>
+  <p class="lead">gRPC 的安全问题一半来自"HTTP/2 + 二进制协议"带来的新攻击面，一半来自"内部服务没人管"的惯性。</p>
+  <h3>1. 传输层：TLS 是底线，mTLS 是内网标准</h3>
+  <pre><span class="c"># 服务端强制 TLS</span>
+server = grpc.server(
+    ssl_server_credentials=[(
+        open("server.crt","rb").read(),
+        open("server.key","rb").read(),
+        open("ca.crt","rb").read(),      <span class="c">// 第三份是客户端 CA，给了就是 mTLS</span>
+    )],
+)
+
+<span class="c"># 客户端带证书（内网服务间调用默认 mTLS）</span>
+creds = grpc.ssl_channel_credentials(
+    root_certificates=open("ca.crt","rb").read(),
+    private_key=open("client.key","rb").read(),
+    certificate_chain=open("client.crt","rb").read(),
+)
+channel = grpc.secure_channel("grpc.example.com:443", creds)</pre>
+  <h3>2. 拦截器：认证/日志/限流的统一挂点</h3>
+  <pre><span class="c"># Python 示例：把认证做成拦截器，每个方法自动过</span>
+class AuthInterceptor(grpc.ServerInterceptor):
+    def intercept_service(self, continuation, handler_call_details):
+        md = dict(handler_call_details.invocation_metadata)
+        token = md.get("authorization", "").removeprefix("Bearer ").strip()
+        ctx = verify_jwt(token)                     <span class="c"># 验签 + 过期 + scope</span>
+        if ctx is None:
+            return grpc.unary_unary_rpc_method_handler(
+                lambda req, ctx: ctx.abort(grpc.StatusCode.UNAUTHENTICATED, "bad token"))
+        return continuation(handler_call_details)
+
+server = grpc.server(
+    thread_pool=futures.ThreadPoolExecutor(32),
+    interceptors=(AuthInterceptor(), LoggingInterceptor(),))</pre>
+  <h3>3. 元数据（metadata）的坑</h3>
+  <ul>
+    <li>gRPC 的 metadata 就是 HTTP/2 header，<b>token、trace-id 都走这里</b>，必须走 TLS，明文 gRPC（h2c）等于把凭证写在网上传</li>
+    <li>metadata 不是白名单：客户端可以塞任意自定义头，<b>不要信任客户端传入的 user-id/x-user-role 这类头</b>，身份只从服务端验过的 token 取</li>
+    <li>单个 header 有默认上限（通常 8KB），超限会被 RST_STREAM，可被用来做 DoS，网关要设请求头大小上限</li>
+  </ul>
+  <h3>4. Server Reflection：生产必须关</h3>
+  <pre><span class="c"># 反射服务让 grpcurl 之类工具能列出全部服务和方法 —— 调试神器，生产情报泄露</span>
+<span class="c"># ✗ 生产开启</span>
+reflection.enable(server)
+
+<span class="c"># ✓ 只在内部调试端口开启（走管理端口 + ACL）</span>
+mgmt = grpc.server(...)
+reflection.enable(mgmt)          <span class="c"># 只对 debug server 开，不对业务端口开</span></pre>
+  <h3>5. 三种 API 形态的安全差异</h3>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:220px">REST</th><th style="width:220px">GraphQL</th><th>gRPC</th></tr>
+    <tr><td><b>攻击入口</b></td><td>每个 URL+方法</td><td>通常单一端点 /graphql</td><td>每个方法，二进制载荷</td></tr>
+    <tr><td><b>限流粒度</b></td><td>按 URL 限流</td><td><b>难</b>：一个查询含 N 个子请求，要做复杂度定价</td><td>按方法限流；HTTP/2 多路复用下按连接限不准</td></tr>
+    <tr><td><b>WAF 可见性</b></td><td>JSON/明文，WAF 友好</td><td>单端点 + 嵌套 JSON，传统 WAF 容易漏</td><td><b>二进制，WAF 基本失效</b>，靠 TLS+mTLS+服务端校验</td></tr>
+    <tr><td><b>授权粒度</b></td><td>端点级 + 对象级</td><td><b>字段级</b>（resolver 里做）</td><td>方法级 + 消息级</td></tr>
+    <tr><td><b>信息泄露</b></td><td>错误页、版本头</td><td>内省、详尽错误</td><td>Server Reflection、protob 文件</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>Protobuf 二进制 ≠ 安全。</b>很多人觉得"二进制看不懂所以安全"——<span class="k">grpcurl</span>、<span class="k">protoc --decode</span> 拿到 .proto 就能构造任意请求。二进制只是增加了爬虫门槛，该有的认证授权一个都不能少。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>API 网关安全控制</h2></div>
+  <p class="lead">网关（Kong / APISIX / Spring Cloud Gateway / AWS API Gateway / Envoy）是横切防线的最佳挂点。但先记住它能做什么、<b>不能</b>做什么。</p>
+  <table>
+    <tr><th style="width:220px">能力</th><th>典型实现</th><th>说明</th></tr>
+    <tr><td><b>JWT 验签</b></td><td class="f">Kong jwt plugin</td><td>验签 + 过期 + iss/aud；网关拿到 claims 后下传给业务</td></tr>
+    <tr><td><b>API Key</b></td><td class="f">key-auth plugin</td><td>机器对机器场景；key 只做识别，授权仍靠业务</td></tr>
+    <tr><td><b>限流/配额</b></td><td class="f">rate-limiting / rate-limiting-advanced</td><td>按 consumer/IP/路由多维；429 + Retry-After</td></tr>
+    <tr><td><b>请求体限制</b></td><td class="f">request-size-limiting</td><td>挡超大 body，默认 128KB 级</td></tr>
+    <tr><td><b>IP 黑白名单</b></td><td class="f">ip-restriction</td><td>管理接口只放办公网/VPN 出口</td></tr>
+    <tr><td><b>CORS</b></td><td class="f">cors plugin</td><td>显式源白名单，见下方坑</td></tr>
+    <tr><td><b>WAF</b></td><td class="f">ModSecurity / OpenResty + 规则集</td><td>对 SQLi/XSS 模式有效，对 BOLA 完全无效</td></tr>
+    <tr><td><b>审计日志</b></td><td class="f">http-log / kafka-log</td><td>记录 who/where/what/status，送日志平台</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>网关的三个"不能"：</b>① <b>不能</b>替你判断 BOLA（它不知道订单归属）；② <b>不能</b>替你校验业务字段（它不懂你的领域模型）；③ <b>不能</b>防逻辑漏洞（重复领取、负余额、状态机跳跃）。这些必须在业务层实现。把网关当"安全已就绪"的团队，通常三项全裸。
+  </div>
+  <h3>CORS 的经典错配</h3>
+  <pre><span class="c"># ✗ 致命组合：反射 Origin + 允许携带凭证</span>
+Access-Control-Allow-Origin: https://evil.com      <span class="c"># 反射了请求头里的 Origin</span>
+Access-Control-Allow-Credentials: true
+
+<span class="c"># 浏览器视角：evil.com 的页面可以带着 cookie 读你的 API 响应</span>
+<span class="c"># 注意：Allow-Origin: * 与 Allow-Credentials: true 组合浏览器直接拒</span>
+<span class="c"># 真正危险的是"动态反射 Origin"这个写法，要显式白名单</span>
+
+<span class="c"># ✓ 显式白名单 + 必要才开 credentials</span>
+ALLOWED_ORIGINS = {"https://app.example.com", "https://admin.example.com"}
+origin = request.headers.get("Origin")
+if origin in ALLOWED_ORIGINS:
+    resp.headers["Access-Control-Allow-Origin"] = origin
+    resp.headers["Access-Control-Allow-Credentials"] = "true"
+    resp.headers["Vary"] = "Origin"</pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>JWT 与 OAuth 的使用要点</h2></div>
+  <h3>JWT 的结构与验什么</h3>
+  <pre><span class="c"># 三段：header.payload.signature（点号拼接）</span>
+header:    {"alg":"HS256","typ":"JWT","kid":"key-2024"}
+payload:   {"sub":"1001","role":"user","iss":"https://idp.example.com",
+            "aud":"api.example.com","exp":1719000000,"iat":1718999000,"jti":"abc123"}
+
+<span class="c"># 服务端必须校验的七项（少一项就是漏洞）</span>
+[ ] 签名有效（用对算法和密钥）
+[ ] alg 不是 none，且与期望一致（防 alg 混淆）
+[ ] exp 未过期（留 60s 时钟偏移）
+[ ] iss 与 aud 与你的服务匹配
+[ ] nbf/iat 合理
+[ ] sub 对应真实用户且状态正常（未被封禁）
+[ ] jti 在需要时可用于撤销</pre>
+  <h3>JWT 的经典攻击面</h3>
+  <table>
+    <tr><th style="width:170px">攻击</th><th>原理</th><th>防御</th></tr>
+    <tr><td><b>alg: none</b></td><td>把 header 改成 <span class="k">{"alg":"none"}</span>，签名留空，服务端不校验直接信</td><td>服务端只接受期望算法的白名单（HS256/RS256 显式指定）</td></tr>
+    <tr><td><b>算法混淆</b></td><td>RS256 的服务端被喂 HS256 的 token，用<b>公钥当 HMAC 密钥</b>签名通过</td><td>算法在服务端固定，不接受 header 里的 alg 决定</td></tr>
+    <tr><td><b>弱密钥爆破</b></td><td>HS256 密钥是 "secret" 这类弱串，离线秒破</td><td>密钥 ≥ 256bit 随机，定期轮换（靠 kid 支持多密钥）</td></tr>
+    <tr><td><b>kid 注入</b></td><td>header 里 <span class="k">kid</span> 被拼进 SQL/文件路径取密钥</td><td>kid 只做查表键，不进 SQL/文件系统</td></tr>
+    <tr><td><b>jku/x5u 伪造</b></td><td>诱导服务端去攻击者的 JWKS 地址取"公钥"</td><td>禁用 jku/x5u，JWKS 地址服务端配置</td></tr>
+    <tr><td><b>不验 aud/exp</b></td><td>拿别的系统的 token 调你的 API，或拿过期 token 一直用</td><td>见上面七项校验，用成熟库（java-jwt/pyjose/nimbus）</td></tr>
+  </table>
+  <h3>存储与撤销</h3>
+  <ul>
+    <li><b>access token 短寿命</b>（5~15 分钟）+ <b>refresh token 轮换</b>（一次一换，旧作废），别让 JWT 活几天</li>
+    <li><b>存储位置</b>：浏览器端优先 <span class="k">httpOnly + Secure + SameSite=Lax</span> 的 cookie；localStorage 会被 XSS 一锅端，用了就必须配严格的 CSP</li>
+    <li><b>撤销</b>：JWT 天生难撤销。补救是 access token 短过期 + refresh 服务端可撤 + 必要时 jti 黑名单（Redis，TTL=token 剩余寿命）</li>
+  </ul>
+  <h3>OAuth 2.0 在 API 场景的要点</h3>
+  <table>
+    <tr><th style="width:150px">机制</th><th>要点</th></tr>
+    <tr><td><b>授权码 + PKCE</b></td><td>公开客户端（SPA/移动端）必须用 PKCE（code_verifier/code_challenge），防授权码拦截</td></tr>
+    <tr><td><b>state 参数</b></td><td>每次授权生成随机 state 并校验，防 CSRF 绑定攻击者账号</td></tr>
+    <tr><td><b>redirect_uri</b></td><td><b>精确全串匹配</b>，不接受前缀/通配，防授权码被重定向到攻击者地址</td></tr>
+    <tr><td><b>scope 最小化</b></td><td>按功能申请最小 scope；scope 里带资源标识（如 <span class="k">orders:read</span>）</td></tr>
+    <tr><td><b>token 绑定</b></td><td>mTLS-bound token（RFC 8705）或 DPoP，防 token 被盗用</td></tr>
+    <tr><td><b>设备流</b></td><td>IoT/TV 场景用 device authorization grant，同样带 user_code 防钓鱼</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一句话选型：</b>内部微服务之间用 <b>mTLS + 服务账号</b>；面向浏览器/移动端用 <b>OAuth 2.1 授权码 + PKCE + 短寿命 JWT</b>；机器对机器用 <b>client_credentials + scope 最小化</b>。别自创 token 格式，别把 session id 当 bearer token 到处传。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>速率限制与防爬</h2></div>
+  <h3>三种限流算法</h3>
+  <table>
+    <tr><th style="width:130px">算法</th><th style="width:220px">原理</th><th>优缺点</th></tr>
+    <tr><td><b>固定窗口</b></td><td>每分钟计数，整点清零</td><td>简单，但<b>窗口边界可突刺 2 倍</b>（临界点前后各打满）</td></tr>
+    <tr><td><b>滑动窗口</b></td><td>记录每个请求时间戳，统计最近 N 秒</td><td>无突刺，内存随时间戳数增长（可用 Redis ZSet）</td></tr>
+    <tr><td><b>令牌桶</b></td><td>恒定速率补令牌，请求取令牌，桶有容量</td><td><b>最平滑，允许合理突发</b>，业界标准（Guava RateLimiter、nginx limit_req 同思路）</td></tr>
+    <tr><td><b>漏桶</b></td><td>请求进桶，恒定速率流出</td><td>绝对平滑但不允许突发，适合对下游保护严格的场景</td></tr>
+  </table>
+  <pre><span class="c"># Redis + Lua 令牌桶（原子、单次往返）</span>
+<span class="c">-- KEYS[1]=桶 key, ARGV[1]=容量, ARGV[2]=每秒补充速率, ARGV[3]=当前时间戳</span>
+local tokens = redis.call('GET', KEYS[1])
+if tokens then
+  tokens = tonumber(tokens)
+else
+  tokens = tonumber(ARGV[1])          <span class="c">-- 首次初始化满桶</span>
+end
+local now = tonumber(ARGV[3])
+local last = tonumber(redis.call('HGET', KEYS[1]..':ts', 't') or now)
+tokens = math.min(tonumber(ARGV[1]), tokens + (now - last) * tonumber(ARGV[2]))
+if tokens &gt;= 1 then
+  redis.call('SET', KEYS[1], tokens - 1)
+  redis.call('HSET', KEYS[1]..':ts', 't', now)
+  return 1                            <span class="c">-- 放行</span>
+end
+return 0                              <span class="c">-- 拒绝，业务侧回 429</span></pre>
+  <h3>限流的四个维度</h3>
+  <ul>
+    <li><b>按用户</b>（登录态）：登录用户 100 次/分钟，最贴合业务</li>
+    <li><b>按 IP</b>：匿名流量 20 次/分钟，注意 NAT 后共享 IP 会误伤，要留余量</li>
+    <li><b>按 API Key</b>：对开放平台的合作方，超配额返回 429 + <span class="k">X-RateLimit-Remaining</span></li>
+    <li><b>按接口</b>：敏感接口（登录、短信、支付）单独低配额，与普通查询分开</li>
+  </ul>
+  <h3>防爬：从"限流"到"识别"</h3>
+  <table>
+    <tr><th style="width:150px">手段</th><th>说明</th></tr>
+    <tr><td><b>响应头规范</b></td><td class="f">X-RateLimit-Limit / Remaining / Reset + 429 + Retry-After</td></tr>
+    <tr><td><b>行为分析</b></td><td>请求间隔过于规律（机器人特征）、只走列表不详情、 UA 与 TLS 指纹不匹配</td></tr>
+    <tr><td><b>数据蜜标</b></td><td>在响应里埋不可见标记（隐藏字段/1px 元素），出现在别人站点即证明被爬</td></tr>
+    <tr><td><b>签名参数</b></td><td>关键查询要求带时间戳 + 签名（HMAC），签名算法放客户端 SDK，增加重放成本</td></tr>
+    <tr><td><b>验证码阶梯</b></td><td>超阈值先出验证码再放行，别一上来全拦（误伤真实用户）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>防爬的边界：</b>客户端能看到的都能被模拟。任何"前端混淆/加密参数/签名"都只是提高成本，不是安全边界。<b>真正的防线在服务端的业务风控</b>：异常模式识别（新号高频、只拉不买）、数据分级（核心数据走授权接口）、以及法务兜底。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个真实坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">前端做权限控制，API 裸奔</div><div class="pd">按钮置灰、菜单隐藏只是 UX。攻击者直接调 API。每个接口都要服务端鉴权，管理接口独立前缀 + 角色校验双保险。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">用自增 ID 且不查属主</div><div class="pd">BOLA：/orders/1002 遍历即脱裤。查询必须带 owner 条件；UUID 只是增加枚举难度，不是修复。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">请求体直接绑 ORM 实体</div><div class="pd">批量赋值：POST /users 里夹带 {"role":"admin"}。用输入 DTO 白名单，实体永远不直接当入参。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">响应返回整个实体</div><div class="pd">password_hash、内部备注、别人手机号全出去。输出也用 VO/DTO，显式列字段；序列化层加 @JsonIgnore 兜底。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">JWT 不验 alg / 不验 aud / 不验 exp</div><div class="pd">alg:none、算法混淆、拿别的系统 token 来打。七项校验（签/alg/exp/iss/aud/nbf/用户状态）一项不能少，用成熟库。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">JWT 活 30 天且无法撤销</div><div class="pd"> token 泄露后攻击者用一个月。access 5~15 分钟 + refresh 轮换 + 服务端可撤 + 必要时 jti 黑名单。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">登录/短信接口无限流</div><div class="pd">撞库、短信轰炸、账单爆炸。敏感接口单独低配额 + 验证码阶梯 + 按 IP/用户/设备多维限制。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">GraphQL 生产开内省、无深度限制</div><div class="pd">一个 __schema 查询拿走全部 schema；嵌套查询打满数据库。禁内省 + depth-limit + 复杂度定价 + 持久化查询。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">gRPC 生产开 Server Reflection、内网无 mTLS</div><div class="pd">grpcurl 直接列出全部服务方法；明文 h2c 把 token 送上路。反射只开在管理端口，服务间默认 mTLS。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">CORS 反射 Origin + Allow-Credentials</div><div class="pd">evil.com 的页面能带着 cookie 读你的响应。Origin 显式白名单 + 按需才开 credentials + Vary: Origin。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. BOLA（对象级授权失效）的典型表现是？</div>
+      <button class="opt">数据库被 SQL 注入</button>
+      <button class="opt">登录后把请求里的对象 ID 改成别人的（如 /orders/1002），就能看到他人数据</button>
+      <button class="opt">密码明文存储</button>
+      <div class="ans">正确答案：<b>改 ID 访问他人对象</b>。BOLA 连续多年排在 OWASP API Top 10 第一位，因为它无需任何"技术漏洞"，只要授权判断缺失。修复：查询强制带属主条件， UUID 只是缓解。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. GraphQL 内省（introspection）在生产环境的正确做法是？</div>
+      <button class="opt">开启以方便前端调试</button>
+      <button class="opt">用密码保护</button>
+      <button class="opt">关闭，因为它会把全部类型、字段、参数暴露给任何调用方</button>
+      <div class="ans">正确答案：<b>关闭</b>。一个 <span class="k">{__schema{types{name}}}</span> 查询就能拿到完整 schema，隐藏字段、内部类型全泄露。调试环境单独开，生产关闭。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 防御批量赋值（mass assignment）最有效的手段是？</div>
+      <button class="opt">用专用的输入 DTO 白名单绑定，只接受业务允许的字段</button>
+      <button class="opt">对 JSON 做 XSS 过滤</button>
+      <button class="opt">给接口加 HTTPS</button>
+      <div class="ans">正确答案：<b>输入 DTO 白名单</b>。批量赋值的根源是"用户 JSON 字段 → ORM 实体字段"的自动映射没有边界。HTTPS 防传输窃听，XSS 过滤防脚本，都与这个问题无关。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 攻击者把 JWT header 改成 {"alg":"none"} 并清空签名，能得逞的原因是？</div>
+      <button class="opt">JWT 本身不安全</button>
+      <button class="opt">密钥太短</button>
+      <button class="opt">服务端信任了 header 里的 alg 字段，接受了未签名的 token</button>
+      <div class="ans">正确答案：<b>服务端用 header 的 alg 决定验签方式</b>。正确做法：算法在服务端固定（白名单），库不接受 alg:none。同类问题还有 RS256 服务端被喂 HS256 的算法混淆攻击。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 三种限流算法中，最平滑且允许合理突发的是？</div>
+      <button class="opt">固定窗口计数</button>
+      <button class="opt">令牌桶</button>
+      <button class="opt">漏桶</button>
+      <div class="ans">正确答案：<b>令牌桶</b>。固定窗口在边界时刻可突刺 2 倍；漏桶绝对平滑但不允许突发；令牌桶恒定补充 + 桶容量缓冲，是 API 限流的事实标准。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. gRPC 生产环境应该关闭的是？</div>
+      <button class="opt">Server Reflection（反射服务），它会让 grpcurl 列出全部服务和方法定义</button>
+      <button class="opt">TLS</button>
+      <button class="opt">拦截器</button>
+      <div class="ans">正确答案：<b>Server Reflection</b>。反射是调试神器，但生产开启等于公开全部 API 清单。只在管理端口开；TLS/mTLS 和拦截器恰恰是必须开的。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查对策</h3>
+  <div class="cmds">
+    <div class="crow"><code>GET /api/v1/orders/1002</code><span class="desc">BOLA 自测：换个 ID 打自己的接口，看是否返回他人数据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /users {"role":"admin"}</code><span class="desc">批量赋值自测：注册/更新接口夹带特权字段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>{"query":"{ __schema { types { name } } }"}</code><span class="desc">GraphQL 内省自测：生产环境应被拒绝</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grpcurl -plaintext host:5000 list</code><span class="desc">gRPC 反射自测：生产端口应无输出</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -H "Origin: https://evil.com" ...</code><span class="desc">CORS 自测：响应不应反射任意 Origin + credentials</span><button class="copy">复制</button></div>
+    <div class="crow"><code>for i in {1..100}; do curl -X POST /api/v1/login; done</code><span class="desc">限流自测：第 N 次起应返回 429</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>JWT 验签 checklist</h3>
+  <pre><span class="c"># 每一条都在线上见过缺失导致的事故</span>
+[ ] 算法服务端固定白名单，拒绝 alg:none，拒绝 RS256→HS256 混淆
+[ ] 密钥 ≥ 256bit 随机，支持 kid 多密钥轮换
+[ ] exp 必验（60s 时钟偏移）；nbf/iat 必验
+[ ] iss / aud 与本服务匹配
+[ ] sub 对应用户存在且未被封禁（高危操作实时查库）
+[ ] access token ≤ 15 分钟，refresh 轮换 + 服务端可撤
+[ ] 传输只走 TLS；浏览器存储优先 httpOnly cookie
+[ ] 不用 jwt.io 默认示例密钥；JWKS 地址服务端配置，禁 jku/x5u</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>BOLA</b></td><td>对象级授权失效：改 ID 就能访问他人资源，OWASP API 榜首</td></tr>
+    <tr><td><b>BFLA</b></td><td>功能级授权失效：普通用户能调管理员功能</td></tr>
+    <tr><td><b>BOPLA</b></td><td>属性级授权失效：批量赋值 + 过度数据暴露的合并条目</td></tr>
+    <tr><td><b>批量赋值</b></td><td>请求 JSON 字段被自动映射到 ORM 实体，夹带特权字段</td></tr>
+    <tr><td><b>过度数据暴露</b></td><td>响应返回比前端所需更多的字段（密码哈希、内部备注）</td></tr>
+    <tr><td><b>内省 introspection</b></td><td>GraphQL 的 __schema 查询，会暴露全部类型和字段定义</td></tr>
+    <tr><td><b>aliases</b></td><td>GraphQL 别名语法，可在一个请求里批量发 N 个子查询</td></tr>
+    <tr><td><b>深度限制 / 复杂度分析</b></td><td>限制查询嵌套层级 / 给字段定价并设总预算，防 GraphQL DoS</td></tr>
+    <tr><td><b>持久化查询</b></td><td>只允许执行预先注册的查询哈希，GraphQL 加固手段</td></tr>
+    <tr><td><b>interceptor</b></td><td>gRPC 拦截器，认证/日志/限流的统一挂点</td></tr>
+    <tr><td><b>metadata</b></td><td>gRPC 的键值对头信息（等价 HTTP header），凭证常走这里</td></tr>
+    <tr><td><b>Server Reflection</b></td><td>gRPC 反射服务，可被 grpcurl 列出全部方法，生产应关</td></tr>
+    <tr><td><b>mTLS</b></td><td>双向 TLS，客户端也要证书，内网服务间通信标准</td></tr>
+    <tr><td><b>JWT</b></td><td>header.payload.signature 三段式自包含 token</td></tr>
+    <tr><td><b>OAuth 2.0 / PKCE</b></td><td>授权框架；PKCE 用 code_challenge 防授权码拦截，公开客户端必用</td></tr>
+    <tr><td><b>scope</b></td><td>OAuth 权限粒度，应按最小化申请</td></tr>
+    <tr><td><b>CORS</b></td><td>浏览器跨域资源共享；反射 Origin + credentials 是经典错配</td></tr>
+    <tr><td><b>限流算法</b></td><td>固定窗口 / 滑动窗口 / 令牌桶 / 漏桶，令牌桶最平滑</td></tr>
+    <tr><td><b>429 + Retry-After</b></td><td>限流的标准响应码与重试提示头</td></tr>
+    <tr><td><b>审计日志</b></td><td>记录主体、对象、动作、结果，安全事件溯源的唯一依据</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>拿自己的项目做一次 API 审计 —— ① 登录后遍历 ID 打自己接口的详情端点，确认全部 404；② 注册/更新接口夹带 <span class="k">"role":"admin"</span>，确认被 DTO 挡掉；③ 生产环境打 <span class="k">__schema</span> 和 <span class="k">grpcurl list</span>，确认无输出；④ 用 <span class="k">Origin: https://evil.com</span> 打一个带登录态的接口，看 CORS 响应；⑤ 把登录接口限流调到 5 次/分钟，连打 20 次确认第 6 次起 429。<br><br>
+    <b>之后值得单独学：</b>OAuth 2.1 与 OpenID Connect 的完整流程、服务网格（Istio）的 mTLS 与 AuthorizationPolicy、以及 API 资产管理与影子 API 发现。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 API 安全 · 上线前务必检查：对象级授权、DTO 白名单、JWT 七项校验、限流</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（REST 越权）和模块 3（GraphQL）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边拿自己的接口做一轮越权自测。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个本地服务跟着敲：python -m http.server 只能看静态，配个 Flask/Express 更有体感';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

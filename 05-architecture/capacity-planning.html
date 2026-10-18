@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透容量规划与性能基线</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 11 期 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透容量规划与性能基线</h1>
+    <p class="sub">容量规划不是"买几台机器"，是一套<b>可计算、可验证、可复盘</b>的工程方法。这篇讲峰值系数怎么取、单机容量怎么压出来、扩容怎么决策，以及为什么"只看 CPU"一定会出事。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 维容量模型</span>
+      <span class="chip"><b>6</b> 步规划法</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议先想清楚：你负责的系统，单机容量数字是多少？依据是什么？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>容量规划到底规划什么</h2></div>
+  <p class="lead">容量规划（Capacity Planning）回答三个问题：<b>业务到多少量时系统会挂？挂之前多久能加上资源？加资源要花多少钱？</b>三个都答不上来，就是在裸奔。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>单机容量</div><div class="cd">一台机器在 SLA（如 P99 &lt; 200ms）约束下能扛的最大流量。这是所有规划的<b>原子单位</b>，必须压出来，不能估。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>水位</div><div class="cd">当前用量 / 容量的比率。健康水位通常 40%~60%，<b>超过 70% 就该预警，超过 80% 就该动手</b>。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>冗余度</div><div class="cd">为容灾预留的余量。N+1 是底线（挂一台还能扛），核心链路 N+2。大促期间按峰值容量规划，日常按均值。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>峰值系数</div><div class="cd">峰值流量 / 平均流量。电商常见 3~5 倍，秒杀场景 50 倍以上。<b>按平均值买机器，大促一定挂。</b></div></div>
+  </div>
+  <div class="callout">
+    <b>核心公式（后面反复用）：</b><br>
+    <span class="k">所需机器数 = ceil( 预估峰值QPS × 峰值系数 ÷ (单机安全QPS × 可用率) )</span><br>
+    其中 <span class="k">单机安全QPS = 压测极限QPS × 0.7</span>，可用率 = 健康节点数 ÷ 总节点数（考虑发布、灰度、故障占位）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>容量规划方法论：六步法</h2></div>
+  <p class="lead">这套流程的价值在于<b>每一步都有数字产出</b>，评审时能拿数字说话，而不是"我觉得够了"。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>① 明确业务指标：</b>未来 3~6 个月的流量目标（QPS、DAU、订单量），由业务方给出，写进容量规划文档。<b>没有业务承诺的容量规划是猜谜。</b></div></div>
+    <div class="step"><div class="txt"><b>② 采集历史基线：</b>从监控系统导出过去 90 天的 QPS、CPU、内存、RT、错误率，算出日均、峰值、峰值系数、同比/环比增长率。</div></div>
+    <div class="step"><div class="txt"><b>③ 压测单机容量：</b>在生产等配环境做单机压测，找到 P99 RT 突破 SLA 的拐点（饱和点），记录该点的 CPU、内存、IO、连接数。<b>这一步是整个方法的地基。</b></div></div>
+    <div class="step"><div class="txt"><b>④ 计算需求：</b>用核心公式算出目标机器数，对比现有容量得出缺口，输出采购/扩缩容清单。</div></div>
+    <div class="step"><div class="txt"><b>⑤ 制定扩容预案：</b>明确"什么指标触发扩容、谁来执行、多久能生效"。弹性伸缩的从触发到就绪通常要 3~10 分钟，<b>预案必须跑在故障前面</b>。</div></div>
+    <div class="step"><div class="txt"><b>⑥ 复盘校准：</b>每次大促后对比预估 vs 实际，误差超过 30% 就要修正模型。容量模型是迭代出来的，不是一次算对的。</div></div>
+  </div>
+  <h3>完整计算示例（真实数字走一遍）</h3>
+  <table>
+    <tr><th style="width:230px">输入项</th><th style="width:150px">数值</th><th>来源</th></tr>
+    <tr><td>当前日均 QPS</td><td class="f">2,000</td><td>监控系统 90 天均值</td></tr>
+    <tr><td>当前日峰值 QPS</td><td class="f">6,000</td><td>监控系统 90 天 P100</td></tr>
+    <tr><td>峰值系数</td><td class="f">3.0</td><td>6000 ÷ 2000</td></tr>
+    <tr><td>下季度日均 QPS 目标</td><td class="f">4,000</td><td>业务方承诺（增长 100%）</td></tr>
+    <tr><td>下季度预估峰值 QPS</td><td class="f">12,000</td><td>4000 × 3.0</td></tr>
+    <tr><td>大促目标峰值</td><td class="f">20,000</td><td>业务方大促目标</td></tr>
+    <tr><td>单机压测极限 QPS</td><td class="f">1,400</td><td>压测：P99 RT 突破 200ms 的拐点</td></tr>
+    <tr><td>单机安全 QPS</td><td class="f">980</td><td>1400 × 0.7（安全系数）</td></tr>
+    <tr><td>可用率</td><td class="f">0.85</td><td>预留 15% 给发布/灰度/故障占位</td></tr>
+  </table>
+  <pre><span class="c"># 日常容量计算</span>
+所需节点 = ceil(12000 / (980 × 0.85)) = ceil(12000 / 833) = ceil(14.4) = <span class="g">15 台</span>
+现有 8 台 → 缺口 7 台
+
+<span class="c"># 大促容量计算（按大促峰值 + 冗余度 N+2）</span>
+大促节点 = ceil(20000 / (980 × 0.85)) = ceil(24.0) = <span class="g">25 台</span>
+叠加 N+2 冗余 → <span class="g">27 台</span>
+大促后缩容回 15 台 + 少量弹性缓冲
+
+<span class="c"># 敏感性：如果安全系数从 0.7 降到 0.5（压测更激进）</span>
+所需节点 = ceil(12000 / (1400 × 0.5 × 0.85)) = ceil(20.2) = 21 台
+<span class="c"># 安全系数每降 0.1，机器需求涨约 15% —— 别为了省钱压安全线</span></pre>
+  <div class="callout warn">
+    <b>安全系数 0.7 不是魔法数字：</b>它覆盖了压测环境与生产的差异（数据量、缓存命中率、网络拓扑）、机器性能抖动（5%~10%）、以及监控告警的响应时间。<b>核心支付链路建议 0.6，读多写少的展示链路可以到 0.75。</b>系数本身要写进文档并说明依据。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>性能基线：压测与历史外推</h2></div>
+  <p class="lead">容量规划的地基是<b>单机容量数字</b>，这个数字只能从压测来。历史外推只能告诉你"涨多快"，不能告诉你"上限在哪"。</p>
+  <h3>三种压测的定位</h3>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:190px">环境</th><th style="width:150px">回答的问题</th><th>局限</th></tr>
+    <tr><td><b>基准压测</b></td><td>独立压测环境，生产等配</td><td>单机极限 QPS、饱和拐点</td><td>数据量、缓存命中率与生产有差距</td></tr>
+    <tr><td><b>全链路压测</b></td><td>生产环境，流量打标隔离</td><td>真实容量、瓶颈链路、容量规划验证</td><td>成本高，需要压测平台和隔离方案</td></tr>
+    <tr><td><b>线上引流</b></td><td>生产，复制真实请求回放</td><td>验证真实流量模型下的表现</td><td>有风险，只读接口可做，写接口需隔离</td></tr>
+  </table>
+  <h3>单机压测标准流程（以 JMeter 为例）</h3>
+  <pre><span class="c"># 1. 准备：生产等配机器（同规格 ECS/容器、同 JVM 参数、同数据量级）</span>
+<span class="c"># 2. 梯度加压：每档持续 5 分钟，记录指标</span>
+线程数 50  → 100 → 200 → 400 → 800 → 1600
+<span class="c"># 3. 每档记录：QPS、P50/P99/P999 RT、错误率、CPU、内存、GC 次数、DB 连接数</span>
+
+<span class="c"># 4. 判定饱和点：满足以下任一条即认为到达极限</span>
+<span class="c">#    a. P99 RT 超过 SLA（如 200ms）</span>
+<span class="c">#    b. 错误率超过 0.1%</span>
+<span class="c">#    c. CPU 持续 &gt; 80% 且 QPS 不再增长</span>
+<span class="c">#    d. GC 时间占比 &gt; 10% 或发生 Full GC</span>
+
+<span class="c"># JMeter 命令行（非 GUI，压测机单独部署）</span>
+jmeter -n -t plan.jmx -l result.jtl -e -o report/ -Jthreads=400 -Jduration=300</pre>
+  <h3>历史数据外推法</h3>
+  <pre><span class="c"># 外推模型：容量需求 = 当前容量 × (1 + 月环比增长率)^月数</span>
+<span class="c"># 例：当前 8 台，月环比增长 15%，6 个月后</span>
+8 × (1.15)^6 = 8 × 2.313 = 18.5 → 19 台
+
+<span class="c"># 注意三个修正：</span>
+<span class="c"># 1. 增长率要剔除外推窗口内已知的大促（大促是一次性的，不改变趋势线）</span>
+<span class="c"># 2. 摩尔定律式优化：单机性能提升（JVM 调优、索引优化）会让模型右移</span>
+<span class="c"># 3. 季节性：教育类 9 月涨、电商类 11 月涨，外推要按日历对齐，不能简单按月</span></pre>
+  <div class="callout danger">
+    <b>压测环境与生产的差异是最大的坑：</b>压测环境通常<b>数据量小</b>（生产几个亿的行，压测库几万行，索引全走内存，快得虚假）、<b>缓存全命中</b>（没有真实热点分布）、<b>网络多一跳</b>。对策：① 压测库脱敏后恢复生产等量数据；② 压测前先冷缓存再测；③ 核心结论必须用一次<b>全链路压测</b>在生产验证。
+  </div>
+  <h3>基线监控的最小指标集</h3>
+  <p>没有这些指标，"基线"只是一句空话。每项都要有：当前值、历史同期值、基线告警线。</p>
+  <table>
+    <tr><th style="width:140px">指标</th><th style="width:150px">采集方式</th><th>容量规划用途</th></tr>
+    <tr><td><b>QPS / TPS</b></td><td>网关/应用埋点</td><td>容量计算主输入，分接口统计</td></tr>
+    <tr><td><b>P50/P99/P999 RT</b></td><td>APM 或日志</td><td>判断饱和拐点，SLA 红线</td></tr>
+    <tr><td><b>错误率 / 超时率</b></td><td>访问日志</td><td>饱和信号，比 RT 更敏感</td></tr>
+    <tr><td><b>CPU / 内存 / IO</b></td><td>节点 exporter</td><td>四维模型，注意 steal 和 swap</td></tr>
+    <tr><td><b>连接池使用率</b></td><td>中间件埋点</td><td>隐形瓶颈，扩容上限依据</td></tr>
+    <tr><td><b>GC 停顿 / 次数</b></td><td>JVM  metrics</td><td>内存瓶颈和延迟毛刺定位</td></tr>
+    <tr><td><b>队列/堆积深度</b></td><td>MQ 监控</td><td>异步系统容量滞后信号</td></tr>
+    <tr><td><b>缓存命中率</b></td><td>Redis INFO</td><td>命中率跌 = 后端压力涨的先行指标</td></tr>
+  </table>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>扩容决策：水平 vs 垂直，提前 vs 弹性</h2></div>
+  <table>
+    <tr><th style="width:110px">方式</th><th style="width:200px">做法</th><th>优势</th><th>代价与适用</th></tr>
+    <tr><td><b>水平扩容 Scale Out</b></td><td>加机器/加实例，负载均衡分摊</td><td>理论无上限，成本线性，故障域隔离</td><td>需要应用无状态化、共享存储、服务发现。<b>首选</b></td></tr>
+    <tr><td><b>垂直扩容 Scale Up</b></td><td>升配：4C8G → 8C16G</td><td>零改造，对有状态服务（DB、Redis）几乎是唯一选择</td><td>有物理上限；升配要重启；单点风险变大；大规格单价更贵</td></tr>
+    <tr><td><b>提前扩容</b></td><td>按规划提前买/开资源</td><td>大促容量确定，不依赖弹性速度</td><td>占用资金，容量利用率低</td></tr>
+    <tr><td><b>弹性伸缩</b></td><td>ASG / HPA / KEDA 按指标自动加减</td><td>成本优，应对不可预见流量</td><td>扩容有时延（3~10 分钟），应对不了秒级突发</td></tr>
+  </table>
+  <h3>扩容触发决策树</h3>
+  <pre><span class="c">Q: 流量增长是渐进的还是突发的？</span>
+├─ 渐进（日环比 &lt; 10%）
+│   └─ 弹性伸缩即可，配合月度规划批量调整
+├─ 可预见突发（大促、活动，提前知道时间）
+│   └─ 提前扩容 + 压测验证 + 活动后缩容（提前 2~4 周采购）
+└─ 不可预见突发（被刷、爆款、热点）
+    └─ 三层防御：
+        ① 限流（立即生效，牺牲部分请求保系统）
+        ② 弹性伸缩（3~10 分钟生效，追渐进部分）
+        ③ 降级（关非核心功能，给核心让资源）</pre>
+  <h3>Kubernetes HPA 配置示例</h3>
+  <pre><span class="b">apiVersion</span>: autoscaling/v2
+<span class="b">kind</span>: HorizontalPodAutoscaler
+<span class="b">metadata</span>:
+  <span class="b">name</span>: order-service-hpa
+<span class="b">spec</span>:
+  scaleTargetRef:
+    <span class="b">apiVersion</span>: apps/v1
+    <span class="b">kind</span>: Deployment
+    <span class="b">name</span>: order-service
+  minReplicas: <span class="g">6</span>       <span class="c"># 下限 = N+2 冗余，任何时候不少于 6 个</span>
+  maxReplicas: <span class="g">60</span>      <span class="c"># 上限要匹配下游容量（DB 连接池！）</span>
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: <span class="g">60</span>   <span class="c"># CPU 60% 就扩，不是 90% 才动</span>
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: <span class="g">600</span>  <span class="c"># 缩容观察 10 分钟，防抖动</span></pre>
+  <div class="callout warn">
+    <b>HPA 按 CPU 扩容易滞后：</b>CPU 从 60% 涨到 90% 只要几十秒，Pod 从调度到 ready 却要 30 秒以上，等新 Pod 就绪系统可能已经过载。<b>并发连接数、QPS、队列长度是更领先的指标</b>（KEDA 支持自定义指标）。另外 maxReplicas 一定要匹配数据库连接池上限，否则扩容越多，DB 先挂。
+  </div>
+  <h3>扩容前的检查清单</h3>
+  <pre><span class="c"># 每次扩容/升配前过一遍（任何一条不过就停下来）</span>
+□ 1. 瓶颈确认：是 CPU、内存、IO 还是连接数？只扩不相关的维度等于浪费
+□ 2. 下游容量：DB 连接数、Redis 带宽、下游服务容量是否也够？瓶颈可能在下游
+□ 3. 扩容上限：节点数 × 单节点连接池 ≤ DB max_connections × 0.7
+□ 4. 单机安全 QPS 是否有压测依据？没有就先补压测再谈数量
+□ 5. 发布影响：新节点纳入发布批次需要多久？滚动发布期间容量是否够
+□ 6. 回滚/缩容方案：扩容后如何评估效果、何时缩回去，责任到人
+□ 7. 监控就绪：新节点的 QPS/RT/资源指标接入告警，避免"盲扩"</pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>四维容量模型：CPU/内存/IO/连接数</h2></div>
+  <p class="lead">"只看 CPU"是容量规划第一大坑。<b>系统先被哪个维度打满，哪个就是瓶颈，而它往往不是 CPU。</b></p>
+  <table>
+    <tr><th style="width:80px">维度</th><th style="width:200px">健康水位</th><th style="width:200px">先满的典型场景</th><th>满了怎么办</th></tr>
+    <tr><td><b>CPU</b></td><td>持续 60% 以下，峰值不超 80%</td><td>计算密集型：图片处理、加解密、序列化、复杂 SQL</td><td>水平扩容；算法优化；异步化</td></tr>
+    <tr><td><b>内存</b></td><td>使用率 70% 以下，无频繁 Full GC</td><td>大对象缓存、JVM 堆不足、内存泄漏、Elasticsearch 堆</td><td>扩容或升配；优化缓存策略；修泄漏</td></tr>
+    <tr><td><b>IO</b></td><td>util &lt; 60%，await &lt; 10ms（SSD）</td><td>日志写盘、大文件、数据库随机写、NoSQL 落盘</td><td>换 SSD/ESSD；批量写；异步落盘；加缓存</td></tr>
+    <tr><td><b>连接数</b></td><td>峰值不超过池上限 80%</td><td>DB 连接池打满、Redis 连接、句柄数（ulimit -n）</td><td>调池 + 控制并发；加代理（ProxySQL）；升规格</td></tr>
+  </table>
+  <h3>容量模型记录表（每次压测填这张表）</h3>
+  <table>
+    <tr><th style="width:150px">指标</th><th style="width:110px">饱和点值</th><th style="width:110px">安全阈值</th><th>说明</th></tr>
+    <tr><td>QPS</td><td class="f">1,400</td><td class="f">980</td><td>P99 RT 突破 SLA 时的 QPS</td></tr>
+    <tr><td>CPU 使用率</td><td class="f">78%</td><td class="f">60%</td><td>user + system，注意 steal（云超售）</td></tr>
+    <tr><td>内存使用</td><td class="f">5.2G / 8G</td><td class="f">5.6G</td><td>含 JVM 堆 + 堆外 + 页缓存</td></tr>
+    <tr><td>磁盘 IO util</td><td class="f">45%</td><td class="f">60%</td><td>未饱和，但日志量大要盯 await</td></tr>
+    <tr><td>DB 连接数</td><td class="f">120 / 200</td><td class="f">160</td><td><b>最先暴露的瓶颈，扩容机器前先看这个</b></td></tr>
+    <tr><td>P99 RT</td><td class="f">210ms</td><td class="f">200ms</td><td>SLA 红线</td></tr>
+    <tr><td>错误率</td><td class="f">0.05%</td><td class="f">0.1%</td><td>含超时、429、5xx</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>连接数是最容易被忽视的瓶颈：</b>订单服务扩容到 30 台，每台连接池 20，共需 600 个 DB 连接，而 MySQL <span class="k">max_connections</span> 默认 151，云 RDS 默认几百到几千。<b>扩容前先算：节点数 × 单节点连接池 ≤ DB 最大连接的 70%</b>。超了要么加数据库代理，要么降单节点池大小（牺牲排队能力）。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>大促与活动保障</h2></div>
+  <p class="lead">大促保障 = <b>容量 × 压测验证 × 预案 × 值班</b>四件套。少任何一件，都是在拿生产环境赌运气。</p>
+  <h3>大促容量规划时间线</h3>
+  <table>
+    <tr><th style="width:110px">时间点</th><th style="width:210px">动作</th><th>产出</th></tr>
+    <tr><td><b>T-6 周</b></td><td>业务目标对齐：峰值 QPS、订单量、核心链路清单</td><td>容量规划文档 v1</td></tr>
+    <tr><td><b>T-4 周</b></td><td>资源采购/申请，缩容非大促资源腾预算</td><td>资源清单</td></tr>
+    <tr><td><b>T-3 周</b></td><td>全链路压测：按目标峰值 1.2 倍压，找瓶颈</td><td>压测报告、优化项</td></tr>
+    <tr><td><b>T-2 周</b></td><td>扩容完成，复测；预案编写与评审</td><td>扩容验收、预案库</td></tr>
+    <tr><td><b>T-1 周</b></td><td>预案演练（故障注入：杀节点、断网、延迟）</td><td>演练报告</td></tr>
+    <tr><td><b>T-3 天</b></td><td>封网：冻结发布，只允许修复性上线</td><td>封网公告</td></tr>
+    <tr><td><b>T 当天</b></td><td>值班：作战室，核心指标大盘，扩容待命</td><td>实时战报</td></tr>
+    <tr><td><b>T+1 周</b></td><td>复盘：预估 vs 实际，误差校准模型</td><td>复盘文档</td></tr>
+  </table>
+  <h3>预案清单（每条都要可执行）</h3>
+  <pre><span class="c"># 预案模板（每条必须包含：触发条件、执行动作、执行人、回滚方式）</span>
+<span class="c"># 例 1：下单接口 RT 突增</span>
+触发：P99 RT &gt; 500ms 持续 3 分钟
+动作：① 关闭"猜你喜欢"推荐（非核心）；② 购物车接口限流降级到只读缓存
+执行：SRE oncall 一键开关
+回滚：RT 恢复后 10 分钟逐步打开
+
+<span class="c"># 例 2：数据库 CPU &gt; 90%</span>
+触发：DB CPU 90% 持续 5 分钟
+动作：① 开启全局限流（QPS 砍半）；② 只读流量切只读实例；③ 大 SQL 查杀
+执行：DBA + 服务负责人双确认
+
+<span class="c"># 例 3：缓存集群命中率暴跌</span>
+触发：命中率 &lt; 90% 持续 2 分钟（可能热 key 或节点故障）
+动作：① 本地缓存兜底开启；② 热 key 探测并本地化；③ 必要时限流保 DB</pre>
+  <div class="callout ok">
+    <b>全链路压测的三个关键设计：</b>① <b>流量打标</b>（压测流量带特殊标记，影子库/影子表隔离，不污染真实数据）；② <b>数据构造</b>（按真实分布造数据，别全是空库）；③ <b>压到位</b>（按目标峰值的 1.2~1.5 倍压，留出模型误差）。只压不隔离、压完不留存报告，等于白压。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>成本与容量的平衡</h2></div>
+  <p class="lead">容量不是越大越好，<b>每一分冗余都是钱</b>。平衡点在于：故障恢复时间 × 业务损失 vs 冗余资源成本。</p>
+  <table>
+    <tr><th style="width:180px">策略</th><th style="width:190px">做法</th><th>适用</th></tr>
+    <tr><td><b>日常保水位</b></td><td>按均值 + 30% 冗余常驻</td><td>稳定业务，利用率 60% 左右</td></tr>
+    <tr><td><b>大促前扩容</b></td><td>提前 2~4 周按峰值开资源</td><td>可预见峰值，用时间换成本</td></tr>
+    <tr><td><b>错峰混部</b></td><td>在线业务与离线任务错峰使用同一批机器</td><td>大数据/计算平台与在线服务混部</td></tr>
+    <tr><td><b>分级保障</b></td><td>核心链路高冗余，边缘服务低冗余</td><td>所有系统。评论挂了无所谓，支付挂了要命</td></tr>
+    <tr><td><b>Serverless</b></td><td>低频/突发流量用函数计算按量付费</td><td>图像处理、报表、Webhook 等弹性场景</td></tr>
+  </table>
+  <pre><span class="c"># 成本-风险量化示例</span>
+某服务峰值 10,000 QPS，单机安全 QPS 800
+方案 A：常驻 13 台（980×0.85=833/台，13×833=10,829）
+  年成本 = 13 × 4C8G × 单价 × 12
+方案 B：常驻 6 台（覆盖日均 5,000 QPS）+ 弹性扩 7 台
+  日常成本 = 6 台常驻；大促 20 天按需扩 7 台
+  年成本 ≈ 6×12 + 7×(20/30) = 72 + 4.7 ≈ 77 台·月 vs A 方案 156 台·月
+  <span class="c"># 节省约 50%，代价：大促期间弹性扩容有 5~10 分钟空窗，需要预案兜底</span></pre>
+  <div class="callout">
+    <b>决策原则：</b><b>不可预见的流量风险用弹性扛，可预见的峰值提前备，核心链路冗余给足，边缘链路能省则省。</b>把每个服务标注 SLO 等级（S/A/B/C），容量策略按等级走，不要所有服务一个标准。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看 CPU 做容量判断，被连接数/IO 偷袭</div><div class="pd">CPU 才 50% 但 DB 连接池打满，请求全在排队等连接，表现为"莫名变慢"。必须四维一起看，连接数和队列长度优先。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">按日均值买机器，大促当天挂</div><div class="pd">均值 2,000 QPS、峰值 6,000 QPS，按均值配 3 台，峰值日直接过载。容量必须按<b>峰值 × 安全系数</b>算，日常低水位是正常代价。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">忽视峰值毛刺（分钟级尖峰）</div><div class="pd">整点秒杀、定时任务集中触发、缓存同时过期，都能造成秒级 5~10 倍毛刺。对策：限流削峰、过期时间加随机值、任务打散。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">容量规划一次定终身，从不复查</div><div class="pd">业务涨了 5 倍，容量还是去年的数字；或者业务萎缩了，机器白放两年。<b>容量规划是季度例行工作</b>，每次大促后必须校准模型。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">压测环境与生产差异巨大，数字不可信</div><div class="pd">压测库几万行数据全内存，生产几亿行走磁盘，同样的 SQL 差 10 倍。压测库要等量数据、真实分布，核心结论要全链路压测验证。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">弹性扩容来不及：从触发到就绪 10 分钟，故障 3 分钟就到</div><div class="pd">扩容速度永远追不上突发流量。弹性只补渐进增长，秒级突发必须靠限流、缓存、降级先扛住。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">HPA maxReplicas 不匹配下游 DB 连接池</div><div class="pd">扩容到 100 Pod，每个 20 连接 = 2,000 连接，MySQL 直接 max_connections 打满全线崩溃。扩容上限要先除以下游容量。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">压测不留数据、不复盘，下次从零开始</div><div class="pd">每次压测都重新摸瓶颈。必须沉淀：单机容量表、瓶颈清单、压测脚本进仓库，形成资产。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">预留冗余算了节点数，忘了网络/中间件容量</div><div class="pd">应用层够了，但 SLB 连接数、Redis 带宽、Kafka 分区吞吐先打满。容量规划要覆盖<b>全链路每个组件</b>，不只是应用服务器。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">大促缩容不及时，活动后资源白放一个月</div><div class="pd">大促开的 20 台忘了退，月账单一堆。预案里要写"活动结束 48 小时内缩容"，并指定责任人。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="0">
+      <div class="qt">1. 某服务预估峰值 12,000 QPS，单机压测极限 1,400 QPS，安全系数取 0.7，可用率 0.85。需要多少台？</div>
+      <button class="opt">ceil(12000 ÷ (1400×0.7×0.85)) = ceil(14.4) = 15 台</button>
+      <button class="opt">ceil(12000 ÷ 1400) = 9 台</button>
+      <button class="opt">ceil(12000 ÷ (1400×0.7)) = 13 台</button>
+      <div class="ans">正确答案：<b>15 台</b>。单机安全 QPS = 1400 × 0.7 = 980，再乘可用率 0.85 得 833，12000 ÷ 833 ≈ 14.4，向上取整 15 台。忘了可用率会少配 2 台，发布或故障时就过载。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于四个容量维度，哪个说法是对的？</div>
+      <button class="opt">CPU 最先满，盯 CPU 就够</button>
+      <button class="opt">内存最便宜，配大就行</button>
+      <button class="opt">系统先被哪个维度打满哪个就是瓶颈，DB 连接数这类"隐形维度"常常先满</button>
+      <div class="ans">正确答案：<b>瓶颈取决于负载特征</b>。计算密集型先满 CPU，缓存密集型先满内存，写密集型先满 IO，高并发服务常常先满连接数。只盯 CPU 会漏掉真实瓶颈。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 面对"双 11 零点秒杀"这种可预见的突发流量，最合适的组合是？</div>
+      <button class="opt">只配 HPA 弹性扩容，让系统自己扩</button>
+      <button class="opt">提前扩容 + 全链路压测 + 限流降级预案，HPA 只做兜底</button>
+      <button class="opt">垂直升配到最大规格，一台顶全部</button>
+      <div class="ans">正确答案：<b>提前扩容 + 压测 + 预案</b>。弹性扩容从触发到就绪要 3~10 分钟，追不上秒级突发；可预见峰值必须提前备，弹性只兜渐进部分和未知部分。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 压测环境测出单机 1,400 QPS，直接用它规划生产容量，最大的风险是？</div>
+      <button class="opt">压测环境数据量、缓存命中率、网络与生产不同，数字偏乐观</button>
+      <button class="opt">压测机性能比生产好，数字偏保守</button>
+      <button class="opt">没有风险，生产等配就没差异</button>
+      <div class="ans">正确答案：<b>压测环境通常偏乐观</b>。小数据量全走内存、缓存全命中、缺少真实热点分布，会让 QPS 虚高。必须用等量数据 + 全链路压测校正，并保留 0.7 安全系数。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 订单服务要从 10 台扩到 50 台，DBA 说"先别扩"。最可能的原因是？</div>
+      <button class="opt">50 台太浪费钱</button>
+      <button class="opt">发布太麻烦</button>
+      <button class="opt">50 台 × 20 连接池 = 1000 连接，可能打满 DB max_connections</button>
+      <div class="ans">正确答案：<b>连接数瓶颈</b>。水平扩容会线性放大对 DB 的连接需求，DB 连接数是共享瓶颈。扩容前必须验证：节点数 × 单节点池 ≤ DB 最大连接 × 70%。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 历史数据外推容量时，下列哪种做法是对的？</div>
+      <button class="opt">把大促峰值也纳入趋势线，线性外推</button>
+      <button class="opt">剔除已知大促等一次性事件，按增长趋势 + 季节性对齐外推</button>
+      <button class="opt">用过去一个月最高值乘 12</button>
+      <div class="ans">正确答案：<b>剔除一次性事件 + 季节性对齐</b>。大促峰值不代表常态趋势，直接用会严重高估；同时教育、电商等行业有强季节性，简单按月外推会错。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查公式与命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>节点数 = ceil(峰值QPS ÷ (极限QPS×0.7×可用率))</code><span class="desc">容量规划核心公式</span><button class="copy">复制</button></div>
+    <div class="crow"><code>安全 QPS = 压测极限 QPS × 0.7</code><span class="desc">核心链路用 0.6，读链路可到 0.75</span><button class="copy">复制</button></div>
+    <div class="crow"><code>峰值系数 = 历史峰值QPS ÷ 日均QPS</code><span class="desc">电商常见 3~5，秒杀 50+</span><button class="copy">复制</button></div>
+    <div class="crow"><code>DB连接校验：节点数 × 池大小 ≤ max_connections × 0.7</code><span class="desc">扩容前必算，防连接数打满</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jmeter -n -t plan.jmx -l r.jtl -e -o report/</code><span class="desc">命令行压测并生成 HTML 报告</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get hpa -w</code><span class="desc">实时观察 HPA 扩缩状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>top / vmstat 1 / iostat -x 1</code><span class="desc">CPU / 内存 / IO 实时监控三板斧</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -s / netstat -ant | wc -l</code><span class="desc">看连接数与各状态分布</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ulimit -n</code><span class="desc">看句柄上限，高并发服务至少 65535</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW STATUS LIKE 'Threads_connected'</code><span class="desc">MySQL 当前连接数，对比 max_connections</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>健康水位速查</h3>
+  <table>
+    <tr><th style="width:170px">指标</th><th style="width:110px">健康</th><th style="width:110px">预警</th><th style="width:110px">危险</th><th>动作</th></tr>
+    <tr><td>CPU 使用率</td><td class="f">&lt; 60%</td><td class="f">60%~80%</td><td class="f">&gt; 80%</td><td>扩容或优化热点</td></tr>
+    <tr><td>内存使用率</td><td class="f">&lt; 70%</td><td class="f">70%~85%</td><td class="f">&gt; 85%</td><td>扩内存 / 修泄漏</td></tr>
+    <tr><td>磁盘 IO util</td><td class="f">&lt; 50%</td><td class="f">50%~70%</td><td class="f">&gt; 70%</td><td>SSD / 异步写</td></tr>
+    <tr><td>连接池使用率</td><td class="f">&lt; 70%</td><td class="f">70%~85%</td><td class="f">&gt; 85%</td><td>扩池或控并发</td></tr>
+    <tr><td>P99 RT / SLA</td><td class="f">&lt; 80%</td><td class="f">80%~100%</td><td class="f">&gt; SLA</td><td>找瓶颈降 RT</td></tr>
+    <tr><td>错误率</td><td class="f">&lt; 0.01%</td><td class="f">0.01%~0.1%</td><td class="f">&gt; 0.1%</td><td>查日志定位</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>容量规划</b></td><td>回答"多少量会挂、多久能扩、扩多少"的工程方法</td></tr>
+    <tr><td><b>单机容量</b></td><td>单机在 SLA 约束下的最大承载流量，压测得出</td></tr>
+    <tr><td><b>峰值系数</b></td><td>峰值流量 ÷ 平均流量，容量按峰值规划</td></tr>
+    <tr><td><b>安全系数</b></td><td>极限容量打 7 折使用，覆盖环境差异与抖动</td></tr>
+    <tr><td><b>可用率</b></td><td>健康节点占比，预留发布/灰度/故障占位</td></tr>
+    <tr><td><b>水位</b></td><td>当前用量 ÷ 容量，健康区间 40%~60%</td></tr>
+    <tr><td><b>性能基线</b></td><td>正常时段的 QPS/RT/资源曲线，异常对比的参照</td></tr>
+    <tr><td><b>饱和点</b></td><td>QPS 增长但 RT 急剧恶化的拐点</td></tr>
+    <tr><td><b>全链路压测</b></td><td>生产环境按真实模型施压，流量打标隔离</td></tr>
+    <tr><td><b>影子库/影子表</b></td><td>压测写流量的隔离存储，不污染真实数据</td></tr>
+    <tr><td><b>水平扩容</b></td><td>加节点分摊流量，需无状态化</td></tr>
+    <tr><td><b>垂直扩容</b></td><td>升机器规格，适合有状态服务</td></tr>
+    <tr><td><b>弹性伸缩</b></td><td>按指标自动加减节点，有时延</td></tr>
+    <tr><td><b>N+1 / N+2 冗余</b></td><td>挂 1 台 / 2 台仍能承载的冗余策略</td></tr>
+    <tr><td><b>毛刺</b></td><td>秒级流量尖峰，常由定时任务、缓存过期引发</td></tr>
+    <tr><td><b>SLO</b></td><td>服务等级目标，容量策略分级依据</td></tr>
+    <tr><td><b>封网</b></td><td>大促前冻结发布，只允许修复性上线</td></tr>
+    <tr><td><b>混部</b></td><td>在线与离线任务错峰共用机器，提升利用率</td></tr>
+    <tr><td><b>容量模型校准</b></td><td>大促后对比预估与实际，修正系数</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 给自己负责的服务做一次单机梯度压测，填一张四维容量模型表；② 从监控导出 90 天 QPS 曲线，算出峰值系数；③ 用核心公式算当前容量缺口，写一页容量规划文档；④ 检查 DB 连接数：节点数 × 连接池 vs max_connections。<br><br>
+    <b>之后值得单独学：</b>全链路压测平台建设（流量染色、影子库）、KEDA 自定义指标扩缩容、以及成本优化与容量的联动。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透容量规划与性能基线 · 记住：容量是算出来的、压出来的、复盘出来的，不是拍出来的</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（六步法与计算示例）和模块 4（四维模型）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边算你负责系统的容量缺口。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议先想清楚：你负责的系统，单机容量数字是多少？依据是什么？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

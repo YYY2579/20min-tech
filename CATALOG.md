@@ -1,0 +1,312 @@
+# 20分钟速学 · 完整目录（198 份）
+
+> 9 个分类，每类 **20~24 份**。`✅` 已完成 ｜ `⬜` 待写
+> 分类编号 01~09 已定死，未来新增分类追加为 10、11……
+> **当前进度：198 / 198** ✅ 全部完成
+
+---
+
+## 01 工程基础 · fundamentals（22 份 · 完成 22）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `git.html` | Git 版本控制 | ✅ |
+| 02 | `linux-cli.html` | Linux 命令行与系统排查 | ✅ |
+| 03 | `http-https.html` | HTTP 与 HTTPS | ✅ |
+| 04 | `packet-capture.html` | 抓包与分析 | ✅ |
+| 05 | `shell-scripting.html` | Shell 脚本与自动化 | ✅ |
+| 06 | `regex.html` | 正则表达式 | ✅ |
+| 07 | `debugging.html` | 调试与排错方法论 | ✅ |
+| 08 | `testing.html` | 测试设计与测试金字塔 | ✅ |
+| 09 | `code-review.html` | 代码审查 | ✅ |
+| 10 | `cli-toolbox.html` | 命令行工具箱（jq/awk/sed/find） | ✅ |
+| 11 | `vim.html` | Vim 与终端编辑 | ✅ |
+| 12 | `build-tools.html` | 构建工具与 Makefile | ✅ |
+| 13 | `ssh.html` | SSH 深入（隧道/跳板/密钥） | ✅ |
+| 14 | `tmux.html` | tmux 与终端复用 | ✅ |
+| 15 | `dotfiles.html` | dotfiles 与开发环境管理 | ✅ |
+| 16 | `json-yaml.html` | JSON / YAML 处理与陷阱 | ✅ |
+| 17 | `api-testing.html` | 接口测试与自动化 | ✅ |
+| 18 | `git-advanced.html` | Git 进阶（工作流/submodule/hook） | ✅ |
+| 19 | `release-versioning.html` | 版本号与发布管理 | ✅ |
+| 20 | `log-analysis.html` | 日志分析实战 | ✅ |
+| 21 | `markdown-docs.html` | Markdown 与技术文档 | ✅ |
+| 22 | `ide-setup.html` | 编辑器与 IDE 配置 | ✅ |
+
+---
+
+## 02 底层原理 · lowlevel（21 份 · 完成 21）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `networking.html` | 计算机网络 | ✅ |
+| 02 | `os-io-model.html` | 操作系统与 IO 模型 | ✅ |
+| 03 | `cpu-cache.html` | CPU 与缓存层次 | ✅ |
+| 04 | `process-thread.html` | 进程、线程与调度 | ✅ |
+| 05 | `memory-management.html` | 内存管理 | ✅ |
+| 06 | `filesystem.html` | 文件系统 | ✅ |
+| 07 | `compile-link.html` | 编译与链接 | ✅ |
+| 08 | `concurrency-model.html` | 并发模型 | ✅ |
+| 09 | `performance-profiling.html` | 性能分析（perf/eBPF） | ✅ |
+| 10 | `encoding.html` | 字符编码 | ✅ |
+| 11 | `data-structures.html` | 数据结构与算法 | ✅ |
+| 12 | `syscall.html` | 系统调用与内核边界 | ✅ |
+| 13 | `interrupts.html` | 中断与软中断 | ✅ |
+| 14 | `virtualization.html` | 虚拟化原理（VM 与容器） | ✅ |
+| 15 | `container-kernel.html` | 容器内核机制深入 | ✅ |
+| 16 | `cpu-arch.html` | CPU 架构（x86 与 ARM） | ✅ |
+| 17 | `boot-process.html` | 开机流程（UEFI 到 init） | ✅ |
+| 18 | `numa-hugepage.html` | NUMA 与大页内存 | ✅ |
+| 19 | `lock-free.html` | 无锁数据结构 | ✅ |
+| 20 | `kernel-tracing.html` | 内核追踪（ftrace/eBPF） | ✅ |
+| 21 | `dma-device-io.html` | 设备与 DMA | ✅ |
+
+---
+
+## 03 编程语言 · languages（21 份 · 完成 21）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `python.html` | Python | ✅ |
+| 02 | `java.html` | Java 与 JVM | ✅ |
+| 03 | `go.html` | Go | ✅ |
+| 04 | `rust.html` | Rust | ✅ |
+| 05 | `c.html` | C 与内存 | ✅ |
+| 06 | `cpp.html` | C++ | ✅ |
+| 07 | `javascript.html` | JavaScript | ✅ |
+| 08 | `typescript.html` | TypeScript | ✅ |
+| 09 | `react.html` | React | ✅ |
+| 10 | `sql.html` | SQL 语言 | ✅ |
+| 11 | `language-selection.html` | 语言选型方法论 | ✅ |
+| 12 | `kotlin.html` | Kotlin | ✅ |
+| 13 | `swift.html` | Swift | ✅ |
+| 14 | `php.html` | PHP | ✅ |
+| 15 | `nodejs.html` | Node.js 运行时 | ✅ |
+| 16 | `vue.html` | Vue | ✅ |
+| 17 | `spring-boot.html` | Spring Boot | ✅ |
+| 18 | `django-fastapi.html` | Django 与 FastAPI | ✅ |
+| 19 | `runtime-vm.html` | 语言运行时与 VM 对比 | ✅ |
+| 20 | `dsl-metaprogramming.html` | DSL 与元编程 | ✅ |
+| 21 | `wasm.html` | WebAssembly | ✅ |
+
+---
+
+## 04 数据与存储 · data（24 份 · 完成 24）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `mysql.html` | MySQL | ✅ |
+| 02 | `postgresql.html` | PostgreSQL | ✅ |
+| 03 | `redis.html` | Redis | ✅ |
+| 04 | `message-queue.html` | 消息队列 | ✅ |
+| 05 | `sqlserver.html` | SQL Server | ✅ |
+| 06 | `oracle.html` | Oracle | ✅ |
+| 07 | `clickhouse.html` | ClickHouse | ✅ |
+| 08 | `elasticsearch.html` | Elasticsearch | ✅ |
+| 09 | `mongodb.html` | MongoDB | ✅ |
+| 10 | `tidb.html` | TiDB | ✅ |
+| 11 | `domestic-db.html` | 国产数据库（达梦/OceanBase/GaussDB） | ✅ |
+| 12 | `sharding.html` | 分库分表 | ✅ |
+| 13 | `data-warehouse.html` | 数仓建模 | ✅ |
+| 14 | `hbase.html` | HBase | ✅ |
+| 15 | `neo4j.html` | 图数据库 | ✅ |
+| 16 | `influxdb.html` | 时序数据库 | ✅ |
+| 17 | `rabbitmq.html` | RabbitMQ | ✅ |
+| 18 | `kafka-deep.html` | Kafka 深入 | ✅ |
+| 19 | `rocksdb-lsm.html` | RocksDB 与 LSM 树 | ✅ |
+| 20 | `index-internals.html` | 索引原理深入 | ✅ |
+| 21 | `query-optimizer.html` | 查询优化器 | ✅ |
+| 22 | `replication.html` | 主从复制与一致性 | ✅ |
+| 23 | `backup-recovery.html` | 备份与恢复 | ✅ |
+| 24 | `data-migration.html` | 数据迁移 | ✅ |
+
+---
+
+## 05 架构与设计 · architecture（22 份 · 完成 22）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `architecture-review.html` | 架构评审 | ✅ |
+| 02 | `system-design-cases.html` | 系统设计案例集 | ✅ |
+| 03 | `distributed-systems.html` | 分布式基础 | ✅ |
+| 04 | `microservices-api.html` | 微服务与 API 设计 | ✅ |
+| 05 | `design-patterns.html` | 设计模式 | ✅ |
+| 06 | `ddd.html` | 领域驱动设计 | ✅ |
+| 07 | `event-driven.html` | 事件驱动架构 | ✅ |
+| 08 | `high-concurrency.html` | 高并发设计 | ✅ |
+| 09 | `cache-architecture.html` | 缓存架构 | ✅ |
+| 10 | `service-mesh.html` | 服务网格 | ✅ |
+| 11 | `multi-active.html` | 多活与容灾 | ✅ |
+| 12 | `tech-selection.html` | 技术选型方法论 | ✅ |
+| 13 | `monolith-modular.html` | 单体与模块化 | ✅ |
+| 14 | `idempotency.html` | 幂等设计 | ✅ |
+| 15 | `rate-limiting.html` | 限流与熔断 | ✅ |
+| 16 | `capacity-planning.html` | 容量规划 | ✅ |
+| 17 | `cost-optimization.html` | 架构成本优化 | ✅ |
+| 18 | `legacy-modernization.html` | 遗留系统改造 | ✅ |
+| 19 | `architecture-doc.html` | 架构文档与 ADR | ✅ |
+| 20 | `performance-arch.html` | 性能架构 | ✅ |
+| 21 | `security-arch.html` | 安全架构 | ✅ |
+| 22 | `data-consistency.html` | 数据一致性设计 | ✅ |
+
+---
+
+## 06 运维与云原生 · devops（24 份 · 完成 24）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `docker.html` | Docker | ✅ |
+| 02 | `kubernetes.html` | Kubernetes | ✅ |
+| 03 | `observability.html` | 可观测性 | ✅ |
+| 04 | `nginx.html` | Nginx 与负载均衡 | ✅ |
+| 05 | `cicd-chaos.html` | CI/CD 与混沌工程 | ✅ |
+| 06 | `ansible.html` | Ansible | ✅ |
+| 07 | `prometheus.html` | Prometheus | ✅ |
+| 08 | `grafana.html` | Grafana | ✅ |
+| 09 | `log-stack.html` | 日志栈（EFK / Loki） | ✅ |
+| 10 | `zabbix.html` | Zabbix | ✅ |
+| 11 | `terraform.html` | Terraform 与 IaC | ✅ |
+| 12 | `jenkins-gitlab-ci.html` | Jenkins 与 GitLab CI | ✅ |
+| 13 | `linux-tuning.html` | Linux 系统调优 | ✅ |
+| 14 | `sre-practice.html` | SRE 实践 | ✅ |
+| 15 | `helm.html` | Helm | ✅ |
+| 16 | `istio.html` | Istio 与服务治理 | ✅ |
+| 17 | `argocd-gitops.html` | ArgoCD 与 GitOps | ✅ |
+| 18 | `harbor-registry.html` | Harbor 与镜像仓库 | ✅ |
+| 19 | `k8s-advanced.html` | Kubernetes 进阶 | ✅ |
+| 20 | `k8s-troubleshooting.html` | Kubernetes 排障 | ✅ |
+| 21 | `docker-compose.html` | Compose 与本地编排 | ✅ |
+| 22 | `vault-secrets.html` | Vault 与密钥管理 | ✅ |
+| 23 | `backup-dr.html` | 备份与灾备 | ✅ |
+| 24 | `oncall-incident.html` | on-call 与故障管理 | ✅ |
+
+---
+
+## 07 安全 · security（20 份 · 完成 20）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `web-security.html` | Web 安全 | ✅ |
+| 02 | `injection.html` | 注入攻防 | ✅ |
+| 03 | `xss-csrf.html` | XSS 与 CSRF 攻防 | ✅ |
+| 04 | `auth-security.html` | 认证授权安全 | ✅ |
+| 05 | `cryptography.html` | 密码学基础 | ✅ |
+| 06 | `pentest.html` | 渗透测试入门 | ✅ |
+| 07 | `secure-coding.html` | 安全编码 | ✅ |
+| 08 | `supply-chain-security.html` | 供应链安全 | ✅ |
+| 09 | `cloud-security.html` | 云安全 | ✅ |
+| 10 | `incident-response.html` | 应急响应 | ✅ |
+| 11 | `compliance.html` | 等保与合规 | ✅ |
+| 12 | `owasp-deep.html` | OWASP Top 10 逐条实战 | ✅ |
+| 13 | `deserialization.html` | 反序列化漏洞 | ✅ |
+| 14 | `ssrf.html` | SSRF 深入 | ✅ |
+| 15 | `file-upload.html` | 文件上传安全 | ✅ |
+| 16 | `api-security.html` | API 安全 | ✅ |
+| 17 | `k8s-security.html` | 容器与 K8s 安全 | ✅ |
+| 18 | `network-security.html` | 网络安全与零信任 | ✅ |
+| 19 | `threat-modeling.html` | 威胁建模 | ✅ |
+| 20 | `security-testing.html` | 安全测试（SAST/DAST） | ✅ |
+
+---
+
+## 08 AI 工程 · ai（22 份 · 完成 22）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `llm-app-dev.html` | 大模型应用开发 | ✅ |
+| 02 | `vector-database.html` | 向量数据库与语义检索 | ✅ |
+| 03 | `ai-service-ops.html` | AI 服务部署与运维 | ✅ |
+| 04 | `prompt-engineering.html` | 提示词工程 | ✅ |
+| 05 | `rag-advanced.html` | RAG 进阶 | ✅ |
+| 06 | `agent-dev.html` | Agent 开发 | ✅ |
+| 07 | `fine-tuning.html` | 模型微调 | ✅ |
+| 08 | `eval-testing.html` | AI 应用评估 | ✅ |
+| 09 | `llm-gateway.html` | 模型网关 | ✅ |
+| 10 | `ai-coding.html` | AI 辅助编程 | ✅ |
+| 11 | `mlops.html` | MLOps | ✅ |
+| 12 | `multimodal.html` | 多模态应用 | ✅ |
+| 13 | `llm-internals.html` | 大模型原理（Transformer） | ✅ |
+| 14 | `tokenization.html` | 分词与 Token | ✅ |
+| 15 | `context-engineering.html` | 上下文工程 | ✅ |
+| 16 | `structured-output.html` | 结构化输出 | ✅ |
+| 17 | `multi-agent.html` | 多智能体协作 | ✅ |
+| 18 | `guardrails.html` | 安全护栏与内容审核 | ✅ |
+| 19 | `ai-observability.html` | AI 应用可观测性 | ✅ |
+| 20 | `ai-cost.html` | AI 成本优化 | ✅ |
+| 21 | `speech-tts.html` | 语音识别与合成 | ✅ |
+| 22 | `image-gen.html` | 图像生成应用 | ✅ |
+
+---
+
+## 09 综合实战 · practice（22 份 · 完成 22）
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `build-deployable-system.html` | 从零搭建可部署系统 | ✅ |
+| 02 | `ecommerce.html` | 电商系统 | ✅ |
+| 03 | `shortlink.html` | 短链系统 | ✅ |
+| 04 | `im.html` | IM 即时通讯 | ✅ |
+| 05 | `seckill.html` | 秒杀系统 | ✅ |
+| 06 | `log-platform.html` | 日志平台 | ✅ |
+| 07 | `monitoring-platform.html` | 监控告警平台 | ✅ |
+| 08 | `auth-system.html` | 权限系统 | ✅ |
+| 09 | `payment.html` | 支付系统 | ✅ |
+| 10 | `search.html` | 搜索系统 | ✅ |
+| 11 | `api-gateway.html` | API 网关 | ✅ |
+| 12 | `feed.html` | 信息流系统 | ✅ |
+| 13 | `cms.html` | 内容管理系统 | ✅ |
+| 14 | `approval-workflow.html` | 审批工作流 | ✅ |
+| 15 | `bi-report.html` | BI 报表平台 | ✅ |
+| 16 | `etl-platform.html` | ETL 数据同步平台 | ✅ |
+| 17 | `config-center.html` | 配置中心 | ✅ |
+| 18 | `task-scheduler.html` | 分布式任务调度 | ✅ |
+| 19 | `message-push.html` | 消息推送系统 | ✅ |
+| 20 | `live-stream.html` | 直播系统 | ✅ |
+| 21 | `social.html` | 社交系统 | ✅ |
+| 22 | `ci-platform.html` | 构建发布平台 | ✅ |
+
+---
+
+## 进度总览
+
+| 分类 | 目标 | 已完成 | 待写 |
+|---|---|---|---|
+| 01 工程基础 | 22 | 22 | 18 |
+| 02 底层原理 | 21 | 21 | 10 |
+| 03 编程语言 | 21 | 21 | 20 |
+| 04 数据与存储 | 24 | 24 | 20 |
+| 05 架构与设计 | 22 | 22 | 18 |
+| 06 运维与云原生 | 24 | 24 | 19 |
+| 07 安全 | 20 | 20 | 19 |
+| 08 AI 工程 | 22 | 22 | 19 |
+| 09 综合实战 | 22 | 22 | 21 |
+| **合计** | **198** | **198** | **0** |
+
+---
+
+## 执行顺序（按依赖关系排）
+
+| 批次 | 分类 | 份数 | 理由 |
+|---|---|---|---|
+| 1 | 02 底层原理 | 10 | 已过半，先收口 |
+| 2 | 01 工程基础 | 18 | 日常最高频 |
+| 3 | 03 编程语言 | 20 | 覆盖面要全 |
+| 4 | 04 数据与存储 | 20 | 事故重灾区 |
+| 5 | 06 运维与云原生 | 19 | 运维方向核心 |
+| 6 | 05 架构与设计 | 18 | 需前置打底 |
+| 7 | 07 安全 | 19 | 独立性强 |
+| 8 | 08 AI 工程 | 19 | 当前最热 |
+| 9 | 09 综合实战 | 21 | 收口，需全部前置 |
+
+---
+
+## 统一体例（每份必须满足）
+
+计时器 20 分钟 ｜ 6~8 个知识模块 ｜ 8~10 条真实坑 ｜ 6 道自测（带解析）｜ 速查卡 ｜ 15~20 条术语表 ｜ 正文自包含 ｜ 面向有工程经验的读者
+
+## 质量红线
+
+- 不编造 API、参数、命令
+- 技术细节必须核实，官方文档优先
+- 每个数字、每条配置都要能落地
+- 不用"等等""若干""一些"糊弄

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 支付系统设计实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 支付系统设计实战</h1>
+    <p class="sub">支付系统的第一性原则：<b>钱不能多、不能少、不能说不清。</b>这篇讲机制：状态机与幂等怎么保正确、掉单怎么补、对账怎么兜底、签名怎么防篡改，以及那些"看起来能跑、出事就是大事"的经典坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 态支付状态机</span>
+      <span class="chip"><b>7</b> 张核心表</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边推演：一笔"支付成功但没收到通知"的订单，从发生到对账兜底的完整链路</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>支付系统的四条铁律</h2></div>
+  <table>
+    <tr><th style="width:170px">铁律</th><th>工程含义</th></tr>
+    <tr><td><b>不许多扣（不能多）</b></td><td>任何操作幂等。重复请求、重复通知、重复回调，只能生效一次</td></tr>
+    <tr><td><b>不许少扣（不能少）</b></td><td>该收的钱必须收到。掉单必须被发现并补偿，不能静默丢失</td></tr>
+    <tr><td><b>账实相符（不能说不清）</b></td><td>每一笔钱都有流水，流水和账户余额永远对得上</td></tr>
+    <tr><td><b>全程可审计</b></td><td>每个状态迁移有日志、有时间、有操作方，事后可复盘</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>支付和其他系统最大的差别：错误不可回滚，只能补偿。</b>电商少发一件货可以补发，支付多扣一次钱用户会投诉到银保监。所以支付系统到处都是"双保险"：状态机 + 幂等 + 对账，三层各抓各的漏。<b>任何一笔资金的最终状态，必须是"三账相符"的结果：业务账、支付账、渠道账。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>支付核心架构：收单 / 退款 / 对账 / 清结算</h2></div>
+  <p class="lead">支付平台按资金流向分四大子系统。边界清晰、职责单一，出错时能定位到具体子系统。</p>
+  <pre><span class="c">┌──────────────────────────────────────────────────────────────┐</span>
+<span class="c">│ 业务侧（订单/交易）                                          │</span>
+<span class="c">└───────────┬───────────────────────────────┬────────────────┘</span>
+            <span class="g">│ 支付请求（创建支付单）</span>           <span class="g">│ 退款请求</span>
+<span class="c">┌───────────▼───────────────┐   ┌───────────▼───────────────┐</span>
+<span class="c">│  收单系统 Acquiring        │   │  退款系统 Refund           │</span>
+<span class="c">│  支付单管理/路由/状态机     │◄──│  原路退回/部分退/幂等      │</span>
+<span class="c">└───────────┬───────────────┘   └───────────────────────────┘</span>
+            <span class="g">│ 渠道路由</span>
+<span class="c">┌───────────▼───────────────────────────────────────────────┐</span>
+<span class="c">│  统一支付网关 Channel Gateway                             │</span>
+<span class="c">│  渠道适配（微信/支付宝/银联/卡组织）签名验签/报文转换       │</span>
+<span class="c">└───────────┬───────────────────────────────────────────────┘</span>
+            <span class="g">│ 异步通知（回调）</span>
+<span class="c">┌───────────▼───────────────┐   ┌───────────────────────────┐</span>
+<span class="c">│  对账系统 Reconciliation   │──►│  清结算系统 Clearing       │</span>
+<span class="c">│  日终渠道账单 vs 平台流水  │   │  商户结算/T+1 打款/分账     │</span>
+<span class="c">└───────────────────────────┘   └───────────────────────────┘</span></pre>
+  <table>
+    <tr><th style="width:130px">子系统</th><th>核心职责</th><th>关键正确性要求</th></tr>
+    <tr><td><b>收单</b></td><td>创建支付单、路由渠道、驱动状态机、接收回调</td><td>支付单全局唯一；状态只能正向迁移</td></tr>
+    <tr><td><b>退款</b></td><td>原路退回、部分退、多次退、退到关单</td><td>累计退款额 ≤ 实收额；退款单幂等</td></tr>
+    <tr><td><b>对账</b></td><td>拉渠道账单，与平台流水逐笔勾兑，出差错单</td><td>一笔不漏；长款短款都要挂账</td></tr>
+    <tr><td><b>清结算</b></td><td>算清每商户应收（交易额 − 手续费 − 退款），生成结算单打款</td><td>结算单 = 明细汇总，可重算复现</td></tr>
+  </table>
+  <div class="callout">
+    <b>为什么对账是"最后一道防线"：</b>状态机可能因为丢消息卡住，异步通知可能因为网络延迟没到，这些都绕不开一个事实 —— <b>渠道侧的账单文件是"外部真相"</b>。每天把渠道账单和平台流水逐笔比对，任何不一致都会暴露。前面所有机制（幂等、重试、确认）是"尽量不出错"，对账是"出了错一定发现"。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>支付状态机与幂等</h2></div>
+  <h3>支付单状态机</h3>
+  <pre><span class="c"># 支付单六态与合法迁移（只允许沿箭头方向）</span>
+CREATED ──发起渠道──► PAYING ──渠道成功──► PAID
+   ▲                      │                    │
+   │                      │渠道失败             │业务确认入账
+   └────关单/超时──────────┘                    ▼
+(CLOSED) ◄──全额退款─── REFUNDING ◄──退款中── PAID
+
+<span class="c"># 关键规则</span>
+① CREATED → PAYING 必须持锁 + 幂等号（同一 biz_no 只能发起一次）
+② PAYING → PAID 只能由"渠道异步通知 + 主动查询"双重确认触发
+③ PAID 之后只能走向 REFUNDING，永远回不到 PAYING
+④ CLOSED 是终态；PAID 是事实终态（之后只有退款能改变账）</pre>
+  <h3>全局唯一流水号：幂等的基石</h3>
+  <table>
+    <tr><th style="width:150px">编号</th><th>作用</th><th>生成规则</th></tr>
+    <tr><td><b>支付单号 pay_no</b></td><td>平台侧唯一，关联业务订单</td><td>Biz + 日期 + 序列，如 PAY2026101800123456</td></tr>
+    <tr><td><b>渠道流水号 channel_no</b></td><td>渠道侧唯一，回调时带回</td><td>渠道生成，平台存储</td></tr>
+    <tr><td><b>幂等号 idempotent_key</b></td><td>防重复提交，DB 唯一索引兜底</td><td>业务单号 + 场景（如 order_123_pay）</td></tr>
+  </table>
+  <pre><span class="c"># 幂等的三层防线</span>
+<span class="y">第一层 入口</span>：同一 idempotent_key 的请求，直接返回首次结果（不重复执行）
+<span class="y">第二层 DB</span>：支付单表 idempotent_key 唯一索引，Insert 冲突即拒绝
+<span class="y">第三层 状态机</span>：UPDATE ... SET status='PAID' WHERE pay_no=? AND status='PAYING'
+           <span class="c"># 影响行数 = 0 说明已被别人处理过，当前请求直接返回成功</span>
+
+<span class="c"># 回调处理的标准姿势（先查后改 + 状态条件更新）</span>
+<span class="b">public void</span> onChannelNotify(String channelNo, String result) {
+    PayOrder o = payMapper.selectByChannelNo(channelNo);   <span class="c">// 先查</span>
+    <span class="b">if</span> (o == <span class="b">null</span>) { log.warn(<span class="g">"未知回调"</span>); <span class="b">return</span>; }
+    <span class="b">if</span> (!<span class="g">"PAYING"</span>.equals(o.getStatus())) <span class="b">return</span>;        <span class="c">// 已处理，幂等返回</span>
+    <span class="b">int</span> n = payMapper.updateStatus(o.getPayNo(), <span class="g">"PAYING"</span>, <span class="g">"PAID"</span>); <span class="c">// CAS</span>
+    <span class="b">if</span> (n == 1) { notifyBusiness(o); }                          <span class="c">// 只有抢到锁的线程推进业务</span>
+}</pre>
+  <div class="callout warn">
+    <b>"先改状态再发消息"还是"先发消息再改状态"？</b>支付场景的标准答案是：<b>先落库（状态改 PAID），再发消息通知业务方</b>。消息用本地事务表或事务消息保证最终送达。反过来做（先发消息）会出现"业务已加款、支付单却没改状态"的撕裂 —— 而支付单是钱的事实来源，必须以它为准。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>掉单处理：主动查询 / 异步通知 / 对账补偿</h2></div>
+  <p class="lead">掉单 = 用户已付款，但平台侧支付单还是 PAYING。<b>掉单一定会发生</b>（网络分区、渠道回调丢、进程重启），设计目标是"发现并补偿，而不是祈祷不发生"。</p>
+  <h3>三道防线，逐层兜底</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一道：异步通知。</b>渠道回调推送支付结果。要求：验签通过才处理；回调接口幂等；收到先回执（HTTP 200）再处理，处理失败进重试队列（间隔 1s/5s/30s/2min/10min/30min）</div></div>
+    <div class="step"><div class="txt"><b>第二道：主动查询。</b>支付单 PAYING 超过 N 秒（如 5s）未终态，定时任务按渠道查询接口拉真实结果。查询频率前密后疏（5s/10s/30s/1min……），最多查到 24h 后移交对账</div></div>
+    <div class="step"><div class="txt"><b>第三道：对账补偿。</b>日终渠道账单里有"成功"记录而平台是 PAYING/CLOSED → 生成差错单"长款"，补推状态或退款。这是终极兜底，T+1 发现</div></div>
+  </div>
+  <pre><span class="c"># 主动查询任务的关键设计</span>
+<span class="y">选单</span>：SELECT * FROM pay_order WHERE status='PAYING'
+     AND create_time &lt; NOW() - INTERVAL 5 SECOND LIMIT 500;  <span class="c">// 分批，防一次拉爆</span>
+<span class="y">查询</span>：按渠道分组，合并查询（微信/支付宝都支持批量查询，减少 API 调用）
+<span class="y">处理</span>：查到终态 → 走标准状态迁移（和回调同一个入口，复用幂等）
+     查不到 → 累加查询次数；超过阈值（如 20 次）→ 标"异常"进人工核查队列
+<span class="y">防重</span>：同一支付单的查询任务加分布式锁 / 状态位，避免多 worker 重复查</pre>
+  <table>
+    <tr><th style="width:130px">防线</th><th>发现时效</th><th>适用场景</th></tr>
+    <tr><td>异步通知</td><td>秒级</td><td>正常路径，95%+ 的订单在这步完成</td></tr>
+    <tr><td>主动查询</td><td>5 秒 ~ 分钟级</td><td>回调丢失、回调延迟、进程崩溃</td></tr>
+    <tr><td>对账补偿</td><td>T+1</td><td>渠道系统故障、极端异常，兜底一切</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>用户侧的兜底：支付结果页"手动同步"。</b>前端在 PAYING 态轮询平台侧状态（不是直接问渠道），给用户一个"我已完成支付，刷新状态"的按钮 —— 用户点一下触发一次主动查询。<b>这是把掉单的焦虑转移给用户自助，而不是让用户找客服。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>渠道路由与统一支付网关</h2></div>
+  <p class="lead">渠道（微信、支付宝、银联、外卡）接口各异，<b>统一网关把差异封在一层内</b>：对上提供标准接口，对下适配各渠道。</p>
+  <h3>网关职责</h3>
+  <table>
+    <tr><th style="width:140px">职责</th><th>说明</th></tr>
+    <tr><td><b>协议适配</b></td><td>各渠道报文（XML/JSON/表单）→ 内部标准模型，双向转换</td></tr>
+    <tr><td><b>签名验签</b></td><td>出参加签、回调验签，密钥按渠道隔离管理</td></tr>
+    <tr><td><b>渠道路由</b></td><td>按金额/费率/成功率/渠道状态选择最优渠道，支持渠道路由表动态配置</td></tr>
+    <tr><td><b>降级切换</b></td><td>渠道超时/故障率超标 → 自动切换备用渠道，对上层透明</td></tr>
+    <tr><td><b>限流与隔离</b></td><td>按渠道限流（别把微信的配额打满），慢渠道隔离线程池</td></tr>
+  </table>
+  <h3>渠道路由策略（按优先级）</h3>
+  <pre><span class="c"># 路由决策链（任一规则命中即返回，全不命中走默认渠道）</span>
+1. 特殊业务路由：大额(≥5000元)→银行通道；跨境→外卡渠道
+2. 渠道可用性过滤：剔除"熔断中/维护中/当日限额已满"的渠道
+3. 成本优先：按渠道费率升序（同费率按成功率降序）
+4. 成功率均衡：近 1h 成功率 &lt; 99% 的渠道降权，流量切给健康渠道
+5. 默认渠道：兜底配置</pre>
+  <div class="callout warn">
+    <b>渠道降级的真实代价是"重复扣款风险"：</b>用户点了支付，A 渠道发起后超时，系统自动切 B 渠道重发 —— 如果 A 其实成功了（只是响应慢），用户就被扣了两笔。<b>正确做法：超时未终态的支付单不允许自动切渠道重发</b>，只能继续查 A 的结果；只有明确失败（渠道返回 FAIL）才能换渠道。切渠道重发必须极其保守。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>安全：签名验签、密钥管理、敏感信息</h2></div>
+  <h3>签名：防篡改、防重放</h3>
+  <pre><span class="c"># 标准签名算法（各渠道大同小异，以 RSA2/SHA256WithRSA 为例）</span>
+<span class="y">1. 构造待签串</span>：除 sign 外所有字段，按 key 字典序排序，key=value&amp;key=value 拼接
+<span class="y">2. 加签</span>：用商户私钥对待签串做 SHA256WithRSA，Base64 后作为 sign 字段
+<span class="y">3. 验签</span>：用平台/渠道公钥对收到的 sign 验证，比对重算结果
+
+<span class="c"># 必加的防重放三件套</span>
+nonce  = 随机串（一次性，Redis 存 5 分钟，重复即拒绝）
+timestamp = 请求时间戳（与服务器时间偏差 &gt; 5 分钟即拒绝）
+sign  = 覆盖以上所有字段的签名</pre>
+  <table>
+    <tr><th style="width:150px">场景</th><th>签名方向</th><th>说明</th></tr>
+    <tr><td>请求发往渠道</td><td>平台私钥签名 → 渠道公钥验</td><td>证明"我是合法商户"</td></tr>
+    <tr><td>渠道回调进来</td><td>渠道私钥签名 → 平台公钥验</td><td>证明"回调真的来自渠道"</td></tr>
+    <tr><td>平台回调业务方</td><td>平台私钥签名 → 业务方公钥验</td><td>业务方同样要验签，防伪造到账通知</td></tr>
+  </table>
+  <h3>密钥管理</h3>
+  <ul>
+    <li><b>分渠道分环境隔离</b>：生产/测试密钥分离，一渠道一密钥，泄露可控</li>
+    <li><b>KMS 托管</b>：私钥存 HSM/KMS，应用只持密钥 ID；支持轮换（kid 标识并存过渡）</li>
+    <li><b>定期轮换 + 应急撤销</b>：证书到期自动告警；疑似泄露 10 分钟内完成撤销换新</li>
+    <li><b>访问审计</b>：每次密钥使用记录调用方、时间、用途</li>
+  </ul>
+  <h3>敏感信息</h3>
+  <pre><span class="c"># 敏感数据处理红线</span>
+银行卡号：存储只留后四位，全号加密（ENV 可逆加密，密钥在 KMS）
+CVV2：<span class="r">任何时候都不存储</span>，验完即弃
+日志：请求响应中的卡号/姓名/手机号必须脱敏（掩码规则）后再落盘
+传输：全链路 TLS1.2+，敏感字段额外应用层加密（即使 TLS 被破解仍有屏障）
+排查：脱敏数据 + 专用解密工具（解密动作本身记审计）</pre>
+  <div class="callout danger">
+    <b>血的教训：回调没验签。</b>攻击者伪造"支付成功"通知打到你的回调接口，你没验签就改了状态、发了货 —— 钱没收到，货出去了。<b>回调验签是支付系统不可协商的红线</b>，且要在状态迁移之前完成。同理，回调里的一切字段（金额、单号）都要和本地支付单比对，金额不一致以本地为准并告警。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>高可用：异步化、降级、对账系统</h2></div>
+  <h3>高可用手段</h3>
+  <table>
+    <tr><th style="width:140px">手段</th><th>说明</th></tr>
+    <tr><td><b>异步化</b></td><td>回调处理"先落状态、后推业务"；业务通知走消息队列重试。支付主链路只做最小的事</td></tr>
+    <tr><td><b>渠道降级</b></td><td>渠道故障自动切换；排队机制（支付中提示"银行通道繁忙"，而不是报错）</td></tr>
+    <tr><td><b>多活容灾</b></td><td>支付核心双活（分渠道维度切流），数据库主从 + 强同步，RPO ≈ 0 是底线</td></tr>
+    <tr><td><b>对账兜底</b></td><td>任何中间态丢失都能被日终对账发现并补偿，这是高可用的最后一块拼图</td></tr>
+  </table>
+  <h3>对账系统：日终对账与差错处理</h3>
+  <pre><span class="c"># 对账流程（T+1 日终）</span>
+<span class="y">1. 下载账单</span>：定时拉取各渠道前一交易日账单文件（对账文件接口，非交易接口）
+<span class="y">2. 标准化</span>：渠道账单 → 统一格式（渠道单号/金额/时间/状态/手续费）
+<span class="y">3. 逐笔勾兑</span>：以 channel_no 为 key，平台流水 vs 渠道账单全量比对
+<span class="y">4. 差错分类</span>：
+   长款：渠道有、平台无（或平台未成功）→ 查支付单，补状态或发起退款
+   短款：平台有、渠道无（或平台成功渠道失败）→ 以渠道为准，冲正平台状态
+   金额不一致：平台 100 渠道 99.99（手续费处理差异）→ 按规则平账
+   状态不一致：两边状态映射不同 → 人工核查队列
+<span class="y">5. 差错闭环</span>：差错单自动处理（可自动补）或转人工，全部记录处理结果</pre>
+  <table>
+    <tr><th style="width:120px">差错类型</th><th>含义</th><th>处理</th></tr>
+    <tr><td><b>长款</b></td><td>渠道成功、平台未入账</td><td>补记流水；若业务已关单则原路退款</td></tr>
+    <tr><td><b>短款</b></td><td>平台成功、渠道失败/无记录</td><td>以渠道为准冲正；涉及发货的触发业务回滚</td></tr>
+    <tr><td><b>金额差</b></td><td>两边金额不一致</td><td>多为手续费/汇率差，按平账规则处理并记账</td></tr>
+    <tr><td><b>单边账</b></td><td>一边有一边没有</td><td>按外部真相（渠道）为准修正，记录原因</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>对账的核心原则：渠道账单是外部真相，但修正动作必须幂等且留痕。</b>自动补单、自动退款这类补偿动作，本身也要走幂等（同一差错单只处理一次），且全部记录"谁在什么时候因为哪笔对账改了什么"。没有审计的自动补偿是把对账系统变成事故放大器。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>核心表结构、签名代码与配置</h2></div>
+  <h3>核心表（7 张）</h3>
+  <pre><span class="c">-- 支付单（资金事实来源）</span>
+<span class="b">CREATE TABLE</span> pay_order (
+  pay_no          <span class="g">VARCHAR</span>(32) PRIMARY KEY,   <span class="c">-- 平台唯一</span>
+  biz_no          <span class="g">VARCHAR</span>(64) NOT NULL,    <span class="c">-- 业务单号</span>
+  idempotent_key  <span class="g">VARCHAR</span>(64) NOT NULL,    <span class="c">-- 幂等号</span>
+  amount          <span class="g">BIGINT</span> NOT NULL,         <span class="c">-- 单位:分，永远整数</span>
+  currency        <span class="g">CHAR</span>(3) DEFAULT 'CNY',
+  channel         <span class="g">VARCHAR</span>(32) NOT NULL,    <span class="c">-- 渠道编码</span>
+  channel_no      <span class="g">VARCHAR</span>(64),             <span class="c">-- 渠道流水号</span>
+  status          <span class="g">VARCHAR</span>(16) NOT NULL,    <span class="c">-- CREATED/PAYING/PAID/CLOSED/REFUNDING</span>
+  query_count     <span class="g">INT</span> DEFAULT 0,           <span class="c">-- 主动查询次数</span>
+  version         <span class="g">INT</span> DEFAULT 0,           <span class="c">-- 乐观锁</span>
+  UNIQUE(idempotent_key), UNIQUE(biz_no),
+  KEY idx_status_time(status, create_time)     <span class="c">-- 掉单扫描索引</span>
+);
+
+<span class="c">-- 支付流水（每一次状态迁移一条，可审计）</span>
+<span class="b">CREATE TABLE</span> pay_flow (
+  id          <span class="g">BIGINT</span> PRIMARY KEY,
+  pay_no      <span class="g">VARCHAR</span>(32) NOT NULL,
+  from_status <span class="g">VARCHAR</span>(16),
+  to_status   <span class="g">VARCHAR</span>(16),
+  operator    <span class="g">VARCHAR</span>(32),               <span class="c">-- notify/query/reconcile/manual</span>
+  trace_id    <span class="g">VARCHAR</span>(64),
+  created_at  <span class="g">DATETIME</span> NOT NULL
+);
+
+<span class="c">-- 退款单</span>
+<span class="b">CREATE TABLE</span> refund_order (
+  refund_no    <span class="g">VARCHAR</span>(32) PRIMARY KEY,
+  pay_no       <span class="g">VARCHAR</span>(32) NOT NULL,
+  amount       <span class="g">BIGINT</span> NOT NULL,           <span class="c">-- 支持部分退、多次退</span>
+  status       <span class="g">VARCHAR</span>(16),               <span class="c">-- REFUNDING/REFUNDED/FAILED</span>
+  channel_no   <span class="g">VARCHAR</span>(64),
+  UNIQUE(pay_no, refund_no)
+);
+
+<span class="c">-- 对账差错单</span>
+<span class="b">CREATE TABLE</span> reconcile_diff (
+  id           <span class="g">BIGINT</span> PRIMARY KEY,
+  bill_date    <span class="g">DATE</span> NOT NULL,
+  channel      <span class="g">VARCHAR</span>(32) NOT NULL,
+  channel_no   <span class="g">VARCHAR</span>(64),
+  diff_type    <span class="g">VARCHAR</span>(16),               <span class="c">-- LONG/SHORT/AMOUNT</span>
+  platform_amt <span class="g">BIGINT</span>, channel_amt <span class="g">BIGINT</span>,
+  status       <span class="g">VARCHAR</span>(16),               <span class="c">-- PENDING/PROCESSED</span>
+  UNIQUE(bill_date, channel, channel_no, diff_type)  <span class="c">-- 差错单幂等</span>
+);
+
+<span class="c">-- 渠道配置（路由 + 密钥引用，动态生效）</span>
+<span class="b">CREATE TABLE</span> channel_config (
+  channel      <span class="g">VARCHAR</span>(32) PRIMARY KEY,
+  status       <span class="g">VARCHAR</span>(16),               <span class="c">-- ONLINE/OFFLINE/CIRCUIT_BREAK</span>
+  fee_rate     <span class="g">DECIMAL</span>(6,4),
+  daily_limit  <span class="g">BIGINT</span>,
+  key_ref      <span class="g">VARCHAR</span>(64)                <span class="c">-- KMS 密钥ID，不存明文</span>
+);</pre>
+  <h3>签名示例代码（Java，RSA2）</h3>
+  <pre><span class="c">// 1. 构造待签串：字典序 + key=value&amp;key=value</span>
+<span class="b">public static</span> String buildSignStr(Map&lt;String,String&gt; params) {
+    <span class="b">return</span> params.entrySet().stream()
+        .filter(e -&gt; e.getValue() != null &amp;&amp; !<span class="g">""</span>.equals(e.getValue())
+                &amp;&amp; !<span class="g">"sign"</span>.equals(e.getKey()))   <span class="c">// 排除空值和 sign 本身</span>
+        .sorted(Map.Entry.comparingByKey())                <span class="c">// 字典序</span>
+        .map(e -&gt; e.getKey() + <span class="g">"="</span> + e.getValue())
+        .collect(Collectors.joining(<span class="g">"&amp;"</span>));
+}
+
+<span class="c">// 2. 加签（私钥在 KMS，应用只调用签名服务）</span>
+<span class="b">public static</span> String sign(String content, String privateKey)
+        <span class="b">throws</span> Exception {
+    Signature signature = Signature.getInstance(<span class="g">"SHA256withRSA"</span>);
+    signature.initSign(loadPrivateKey(privateKey));
+    signature.update(content.getBytes(StandardCharsets.UTF_8));
+    <span class="b">return</span> Base64.getEncoder().encodeToString(signature.sign());
+}
+
+<span class="c">// 3. 验签（回调入口，失败直接拒绝）</span>
+<span class="b">public static boolean</span> verify(String content, String sign,
+        String publicKey) <span class="b">throws</span> Exception {
+    Signature signature = Signature.getInstance(<span class="g">"SHA256withRSA"</span>);
+    signature.initVerify(loadPublicKey(publicKey));
+    signature.update(content.getBytes(StandardCharsets.UTF_8));
+    <span class="b">return</span> signature.verify(Base64.getDecoder().decode(sign));
+}</pre>
+  <div class="callout warn">
+    <b>签名实现的三个经典 bug：</b>① 待签串没排除空值字段，渠道也排除 → 签不上；② 字段值里有 &amp; 或 = 没做转义，被拆穿；③ 验签用的是"重排后的串"而不是<b>原始报文顺序</b>。 safest 的做法：保留渠道原始报文，验签时用原始串；与渠道联调时用他们提供的 demo 逐字节比对。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">重复扣款：超时后自动切渠道重发</div><div class="pd">A 渠道超时未终态就切 B 渠道重发，A 其实成功了，用户被扣两笔。超时未终态只能继续查原渠道；明确失败才能换渠道。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">回调没验签就改状态</div><div class="pd">伪造"支付成功"通知直接入库发货。回调必须先验签，且金额与本地支付单比对，不一致以本地为准并告警。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">幂等只做在内存层，没做 DB 唯一索引</div><div class="pd">并发下两个请求同时通过内存检查，重复创建支付单/重复入账。幂等必须有 DB 唯一索引兜底（idempotent_key），内存检查只是优化。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">金额用浮点数，分转元算出几分钱误差</div><div class="pd">0.1 + 0.2 != 0.3，对账天天金额差。全程整数分（BIGINT），展示时再除 100；绝不用 double 存钱。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">掉单没人管：PAYING 状态睡 30 天</div><div class="pd">回调丢了、主动查询也没配，用户付了钱订单没动。必须配"PAYING 超时扫描 + 主动查询 + 对账兜底"三道防线，缺一道就是资金事故。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">状态机能回跳：PAID 被打回 PAYING</div><div class="pd">代码没做 CAS 条件更新，异常重试把已成功的单子改回中间态，重复入账。所有状态迁移用 UPDATE ... WHERE status='旧态'，影响行数为 0 就放弃。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">退款不校验累计上限</div><div class="pd">并发两笔部分退，各校验"本次 ≤ 剩余"都通过，加起来超退。累计退款校验要在行锁内做（SELECT ... FOR UPDATE），或 DB 层加约束。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">对账只对"金额"不对"状态"</div><div class="pd">渠道成功平台失败（或反之）时金额相同，对账显示平。勾兑必须 (渠道单号, 金额, 状态) 三元组全匹配，单边账也要出差错单。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">日志里打印完整卡号和 CVV2</div><div class="pd">合规事故，PCI-DSS 直接挂。敏感字段脱敏后落盘；CVV2 验完即弃永不存储；排查用专用解密工具且解密动作记审计。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">结算单算错，商户集体投诉</div><div class="pd">结算金额 = 交易额 − 手续费 − 退款，漏了退款或手续费精度丢了分。结算单必须可由明细重算复现，出账前和明细双向核对，历史结算单不可变（红冲另开新单）。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 用户在微信支付页面付款成功，但平台支付单一直是 PAYING，可能的原因和正确处理是？</div>
+      <button class="opt">一定是微信挂了，等微信恢复后自动恢复</button>
+      <button class="opt">异步通知丢失或延迟，靠主动查询任务拉取微信侧真实结果，仍不行则由日终对账兜底</button>
+      <button class="opt">直接给用户关单退款，不需要查渠道</button>
+      <div class="ans">正确答案：<b>主动查询 + 对账兜底</b>。掉单的第一道防线是回调，第二道是 PAYING 超时后的主动查询，第三道是 T+1 对账。直接关单会导致"用户付了钱、订单关了"的资金差错。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 防止"支付状态被重复修改"最可靠的机制是？</div>
+      <button class="opt">在内存里用 Set 记录已处理的单号</button>
+      <button class="opt">在代码入口用 if 判断当前状态再修改</button>
+      <button class="opt">UPDATE pay_order SET status='PAID' WHERE pay_no=? AND status='PAYING'，靠影响行数判断是否抢到</button>
+      <div class="ans">正确答案：<b>带旧态条件的 CAS 更新</b>。只有数据库的条件更新是原子的，并发下只有一个线程能把 PAYING 改成 PAID，其他线程影响行数为 0，自然幂等。内存 Set 多实例失效，if 判断有竞态窗口。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 渠道 A 支付请求发出后 10 秒未返回，此时最安全的做法是？</div>
+      <button class="opt">继续查询渠道 A 的结果，未确认前不换渠道重发</button>
+      <button class="opt">马上切换渠道 B 重新发起扣款</button>
+      <button class="opt">直接关单并通知用户支付失败</button>
+      <div class="ans">正确答案：<b>继续查 A，不换渠道</b>。A 可能已扣款只是响应慢，切 B 会导致重复扣款。只有渠道明确返回失败，才能更换渠道重试。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 对账发现"渠道账单有一笔成功、平台没有对应流水"（长款），正确处理是？</div>
+      <button class="opt">忽略它，反正是渠道多记的</button>
+      <button class="opt">生成差错单：若业务未关单则补状态推进；若业务已关单则原路退款给用户，全过程幂等留痕</button>
+      <button class="opt">手工改数据库把平台记录补上，不用记录</button>
+      <div class="ans">正确答案：<b>生成差错单并幂等处理</b>。长款意味着用户可能已扣款但平台没入账，必须处理（补单或退款），且补偿动作要幂等（同一差错单只处理一次）+ 留痕。忽略是资金损失，无记录的手改是审计事故。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于支付金额的存储，正确的是？</div>
+      <button class="opt">用 double 存元，展示时格式化</button>
+      <button class="opt">用 float 存元，省空间</button>
+      <button class="opt">用 BIGINT 存分，展示时除 100，全程不出现浮点</button>
+      <div class="ans">正确答案：<b>BIGINT 存分</b>。浮点数有精度问题（0.1+0.2≠0.3），分位误差在对账、结算里会被放大成资金差错。整数分是支付行业标准做法，汇率换算在边界处做且保留足够精度。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 收到渠道的支付回调通知，处理顺序应该是？</div>
+      <button class="opt">先验签 → 比对本地支付单金额 → 条件更新状态 → 通知业务方</button>
+      <button class="opt">先改状态 → 再验签 → 通知业务方</button>
+      <button class="opt">先通知业务方加款 → 再改自己状态</button>
+      <div class="ans">正确答案：<b>先验签再改状态</b>。验签不过可能是伪造通知；金额不一致要以本地支付单为准并告警。状态更新必须用带旧态的条件更新保证幂等，全部通过后才推业务消息。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>支付设计速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>金额全程 BIGINT 单位分</code><span class="desc">禁止浮点，展示时除 100</span><button class="copy">复制</button></div>
+    <div class="crow"><code>UPDATE ... WHERE status='旧态'</code><span class="desc">状态机 CAS，影响行数为 0 即已被处理</span><button class="copy">复制</button></div>
+    <div class="crow"><code>回调：先验签 → 比金额 → 改状态 → 推业务</code><span class="desc">顺序不能反，反了就是事故</span><button class="copy">复制</button></div>
+    <div class="crow"><code>掉单三防线：回调 / 主动查询 / 对账</code><span class="desc">秒级、分钟级、T+1 逐层兜底</span><button class="copy">复制</button></div>
+    <div class="crow"><code>超时未终态 = 继续查，不换渠道</code><span class="desc">换渠道重发 = 重复扣款风险</span><button class="copy">复制</button></div>
+    <div class="crow"><code>三账相符：业务账 / 支付账 / 渠道账</code><span class="desc">日终对账是终极真相</span><button class="copy">复制</button></div>
+    <div class="crow"><code>私钥进 KMS，应用只持 key_ref</code><span class="desc">密钥轮换用 kid 标识过渡</span><button class="copy">复制</button></div>
+    <div class="crow"><code>防重放三件套：nonce + timestamp + sign</code><span class="desc">回调与请求双向适用</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>收单</b></td><td>受理支付请求、创建支付单、驱动支付全流程</td></tr>
+    <tr><td><b>支付单 pay_order</b></td><td>平台侧一次支付的唯一记录，资金的事实来源</td></tr>
+    <tr><td><b>渠道流水号</b></td><td>渠道侧交易唯一号，回调和对账的关联键</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作执行多次结果一致，靠唯一键 + 条件更新实现</td></tr>
+    <tr><td><b>状态机</b></td><td>支付单的状态集合与合法迁移，只允许正向迁移</td></tr>
+    <tr><td><b>掉单</b></td><td>用户已付款但平台状态未更新，靠查询与对账补偿</td></tr>
+    <tr><td><b>异步通知</b></td><td>渠道回调推送支付结果，支付系统第一道防线</td></tr>
+    <tr><td><b>主动查询</b></td><td>平台按单号向渠道查真实结果，第二道防线</td></tr>
+    <tr><td><b>对账</b></td><td>日终渠道账单与平台流水逐笔勾兑，终极兜底</td></tr>
+    <tr><td><b>长款 / 短款</b></td><td>渠道有平台无 / 平台有渠道无的差错</td></tr>
+    <tr><td><b>清结算</b></td><td>算清商户应收（扣手续费、退款）并打款</td></tr>
+    <tr><td><b>分账</b></td><td>一笔收款按规则拆分给多方（平台、商家、推广方）</td></tr>
+    <tr><td><b>签名 / 验签</b></td><td>用私钥对报文签名、公钥验证，防篡改防伪造</td></tr>
+    <tr><td><b>防重放</b></td><td>nonce + timestamp + sign，拒绝重复或过期请求</td></tr>
+    <tr><td><b>渠道路由</b></td><td>按费率/成功率/限额选择最优渠道的策略链</td></tr>
+    <tr><td><b>渠道路由降级</b></td><td>渠道故障时切换备用渠道，对上层透明</td></tr>
+    <tr><td><b>T+1 结算</b></td><td>次日结算前一日交易，留出对账与差错处理时间</td></tr>
+    <tr><td><b>冲正</b></td><td>对错误账务做反向修正，产生红字记录</td></tr>
+    <tr><td><b>PCI-DSS</b></td><td>支付卡行业数据安全标准，敏感信息处理的合规基线</td></tr>
+    <tr><td><b>强同步复制</b></td><td>主库写入至少同步到一个从库才返回，RPO≈0</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用本文的七张表建库，写一个"创建支付单 → PAYING → 回调 → PAID"的最小闭环，全部用条件更新；② 故意重放同一回调 10 次，确认只有第一次生效；③ 造一个掉单：跳过回调直接进 PAYING，写主动查询任务补状态；④ 实现一次日终对账：渠道 CSV vs 平台流水，输出长款/短款报告；⑤ 用 SHA256withRSA 实现签名验签，拿联调 demo 逐字节比对。<br><br>
+    <b>之后值得单独学：</b>分布式事务在支付中的边界（Saga/TCC 为什么不适用于资金）、分账与二次结算、跨境支付与汇率、渠道沙箱与自动化联调、以及支付链路全链路压测（影子账号 + 真实渠道回放）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 支付系统设计实战 · 上线前务必检查：幂等、验签、对账三道防线</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（状态机与幂等）和模块 3（掉单）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边推演一笔掉单的完整生命周期。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边推演：一笔"支付成功但没收到通知"的订单，从发生到对账兜底的完整链路';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

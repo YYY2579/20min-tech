@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Zabbix 监控实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 Zabbix 监控实战</h1>
+    <p class="sub">Zabbix 不难装，难在<b>不误报、不刷屏、DB 不炸</b>。这篇直接讲架构分工、触发器表达式、LLD 低级别发现、主动/被动模式，以及和 Prometheus 到底怎么分工。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 类组件架构</span>
+      <span class="chip"><b>12+</b> 种触发器函数</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边在测试机上装个 agent：apt install zabbix-agent2</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 最快的实验方式：Docker 全家桶（server + web + agent）</span>
+<span class="c"># 1. 先起数据库</span>
+docker run -d --name zabbix-db \
+  -e MYSQL_ROOT_PASSWORD=rootpw \
+  -e MYSQL_DATABASE=zabbix \
+  -e MYSQL_USER=zabbix \
+  -e MYSQL_PASSWORD=zabbixpw \
+  mysql:8.0 --default-authentication-plugin=mysql_native_password
+
+<span class="c"># 2. 起 server（容器间用容器名互联）</span>
+docker run -d --name zabbix-server --link zabbix-db:mysql \
+  -e DB_SERVER_HOST=mysql \
+  -e MYSQL_USER=zabbix -e MYSQL_PASSWORD=zabbixpw \
+  -e MYSQL_DATABASE=zabbix \
+  -p 10051:10051 \
+  zabbix/zabbix-server-mysql:alpine-6.4-latest
+
+<span class="c"># 3. 起 web（默认账号 Admin / zabbix）</span>
+docker run -d --name zabbix-web --link zabbix-db:mysql --link zabbix-server:zabbix-server \
+  -e DB_SERVER_HOST=mysql -e MYSQL_USER=zabbix -e MYSQL_PASSWORD=zabbixpw \
+  -e MYSQL_DATABASE=zabbix -e ZBX_SERVER_HOST=zabbix-server \
+  -p 8080:8080 \
+  zabbix/zabbix-web-nginx-mysql:alpine-6.4-latest
+
+<span class="c"># 4. 在被监控机上装 agent 并指向 server</span>
+apt install zabbix-agent2
+sed -i 's/^Server=.*/Server=192.168.1.10/' /etc/zabbix/zabbix_agent2.conf
+systemctl restart zabbix-agent2</pre>
+  <div class="callout warn">
+    <b>测试连通性用 <span class="k">zabbix_get</span>：</b>在 server 上执行 <span class="k">zabbix_get -s 192.168.1.20 -p 10050 -k agent.ping</span>，返回 1 才算通。<b>90% 的"agent 不可达"是防火墙、SELinux 或 Server 地址写错</b>，与 zabbix 本身无关。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>架构：Server / Proxy / Agent 怎么分工</h2></div>
+  <p class="lead">Zabbix 是 C 写的 server + PHP 写的 web 前端 + Go 重写的 agent 2。核心思想：<b>server 决定"采什么"，agent 负责"给数据"</b>。</p>
+  <table>
+    <tr><th style="width:150px">组件</th><th style="width:260px">职责</th><th>关键事实</th></tr>
+    <tr><td><b>Zabbix Server</b></td><td>调度采集、评估触发器、执行动作、写数据库</td><td>C 编写，依赖 MySQL/PostgreSQL，是唯一"大脑"</td></tr>
+    <tr><td><b>Zabbix Proxy</b></td><td>代替 server 采集一片区域，本地缓冲</td><td>有独立数据库。<b>跨公网/跨机房/大规模分层必用</b></td></tr>
+    <tr><td><b>Zabbix Agent</b></td><td>被监控机上的采集器，按 key 返回数据</td><td>被动模式监听 <b>10050</b></td></tr>
+    <tr><td><b>Zabbix Agent 2</b></td><td>同上，但用 Go 实现，内置插件</td><td>支持 MySQL/Redis/Docker/Nginx 等插件，代码更少</td></tr>
+    <tr><td><b>Java Gateway</b></td><td>专门采集 JMX</td><td>监听 <b>10052</b>，server 通过它问 JMX</td></tr>
+    <tr><td><b>Web 前端</b></td><td>配置、看图、告警管理</td><td>PHP + Nginx/Apache，本身不采集数据</td></tr>
+  </table>
+  <h4>端口速记</h4>
+  <table>
+    <tr><th style="width:110px">端口</th><th style="width:150px">方向</th><th>用途</th></tr>
+    <tr><td class="f">10051</td><td>agent/proxy → server</td><td><b>主动模式</b>数据入口（trapper）。proxy 也从 10051 接收 server 配置</td></tr>
+    <tr><td class="f">10050</td><td>server → agent</td><td><b>被动模式</b>采集端口，server 主动来问</td></tr>
+    <tr><td class="f">10052</td><td>server → gateway</td><td>JMX 采集（Zabbix Java Gateway）</td></tr>
+    <tr><td class="f">161 / 162</td><td>双向</td><td>SNMP 查询 / SNMP trap 接收</td></tr>
+    <tr><td class="f">443 / 80</td><td>用户 → web</td><td>Web 界面</td></tr>
+  </table>
+  <div class="callout">
+    <b>数据流一句话：</b>被动模式是"server 打电话问 agent"（server 要能连到 agent）；主动模式是"agent 每隔 N 秒打电话给 server 汇报"（agent 要能连到 server，NAT 后面也能用）。<b>跨公网、大规模场景用 Proxy 缓冲，server 挂了 proxy 还能继续存数据</b>，恢复后补传。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>概念体系：监控项 / 触发器 / 动作 / 模板</h2></div>
+  <p class="lead">Zabbix 的对象层级是：<b>模板 → 主机 → 监控项 → 触发器 → 动作</b>。模板是复用的最小单位，改模板等于改所有挂它的主机。</p>
+  <table>
+    <tr><th style="width:130px">对象</th><th>作用与要点</th></tr>
+    <tr><td><b>主机组 Host group</b></td><td>主机的逻辑分组，权限和动作条件的基本单位（如"生产环境-Linux 机房 A"）</td></tr>
+    <tr><td><b>监控项 Item</b></td><td>一条待采集的数据，由 <span class="k">key</span>（如 vm.memory.size[pavailable]）+ 类型 + 更新间隔组成</td></tr>
+    <tr><td><b>触发器 Trigger</b></td><td>对监控项求值得到 OK / PROBLEM 的表达式，带严重性等级</td></tr>
+    <tr><td><b>动作 Action</b></td><td>事件（如触发器报警）发生后做什么：发消息、执行远程命令、升级</td></tr>
+    <tr><td><b>模板 Template</b></td><td>监控项/触发器/图/LLD 的打包。支持嵌套模板（一个模板挂另一个模板）</td></tr>
+    <tr><td><b>值映射 Value map</b></td><td>把数字翻译成文字：0→"正常"、1→"宕机"。<b>不配值映射，图上是裸数字</b></td></tr>
+    <tr><td><b>维护窗口 Maintenance</b></td><td>一段时间内停止该主机的告警和动作，但<b>数据照常采集</b></td></tr>
+    <tr><td><b>宏 Macro</b></td><td>变量。<span class="k">{$CPU.UTIL.CRIT}</span> 是用户宏（模板级可覆盖），<span class="k">{#FSNAME}</span> 是 LLD 宏</td></tr>
+  </table>
+  <h4>监控项类型（type）怎么选</h4>
+  <table>
+    <tr><th style="width:150px">类型</th><th>适用场景</th></tr>
+    <tr><td class="f">Zabbix agent</td><td>被动模式，server 主动来拉，最常用</td></tr>
+    <tr><td class="f">Zabbix agent (active)</td><td>agent 主动上报，防火墙/NAT 友好，推荐大规模默认</td></tr>
+    <tr><td class="f">Simple check</td><td>不需要 agent 的探活：<span class="k">icmppingsec</span>、<span class="k">net.tcp.service[http]</span></td></tr>
+    <tr><td class="f">HTTP agent</td><td>直接 GET/POST 一个 URL，可解析 JSON/XML，监控 API 利器</td></tr>
+    <tr><td class="f">SNMP agent</td><td>网络设备、打印机等无 agent 设备</td></tr>
+    <tr><td class="f">Dependent item</td><td>依赖另一个主监控项的值，不单独采集（如从 JSON 里抠字段）</td></tr>
+    <tr><td class="f">Calculated item</td><td>用已有监控项做算术：<span class="k">last(/host1/key1)+last(/host2/key2)</span></td></tr>
+    <tr><td class="f">Zabbix trapper</td><td>接收 <span class="k">zabbix_sender</span> 推来的数据，自定义脚本推送用</td></tr>
+  </table>
+  <h4>触发器严重性（severity）</h4>
+  <pre><span class="c"># 从低到高 6 档，数字直接用在表达式里</span>
+<span class="b">0</span> Not classified  未分类      <span class="c"># 默认值，慎用，会让筛选失效</span>
+<span class="b">1</span> Information     信息
+<span class="b">2</span> Warning         警告        <span class="c"># 如磁盘 80%</span>
+<span class="b">3</span> Average         一般        <span class="c"># 如 CPU 90%</span>
+<span class="b">4</span> High            严重        <span class="c"># 如服务宕了</span>
+<span class="b">5</span> Disaster        灾难        <span class="c"># 如核心数据库不可用</span></pre>
+  <div class="callout warn">
+    <b>新手最常犯：</b>所有触发器都挂"未分类"。后果是告警升级、动作条件、报表全都没法按严重性分流。<b>模板里的触发器一律显式指定严重性</b>，这是团队协作的基础。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>触发器表达式：误报的根源在这里</h2></div>
+  <p class="lead">语法骨架：<b>{主机:监控项.函数(参数)} 运算符 阈值</b>。支持 and / or / 括号，支持 K/M/G 和 s/m/h/d 单位。</p>
+  <h4>常用函数</h4>
+  <table>
+    <tr><th style="width:150px">函数</th><th>含义</th></tr>
+    <tr><td class="f">last()</td><td>最近一个值。<b>瞬时值，最容易被毛刺打脸</b></td></tr>
+    <tr><td class="f">avg(5m) / avg(#5)</td><td>5 分钟均值 / 最近 5 个值均值。<b>防误报首选</b></td></tr>
+    <tr><td class="f">max(1h) / min(5m)</td><td>时间窗口内最大 / 最小值</td></tr>
+    <tr><td class="f">sum(10m)</td><td>窗口内求和（流量累计场景）</td></tr>
+    <tr><td class="f">nodata(5m)</td><td><b>5 分钟没有收到任何数据</b>，agent 挂了比业务指标先知道</td></tr>
+    <tr><td class="f">change()</td><td>最近两个值不同就为真，适合状态位跳变</td></tr>
+    <tr><td class="f">diff()</td><td>最近值与上一个值不同（change 的严格版）</td></tr>
+    <tr><td class="f">delta(1h)</td><td>1 小时内的变化量（计数器差值）</td></tr>
+    <tr><td class="f">strlen()&gt;10</td><td>字符串长度，判断返回值是否为空/超长</td></tr>
+    <tr><td class="f">band(mask)</td><td>按位与，适合多状态位一个整型返回的设备</td></tr>
+  </table>
+  <pre><span class="c"># ===== 真实表达式示例 =====</span>
+
+<span class="c"># 1. CPU 空闲时间 5 分钟均值低于阈值（模板宏，可在主机级覆盖）</span>
+<span class="y">{Template_OS_Linux:system.cpu.util[,idle].avg(5m)}&lt;{$CPU.IDLE.MIN}</span>
+
+<span class="c"># 2. 内存可用率低于阈值 10%，持续 5 分钟</span>
+<span class="y">{Template_OS_Linux:vm.memory.size[pavailable].avg(5m)}&lt;10</span>
+
+<span class="c"># 3. 磁盘使用率超 90%（LLD 自动发现的文件系统，{#FSNAME} 是发现宏）</span>
+<span class="y">{Template_OS_Linux:vfs.fs.size[{#FSNAME},pused].last()}&gt;90</span>
+
+<span class="c"># 4. 网卡入流量超过 100MB/s</span>
+<span class="y">{Template_OS_Linux:net.if.in[eth0].avg(5m)}&gt;100M</span>
+
+<span class="c"># 5. agent 5 分钟无数据（配合正常触发器用，能发现"采不到"而非"值异常"）</span>
+<span class="y">{Template_OS_Linux:agent.ping.nodata(5m)}=1</span>
+
+<span class="c"># 6. 多条件组合：CPU 高且内存可用低，才算高危</span>
+<span class="y">({Template_OS_Linux:system.cpu.util.avg(5m)}&gt;90 and \
+ {Template_OS_Linux:vm.memory.size[pavailable].avg(5m)}&lt;15)</span>
+
+<span class="c"># 7. 计数器类：最近一小时重启次数变化</span>
+<span class="y">{Linux:system.boottime.delta(1h)}&gt;0</span></pre>
+  <h4>恢复表达式（recovery expression）</h4>
+  <pre><span class="c"># 问题表达式：avg(5m) > 90</span>
+<span class="c"># 恢复表达式：avg(5m) &lt; 80   ← 故意留 10% 的回差（hysteresis）</span>
+
+<span class="c"># 没有回差会发生什么？CPU 在 90 附近抖动时，</span>
+<span class="c"># 触发器会不停 OK→PROBLEM→OK→PROBLEM，每次翻转都是一条告警</span>
+<span class="c"># 这叫"告警抖动（flapping）"，是告警疲劳的第一大来源</span></pre>
+  <div class="callout danger">
+    <b>三条铁律：</b><br>
+    ① <b>能 avg(5m) 就别用 last()</b>。瞬时尖刺是真实存在的（GC、日志刷盘），但凌晨把你叫醒的成本更高。<br>
+    ② <b>高低阈值分开写</b>，用恢复表达式留回差。<br>
+    ③ <b>nodata 必须单独配</b>。业务指标正常不代表采集链路正常，agent 挂了指标全部"静止"，不配 nodata 你永远不知道。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>自动发现与 LLD 低级别发现</h2></div>
+  <p class="lead">"发现"要解决的是：<b>主机数量、磁盘分区、网卡、数据库表都是动态的，不可能为每块盘手写监控项</b>。Zabbix 有三层发现机制。</p>
+  <h4>三层发现机制</h4>
+  <table>
+    <tr><th style="width:180px">机制</th><th>发现什么</th><th>产物</th></tr>
+    <tr><td><b>Network discovery</b></td><td>按 IP 段扫描存活主机/服务</td><td>扫描到的主机可以<b>自动加入 Zabbix 并绑定动作指定的模板</b></td></tr>
+    <tr><td><b>Agent auto-registration</b></td><td>主动模式的 agent 首次连上 server 时自报家门</td><td>自动注册主机，通常配合"条件 → 绑定模板 + 加入主机组"的动作</td></tr>
+    <tr><td><b>LLD（低级别发现）</b></td><td>主机<b>内部</b>的动态实体：磁盘、网卡、systemd 服务、数据库表</td><td>发现规则定时执行，按返回的 JSON 自动<b>批量生成监控项/触发器/图原型</b></td></tr>
+  </table>
+  <h4>LLD 的 JSON 协议</h4>
+  <p>发现规则的原理：执行一个返回 JSON 的 key，JSON 里列出所有实体和它们的宏，Zabbix 为每个实体克隆原型。</p>
+  <pre><span class="c"># 自定义发现规则，执行：vfs.fs.discovery 的返回长这样</span>
+{
+  <span class="y">"data"</span>: [
+    { <span class="y">"{#FSNAME}"</span>: <span class="g">"/"</span>,        <span class="y">"{#FSTYPE}"</span>: <span class="g">"ext4"</span> },
+    { <span class="y">"{#FSNAME}"</span>: <span class="g">"/data"</span>,    <span class="y">"{#FSTYPE}"</span>: <span class="g">"xfs"</span> },
+    { <span class="y">"{#FSNAME}"</span>: <span class="g">"/boot"</span>,    <span class="y">"{#FSTYPE}"</span>: <span class="g">"ext4"</span> }
+  ]
+}
+
+<span class="c"># 于是你写一次原型监控项，{#FSNAME} 会被替换成 / /data /boot</span>
+<span class="c"># 一块新盘挂上来 → 下一次发现自动多出 3 个监控项 + 2 个触发器</span>
+<span class="c"># 盘被卸载 → 自动清理掉对应实体（默认保留 30 天可配置）</span></pre>
+  <h4>内置 LLD key（开箱即用，优先用）</h4>
+  <div class="cmds">
+    <div class="crow"><code>vfs.fs.discovery</code><span class="desc">发现文件系统，宏 {#FSNAME} {#FSTYPE}</span><button class="copy">复制</button></div>
+    <div class="crow"><code>net.if.discovery</code><span class="desc">发现网卡，宏 {#IFNAME}，注意排除 lo 和 bond 的 slave</span><button class="copy">复制</button></div>
+    <div class="crow"><code>systemd.unit.discovery</code><span class="desc">发现 systemd 服务，宏 {#UNIT.NAME}</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sensor.discovery</code><span class="desc">发现温度/风扇传感器，宏 {#SENSOR}</span><button class="copy">复制</button></div>
+    <div class="crow"><code>diskarray.discovery / ceph.*.discovery</code><span class="desc">存储阵列、Ceph 集群的官方 LLD 模板</span><button class="copy">复制</button></div>
+  </div>
+  <pre><span class="c"># 自定义 LLD：用 UserParameter 返回 JSON，发现所有 Nginx 的 server 块</span>
+UserParameter=nginx.server.discovery,awk '/server_name/{print $2}' /etc/nginx/conf.d/*.conf | sort -u | \
+  awk 'BEGIN{printf "{\"data\":["} {printf "%s{\"{#SERVER}\":\"%s\"}",(NR>1?",":""),$1} END{print "]}"}'
+
+<span class="c"># 用 Python 写更稳（JSON 转义不会出错）</span>
+UserParameter=app.queue.discovery,python3 /etc/zabbix/scripts/queue_discovery.py</pre>
+  <div class="callout warn">
+    <b>LLD 的两个大坑：</b>① 发现间隔别设太短（默认 1 小时足够），发现规则本身也消耗采集资源；② <b>发现宏里带特殊字符（如盘符 <span class="k">/mnt/a b</span>）会让 JSON 出错</b>，自定义 LLD 一定要用 <span class="k">json.dumps()</span> 而不是字符串拼接。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>Zabbix agent 2 与主动 / 被动模式</h2></div>
+  <table>
+    <tr><th style="width:140px">维度</th><th style="width:240px">被动模式 passive</th><th>主动模式 active</th></tr>
+    <tr><td><b>连接方向</b></td><td>server → agent:10050</td><td>agent → server:10051</td></tr>
+    <tr><td><b>谁定时</b></td><td>server 的 poller 按 item 间隔来问</td><td>agent 每隔 <span class="k">RefreshActiveChecks</span> 来拉一次列表</td></tr>
+    <tr><td><b>防火墙要求</b></td><td>server 要能访问所有 agent（跨 NAT 很痛苦）</td><td>agent 出站即可，<b>NAT/公网场景唯一选择</b></td></tr>
+    <tr><td><b>server 压力</b></td><td>每台 agent 占一个 poller 连接，量大时 poller 是瓶颈</td><td>agent 自己批量汇报，<b>server 压力小得多</b></td></tr>
+    <tr><td><b>适用</b></td><td>小规模、内网、需要即时配置下发的场景</td><td><b>中大规模默认推荐</b>，Zabbix 官方模板默认也走主动</td></tr>
+  </table>
+  <h4>agent 2 配置文件要点</h4>
+  <pre><span class="c"># /etc/zabbix/zabbix_agent2.conf</span>
+Server=192.168.1.10            <span class="c"># 允许谁做被动检查（逗号分隔，别图省事写 0.0.0.0/0）</span>
+ServerActive=192.168.1.10      <span class="c"># 主动模式上报给谁</span>
+Hostname=web-node-01           <span class="c"># 必须和 Web 界面里配置的主机名完全一致！</span>
+RefreshActiveChecks=120        <span class="c"># 每隔多少秒来拉一次要采集的 item 列表</span>
+BufferSend=5                   <span class="c"># 数据缓冲几秒再打包发，削峰</span>
+LogFile=/var/log/zabbix/zabbix_agent2.log
+
+<span class="c"># agent 2 的杀手锏：内置插件，不用 UserParameter 也能采</span>
+Plugins.Mysql.Sessions.MySQL=zabbix:zabbixpw@tcp(127.0.0.1:3306)/zabbix
+Plugins.Redis.Uri=tcp://127.0.0.1:6379
+Plugins.Docker.Endpoint=unix:///var/run/docker.sock
+<span class="c"># 然后直接用 mysql.datadir.size / redis.ping / docker.container.info 等 key</span></pre>
+  <div class="callout danger">
+    <b>主动模式第一大坑：<span class="k">Hostname</span> 不一致。</b>agent 上报时用 Hostname 找自己在 server 上的配置，界面上叫 <span class="k">web01</span>、agent 里写 <span class="k">web-node-01</span>，结果就是"配置已同步但没有任何数据"。日志里能看到 <span class="k">host [web-node-01] not found</span>。<b>养成用 DNS 名或 Ansible 统一注入 Hostname 的习惯</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>自定义监控项：UserParameter</h2></div>
+  <p class="lead">官方 key 覆盖不了的，用 UserParameter 把任意 shell 命令包装成监控项。<b>返回值只支持数字或字符串，超时默认 3 秒。</b></p>
+  <pre><span class="c"># /etc/zabbix/zabbix_agent2.conf 里追加</span>
+
+<span class="c"># 1. 无参数：返回值必须单行</span>
+UserParameter=mysql.ping,mysqladmin ping | grep -c alive
+UserParameter=service.nginx,systemctl is-active nginx
+
+<span class="c"># 2. 带参数 [*]：请求 key 里的参数按位置映射 $1 $2 ...</span>
+UserParameter=port.listen[*],ss -ltn | grep -c ":$1 "
+<span class="c"># 调用：zabbix_get -k port.listen[8080]</span>
+
+<span class="c"># 3. 多参数</span>
+UserParameter=file.line.count[*],wc -l &lt; $1
+<span class="c"># 调用：file.line.count[/var/log/nginx/access.log]</span>
+
+<span class="c"># 4. 磁盘 inode 使用率（百分比，整数）</span>
+UserParameter=vfs.fs.inode.pused[*],df -P $1 | awk 'NR==2{gsub("%","",$5);print $5}'
+
+<span class="c"># 5. 外部脚本（推荐把复杂逻辑放脚本，配置里只留一行）</span>
+UserParameter=app.orders.pending,python3 /etc/zabbix/scripts/pending_orders.py
+UserParameter=app.queue.depth,redis-cli -h 127.0.0.1 llen orders:queue</pre>
+  <h4>自测与推送</h4>
+  <pre><span class="c"># server 上测某个 key（agent 机器上也能跑 zabbix_agentd -t key 自测）</span>
+zabbix_get -s 192.168.1.20 -p 10050 -k "port.listen[8080]"
+
+<span class="c"># 主动推数据给 server（trapper 类型 item，适合低频自定义指标）</span>
+zabbix_sender -z 192.168.1.10 -s web-node-01 -k app.orders.pending -o 128
+
+<span class="c"># 批量推（文件格式：主机 key 值）</span>
+zabbix_sender -z 192.168.1.10 -i /tmp/data.txt</pre>
+  <div class="callout warn">
+    <b>三条军规：</b>① <b>输出必须单行</b>——awk 忘了 print 结束条件多打一行空行，agent 会报 <span class="k">Unsupported item key / value format error</span>；② <b>命令必须幂等且快</b>，超时（默认 3s，<span class="k">Timeout=</span> 可调）的 key 会被 agent 杀掉；③ <b>key 名遵守官方命名空间</b>（<span class="k">业务.对象.属性</span>），否则模板导出后和别人冲突。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>告警媒介、升级机制，以及和 Prometheus 的分工</h2></div>
+  <h4>动作与升级</h4>
+  <p>动作 = 条件 + 操作。条件按<b>触发器严重性、主机组、事件标签（event tag）</b>组合；操作可以是发消息、远程命令、再发一条消息。</p>
+  <table>
+    <tr><th style="width:150px">机制</th><th>说明</th></tr>
+    <tr><td><b>媒介 Media type</b></td><td>Email（SMTP）、短信（网关脚本）、钉钉/企微/飞书 Webhook、电话语音。<b>脚本型媒介就是把告警内容作为 stdin 传给脚本</b></td></tr>
+    <tr><td><b>升级 Escalation</b></td><td>没人处理就逐级加码：0min 通知值班 → 30min 通知主管 → 2h 通知总监。<b>每步可指定不同用户组</b></td></tr>
+    <tr><td><b>恢复操作</b></td><td>触发器恢复时自动发"已恢复"消息。<b>不配的话值班永远不知道问题好了没</b></td></tr>
+    <tr><td><b>更新操作</b></td><td>问题持续期间按周期重复通知（acknowledged 后停止）</td></tr>
+    <tr><td><b>抑制 Suppression</b></td><td>基于时间的定时静默（如"每天凌晨 2 点批量任务期间不告警"）</td></tr>
+    <tr><td><b>确认 Ack</b></td><td>值班在界面点"已知晓"，升级停止、消息里带确认人。<b>事故复盘的核心数据</b></td></tr>
+  </table>
+  <pre><span class="c"># 典型动作条件设计（生产环境）</span>
+条件1：触发器严重性 &gt;= 高（High）
+条件2：主机组 属于 "生产环境"
+条件3：事件标签 不包含 "maintenance"   <span class="c"># 给不想告警的触发器打标签过滤</span>
+
+操作：
+  步骤 1（立即）→ 发送消息给 "oncall" 用户，媒介：企业微信
+  步骤 2（30 分钟后仍未恢复）→ 发送消息给 "sre-leader"，媒介：短信 + 电话
+  步骤 3（2 小时后仍未恢复）→ 发送消息给 "cto"
+
+恢复操作 → 发送消息给 "oncall"：问题已恢复，持续了 X 分钟</pre>
+  <h4>与 Prometheus 的定位差异</h4>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:260px">Zabbix</th><th>Prometheus</th></tr>
+    <tr><td><b>采集模型</b></td><td>agent 推送 / server 拉取，agent 协议</td><td>HTTP 拉取 /metrics，<b> exporter 生态</b></td></tr>
+    <tr><td><b>配置方式</b></td><td>Web 界面 + 模板（可 YAML 导出版本管理）</td><td>纯 YAML + 服务发现，<b>GitOps 友好</b></td></tr>
+    <tr><td><b>数据模型</b></td><td>主机 → item，带业务语义</td><td>指标名 + label，多维模型，PromQL 很强</td></tr>
+    <tr><td><b>告警</b></td><td>内置动作/升级/媒介，<b>开箱即用的完整告警体系</b></td><td>Alertmanager（额外组件），灵活但要自己搭</td></tr>
+    <tr><td><b>存储</b></td><td>关系型数据库（MySQL/PG）</td><td>自研 TSDB，本地 + 远程存储</td></tr>
+    <tr><td><b>强项</b></td><td>网络设备、物理机、传统中间件、一体化运维</td><td>K8s/云原生、动态扩缩容、微服务黄金指标</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>怎么分工（业界主流实践）：</b>Zabbix 管<b>基础设施层</b>（物理机、网络设备、数据库、中间件、带外管理口），Prometheus 管<b>云原生与业务应用层</b>（K8s、容器、微服务 QPS/延迟/错误率）。<b>两者不互斥</b>：Zabbix 6.0+ 的 HTTP agent 支持 Prometheus 预处理，可以直接抓 exporter 的 /metrics 端点，把 Prometheus 指标汇入 Zabbix 告警体系——这是很多公司"只用一套告警"的落地方式。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>性能调优：NVPS、housekeeper 与数据库</h2></div>
+  <p class="lead">Zabbix 的性能天花板由两个数决定：<b>NVPS（每秒新增值数）</b>和数据库写入能力。优化方向永远是"少采、晚采、合并采"。</p>
+  <h4>zabbix_server.conf 关键参数</h4>
+  <table>
+    <tr><th style="width:210px">参数</th><th style="width:110px">默认</th><th>说明</th></tr>
+    <tr><td class="f">StartPollers</td><td>5</td><td>被动采集的轮询器数量。<b>被动 item 多就加</b></td></tr>
+    <tr><td class="f">StartPollersUnreachable</td><td>1</td><td>处理不可达主机的 poller</td></tr>
+    <tr><td class="f">StartTrappers</td><td>5</td><td>处理主动模式/agent 上报的接收器</td></tr>
+    <tr><td class="f">StartDiscoverers</td><td>1</td><td>LLD 发现执行器，发现规则多就加</td></tr>
+    <tr><td class="f">HousekeepingFrequency</td><td>1</td><td>每隔几小时跑一次清理。<b>设 1，别设 0</b></td></tr>
+    <tr><td class="f">CacheSize</td><td>32M</td><td>配置缓存，主机/item 极多时调大</td></tr>
+    <tr><td class="f">HistoryCacheSize</td><td>16M</td><td>历史数据写缓冲，调大可缓解 DB 尖刺</td></tr>
+    <tr><td class="f">ValueCacheSize</td><td>8M</td><td>触发器依赖的值缓存，内存够就调大</td></tr>
+  </table>
+  <h4>容量速算</h4>
+  <pre><span class="c"># NVPS = 监控项总数 × 平均频率（次/秒）</span>
+<span class="c"># 例：5000 个 item，平均 30 秒一次 → 5000/30 ≈ 167 NVPS</span>
+<span class="c"># 参考值：单 server（8C16G + SSD + MySQL）稳妥线约 3000~5000 NVPS</span>
+<span class="c"># 超了就上 Proxy 分层，或者：</span>
+<span class="c">#   ① 降低频率：秒级采集 → 30s/1m，NVPS 直接降一个数量级</span>
+<span class="c">#   ② 用 Dependent item：一条 master item 采集，多个子项复用（JSON 预处理）</span>
+<span class="c">#   ③ 计算监控项代替重复采集</span>
+
+<span class="c"># housekeeper 慢 = DB 无限膨胀。按量设保留策略：</span>
+<span class="c"># 管理 → 一般 → housekeeper</span>
+<span class="c">#   History 保留        30 天    <span class="c"># 明细数据，量最大</span></span>
+<span class="c">#   Trends 保留         365 天   <span class="c"># 小时聚合，量小</span></span>
+<span class="c">#   Problems/Events     365 天</span>
+<span class="c">#   Audits 保留         365 天</span>
+
+<span class="c"># DB 侧配合（MySQL）：zabbix 库按时间分区表，删除旧分区是毫秒级；</span>
+<span class="c"># PostgreSQL 可用 timescaledb 扩展（官方推荐）</span></pre>
+  <div class="callout danger">
+    <b>最常见的性能灾难：默认 90 天 history × 几千个秒级 item。</b>history 表能涨到几百 GB，housekeeper 每天删不完，DB 磁盘 100%，server 卡死。<b>上线第一天就把保留时间、频率、proxy 分层规划好</b>，这是补不回来的债。
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">排坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">触发器用 last() 导致毛刺误报</div><div class="pd">凌晨被 CPU 100% 叫醒，上去一看是个位数的瞬时值。持续性指标一律用 avg(5m)，并配恢复表达式留回差。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">忘了配值映射，图上全是 0/1/2</div><div class="pd">icmpping、systemctl is-active 这类返回值不配 value map，值班看到图也不知道是活着还是死了。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">发版期间没设维护窗口</div><div class="pd">一次发布刷出 200 条告警，值班直接麻木。维护窗口只静默告警不停止采集，发版前 10 分钟设上，是团队纪律。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">housekeeper 默认配置，DB 一年涨到 800G</div><div class="pd">History 默认 90 天，但没人根据量调整。history 表太大时 DELETE 单行删会拖垮 DB，应按天/月分区后整分区 DROP。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">主动模式 Hostname 与界面主机名不一致</div><div class="pd">agent 日志里 host not found，数据一条不来。主机名大小写、空格、域名后缀都要严格一致，用 CM 工具统一下发。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">LLD 发现间隔设成 30 秒，key 数量爆炸</div><div class="pd">发现规则本身也占采集资源，网卡/分区多的机器会被发现动作反复创建删除 item。默认 1h 足够，只有真正动态的场景缩短。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">在界面上直接改官方模板</div><div class="pd">下次升级模板被覆盖，改动全丢；多人改同一模板互相冲突。正确做法：克隆模板 → 改名 → 修改，且用 YAML 导出进 git。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Server 与 agent 时间不同步</div><div class="pd">图表错位、nodata 误报、触发器时间对不上。全链路 NTP/chrony 同步是监控系统的前提，监控自己先被监控。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">nodata(1m) 设太短，机器重启就误报</div><div class="pd">开机慢的业务机 2 分钟起不来，nodata(1m) 先报警。nodata 阈值取"采集间隔 × 3 再加 1 分钟"量级，给重启留窗口。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">权限体系没规划，所有人都是超级管理员</div><div class="pd">谁都能改触发器、谁能删主机组，出事无法追溯。用用户组 + 主机组权限做读写分离，审计日志（Administration → Audit）每季度看一次。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 主动模式下，agent 把数据发到 server 的哪个端口？</div>
+      <button class="opt">10050</button>
+      <button class="opt">10051</button>
+      <button class="opt">10052</button>
+      <div class="ans">正确答案：<b>10051</b>。10050 是 agent 被动模式的监听端口（server 来问），10051 是 server 的 trapper 端口（主动上报进来），10052 是 JMX Java Gateway。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 想检测"agent 挂了、5 分钟没有任何数据上报"，应该用哪个表达式？</div>
+      <button class="opt">last()=0</button>
+      <button class="opt">avg(5m)=0</button>
+      <button class="opt">nodata(5m)</button>
+      <div class="ans">正确答案：<b>nodata(5m)</b>。agent 挂了以后 last() 根本不会有新值，触发器停留在最后一次的求值结果上，永远不会触发。nodata 专门判断"多久没收到数据"。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. LLD 发现规则执行后，agent/脚本应该返回什么格式的数据？</div>
+      <button class="opt">JSON，形如 {"data":[{"{#FSNAME}":"/",...}]}</button>
+      <button class="opt">纯文本，每行一个实体名</button>
+      <button class="opt">XML，含每个实体的属性节点</button>
+      <div class="ans">正确答案：<b>JSON</b>。LLD 协议规定返回 {"data":[{宏:值},...]}，Zabbix 用其中的 {#XXX} 宏去替换原型监控项里的同名占位符，从而批量生成实例。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于被动模式，说法正确的是？</div>
+      <button class="opt">agent 定时主动连接 server 上报数据</button>
+      <button class="opt">agent 与 server 之间无需任何网络连通</button>
+      <button class="opt">server 主动连接 agent 的 10050 端口拉取数据</button>
+      <div class="ans">正确答案：<b>server 主动来拉</b>。所以被动模式要求 server 能访问到 agent（跨 NAT 很麻烦）；主动模式反过来，agent 出站即可，更适合大规模和公网场景。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. CPU 使用率在 90% 附近抖动，告警不停触发又恢复。最合适的解决方式是？</div>
+      <button class="opt">把触发器严重性调低，减少关注</button>
+      <button class="opt">用 avg(5m)&gt;90 作为问题表达式，并配 avg(5m)&lt;80 的恢复表达式</button>
+      <button class="opt">把更新间隔改成 1 秒，让数据更精确</button>
+      <div class="ans">正确答案：<b>均值 + 回差</b>。avg(5m) 过滤毛刺；高低阈值分开写（90 触发 / 80 恢复）留出 10% 回差，避免边界抖动造成 flapping。调严重性治标不治本，缩短间隔只会放大问题。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 Zabbix 与 Prometheus 的分工，主流实践是？</div>
+      <button class="opt">Zabbix 管基础设施层，Prometheus 管云原生与业务应用层，可集成</button>
+      <button class="opt">两者功能相同，随便选一个就行</button>
+      <button class="opt">Prometheus 已经完全取代 Zabbix，后者已停止维护</button>
+      <div class="ans">正确答案：<b>分层共存</b>。Zabbix 强在一体化（网络设备、物理机、带外、告警升级），Prometheus 强在动态服务发现与 PromQL。Zabbix 6.0+ 还能通过 HTTP agent 直接抓取 Prometheus 端点，把两套指标汇入统一告警。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>zabbix_get -s IP -p 10050 -k key</code><span class="desc">server 上测 agent 某个 key，排障第一命令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>zabbix_agentd -t key</code><span class="desc">agent 本机自测 key，不依赖网络</span><button class="copy">复制</button></div>
+    <div class="crow"><code>zabbix_sender -z IP -s 主机名 -k key -o 值</code><span class="desc">主动推送数据（trapper item）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>zabbix_get -s IP -k agent.ping</code><span class="desc">探活，返回 1 表示 agent 正常</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tail -f /var/log/zabbix/zabbix_agent2.log</code><span class="desc">看 agent 日志，找 host not found 类错误</span><button class="copy">复制</button></div>
+    <div class="crow"><code>zabbix_server -R config_cache_reload</code><span class="desc">不重启 server 重载配置缓存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -ltnp | grep -E '10050|10051'</code><span class="desc">确认 agent/server 端口在监听</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mysql -e "select count(*) from history;"</code><span class="desc">看 history 表行数，评估 DB 膨胀程度</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置项</h3>
+  <pre><span class="c"># /etc/zabbix/zabbix_server.conf 最小调优集</span>
+StartPollers=10               <span class="c"># 被动 item 多就加</span>
+StartTrappers=10              <span class="c"># 主动模式 item 多就加</span>
+StartDiscoverers=3            <span class="c"># LLD 规则多就加</span>
+HousekeepingFrequency=1       <span class="c"># 每小时清理一次</span>
+CacheSize=64M
+HistoryCacheSize=64M          <span class="c"># 写缓冲，削 DB 尖刺</span>
+ValueCacheSize=32M
+TrendCacheSize=16M
+
+<span class="c"># /etc/zabbix/zabbix_agent2.conf 最小调优集</span>
+Server=10.0.0.1
+ServerActive=10.0.0.1
+Hostname=web-01               <span class="c"># 与界面主机名严格一致</span>
+RefreshActiveChecks=120
+BufferSend=5
+Timeout=5</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>NVPS</b></td><td>New Values Per Second，每秒新增的数据点数，衡量 Zabbix 规模的核心指标</td></tr>
+    <tr><td><b>Poller</b></td><td>server 里执行被动采集的工作单元，数量由 StartPollers 决定</td></tr>
+    <tr><td><b>Trapper</b></td><td>server 10051 端口，接收主动模式上报与 zabbix_sender 推送</td></tr>
+    <tr><td><b>Proxy</b></td><td>带独立数据库的采集代理，用于跨公网/大规模分层与本地缓冲</td></tr>
+    <tr><td><b>LLD</b></td><td>低级别发现，按 JSON 协议自动批量创建监控项/触发器/图原型实例</td></tr>
+    <tr><td><b>发现宏 {#XXX}</b></td><td>LLD 返回的实体占位符，原型里的同名宏会被替换</td></tr>
+    <tr><td><b>用户宏 {$XXX}</b></td><td>模板级变量，可在主机级覆盖，如 {$CPU.UTIL.CRIT}</td></tr>
+    <tr><td><b>值映射 Value map</b></td><td>把数字返回值翻译成人类可读文本的映射表</td></tr>
+    <tr><td><b>维护窗口</b></td><td>定时静默告警与动作的机制，采集不中断</td></tr>
+    <tr><td><b>Dependent item</b></td><td>依赖主监控项取值、不单独采集的监控项，省采集开销</td></tr>
+    <tr><td><b>Calculated item</b></td><td>用已有监控项做算术运算的虚拟监控项</td></tr>
+    <tr><td><b>nodata()</b></td><td>触发器函数，判断一段时间内是否完全没有收到数据</td></tr>
+    <tr><td><b>回差 hysteresis</b></td><td>问题阈值与恢复阈值之间的缓冲带，防告警抖动</td></tr>
+    <tr><td><b>Housekeeper</b></td><td>server 里按保留策略清理 history/trends/events 的后台进程</td></tr>
+    <tr><td><b>升级 Escalation</b></td><td>告警无人确认时按时间步逐级通知更多人的机制</td></tr>
+    <tr><td><b>确认 Ack</b></td><td>值班在界面标记已知晓，停止升级并留痕</td></tr>
+    <tr><td><b>Auto-registration</b></td><td>主动模式 agent 首次连接时自动注册主机的机制</td></tr>
+    <tr><td><b>Network discovery</b></td><td>按 IP 段扫描并自动添加主机/执行动作的发现规则</td></tr>
+    <tr><td><b>Trend</b></td><td>每小时聚合的历史数据，量小，适合看长期趋势</td></tr>
+    <tr><td><b>UserParameter</b></td><td>agent 配置里把 shell 命令包装成监控 key 的指令</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 Docker 起一套 Zabbix，完成这五件事 —— ① 装 agent 并用 zabbix_get 验证 passive 和 active 两种模式；② 克隆 OS Linux 模板，加一个 avg(5m) 防误报的 CPU 触发器并配值映射；③ 用 LLD 的 vfs.fs.discovery 挂一块新盘，看监控项自动出现；④ 写一个 UserParameter 监控自定义业务队列深度；⑤ 配一个带两级升级 + 恢复通知的动作，然后手动制造一次故障看升级链路。<br><br>
+    <b>之后值得单独学：</b>模板的 YAML 导出版本管理、Zabbix API 自动化（token 认证）、Proxy 大规模分层、与 Grafana 的数据源集成、以及低代码发现规则（dependent item + JSONPath 预处理）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Zabbix 监控实战 · 上线前务必检查：触发器回差、值映射、维护窗口、housekeeper 保留策略</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（触发器表达式）和模块 7（告警升级）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在测试机上敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边在测试机上装个 agent：apt install zabbix-agent2';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

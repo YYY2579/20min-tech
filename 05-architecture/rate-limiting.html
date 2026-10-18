@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透限流熔断与降级</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 10 期 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透限流、熔断与降级</h1>
+    <p class="sub">限流不是"配一个阈值"就完事。这篇讲四种算法的真实缺陷、三层限流怎么摆位、<b>Sentinel 与 Hystrix 的本质差异</b>、熔断器状态机的工程实现，以及那些"保护了系统却赶走了用户"的坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4+2</b> 种限流算法</span>
+      <span class="chip"><b>3</b> 个熔断状态</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议打开你项目的网关配置对照着看：阈值是谁定的？依据是什么？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个词的关系：限流、熔断、降级</h2></div>
+  <p class="lead">它们经常一起出现，但解决的问题完全不同。混用的后果是：限流阈值挡住了正常用户，熔断该断的时候没断。</p>
+  <table>
+    <tr><th style="width:90px">手段</th><th style="width:170px">保护谁</th><th style="width:170px">触发依据</th><th>本质动作</th></tr>
+    <tr><td><b>限流</b></td><td>自己（不被冲垮）</td><td>请求速率超过配额</td><td>拒绝或排队<b>一部分请求</b>，系统继续服务</td></tr>
+    <tr><td><b>熔断</b></td><td>自己（不被慢依赖拖死）</td><td>下游错误率/慢调用超阈值</td><td>一段时间内<b>不再调用下游</b>，直接返回失败或兜底</td></tr>
+    <tr><td><b>降级</b></td><td>用户体验</td><td>资源紧张或核心链路故障</td><td><b>关闭非核心功能</b>，把资源让给核心流程</td></tr>
+  </table>
+  <div class="callout">
+    <b>一句话区分：</b>限流是"控制进来的量"，熔断是"控制出去的量"，降级是"控制提供服务的质量"。三者共同构成服务的<b>自我保护层</b>。没有自我保护的系统，一个慢依赖就能把所有线程占满，最后谁都用不了。
+  </div>
+  <h4>典型时序：一次大促故障中三者的协作</h4>
+  <pre><span class="c"># 0ms    大促开始，QPS 从 2,000 涨到 15,000</span>
+<span class="c"># 50ms   网关限流发现超过单机 3,000 QPS 的配额 → 超出的请求返回 429 或排队</span>
+<span class="c"># 200ms  商品服务线程池使用率到 80% → 熔断器开始观察库存服务</span>
+<span class="c"># 600ms  库存服务错误率超 50% → 熔断器 Open，直接走兜底库存缓存</span>
+<span class="c"># 800ms  推荐服务（非核心）被降级开关关闭 → 线程和连接全部让给下单链路</span>
+<span class="c"># 30s    熔断器进入 Half-Open，放 20% 探测流量试库存服务</span>
+<span class="c"># 结果：下单成功率从 40% 恢复到 92%，但推荐位显示"暂时不可用"</span></pre>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>四种限流算法的真实缺陷</h2></div>
+  <p class="lead">面试都会背，但线上选错算法的代价是：要么<b>临界点放过双倍流量</b>，要么<b>误杀正常突发</b>。</p>
+  <h3>固定窗口计数器（Counter Window）</h3>
+  <p>每秒一个计数器，归零重置。<b>问题在临界点</b>：限 100/s，如果第 1 秒的第 900ms 打满 100 个，第 2 秒的第 100ms 又打满 100 个，<b>200ms 内实际放过了 200 个请求</b>，瞬时速率是额度的 2 倍。</p>
+  <pre><span class="c"># 单机版固定窗口（Redis，Lua 保证原子性）</span>
+<span class="b">local</span> c = redis.call(<span class="g">'INCR'</span>, KEYS[1])
+<span class="b">if</span> c == 1 <span class="b">then</span>
+  redis.call(<span class="g">'EXPIRE'</span>, KEYS[1], 1)   <span class="c">-- 窗口 1 秒</span>
+<span class="b">end</span>
+<span class="b">if</span> c &gt; tonumber(ARGV[1]) <span class="b">then</span> <span class="b">return</span> 0 <span class="b">end</span>
+<span class="b">return</span> 1
+<span class="c"># 调用：EVAL script 1 rate:api:search 100</span>
+<span class="c"># 缺陷：临界突刺；且"过期"依赖 EXPIRE，Redis 惰性删除会让计数多存活一小会儿</span></pre>
+
+  <h3>滑动窗口（Sliding Window）</h3>
+  <p>把窗口切成小格（如 1 秒切 10 格，每格 100ms），统计最近 N 格的总数。Sentinel 的默认统计就是滑动窗口（<span class="k">LeapArray</span>，默认 2 个桶）。<b>消除了临界突刺，代价是内存和时间精度</b>。</p>
+  <table>
+    <tr><th style="width:170px">实现方式</th><th style="width:200px">做法</th><th>适用</th></tr>
+    <tr><td><b>分格滑动窗口</b></td><td>1s 切 N 个小桶，统计最近 N 桶总和</td><td>绝大多数业务限流，Sentinel / Guava RateLimiter 都走这个思路</td></tr>
+    <tr><td><b>ZSet 滑动窗口</b></td><td>score 存毫秒时间戳，<span class="k">ZREMRANGEBYSCORE</span> 滑出旧数据后 <span class="k">ZCARD</span> 计数</td><td>需要精确到每一次请求、分布式场景</td></tr>
+    <tr><td><b>TCP 式滑动窗口</b></td><td>字节流级别的连续窗口</td><td>传输层协议，业务限流用不到</td></tr>
+  </table>
+  <pre><span class="c"># Redis ZSet 精确滑动窗口限流（Lua）</span>
+<span class="b">local</span> now = redis.call(<span class="g">'TIME'</span>)[1] * 1000   <span class="c">-- 毫秒时间戳</span>
+<span class="b">local</span> key = KEYS[1]
+<span class="b">local</span> window = tonumber(ARGV[1])   <span class="c">-- 窗口毫秒，如 1000</span>
+<span class="b">local</span> limit = tonumber(ARGV[2])    <span class="c">-- 配额，如 100</span>
+redis.call(<span class="g">'ZREMRANGEBYSCORE'</span>, key, 0, now - window)   <span class="c">-- 滑出过期请求</span>
+<span class="b">local</span> cnt = redis.call(<span class="g">'ZCARD'</span>, key)
+<span class="b">if</span> cnt &gt;= limit <span class="b">then return</span> 0 <span class="b">end</span>
+redis.call(<span class="g">'ZADD'</span>, key, now, now .. <span class="y">':'</span> .. math.random())
+redis.call(<span class="g">'PEXPIRE'</span>, key, window)
+<span class="b">return</span> 1
+<span class="c"># 代价：每个请求在 ZSet 里留一条记录。1万 QPS × 1000 配额 = 100万元素常驻，内存和 O(N) 清理要考虑</span></pre>
+
+  <h3>漏桶（Leaky Bucket）</h3>
+  <p>请求进水，<b>恒定速率出水</b>，桶满则溢出（拒绝）。特点：<b>输出绝对平滑</b>，但不允许任何突发——哪怕下游此刻很空闲，流量也必须排队匀速通过。适合"保护脆弱下游"（如对接第三方 API、写数据库），不适合"保护自己"。</p>
+
+  <h3>令牌桶（Token Bucket）</h3>
+  <p>恒定速率往桶里放令牌，请求拿到令牌才能通过，<b>桶满则令牌丢弃</b>。特点：<b>允许突发</b>（攒下的令牌可以一次用掉），长期速率被严格限制。Sentinel 的 <span class="k">FlowRule</span> 支持 <span class="k">controlBehavior = rate_limiter</span>（匀速排队，漏桶思想）和默认的 <span class="k">default</span>（快速失败，令牌桶思想）。</p>
+  <table>
+    <tr><th style="width:150px">算法</th><th style="width:120px">突发容忍</th><th style="width:130px">输出平滑度</th><th>典型问题</th></tr>
+    <tr><td><b>固定窗口</b></td><td>差（临界 2 倍）</td><td>不平滑</td><td>临界突刺放过双倍流量</td></tr>
+    <tr><td><b>滑动窗口</b></td><td>好</td><td>较平滑</td><td>统计开销、内存</td></tr>
+    <tr><td><b>漏桶</b></td><td>无（强制排队）</td><td>绝对平滑</td><td>误杀正常突发；队列积压导致延迟</td></tr>
+    <tr><td><b>令牌桶</b></td><td>好（吃存量令牌）</td><td>长期平滑</td><td>桶深度设置不当等于没限流</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>选型经验：</b>面向 C 端用户、要防刷 → <b>滑动窗口</b>（Sentinel 默认即可）；保护脆弱下游、写库 → <b>漏桶/匀速排队</b>；对延迟敏感又允许秒杀突发 → <b>令牌桶</b>。别在网关用固定窗口扛大促流量。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>分布式限流：GCRA 与 CRDT 两条路线</h2></div>
+  <p class="lead">单机限流数内存即可，分布式限流必须依赖共享存储（Redis）或节点间协商。这里有两条学术和工程都验证过的路线。</p>
+
+  <h3>GCRA（Generic Cell Rate Algorithm，通用信元率算法）</h3>
+  <p>这是 <b>Google Cloud Armor</b> 限流功能使用的核心算法，也是 ATM 网络里做流量整形的老算法。它不用"数窗口内的请求数"，而是维护一个<b>理论到达时间（Theoretical Arrival Time, TAT）</b>：</p>
+  <pre><span class="c"># GCRA 核心逻辑（IETF RFC 7003 描述的连续状态模型）</span>
+<span class="c"># 每条限流规则定义：emission_interval（发射间隔，= 1/速率）+ tolerance（容忍突发量）</span>
+<span class="c">#</span>
+<span class="c"># 新请求到达，current_time 时刻：</span>
+<span class="c">#   if current_time &lt; TAT - tolerance:  拒绝（来太早，桶里没配额了）</span>
+<span class="c">#   else: 放行，并更新 TAT = max(TAT, current_time) + emission_interval</span>
+<span class="c">#</span>
+<span class="c"># 特点：</span>
+<span class="c"># 1. 只需要维护一个浮点数 TAT，不存任何请求记录 → 内存 O(1) 而非 O(请求数)</span>
+<span class="c"># 2. 天然支持"平滑度 + 突发容忍"两个参数，等价于带突发限制的令牌桶</span>
+<span class="c"># 3. 精度不受时钟回拨影响（如果用单调时钟）</span></pre>
+  <div class="callout ok">
+    <b>工程意义：</b>ZSet 滑动窗口要为每个请求存一条记录，10 万 QPS 下 Redis 内存和清理成本很高；GCRA 每条规则只存一个 TAT 值。<b>超大规模限流（网关层、云厂商产品）优先 GCRA 类算法</b>。Google Cloud Armor 的 rate limit threshold + ban duration 就是基于它实现的。
+  </div>
+
+  <h3>CRDT 限流（无主协商的分布式限流）</h3>
+  <p>思路：放弃"强一致的全局计数"，让<b>每个节点本地计数</b>，节点间通过 gossip 或 Redis 定期合并，用 <b>CRDT（无冲突复制数据类型）</b> 保证合并结果收敛。</p>
+  <table>
+    <tr><th style="width:160px">CRDT 类型</th><th style="width:200px">合并语义</th><th>限流效果</th></tr>
+    <tr><td><b>PN-Counter（增减计数器）</b></td><td>每节点维护 +N/-N 两个集合，合并取并集求和</td><td>精确全局计数，但合并开销随节点数增长</td></tr>
+    <tr><td><b>G-Counter（只增计数器）</b></td><td>每节点一个自增值，合并取 max</td><td>限流常用。可能<b>重复计数</b>（节点 A 已同步的增量又被算一次）</td></tr>
+    <tr><td><b>LWW-Register</b></td><td>最后写入者获胜（按时间戳）</td><td>只保留最新快照，适合低频同步</td></tr>
+  </table>
+  <p><b>代价与收益：</b>CRDT 限流的精度是"最终收敛"，合并周期内各节点配额是过配的（over-admission）。例如全局限 10,000 QPS、20 个节点、5 秒合并一次：每个节点在合并周期内按 10,000/20=500 本地配额执行，极端情况下全局瞬时可达 10,000 + 19×500 = 19,500。<b>所以 CRDT 限流必须把全局阈值调低（乘一个 0.7~0.9 的安全系数），用精度换可用性和零协调延迟。</b></p>
+  <div class="callout warn">
+    <b>什么时候用 CRDT 限流：</b>① Redis 不可用也不允许限流失效的场景（多活架构）；② 限流规则允许 10%~30% 过配；③ 节点数中等（&lt; 100）。<b>绝大多数公司用"Redis 集中计数 + 本地兜底配额"就够了</b>：Redis 正常走全局精确限流，Redis 挂了退化成本机限流（本地阈值 = 全局阈值 / 节点数），这是 Sentinel 集群限流的基础思路。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>限流层级：网关、应用、分布式怎么摆</h2></div>
+  <p class="lead">限流放在哪一层，决定了它保护的范围和误伤的半径。<b>原则：粗粒度放外层，细粒度放内层；外层保命，内层保公平。</b></p>
+  <table>
+    <tr><th style="width:120px">层级</th><th style="width:200px">典型实现</th><th style="width:170px">粒度</th><th>适用与注意</th></tr>
+    <tr><td><b>网关限流</b></td><td>Nginx <span class="k">limit_req</span>、Spring Cloud Gateway + RedisRateLimiter、Kong、Envoy</td><td>IP / 用户 / API 路径</td><td>第一道防线，挡恶意流量。<b>基于 IP 的要小心 NAT 出口误杀一整栋办公楼下单</b></td></tr>
+    <tr><td><b>应用限流</b></td><td>Sentinel <span class="k">SphU.entry</span>、Guava RateLimiter、Hystrix（舱壁）</td><td>接口 / 方法 / 用户 / 热点参数</td><td>贴近业务，能做差异化配额（VIP 双倍）。<b>单机限流不解决单节点热点</b></td></tr>
+    <tr><td><b>分布式限流</b></td><td>Redis + Lua、Sentinel 集群流控（Token Server）、GCRA 类实现</td><td>全局资源（总库存、总短信量）</td><td>保证全局总量不超。<b>Redis 成了新单点，要评估 Redis 故障时的降级策略</b></td></tr>
+    <tr><td><b>客户端/接入侧</b></td><td>SDK 内置退避、连接池上限</td><td>单客户端</td><td>防止自家客户端把自家服务打挂（重试风暴）</td></tr>
+  </table>
+  <h4>Nginx 网关限流配置（真实参数）</h4>
+  <pre><span class="c"># 1. 定义限流区：按客户端 IP，10MB 状态区约存 16 万个 IP 状态</span>
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=50r/s;
+
+<span class="c"># 2. 应用限流：burst=100 允许排队突发，nodelay 不延迟直接处理</span>
+location /api/ {
+    limit_req zone=api_limit burst=100 nodelay;
+    limit_req_status 429;
+    <span class="c"># 超过 burst 的请求直接 429，不排队（nodelay）</span>
+    <span class="c"># 不加 nodelay 时，超出部分按 rate 速率延迟处理，客户端会明显感到变慢</span>
+}
+
+<span class="c"># 3. 连接数限流（防慢连接攻击）</span>
+limit_conn_zone $binary_remote_addr zone=conn_limit:10m;
+limit_conn conn_limit 20;   <span class="c"># 单 IP 最多 20 个并发连接</span></pre>
+  <div class="callout warn">
+    <b>分层配额要相乘不要相加：</b>网关限 1,000 QPS、应用限 800 QPS，全局真实上限是 <b>min(1000, 800 × 节点数)</b>，不是 1000 + 800。配错方向（外层比内层松）会导致内层无限流可限、直接打满线程池。<b>外层配额应该 ≥ 内层单机配额 × 健康节点数，且留 10%~20% 余量给节点扩缩容抖动。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Sentinel 与 Hystrix 对比</h2></div>
+  <p class="lead">Hystrix 在 2016 年后基本停止大版本演进（官方明确不再添加新特性），Sentinel 是它的替代者。但两者设计哲学不同，不是简单的"新版 vs 旧版"。</p>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:270px">Hystrix（Netflix）</th><th>Sentinel（阿里）</th></tr>
+    <tr><td><b>核心理念</b></td><td>隔离：线程池隔离 + 信号量隔离，故障资源互相不占</td><td>流量控制：一切皆可配额化（流控、熔断、热点、系统自适应）</td></tr>
+    <tr><td><b>隔离手段</b></td><td>线程池隔离（默认，异步）、信号量隔离</td><td>信号量隔离（并发线程数控制），<b>没有线程池隔离</b></td></tr>
+    <tr><td><b>统计方式</b></td><td>滑动窗口（10 个桶 × 1s），基于 RxJava 响应式</td><td>滑动窗口（LeapArray，默认 2 桶 × 500ms）+ 多种统计结构</td></tr>
+    <tr><td><b>熔断判据</b></td><td>错误百分比、异常数；Closed/Open/Half-Open</td><td>慢调用比例、异常比例、异常数；同样三态</td></tr>
+    <tr><td><b>规则配置</b></td><td>代码写死或 Archaius 动态配置（无官方控制台）</td><td>动态数据源（Nacos / Apollo / ZK / Redis），<b>控制台实时改规则秒级生效</b></td></tr>
+    <tr><td><b>生态</b></td><td>Spring Cloud 官方集成（1.x 时代）</td><td>Spring Cloud Alibaba、Dubbo、gRPC、WebServlet 全适配</td></tr>
+    <tr><td><b>系统保护</b></td><td>无</td><td><b>系统自适应保护</b>：按 Load1 / CPU / RT / 线程数 / QPS 自动限流（BBR 思想）</td></tr>
+    <tr><td><b>性能开销</b></td><td>较高（线程切换、响应式装箱）</td><td>低（纯内存计数 + 无锁结构）</td></tr>
+  </table>
+  <pre><span class="c">// Sentinel 代码示例：资源 + 流控规则 + 熔断规则</span>
+<span class="b">public static void</span> initFlowRules() {
+    List&lt;FlowRule&gt; rules = <span class="b">new</span> ArrayList&lt;&gt;();
+    FlowRule rule = <span class="b">new</span> FlowRule(<span class="g">"createOrder"</span>)   <span class="c">// 资源名</span>
+        .setCount(800)          <span class="c">// 单机阈值 800 QPS</span>
+        .setGrade(RuleConstant.FLOW_GRADE_QPS)
+        .setStrategy(RuleConstant.STRATEGY_CHAIN)   <span class="c">// 关联流控：入口是 /order/create 才限</span>
+        .setControlBehavior(RuleConstant.CONTROL_BEHAVIOR_RATE_LIMITER); <span class="c">// 匀速排队</span>
+    rules.add(rule);
+    FlowRuleManager.loadRules(rules);
+}
+
+<span class="c">// 熔断规则：慢调用比例超 30% 且 RT 超 200ms，持续 10s → 熔断 10s</span>
+DegradeRule dr = <span class="b">new</span> DegradeRule(<span class="g">"queryStock"</span>)
+    .setGrade(CircuitBreakerStrategy.SLOW_REQUEST_RATIO.getType())
+    .setCount(0.3)               <span class="c">// 阈值 30%</span>
+    .setSlowRatioThreshold(200)  <span class="c">// RT 大于 200ms 算慢调用（ms）</span>
+    .setMinRequestAmount(20)     <span class="c">// 最少 20 个请求才评估，防止低流量误判</span>
+    .setStatIntervalMs(10000)    <span class="c">// 统计窗口 10s</span>
+    .setTimeWindow(10);          <span class="c">// 熔断持续 10s 后进入 Half-Open</span>
+DegradeRuleManager.loadRules(Collections.singletonList(dr));
+
+<span class="c">// 使用：try-with-resources 包裹受保护调用</span>
+<span class="b">try</span> (Entry entry = SphU.entry(<span class="g">"createOrder"</span>)) {
+    <span class="c">// 业务逻辑</span>
+} <span class="b">catch</span> (BlockException e) {
+    <span class="c">// 被限流/熔断/系统保护，走兜底</span>
+    <span class="b">return</span> fallback();
+}</pre>
+  <div class="callout ok">
+    <b>选型结论：</b>新项目直接 <b>Sentinel</b>。但注意 Sentinel 用信号量隔离而非线程池隔离：<b>好处是无线程切换开销，坏处是被保护的依赖如果同步阻塞，当前线程仍然被占住</b>。所以"超时设置"必须配（Sentinel 的熔断规则本身要求 RT 阈值，业务代码里也要有 <span class="k">RestTemplate</span>/Feign 的 connect/read timeout），否则隔离形同虚设。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>熔断器状态机与工程实现</h2></div>
+  <p class="lead">熔断器只有三个状态，但每个状态的<b>进入条件、退出条件、探测策略</b>决定了它是"救火队员"还是"事故放大器"。</p>
+  <table>
+    <tr><th style="width:110px">状态</th><th style="width:200px">行为</th><th>进入条件</th></tr>
+    <tr><td><b>Closed 关闭</b></td><td>正常放行所有请求，后台持续统计错误率/慢调用</td><td>初始状态；或 Half-Open 探测成功后回到此态</td></tr>
+    <tr><td><b>Open 打开</b></td><td><b>所有请求直接失败</b>（或走 fallback），不调用下游，持续一个时间窗</td><td>统计窗口内错误率/慢调用比例超过阈值（如 50% / 30%）</td></tr>
+    <tr><td><b>Half-Open 半开</b></td><td>放行<b>少量探测请求</b>，成功若干次则 Closed，失败则回 Open</td><td>Open 状态持续时间窗结束后自动进入</td></tr>
+  </table>
+  <pre><span class="c"># 状态机文字版（对应 Resilience4j / Sentinel 行为）</span>
+<span class="g">Closed</span> ──错误率>50% 持续10s──▶ <span class="r">Open</span> ──10s 后──▶ <span class="y">Half-Open</span>
+  ▲                                  │                      │
+  │                                  │                      ├─ 探测成功 → Closed
+  └────────── 探测全部成功 ◀─────────┘                      └─ 探测失败 → Open</pre>
+  <h4>核心参数（Resilience4j CircuitBreaker 为例）</h4>
+  <pre><span class="c"># application.yml 真实配置项</span>
+resilience4j.circuitbreaker.instances.stockService:
+  slidingWindowType: COUNT_BASED      <span class="c"># COUNT_BASED 或 TIME_BASED</span>
+  slidingWindowSize: 50               <span class="c"># 按数量：最近 50 次调用；按时间：最近 50 秒</span>
+  minimumNumberOfCalls: 20            <span class="c"># 至少 20 次调用才评估，防低流量误判（关键！）</span>
+  failureRateThreshold: 50            <span class="c"># 失败率超 50% 触发熔断</span>
+  slowCallRateThreshold: 30           <span class="c"># 慢调用（RT>1s）比例超 30% 也触发</span>
+  slowCallDurationThreshold: 1s       <span class="c"># RT 超过 1s 算慢调用</span>
+  waitDurationInOpenState: 10s        <span class="c"># Open 状态持续 10s 后进 Half-Open</span>
+  permittedNumberOfCallsInHalfOpenState: 10  <span class="c"># Half-Open 放 10 个探测请求</span>
+  automaticTransitionFromOpenToHalfOpenEnabled: <span class="b">true</span></pre>
+  <div class="callout danger">
+    <b>最容易犯的三个熔断错误：</b><br>
+    ① <b>没有 minimumNumberOfCalls</b>：凌晨低峰期 5 个请求挂了 3 个就熔断，然后把全部流量打给 fallback，fallback 也挂 → 级联故障。<br>
+    ② <b>fallback 又去调同一个故障下游</b>：熔断是为了不调用它，fallback 里写"重试一次库存服务"，等于熔断白做。<br>
+    ③ <b>Half-Open 探测流量太大</b>：Open 10s 后一次性放进全部真实流量，下游还没恢复又被冲垮。探测请求要小（5~10 个），且最好优先用健康检查类轻量请求。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>降级策略：兜底数据与功能开关</h2></div>
+  <p class="lead">降级不是"出错就返回 null"。好的降级是<b>提前设计好的、分级的、可演练的</b>服务能力收缩方案。</p>
+  <h3>四级降级策略</h3>
+  <table>
+    <tr><th style="width:130px">级别</th><th style="width:220px">做法</th><th>适用场景</th></tr>
+    <tr><td><b>L1 兜底数据</b></td><td>返回缓存/静态默认值（如默认商品图、"稍后重试"提示）</td><td>推荐位、评论数、库存数量等非关键字段异常</td></tr>
+    <tr><td><b>L2 功能裁剪</b></td><td>关闭非核心功能（推荐、足迹、积分计算）</td><td>CPU/线程紧张，保核心下单/支付链路</td></tr>
+    <tr><td><b>L3 异步化</b></td><td>同步改异步（下单后优惠券计算改消息队列），削峰</td><td>写下游压力大，允许最终一致</td></tr>
+    <tr><td><b>L4 只读/维护页</b></td><td>全站只读或静态化，引导去 App/小程序</td><td>核心链路全面故障，止损</td></tr>
+  </table>
+  <h3>兜底数据的三种来源</h3>
+  <pre><span class="c"># 1. 本地缓存兜底（最快，允许陈旧）</span>
+<span class="c">// 定时任务每 30s 刷新一次商品基础信息到 Caffeine，RPC 挂了用本地副本</span>
+Product p = localCache.get(id);
+<span class="b">if</span> (p == <span class="b">null</span>) p = remoteService.get(id);   <span class="c">// 本地没有再走远程</span>
+
+<span class="c"># 2. 静态配置兜底（零依赖）</span>
+<span class="c">// 兜底文案、默认排序、降级开关的初始值都写在配置文件里，不依赖任何存储</span>
+<span class="c">// 关键：兜底数据本身必须"永远可用"，不能兜底数据也要查数据库</span>
+
+<span class="c"># 3. 降级开关（动态，秒级生效）</span>
+<span class="c">// 接入配置中心（Nacos/Apollo），事故中一键关闭功能，不用发版</span>
+<span class="b">boolean</span> recommendOn = configCenter.getBoolean(<span class="g">"feature.recommend.enabled"</span>, <span class="b">true</span>);
+<span class="b">if</span> (!recommendOn) <span class="b">return</span> emptyRecommendList();   <span class="c">// 直接返回空，不打下游</span></pre>
+  <div class="callout ok">
+    <b>降级开关的三条纪律：</b>① <b>默认值必须是"开"</b>——配置中心挂了，功能默认可用，而不是默认全站降级；② <b>开关要能按用户维度灰度</b>（先给 1% 用户关推荐，观察核心指标不掉再全量）；③ <b>每次大促前演练一遍</b>——没演练过的降级开关，第一次用一定是反向操作（把正常功能关了）。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>热点参数限流</h2></div>
+  <p class="lead">接口级限流解决"总量"，但秒杀场景的流量<b>高度集中在一个参数值上</b>：商品 A 占 90% 流量，接口级限 1000 QPS 对它毫无意义，商品 B 却被误伤。</p>
+  <p>Sentinel 的<b>热点参数限流</b>（Param Flow）对方法的某个参数值单独计数：</p>
+  <pre><span class="c">// 热点规则：第 0 个参数（商品ID）单机每秒最多 100 次</span>
+<span class="c">// 但给"爆款商品"单独开 1000 的例外配额（paramIdx=0, paramValue=SKU_12345）</span>
+ParamFlowRule rule = <span class="b">new</span> ParamFlowRule(<span class="g">"getSkuDetail"</span>)
+    .setParamIdx(0)                    <span class="c">// 对第 0 个参数限流</span>
+    .setCount(100)                     <span class="c">// 每个参数值默认 100 QPS</span>
+    .setDurationInSecond(1);
+ParamFlowRule exception = <span class="b">new</span> ParamFlowRule(<span class="g">"getSkuDetail"</span>)
+    .setParamIdx(0).setCount(1000)
+    .setParamValue(<span class="g">"SKU_12345"</span>);   <span class="c">// 爆款商品单独配额</span>
+<span class="c">// 实际效果：普通商品 100 QPS，SKU_12345 走 1000 QPS 的独立令牌桶</span></pre>
+  <table>
+    <tr><th style="width:170px">场景</th><th>做法</th></tr>
+    <tr><td><b>单参数热点</b></td><td>Sentinel ParamFlow，对参数值独立计数 + 例外配额</td></tr>
+    <tr><td><b>热点 key 打缓存</b></td><td>Redis 热 key 本地缓存（应用内缓存热 key，读多写少的数据）</td></tr>
+    <tr><td><b>热点 key 分片</b></td><td>把 key 复制 N 份（key1~keyN），请求随机打其中一片，读时合并</td></tr>
+    <tr><td><b>全局热点</b></td><td>Redis 侧对热点参数值单独计数（<span class="k">token:sku:12345</span> 独立 key）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>热点限流的代价：</b>每个参数值一路独立计数，内存和统计开销随参数基数线性增长。10 万个 SKU 各一个桶，Sentinel 的 <span class="k">ParamMetric</span> 会有可感知的 GC 压力。<b>参数基数大（如 userId 级别）时，改用"统计 + 动态发现"：平时只统计，发现某个参数值占比突增（如超过总量 20%）再动态创建限流桶。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>与 WAF、业务风控的关系</h2></div>
+  <p class="lead">三者都在"拒绝请求"，但拒绝的对象和依据完全不同。<b>搞混的后果：用限流挡爬虫（挡不干净），用风控挡正常突发（误伤用户）。</b></p>
+  <table>
+    <tr><th style="width:110px">体系</th><th style="width:190px">拒绝依据</th><th style="width:150px">判断对象</th><th>典型实现</th></tr>
+    <tr><td><b>WAF</b></td><td>请求内容特征（SQL 注入、XSS、恶意 UA、已知攻击载荷）</td><td>单个请求本身</td><td>ModSecurity、阿里云 WAF、AWS WAF（匹配规则 + 速率规则）</td></tr>
+    <tr><td><b>限流</b></td><td>速率 / 并发量超配额</td><td>请求的"量"，不管内容</td><td>网关 limit_req、Sentinel、Redis 计数</td></tr>
+    <tr><td><b>业务风控</b></td><td>行为模式异常（异地登录、批量注册、薅羊毛、撞库）</td><td>用户/设备/会话的长期行为</td><td>规则引擎 + 设备指纹 + 名单 + 模型评分</td></tr>
+  </table>
+  <h4>一条请求的完整检查链</h4>
+  <pre><span class="c">请求 → CDN/WAF（内容特征、IP 信誉）</span>
+      → 网关限流（速率配额，全局总量保护）</span>
+      → 业务网关（登录态、权限）</span>
+      → 业务风控（行为识别：这个用户 1 分钟内领了 5 张券？设备集群？）</span>
+      → 应用层限流（接口级、热点参数级）</span>
+      → 熔断/降级（依赖异常时自我保护）</span>
+      → 业务逻辑</pre>
+  <div class="callout">
+    <b>边界划分建议：</b>WAF 挡"明显的恶意报文"，限流挡"量"，风控挡"伪装成正常用户的异常行为"。<b>限流拒绝时返回 429 带 Retry-After 头；WAF/风控拒绝时返回 403 且不带细节</b>（不告诉攻击者为什么被拦）。风控判定"黑名单用户"后，应该由风控系统<b>通知限流系统</b>对其降配额，而不是各判各的。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">限流阈值拍脑袋定（"先限 1000 吧"）</div><div class="pd">正确姿势：阈值 = 单机压测容量 × 0.7，再按历史峰值系数验证。没压测过的数字，大促当天就是第一个倒下的。改一次阈值要能说清"依据是哪个压测报告的哪个数"。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">网关按 IP 限流，误杀 NAT 后的一整个园区</div><div class="pd">学校、公司、移动网络共用出口 IP，单 IP QPS 轻松上千。按 IP 限流必须叠加：登录用户优先按 userId 限流，IP 限流阈值放宽且只挡明显异常。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">熔断没有最小请求量阈值，低峰期误触</div><div class="pd">半夜 5 个请求挂 3 个，错误率 60%，熔断打开，fallback 又去打同一个下游，故障扩散。必须配 minimumNumberOfCalls（如 20）和 minimumRequestAmount。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">熔断的 fallback 里重试同一个故障下游</div><div class="pd">熔断的意义就是"别调用它"。fallback 只能走：本地缓存、静态默认值、读副本、返回友好错误。任何对故障依赖的重试都是负优化。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">级联限流：一层拒绝引发下一层流量放大</div><div class="pd">网关 429 后客户端立即重试，重试流量再次触发 429，循环放大；或者上游限流后大量请求涌入降级链路，把兜底缓存服务也压垮。限流必须配合客户端退避（指数退避 + jitter）和兜底链路自己的限流。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">限流后直接返回 500 或空页面，用户体验崩了</div><div class="pd">正确姿势：返回 429 + Retry-After 秒数；页面显示"当前排队人数较多，预计 5 秒后可试"；能排队的场景（下单）进入等待页而不是拒绝。限流是保护系统，不是把用户拒之门外。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">分布式限流把 Redis 打成了瓶颈</div><div class="pd">每个请求都去 Redis INCR，Redis 变成全链路最忙的组件，网络 RTT 和 Redis 单线程反而成为瓶颈。对策：本地批量预取（一次取 100 个配额本地消耗）、GCRA 类 O(1) 算法、只对核心接口走全局限流。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">熔断打开期间，正常用户请求全部失败且没有任何提示</div><div class="pd">熔断是内部机制，对用户应该表现为"服务降级中"（少了推荐位、库存显示"查询中"），而不是全盘报错。要把熔断状态和降级策略联动，而不是各写各的。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">Sentinel 集群流控的 Token Server 单点故障导致限流失效</div><div class="pd">集群模式依赖 Token Server 分配全局配额，Server 挂了若客户端没有降级策略，限流直接失效流量裸奔。要给 Token Server 配高可用，并配置"Server 不可用时退化成本机限流"。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">限流/熔断规则从不复盘，一次配错全年受害</div><div class="pd">每次触发限流/熔断都要记录：触发时间、阈值、当时 QPS、拒绝量、影响用户数。每季度复盘一次阈值是否还合理。规则是活的，业务涨了 10 倍，阈值还是去年那个数，就是隐患。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="0">
+      <div class="qt">1. 固定窗口限流"限 100 QPS"，在第 1 秒最后 100ms 和第 2 秒前 100ms 各通过 100 个请求。这说明固定窗口的缺陷是？</div>
+      <button class="opt">临界突刺：短时间内容许接近 2 倍额度的流量通过</button>
+      <button class="opt">无法统计准确速率</button>
+      <button class="opt">内存占用过高</button>
+      <div class="ans">正确答案：<b>临界突刺</b>。固定窗口在窗口边界处可能放过接近双倍流量，滑动窗口通过细分桶统计最近 N 个桶来消除这个问题。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 需要对接一个脆弱的第三方 API，对方要求"请求速率必须严格匀速，不允许任何突发"，应该选？</div>
+      <button class="opt">令牌桶，因为它允许合理突发</button>
+      <button class="opt">固定窗口，实现最简单</button>
+      <button class="opt">漏桶，输出绝对平滑</button>
+      <div class="ans">正确答案：<b>漏桶</b>。漏桶以恒定速率出水，不允许任何突发，适合保护脆弱下游。令牌桶允许吃掉存量令牌形成突发，反而不适合此场景。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. Sentinel 相比 Hystrix 的核心设计差异是？</div>
+      <button class="opt">Sentinel 用线程池隔离，Hystrix 用信号量隔离</button>
+      <button class="opt">Sentinel 以流量控制为核心（配额化一切），Hystrix 以隔离为核心（线程池/信号量舱壁）</button>
+      <button class="opt">两者设计完全相同，只是 Sentinel 更新</button>
+      <div class="ans">正确答案：<b>Sentinel 流量控制为核心，Hystrix 隔离为核心</b>。另外 Sentinel 支持系统自适应保护、动态数据源实时下发规则，Hystrix 2016 年后基本停止演进。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于熔断器 Half-Open 状态，哪种做法是对的？</div>
+      <button class="opt">放 5~10 个探测请求，成功则 Closed、失败则回 Open</button>
+      <button class="opt">Open 持续 10s 后直接放全部真实流量</button>
+      <button class="opt">Half-Open 期间永久保持放行一半流量</button>
+      <div class="ans">正确答案：<b>放少量探测请求</b>。一次性放全部流量可能把刚恢复的下游再次冲垮，导致反复熔断。探测要小而轻。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. GCRA 算法相比 ZSet 滑动窗口的核心优势是？</div>
+      <button class="opt">统计更精确，能记录每次请求</button>
+      <button class="opt">实现更简单，不需要任何状态</button>
+      <button class="opt">每条规则只维护一个 TAT 浮点数，内存 O(1) 而非 O(请求数)，适合超大规模</button>
+      <div class="ans">正确答案：<b>只维护一个理论到达时间 TAT</b>。ZSet 滑动窗口要为每个请求存一条记录，海量 QPS 下内存和清理成本高。GCRA 正是 Google Cloud Armor 使用的算法。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 网关限流配 1000 QPS、应用限流配 800 QPS × 3 节点，全局实际上限是？</div>
+      <button class="opt">3400 QPS，两层相加</button>
+      <button class="opt">2400 QPS，受应用层约束，网关层应略大于 2400 留余量</button>
+      <button class="opt">1000 QPS，受网关层约束</button>
+      <div class="ans">正确答案：<b>2400 QPS（min 约束）</b>。分层限流是取 min 不是相加。外层配额应 ≥ 内层单机配额 × 健康节点数并留 10%~20% 余量，否则内层会先满、外层形同虚设。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查配置与命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>limit_req_zone $binary_remote_addr zone=x:10m rate=50r/s</code><span class="desc">Nginx 定义限流区（10MB 约 16 万 IP）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>limit_req zone=x burst=100 nodelay</code><span class="desc">应用限流：允许 100 排队突发且不延迟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>limit_conn addr 20</code><span class="desc">单 IP 并发连接上限，防慢连接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SphU.entry("resource")</code><span class="desc">Sentinel 受保护调用入口，BlockException 走兜底</span><button class="copy">复制</button></div>
+    <div class="crow"><code>FlowRule.setCount(800).setGrade(QPS)</code><span class="desc">Sentinel 接口级流控：800 QPS</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CONTROL_BEHAVIOR_RATE_LIMITER</code><span class="desc">Sentinel 匀速排队模式（漏桶思想）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>DegradeRule SLOW_REQUEST_RATIO 0.3</code><span class="desc">慢调用比例超 30% 触发熔断</span><button class="copy">复制</button></div>
+    <div class="crow"><code>setMinRequestAmount(20)</code><span class="desc">熔断最少评估请求数，防低流量误判</span><button class="copy">复制</button></div>
+    <div class="crow"><code>setParamIdx(0).setCount(100)</code><span class="desc">Sentinel 热点参数限流：按第 0 个参数单独计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZREMRANGEBYSCORE key 0 now-window</code><span class="desc">Redis ZSet 滑动窗口滑出旧请求</span><button class="copy">复制</button></div>
+    <div class="crow"><code>INCR + EXPIRE</code><span class="desc">固定窗口计数，注意临界突刺</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>阈值速查表</h3>
+  <table>
+    <tr><th style="width:200px">参数</th><th style="width:150px">推荐值</th><th>说明</th></tr>
+    <tr><td><b>单机限流阈值</b></td><td>压测容量 × 0.7</td><td>留 30% 给 GC、网络抖动、节点不均</td></tr>
+    <tr><td><b>熔断最小请求数</b></td><td>20~50 次</td><td>低于此不评估，防低峰误判</td></tr>
+    <tr><td><b>熔断错误率阈值</b></td><td>50%</td><td>核心支付链路可降到 30%</td></tr>
+    <tr><td><b>慢调用 RT 阈值</b></td><td>P99 的 2~3 倍</td><td>基于历史基线定，别拍脑袋</td></tr>
+    <tr><td><b>Open 持续时间</b></td><td>10~60s</td><td>短了反复熔断，长了恢复慢</td></tr>
+    <tr><td><b>Half-Open 探测数</b></td><td>5~10 个</td><td>小而轻，成功即恢复</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>限流 Rate Limiting</b></td><td>控制请求速率/并发量，超配额请求拒绝或排队</td></tr>
+    <tr><td><b>熔断 Circuit Breaking</b></td><td>下游故障时停止调用并快速失败，定期探测恢复</td></tr>
+    <tr><td><b>降级 Degradation</b></td><td>资源紧张时关闭非核心功能，保核心链路</td></tr>
+    <tr><td><b>固定窗口</b></td><td>按时间窗计数的限流，有临界突刺问题</td></tr>
+    <tr><td><b>滑动窗口</b></td><td>统计最近 N 个小桶，消除临界突刺</td></tr>
+    <tr><td><b>漏桶 Leaky Bucket</b></td><td>恒定速率出水，不允许突发，输出绝对平滑</td></tr>
+    <tr><td><b>令牌桶 Token Bucket</b></td><td>攒令牌允许突发，长期速率受限</td></tr>
+    <tr><td><b>GCRA</b></td><td>通用信元率算法，维护 TAT 一个值实现限流，Google Cloud Armor 在用</td></tr>
+    <tr><td><b>TAT</b></td><td>理论到达时间，GCRA 中判断请求是否合规的依据</td></tr>
+    <tr><td><b>CRDT 限流</b></td><td>各节点本地计数 + 无冲突合并，牺牲精度换零协调</td></tr>
+    <tr><td><b>Closed/Open/Half-Open</b></td><td>熔断器三态：正常 / 全部失败 / 探测恢复</td></tr>
+    <tr><td><b>舱壁隔离 Bulkhead</b></td><td>线程池/信号量隔离，防止一个依赖耗尽所有资源</td></tr>
+    <tr><td><b>热点参数限流</b></td><td>对接口某个参数值单独计数限流，防单 SKU 打爆</td></tr>
+    <tr><td><b>fallback</b></td><td>被限流/熔断后的兜底逻辑，只能用缓存或静态值</td></tr>
+    <tr><td><b>429</b></td><td>限流拒绝的标准状态码，应带 Retry-After 头</td></tr>
+    <tr><td><b>WAF</b></td><td>Web 应用防火墙，按请求内容特征拦截攻击</td></tr>
+    <tr><td><b>业务风控</b></td><td>按用户行为模式识别异常（薅羊毛、撞库、批量注册）</td></tr>
+    <tr><td><b>系统自适应保护</b></td><td>Sentinel 按 Load/CPU/RT 自动限流的能力</td></tr>
+    <tr><td><b>级联限流</b></td><td>一层拒绝引发重试风暴和下游放大的雪崩效应</td></tr>
+    <tr><td><b>指数退避</b></td><td>客户端重试间隔指数增长并加随机抖动，防同步重试</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 Sentinel 给一个接口配 100 QPS 限流，用 JMeter 打到 200 QPS 观察拒绝比例；② 给下游调用配慢调用熔断，用 WireMock 模拟 3 秒延迟验证 Half-Open 行为；③ 在 Nginx 里配 <span class="k">limit_req</span> 压测边界突刺；④ 画一张自己系统的"请求检查链"图，标出 WAF/限流/风控各自的边界。<br><br>
+    <b>之后值得单独学：</b>全链路压测中的流量染色与限流协同、多活架构下的限流配额分配、以及基于 BBR 思想的系统自适应限流。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透限流熔断与降级 · 上线前务必确认：阈值有压测依据、熔断有最小请求量、fallback 不碰故障下游</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（Sentinel vs Hystrix）和模块 5（熔断状态机）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照你项目的限流配置。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议打开你项目的网关配置对照着看：阈值是谁定的？依据是什么？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

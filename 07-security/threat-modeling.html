@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透威胁建模</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 安全篇 · 第 1 期 · 高密度版</span>
+    <h1>二十分钟学透威胁建模</h1>
+    <p class="sub">威胁建模不是"画个图"，是<b>在设计阶段用系统化的方法回答"敌人会怎么打我们"</b>。这篇讲透 STRIDE、DFD、四种方法论、四步流程，以及一个电商下单链路的完整案例。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 类 STRIDE 威胁</span>
+      <span class="chip"><b>5</b> 个 DFD 要素</span>
+      <span class="chip"><b>4</b> 种方法论</span>
+      <span class="chip"><b>10</b> 个常见坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边在纸上画你自己系统的 DFD，画不出来就是没想清楚。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先装两个工具，后面直接跟着画</h2></div>
+  <p class="lead">威胁建模的主流工具都是免费的，本篇的命令和配置以当前官方文档为准。</p>
+  <div class="cmds">
+    <div class="crow"><code>OWASP Threat Dragon</code><span class="desc">开源桌面/Web 应用，画 DFD + 内置 STRIDE 威胁规则库，支持 JSON 模型文件（可进 Git 做版本管理）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Microsoft Threat Modeling Tool</code><span class="desc">Windows 桌面工具，模板化建模（自动根据元素类型生成对应 STRIDE 威胁清单），适合企业流程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pytm</code><span class="desc">Python 写威胁模型（代码即模型），适合把威胁模型纳入代码库和 CI</span><button class="copy">复制</button></div>
+    <div class="crow"><code>threagile</code><span class="desc">YAML 描述架构 → 自动生成风险报告，与 CI/CD 集成友好</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout">
+    <b>工具怎么选：</b>个人/小团队用 <b>Threat Dragon</b>（开源、跨平台、模型文件可版本化）；已在使用微软生态的团队用 <b>Microsoft TMT</b>；想把威胁模型当代码维护进仓库用 <b>pytm</b> 或 <b>threagile</b>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>威胁建模解决什么问题</h2></div>
+  <p class="lead">一句话：<b>在写代码之前，用结构化方法找出"我们这个系统可能被怎么打"，并决定每个风险是修、是缓、还是接受。</b></p>
+  <table>
+    <tr><th style="width:180px">阶段</th><th style="width:150px">发现漏洞的成本</th><th>典型手段</th></tr>
+    <tr><td><b>设计阶段</b></td><td>1x（改一张图）</td><td>威胁建模、架构评审</td></tr>
+    <tr><td><b>编码阶段</b></td><td>约 6.5x</td><td>SAST、代码评审</td></tr>
+    <tr><td><b>测试阶段</b></td><td>约 15x</td><td>DAST、渗透测试</td></tr>
+    <tr><td><b>上线后</b></td><td>约 30~100x</td><td>应急响应、漏洞修复、通报、赔偿</td></tr>
+  </table>
+  <p>上表是 IBM System Sciences Institute 的经典结论，具体倍数随行业不同有出入，但<b>量级关系稳定：越往后越贵</b>。一次线上数据泄露的平均成本（IBM《数据泄露成本报告》口径）在数百万美元级，而威胁建模本身是"白板 + 半天"的投入。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>没有威胁建模</div><div class="cd">架构定稿 → 开发 → 上线前渗透测试 → 发现"设计缺陷级"问题（如"所有接口都没鉴权"）→ 返工架构 → 延期</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>有威胁建模</div><div class="cd">架构评审时画出 DFD 和信任边界 → 发现"支付回调没有验签" → 设计上加 HMAC 验签 → 编码时直接实现</div></div>
+  </div>
+  <div class="callout warn">
+    <b>关键认知：威胁建模不产生"漏洞"，它产生"决策"。</b>每个被识别出的威胁，最终要么变成一条安全需求，要么变成一条明确记录在案的"接受风险"决策。只识别不决策的威胁建模是浪费时间。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>四种方法论</h2></div>
+  <table>
+    <tr><th style="width:150px">方法论</th><th style="width:190px">核心思路</th><th>适用场景</th></tr>
+    <tr><td><b>STRIDE 逐元素</b></td><td>对 DFD 里每个元素（外部实体/进程/数据存储/数据流）逐一过 6 类威胁</td><td><b>最主流。</b>微软提出，Threat Dragon / TMT 都内置。适合大多数业务系统</td></tr>
+    <tr><td><b>攻击树</b></td><td>以"攻击者的目标"为根节点，自顶向下分解达成路径（AND/OR 树）</td><td>高价值目标（支付、核心密钥），分析"要偷到数据有哪几条路，每条路怎么堵"</td></tr>
+    <tr><td><b>PASTA</b></td><td>七阶段风险中心流程：定义目标→定义技术范围→应用分解→威胁分析→漏洞分析→攻击建模→风险与影响分析</td><td>大型组织、需要把威胁建模和风险管理流程（ISO 31000 等）对齐时</td></tr>
+    <tr><td><b>风险矩阵</b></td><td>按"可能性 × 影响"给威胁定级（低/中/高/严重）</td><td>不是独立方法论，是<b>优先级排序工具</b>，通常叠加在前三者之上用</td></tr>
+  </table>
+  <h3>攻击树长什么样</h3>
+  <pre><span class="c"># 攻击树示例：目标是"获取用户订单数据"</span>
+获取订单数据 (OR)
+├── 直接查询数据库 (OR)
+│   ├── 窃取数据库账号密码           <span class="c"># 缓解：密钥管理、网络隔离</span>
+│   └── 利用 SQL 注入                 <span class="c"># 缓解：参数化查询、WAF</span>
+├── 调用订单接口 (AND)
+│   ├── 获得一个有效会话             <span class="c"># 缓解：强认证、异常检测</span>
+│   └── 绕过越权检查                 <span class="c"># 缓解：对象级授权校验（BOLA 防护）</span>
+└── 从备份/日志中恢复 (OR)
+    ├── 窃取备份文件                 <span class="c"># 缓解：备份加密、访问审计</span>
+    └── 日志中打印了敏感字段          <span class="c"># 缓解：日志脱敏</span>
+
+<span class="c"># 读法：OR 节点满足任一子节点即达成目标，AND 节点需要全部子节点。</span>
+<span class="c"># 用法：每一个叶子（攻击路径）都要有缓解措施，缓解后的残余风险进风险矩阵。</span></pre>
+  <div class="callout">
+    <b>PASTA 七阶段速记：</b>① 定义业务目标 ② 定义技术范围 ③ 应用分解（画 DFD）④ 威胁分析 ⑤ 漏洞分析 ⑥ 攻击建模 ⑦ 风险与影响分析。它本质上是把 STRIDE 嵌进了一个更大的企业风险管理流程，<b>对中小团队偏重，了解即可</b>。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>STRIDE 六类威胁与缓解映射</h2></div>
+  <p class="lead">STRIDE 是微软提出的威胁分类法，六类分别对应安全性的一个基本属性。记住<b>"伪造、篡改、抵赖、泄露、拒绝、提权"</b>六个词，再记对应的属性。</p>
+  <table>
+    <tr><th style="width:80px">类别</th><th style="width:120px">违反的属性</th><th style="width:240px">典型威胁</th><th>标准缓解</th></tr>
+    <tr><td><b>S</b> 伪装</td><td>认证</td><td>伪造身份登录、盗用 token、仿冒客户端</td><td>多因素认证、签名 token（JWT 验签）、mTLS、人机校验</td></tr>
+    <tr><td><b>T</b> 篡改</td><td>完整性</td><td>改价格、改库存、改支付回调、改日志</td><td>参数签名/HMAC、完整性校验、防重放（nonce+时间戳）、只读账户</td></tr>
+    <tr><td><b>R</b> 抵赖</td><td>不可否认性</td><td>"我没下单""我没授权"</td><td>审计日志（谁、何时、做了什么）、操作留痕、日志防篡改</td></tr>
+    <tr><td><b>I</b> 信息泄露</td><td>保密性</td><td>拖库、越权查他人订单、日志打印敏感字段</td><td>加密（传输 TLS、存储加密）、最小权限、脱敏、对象级鉴权</td></tr>
+    <tr><td><b>D</b> 拒绝服务</td><td>可用性</td><td>短信轰炸、刷接口、CC 攻击、资源耗尽</td><td>限流、配额、验证码、自动扩容、熔断降级</td></tr>
+    <tr><td><b>E</b> 权限提升</td><td>授权</td><td>普通用户访问管理接口、水平越权改他人数据</td><td>最小权限、RBAC/ABAC、水平/垂直越权校验、管理面隔离</td></tr>
+  </table>
+  <h3>STRIDE 与 DFD 元素的对应关系</h3>
+  <p>不是每个元素都适用全部六类。按元素类型套，能显著提高效率、减少漏项：</p>
+  <table>
+    <tr><th style="width:150px">DFD 元素</th><th>适用的 STRIDE 类别</th></tr>
+    <tr><td><b>外部实体</b><br>（用户、第三方系统）</td><td><b>S</b>（冒充外部实体）、<b>R</b>（抵赖）、<b>I</b>（泄露给不该看的实体）</td></tr>
+    <tr><td><b>进程</b><br>（API、服务、任务）</td><td><b>全部六类</b> —— 进程是分析重点</td></tr>
+    <tr><td><b>数据存储</b><br>（DB、缓存、对象存储）</td><td><b>T</b>、<b>I</b>、<b>D</b>、<b>R</b>（通常不直接讨论 S/E，除非存储被直接访问）</td></tr>
+    <tr><td><b>数据流</b><br>（请求/响应链路）</td><td><b>T</b>、<b>I</b>、<b>D</b>（重点：明文传输、无完整性校验的流）</td></tr>
+    <tr><td><b>信任边界</b><br>（内外网交界等）</td><td>跨边界的数据流默认<b>不可信</b>，重点审 S/T/I/E</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最容易被漏掉的三类：</b><b>R（抵赖）</b>——出纠纷时拿不出证据，金融、电商场景是刚需；<b>跨信任边界的数据流</b>——"内网服务互相调用不需要鉴权"是最常见的错误假设；<b>第三方集成的 T</b>——回调接口不验签等于给攻击者开后门。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>DFD 绘制五要素</h2></div>
+  <p class="lead">数据流图（Data Flow Diagram）是威胁建模的"地图"。五个要素，四个图形 + 一条线。</p>
+  <table>
+    <tr><th style="width:130px">要素</th><th style="width:150px">图形</th><th>说明与示例</th></tr>
+    <tr><td><b>外部实体</b><br>External Entity</td><td>矩形（或小人）</td><td>系统外的交互方：买家、运营人员、支付渠道、短信网关。<b>永远不受我们控制，默认不可信</b></td></tr>
+    <tr><td><b>进程</b><br>Process</td><td>圆形 / 圆角矩形</td><td>处理数据的组件：API 网关、订单服务、风控服务。<b>编号（如 P1、P2）便于威胁清单引用</b></td></tr>
+    <tr><td><b>数据存储</b><br>Data Store</td><td>两条平行横线</td><td>落盘的组件：MySQL、Redis、Kafka、对象存储、日志</td></tr>
+    <tr><td><b>数据流</b><br>Data Flow</td><td>带箭头的线</td><td>数据的流向与内容：HTTPS 请求、SQL 查询、MQ 消息。<b>标注协议和是否跨信任边界</b></td></tr>
+    <tr><td><b>信任边界</b><br>Trust Boundary</td><td>虚线框 / 虚线</td><td>两侧信任级别不同的分界：公网↔DMZ、DMZ↔内网、内网↔数据库区。<b>威胁建模的价值一半在信任边界上</b></td></tr>
+  </table>
+  <h3>一个最小 DFD 的 ASCII 示意</h3>
+  <pre><span class="c"># ===== 最小电商下单 DFD（自包含示意） =====</span>
+
+   ┌─────────┐        HTTPS        ┌──────────────┐
+   │  买家    │────────────────────▶│  API 网关     │ P1
+   │(外部实体)│◀────────────────────│  (进程)       │
+   └─────────┘       JSON/Token     └──────┬───────┘
+                                          │ 内部 RPC
+   ┌─────────┐       回调通知       ┌──────▼───────┐   ┌──────────┐
+   │ 支付渠道  │◀───────────────────▶│  支付服务     │──▶│ 订单库    │
+   │(外部实体)│   跨信任边界!        │  (进程) P2    │   │(数据存储)│
+   └─────────┘                      └──────────────┘   └──────────┘
+
+   ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ 信任边界：公网 │ 内网 ┄┄┄┄┄┄
+   买家、支付渠道回调在边界外；网关、支付服务、订单库在边界内
+
+<span class="c"># 画图规则：</span>
+<span class="c"># 1. 每个进程编号（P1/P2...），威胁清单按编号引用</span>
+<span class="c"># 2. 每条数据流标注协议和载荷（HTTPS/JSON/Token）</span>
+<span class="c"># 3. 数据流穿过信任边界的地方，画重点标记（最危险）</span></pre>
+  <div class="callout warn">
+    <b>DFD 不是部署图。</b>部署图回答"有几台机器、什么配置"；DFD 回答"<b>数据流经谁、存在哪、穿过哪些信任边界</b>"。把进程画成机器、把数据流画成网络链路，是最常见的画错方式。正确粒度：<b>一个进程 = 一个处理数据的逻辑组件</b>，哪怕它部署在 10 个 Pod 上。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>建模四步流程</h2></div>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>① 分解（Decompose）。</b>搞清楚"我们在保护什么、系统长什么样"。产出：资产清单（用户数据、订单、密钥）、DFD、信任边界清单、入口清单（所有对外开放的接口/端口/队列）。<b>常用提问："新人要黑这个系统，他会从哪进来？"</b></div></div>
+    <div class="step"><div class="txt"><b>② 识别（Identify）。</b>按方法论逐个元素过威胁。STRIDE 逐元素过；攻击树则从高价值资产倒推。产出：威胁清单，每条含 ID、所在元素、STRIDE 类别、描述、假设条件。</div></div>
+    <div class="step"><div class="txt"><b>③ 缓解（Mitigate）。</b>每条威胁选一种处理：<b>修复</b>（加验签、加鉴权）、<b>缓解</b>（WAF、限流降低成功率）、<b>转移</b>（保险、第三方合规）、<b>接受</b>（记录决策和理由）。每条必须落到<b>负责人和期限</b>，否则等于没处理。</div></div>
+    <div class="step"><div class="txt"><b>④ 验证（Validate）。</b>缓解措施做完了没？有效没？产出：安全测试用例（给 QA/渗透测试）、回归检查项。威胁建模的闭环在验证——<b>没有验证环节，前面的努力有 50% 会烂尾</b>。</div></div>
+  </div>
+  <h3>威胁清单的推荐格式</h3>
+  <pre><span class="c"># 每条威胁一行，进表格或 issue 系统都可以</span>
+ID: TM-014
+元素: P2 支付服务 / 数据流"支付渠道回调"（跨信任边界）
+类别: T 篡改
+描述: 攻击者伪造支付渠道的"支付成功"回调通知，导致 0 元购
+假设: 回调仅校验了渠道分配的 merchant_id，未验签
+风险: 高（影响大 × 可利用性高）
+缓解: 接入渠道官方 SDK 做 RSA 验签；增加回调 IP 白名单；增加金额二次核对
+负责人: 张三 / 期限: 2026-11-01
+状态: 已修复 / 待验证 / 已接受
+
+<span class="c"># 关键字段：假设（assumption）——威胁建模暴露的往往是"我们以为安全"的错误假设</span></pre>
+  <div class="callout ok">
+    <b>时长建议：</b>第一次给核心系统做完整建模 2~4 小时；之后每个大版本/新架构决策后花 30~60 分钟增量更新。<b>不要追求一次建模覆盖所有系统</b>，按数据敏感度和攻击面排优先级。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>工具实操与建模时机</h2></div>
+  <h3>Microsoft TMT 与 Threat Dragon 的工作方式</h3>
+  <table>
+    <tr><th style="width:150px">工具</th><th style="width:220px">建模方式</th><th>产出与集成</th></tr>
+    <tr><td><b>Microsoft TMT</b></td><td>选模板（如"Web 应用"）→ 拖元素 → 工具按元素类型<b>自动生成 STRIDE 威胁清单</b> → 人工确认/补充</td><td>报告（HTML/Excel）。注意：该工具已进入低维护状态，但对企业内部流程仍然可用</td></tr>
+    <tr><td><b>OWASP Threat Dragon</b></td><td>画 DFD → 按元素逐个选择适用的 STRIDE 威胁 → 填缓解措施</td><td>模型存为 JSON，可提交进 Git 做版本管理；Web 版可自托管</td></tr>
+    <tr><td><b>pytm</b></td><td>用 Python 类定义元素、边界、数据流，运行后生成 DFD 和报告</td><td>与代码同库评审；模板带 HTML/PlantUML 输出</td></tr>
+    <tr><td><b>threagile</b></td><td>写 YAML 描述资产、数据流、技术栈 → 生成风险报告</td><td>CI 里跑，架构变更时自动出风险差异报告</td></tr>
+  </table>
+  <pre><span class="c"># pytm 示例：代码即威胁模型（示意，API 以官方仓库为准）</span>
+<span class="b">from</span> pytm <span class="b">import</span> TM, Server, Datastore, DataFlow, Boundary, Actor
+
+tm = TM(<span class="y">"电商下单"</span>)
+internet = Boundary(<span class="y">"公网"</span>)
+internal = Boundary(<span class="y">"内网"</span>)
+
+buyer = Actor(<span class="y">"买家"</span>); buyer.inBoundary = internet
+gateway = Server(<span class="y">"API 网关"</span>); gateway.inBoundary = internal
+order_db = Datastore(<span class="y">"订单库"</span>); order_db.inBoundary = internal
+
+<span class="c"># 数据流穿过信任边界，pytm 会为它生成对应的 STRIDE 威胁</span>
+DataFlow(buyer, gateway, <span class="y">"下单请求 HTTPS"</span>)
+DataFlow(gateway, order_db, <span class="y">"写订单 SQL"</span>)
+tm.process()</pre>
+  <h3>什么时候做威胁建模</h3>
+  <div class="cmds">
+    <div class="crow"><code>新系统立项 / 架构设计期</code><span class="desc">最佳时机。改图的成本几乎为零</span><button class="copy">复制</button></div>
+    <div class="crow"><code>大版本迭代</code><span class="desc">新增对外接口、新数据流、新第三方集成时增量更新</span><button class="copy">复制</button></div>
+    <div class="crow"><code>引入新组件</code><span class="desc">接入新的支付/短信/物流渠道、引入消息队列或缓存时</span><button class="copy">复制</button></div>
+    <div class="crow"><code>事故复盘后</code><span class="desc">"这个威胁当时为什么没识别到"——补进威胁库</span><button class="copy">复制</button></div>
+    <div class="crow"><code>合规要求时</code><span class="desc">等保、PCI-DSS、ISO 27001 均要求设计阶段风险评估</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout danger">
+    <b>最差的时机是上线后。</b>上线后再做威胁建模，你会发现 80% 的威胁已经"固化在架构里"，修复成本指数级上升。但如果一个老系统从来没做过，<b>现在做也比不做好</b>——优先做一次基线建模，之后随迭代增量更新。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>完整案例：电商下单链路</h2></div>
+  <p class="lead">用一个简化但真实的电商下单系统，走一遍"分解 → 识别 → 缓解 → 验证"。</p>
+  <h3>第一步：分解（资产 + DFD）</h3>
+  <p><b>资产：</b>用户个人信息（PII）、订单数据、库存数据、支付凭证、优惠券资产。<b>入口：</b>下单 API、支付回调、查询订单 API、管理后台。</p>
+  <pre><span class="c"># 电商下单系统 DFD（ASCII 完整版）</span>
+
+┌──────────┐   ┌──────────┐   ┌──────────┐
+│  买家 App │   │ 支付渠道  │   │  运营后台 │
+│(外部实体)│   │(外部实体)│   │(外部实体)│
+└────┬─────┘   └────┬─────┘   └────┬─────┘
+     │ 1.下单 HTTPS  │ 6.回调(验签?) │ 9.管理操作
+     ▼              ▼              ▼
+┌─────────────────────────────────────────┐
+│  P1 API 网关（限流/认证/防重放）          │  ← 信任边界①：公网│DMZ
+└────┬──────────────┬────────────────┬────┘
+     │ 2.创建订单 RPC │ 5.发起支付 RPC   │ 8.查询/改单
+     ▼              ▼                ▼
+┌──────────┐  ┌──────────┐  ┌──────────────┐
+│ P2 订单服务│  │ P3 支付服务│  │ P4 管理服务    │
+└────┬─────┘  └────┬─────┘  └──────┬───────┘
+     │ 3.写订单      │ 7.写支付单     │
+     ▼              ▼              ▼
+┌──────────┐  ┌──────────┐  ┌──────────────────┐
+│ DS1 订单库 │  │ DS2 Redis │  │ DS3 审计日志      │
+│  (MySQL)  │  │(库存缓存) │  │  (只追加)         │
+└──────────┘  └──────────┘  └──────────────────┘
+     └──────────── 信任边界②：DMZ │ 数据库区 ─────────┘
+┌──────────┐
+│ P5 库存服务│──▶ DS2（扣减库存）
+└──────────┘</pre>
+  <h3>第二步：识别（节选关键威胁）</h3>
+  <table>
+    <tr><th style="width:60px">ID</th><th style="width:130px">元素</th><th style="width:50px">类别</th><th>威胁描述</th></tr>
+    <tr><td class="f">TM-01</td><td>数据流 1（买家→网关）</td><td><b>S</b></td><td>攻击者用窃取的 token 冒充他人下单，收货地址篡改为攻击者地址（账号盗用）</td></tr>
+    <tr><td class="f">TM-02</td><td>数据流 1</td><td><b>T</b></td><td>抓包篡改商品单价/优惠券 ID/购买数量，0 元购或超低价购</td></tr>
+    <tr><td class="f">TM-03</td><td>P3 支付服务 / 数据流 6</td><td><b>T</b></td><td><b>伪造支付成功回调</b>：构造渠道通知报文，不验签则订单被置为"已支付"，0 元购</td></tr>
+    <tr><td class="f">TM-04</td><td>P3 支付服务</td><td><b>R</b></td><td>用户称"未支付"被扣款，平台无签名日志证明扣款请求由用户发起，纠纷无法仲裁</td></tr>
+    <tr><td class="f">TM-05</td><td>数据流 1 / P1</td><td><b>D</b></td><td>短信验证码接口被刷，产生高额短信费用并骚扰用户；下单接口 CC 攻击拖垮网关</td></tr>
+    <tr><td class="f">TM-06</td><td>DS1 订单库</td><td><b>I</b></td><td>越权查询：改订单号即可看他人订单（对象级授权缺失，BOLA）</td></tr>
+    <tr><td class="f">TM-07</td><td>DS1 订单库 / DS3</td><td><b>I</b></td><td>订单表明文存手机号/地址，或日志打印完整报文，泄露 PII</td></tr>
+    <tr><td class="f">TM-08</td><td>P4 管理服务 / 数据流 9</td><td><b>E</b></td><td>普通员工账号越权调用管理接口改价格、改库存、导全量数据</td></tr>
+    <tr><td class="f">TM-09</td><td>DS2 Redis（库存）</td><td><b>T</b></td><td>Redis 直连（无认证/弱口令），被改库存 key 或刷超卖脚本</td></tr>
+    <tr><td class="f">TM-10</td><td>P2 订单服务</td><td><b>D</b></td><td>重复提交订单（无幂等），订单表和库存缓存被刷爆</td></tr>
+  </table>
+  <h3>第三步：缓解（部分节选，含责任字段）</h3>
+  <table>
+    <tr><th style="width:60px">ID</th><th>缓解措施</th><th style="width:90px">处理方式</th></tr>
+    <tr><td class="f">TM-01</td><td>登录态 token 绑定设备指纹 + 异地登录二次验证；下单时短信二次确认（高价值订单）</td><td>修复</td></tr>
+    <tr><td class="f">TM-02</td><td><b>价格以服务端 SKU 表为准，客户端只传 SKU ID + 数量</b>；金额相关字段加参数签名；优惠券服务端二次校验有效期与适用商品</td><td>修复</td></tr>
+    <tr><td class="f">TM-03</td><td>支付回调用渠道官方 SDK <b>RSA/SM2 验签</b>；回调来源 IP 白名单；金额与本地支付单核对（不一致进人工审核）；<b>只认"已验签"的终态</b></td><td>修复</td></tr>
+    <tr><td class="f">TM-04</td><td>支付请求/回调全量审计日志（含签名值、报文摘要、时间戳），日志只追加、定期归档取证</td><td>修复</td></tr>
+    <tr><td class="f">TM-05</td><td>验证码 60s/号/天上限 + 图形验证码前置；网关按 IP/账号/设备限流；支付类接口单独配额</td><td>缓解</td></tr>
+    <tr><td class="f">TM-06</td><td>查询接口强制校验"订单归属用户 == 当前登录用户"；订单号不使用连续可猜 ID，改用 UUID/混淆 ID</td><td>修复</td></tr>
+    <tr><td class="f">TM-07</td><td>手机号/地址加密存储（应用层加密 + 密钥托管）；查询接口返回脱敏字段；日志脱敏规则（正则替换手机号/卡号）</td><td>修复</td></tr>
+    <tr><td class="f">TM-08</td><td>管理后台独立域名 + 办公网 VPN；RBAC 细到按钮；敏感操作（改价/导数据）双人复核 + 审计</td><td>修复</td></tr>
+    <tr><td class="f">TM-09</td><td>Redis 开启 ACL + 强密码 + 仅内网可达 + rename-command 禁用 FLUSHALL/KEYS；库存扣减用 Lua 保证原子</td><td>修复</td></tr>
+    <tr><td class="f">TM-10</td><td>下单接口幂等键（userId + 客户端请求 ID），Redis 去重窗口 10s；重复请求返回首个订单结果</td><td>修复</td></tr>
+  </table>
+  <h3>第四步：验证（给测试团队的安全测试用例）</h3>
+  <ul>
+    <li><b>验 TM-03：</b>构造无签名/错签名的回调报文，断言订单状态不变；重放同一签名报文，断言幂等拒绝</li>
+    <li><b>验 TM-02：</b>抓包改 price 字段为 0.01，断言服务端按 SKU 原价结算</li>
+    <li><b>验 TM-06：</b>登录用户 A，用 A 的会话查用户 B 的订单号，断言 403</li>
+    <li><b>验 TM-05：</b>脚本并发 100 次请求验证码接口，断言第 2 次起被限流</li>
+    <li><b>验 TM-10：</b>同一客户端请求 ID 连发 10 次下单，断言只生成 1 笔订单</li>
+  </ul>
+  <div class="callout ok">
+    <b>这个案例的"正确打开方式"：</b>十条威胁里，<b>TM-02（改价格）和 TM-03（伪造回调）是"设计缺陷级"问题</b>——它们不是代码 bug，是"信任了不该信任的输入"。这类问题只有威胁建模能在编码前以接近零成本发现。其余多为"实现层问题"，SAST/渗透测试也能发现，但晚一个阶段。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个常见坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只列威胁，不做缓解决策</div><div class="pd">产出一张 50 行的威胁清单就宣布"建模完成"，没有 owner、没有期限、没有"修复/接受"决策。三个月后没人记得，风险原样存在。每条威胁必须有处理方式和负责人。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">过度建模</div><div class="pd">给一个内部报表工具画 20 页 DFD、列 80 条威胁。建模成本超过系统本身价值。按数据敏感度和攻击面分级：核心交易系统详细建模，内部低敏系统 30 分钟过一遍即可。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">安全团队闭门造车</div><div class="pd">安全工程师自己画图、自己识别威胁，开发不参与。结果：威胁清单脱离实际（提出的缓解方案技术上不可行），开发不买账，最后被扔进抽屉。<b>建模会必须是"开发主讲架构 + 安全主讲威胁"的结对形式。</b></div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">建模只做一次，不随架构演进</div><div class="pd">半年前给 v1.0 做了建模，之后加了开放 API、接了新渠道、上了消息队列，威胁模型没更新。威胁模型是<b>活文档</b>，架构变更必须触发增量评审。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把 DFD 画成部署图</div><div class="pd">进程画成"K8s 集群"，数据流画成"走 Service Mesh"，信任边界画不出来。部署图回答"在哪跑"，DFD 回答"数据怎么流"。没有数据流视角，就识别不了篡改和泄露类威胁。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">忽略信任边界</div><div class="pd">"都是内网服务，互相调用不用鉴权"。一旦任一服务被攻破，攻击者在内网横向移动毫无阻碍。跨边界的数据流必须逐一验证认证、完整性和授权。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">混淆资产、漏洞与威胁</div><div class="pd">把"用户数据库"（资产）、"MySQL 弱密码"（漏洞）、"攻击者拖库"（威胁）混为一谈列在一起，导致清单无法处理。正确结构：资产 → 威胁（谁怎么打）→ 漏洞（凭什么打成）→ 缓解。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用方法论名词唬人，不落地</div><div class="pd">满嘴 PASTA 七阶段、FAIR 量化模型，落到自己系统上一个数据流都画不出来。方法论是工具不是目的，能把 STRIDE 用熟就超过大多数团队了。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">不验证缓解措施</div><div class="pd">安全需求写进 PRD 就完事，没人验证开发是否实现、实现是否有效。"已修复"和"已验证"是两回事，没有第四步（验证）的建模只完成了一半。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">追求 100% 覆盖和零风险</div><div class="pd">试图列出所有威胁、消除所有风险，导致会议无限拉长。威胁建模是风险决策工具，不是完美主义工具。核心资产的高危威胁覆盖到了，剩下中低风险记录在案按迭代处理。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. STRIDE 中的 "T" 指什么，违反哪项安全属性？</div>
+      <button class="opt">伪装（Tampering），违反认证</button>
+      <button class="opt">篡改（Tampering），违反完整性</button>
+      <button class="opt">抵赖（Repudiation），违反不可否认性</button>
+      <div class="ans">正确答案：<b>篡改（Tampering），违反完整性</b>。六个词的对应关系是：S 伪装→认证，T 篡改→完整性，R 抵赖→不可否认性，I 信息泄露→保密性，D 拒绝服务→可用性，E 权限提升→授权。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. DFD 五要素中，哪一个是"两侧信任级别不同的分界线"，也是威胁建模价值最集中的地方？</div>
+      <button class="opt">数据流（Data Flow）</button>
+      <button class="opt">数据存储（Data Store）</button>
+      <button class="opt">信任边界（Trust Boundary）</button>
+      <div class="ans">正确答案：<b>信任边界</b>。跨边界的数据流默认不可信，是 S/T/I/E 类威胁的高发区。很多入侵案例的根因就是"内网服务互调不鉴权"这类错误假设。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 攻击树中的 AND 节点表示什么？</div>
+      <button class="opt">需要满足所有子节点，目标才能达成</button>
+      <button class="opt">满足任一子节点即可达成目标</button>
+      <button class="opt">子节点之间互相排斥</button>
+      <div class="ans">正确答案：<b>AND = 全部子节点都要满足</b>，OR = 任一子节点满足即可。用 AND 分解攻击路径，能找出"最便宜的阻断点"——掐断 AND 下的任意一个子条件，整条路径就废了。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于威胁建模的时机，哪种说法是对的？</div>
+      <button class="opt">上线后做，这样能看到真实攻击面，效果最好</button>
+      <button class="opt">等保测评前集中做一次，应付合规检查就够了</button>
+      <button class="opt">设计阶段做基线，之后随架构演进增量更新</button>
+      <div class="ans">正确答案：<b>设计阶段做基线 + 增量更新</b>。上线后修复设计缺陷成本是设计阶段的数十倍；只做一次的威胁模型会随架构演进迅速过期。它是活文档，不是一次性项目交付物。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 威胁建模四步流程"分解→识别→缓解→验证"中，最容易被跳过的是哪一步？</div>
+      <button class="opt">分解，因为团队觉得自己已经了解系统</button>
+      <button class="opt">验证，因为安全需求写进 PRD 后就"以为做完了"</button>
+      <button class="opt">识别，因为有工具能自动生成威胁清单</button>
+      <div class="ans">正确答案：<b>验证</b>。"已修复"和"已验证"是两回事。没有验证环节，缓解措施可能根本没实现、或实现了但无效（如验签代码写错）。验证的产出是安全测试用例，交给 QA 和渗透测试执行。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 某团队画 DFD 时把"K8s 集群"画成一个进程，把"走 Service Mesh 的网络链路"画成数据流。问题出在哪？</div>
+      <button class="opt">把 DFD 画成了部署图，丢失了数据流视角</button>
+      <button class="opt">没有问题，这样画信息量更大更清晰</button>
+      <button class="opt">只是图形用错，换成圆形进程符号就对了</button>
+      <div class="ans">正确答案：<b>画成了部署图</b>。DFD 里一个进程 = 一个处理数据的逻辑组件（哪怕部署在 10 个 Pod 上），数据流 = 数据的语义内容（如"下单请求：userId + skuId + 数量"），不是网络链路。没有数据流视角就识别不了篡改和泄露。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>STRIDE 速查（含一句话缓解）</h3>
+  <div class="cmds">
+    <div class="crow"><code>S 伪装 Spoofing</code><span class="desc">认证：token 验签、mTLS、MFA</span><button class="copy">复制</button></div>
+    <div class="crow"><code>T 篡改 Tampering</code><span class="desc">完整性：参数签名、HMAC、防重放</span><button class="copy">复制</button></div>
+    <div class="crow"><code>R 抵赖 Repudiation</code><span class="desc">不可否认：审计日志、操作留痕</span><button class="copy">复制</button></div>
+    <div class="crow"><code>I 泄露 Info Disclosure</code><span class="desc">保密性：TLS、加密存储、脱敏</span><button class="copy">复制</button></div>
+    <div class="crow"><code>D 拒绝服务 DoS</code><span class="desc">可用性：限流、配额、熔断</span><button class="copy">复制</button></div>
+    <div class="crow"><code>E 提权 Elevation</code><span class="desc">授权：最小权限、RBAC、越权校验</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>威胁清单字段模板</h3>
+  <pre><span class="c"># 每条威胁必须有的字段（可直接贴进表格或 issue 模板）</span>
+ID / 所在DFD元素 / STRIDE类别 / 威胁描述 / 攻击假设
+风险等级(可能性×影响) / 缓解措施 / 处理方式(修复|缓解|转移|接受)
+负责人 / 期限 / 验证用例 / 状态
+
+<span class="c"># 风险矩阵（可能性 × 影响，各分 3 档）</span>
+                影响: 低      中        高
+可能性 高  │     中       高       严重
+可能性 中  │     低       中       高
+可能性 低  │     低       低       中
+
+<span class="c"># 处置规则：严重/高 → 本迭代必须处理；中 → 排期；低 → 记录并定期复查</span></pre>
+
+  <h3>工具选择速查</h3>
+  <table>
+    <tr><th style="width:170px">场景</th><th>推荐</th></tr>
+    <tr><td>开源优先、跨平台、模型要进 Git</td><td><b>OWASP Threat Dragon</b></td></tr>
+    <tr><td>微软生态、模板化自动出威胁清单</td><td><b>Microsoft TMT</b></td></tr>
+    <tr><td>威胁模型即代码、CI 集成</td><td><b>pytm</b> / <b>threagile</b></td></tr>
+    <tr><td>企业级流程与合规对齐（PASTA）</td><td><b>IriusRisk</b>（商业）等</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>威胁建模</b></td><td>在设计阶段系统化识别威胁并决策处理方式的安全活动</td></tr>
+    <tr><td><b>资产 Asset</b></td><td>你要保护的东西：数据、凭证、服务可用性</td></tr>
+    <tr><td><b>威胁 Threat</b></td><td>可能损害资产的潜在事件（攻击者视角的"怎么打"）</td></tr>
+    <tr><td><b>漏洞 Vulnerability</b></td><td>可被利用的弱点（攻击"凭什么"能成功）</td></tr>
+    <tr><td><b>风险 Risk</b></td><td>威胁 × 漏洞 × 资产价值的综合结果，通常用可能性×影响定级</td></tr>
+    <tr><td><b>攻击面 Attack Surface</b></td><td>系统所有可被攻击者接触的入口总和（接口、端口、凭证、人员）</td></tr>
+    <tr><td><b>攻击向量 Attack Vector</b></td><td>攻击者利用的具体路径或手段</td></tr>
+    <tr><td><b>STRIDE</b></td><td>微软威胁分类法：伪装/篡改/抵赖/泄露/拒绝服务/提权</td></tr>
+    <tr><td><b>DFD 数据流图</b></td><td>描述数据在系统中如何流动、存储、跨越信任边界的图</td></tr>
+    <tr><td><b>信任边界</b></td><td>DFD 中信任级别发生变化的分界线，跨边界数据默认不可信</td></tr>
+    <tr><td><b>攻击树</b></td><td>以攻击目标为根、按 AND/OR 分解攻击路径的树形模型</td></tr>
+    <tr><td><b>PASTA</b></td><td>七阶段风险中心威胁建模流程，面向企业风险管理对齐</td></tr>
+    <tr><td><b>风险矩阵</b></td><td>按可能性×影响给风险定级的二维排序工具</td></tr>
+    <tr><td><b>DREAD</b></td><td>旧的风险评级模型（损害/复现/利用/影响/发现难度），现多被矩阵取代</td></tr>
+    <tr><td><b>安全需求</b></td><td>由威胁推导出的功能性/非功能性需求，进 PRD 排期实现</td></tr>
+    <tr><td><b>残余风险</b></td><td>实施缓解后仍然存在的风险，需明确记录并接受</td></tr>
+    <tr><td><b>SDL</b></td><td>安全开发生命周期，威胁建模是其设计阶段核心环节</td></tr>
+    <tr><td><b>左移 Shift Left</b></td><td>把安全活动提前到设计和编码阶段，降低修复成本</td></tr>
+    <tr><td><b>BOLA</b></td><td>对象级授权失效，越权访问他人数据的典型漏洞（OWASP API Top 1）</td></tr>
+    <tr><td><b>STRIDE-per-Element</b></td><td>按 DFD 元素类型过滤适用 STRIDE 类别的高效建模技巧</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>选你手上一个真实系统（有对外 API、有数据库），用 Threat Dragon 或纸笔完成五件事 —— ① 列出资产和入口清单；② 画 DFD，至少 3 个进程、2 个数据存储、2 条信任边界；③ 对每个进程过一遍 STRIDE，产出 ≥ 10 条威胁；④ 每条威胁写清缓解措施和负责人；⑤ 挑 3 条高危威胁写成测试用例，交给 QA 或自己用 curl 验证。<br><br>
+    <b>之后值得单独学：</b>攻击树与攻击图（自动化生成）、FAIR 风险量化、把威胁模型接入 CI（pytm/threagile）、以及 OWASP ASVS 与威胁建模的互补使用。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透威胁建模 · 记住：没有缓解决策和验证的威胁建模，只是一张昂贵的图</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（STRIDE 映射）和模块 7（电商案例）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在纸上画你自己系统的 DFD。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边在纸上画你自己系统的 DFD，画不出来就是没想清楚。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

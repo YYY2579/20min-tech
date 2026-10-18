@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Neo4j 图数据库</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 数据库篇 · 高密度版</span>
+    <h1>二十分钟学透图数据库 Neo4j</h1>
+    <p class="sub">图数据库的核心优势只有一句话：<b>遍历关系的成本只与走过的子图大小有关，与全图数据量无关</b>。这篇讲清楚属性图模型、Cypher 语法、免索引邻接、因果集群，以及用图做权限和风控的真实姿势。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">查询语言 <b>Cypher</b></span>
+      <span class="chip">集群形态 <b>因果集群</b></span>
+      <span class="chip">一致性 <b>ACID + 因果</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 Neo4j 跟着敲：docker run -d -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:5</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起一个 Neo4j 5（浏览器 7474，Bolt 协议 7687）</span>
+docker run -d --name neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/password \
+  neo4j:5
+
+<span class="c"># 打开 http://localhost:7474 用 neo4j/password 登录，直接敲 Cypher</span>
+
+<span class="c"># 也可以用命令行（容器内自带 cypher-shell）</span>
+docker exec -it neo4j cypher-shell -u neo4j -p password
+
+<span class="c"># 常用元命令</span>
+<span class="b">:sysinfo</span>                       <span class="c"># 版本、存储、内存信息</span>
+<span class="b">SHOW DATABASES</span>                 <span class="c"># 看所有数据库（默认 neo4j + system）</span>
+<span class="b">CALL db.labels()</span>                <span class="c"># 当前库所有标签</span>
+<span class="b">CALL db.relationshipTypes()</span>     <span class="c"># 所有关系类型</span>
+<span class="b">MATCH (n) RETURN count(n)</span>       <span class="c"># 节点总数（生产大图上慎用）</span></pre>
+  <pre><span class="c"># ===== 灌一个社交图谱（后面的例子都用它）=====</span>
+<span class="b">CREATE</span> (a:User {name:<span class="y">'Alice'</span>,  email:<span class="y">'alice@example.com'</span>, city:<span class="y">'北京'</span>})
+<span class="b">CREATE</span> (b:User {name:<span class="y">'Bob'</span>,    email:<span class="y">'bob@example.com'</span>,   city:<span class="y">'上海'</span>})
+<span class="b">CREATE</span> (c:User {name:<span class="y">'Carol'</span>,  email:<span class="y">'carol@example.com'</span>, city:<span class="y">'北京'</span>})
+<span class="b">CREATE</span> (d:User {name:<span class="y">'Dave'</span>,   email:<span class="y">'dave@example.com'</span>,  city:<span class="y">'深圳'</span>})
+<span class="b">CREATE</span> (a)-[:FOLLOWS {since: date(<span class="y">'2024-03-01'</span>)}]-&gt;(b)
+<span class="b">CREATE</span> (a)-[:FOLLOWS {since: date(<span class="y">'2024-05-20'</span>)}]-&gt;(c)
+<span class="b">CREATE</span> (b)-[:FOLLOWS]-&gt;(c)
+<span class="b">CREATE</span> (c)-[:FOLLOWS]-&gt;(d)
+<span class="b">CREATE</span> (d)-[:FOLLOWS]-&gt;(a)</pre>
+  <div class="callout warn">
+    <b>一个常见困惑：</b>Neo4j 一个数据库实例下可以有多个 database（社区版只能连默认的 <span class="k">neo4j</span>）。多 database 隔离是 4.0+ 的企业特性思路，社区版就老老实实用一个库 + 标签前缀区分业务。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>属性图模型：节点、关系、标签、属性</h2></div>
+  <p class="lead">Neo4j 遵循<b>属性图模型（Labeled Property Graph）</b>。四个概念，全部背下来只要一分钟，但每个都有工程含义。</p>
+  <table>
+    <tr><th style="width:110px">概念</th><th style="width:230px">是什么</th><th>工程含义</th></tr>
+    <tr><td><b>节点 Node</b></td><td>一个实体，如一个用户、一台服务器</td><td>内部有<b>固定大小的引用</b>指向它的所有关系，这是性能的根源</td></tr>
+    <tr><td><b>关系 Relationship</b></td><td>两个节点间的<b>有类型、有方向</b>的连接，如 (:User)-[:FOLLOWS]-&gt;(:User)</td><td>关系<b>必须有一个类型</b>，方向在查询里可省略语义但存储时保留。关系上也能挂属性（如 since）</td></tr>
+    <tr><td><b>标签 Label</b></td><td>节点的分类，如 :User、:Server。一个节点可以有多个标签</td><td>类似"表名"，<b>查询时指定标签能大幅缩小扫描范围</b></td></tr>
+    <tr><td><b>属性 Property</b></td><td>键值对，存在节点或关系上</td><td>值可以是 string、number、boolean、日期时间、<b>字符串列表</b>等。<b>null 不允许</b></td></tr>
+  </table>
+  <h4>和关系模型的本质区别</h4>
+  <table>
+    <tr><th style="width:140px">维度</th><th style="width:250px">关系数据库</th><th>属性图</th></tr>
+    <tr><td>连接表达</td><td>外键 + JOIN，运行时按条件匹配</td><td>关系是<b>一等公民</b>，物理上直接存指针</td></tr>
+    <tr><td>遍历成本</td><td>随 JOIN 层数<b>指数级</b>恶化（递归 CTE 尤其明显）</td><td>每跳都是<b>指针跟随</b>，成本与走过的边数成正比</td></tr>
+    <tr><td>模式</td><td>先建表结构，数据必须符合</td><td>先有数据，标签/属性即兴扩展</td></tr>
+    <tr><td>适合的查询</td><td>"查满足条件的行"，集合运算</td><td>"找路径、找邻居、找模式"，遍历运算</td></tr>
+  </table>
+  <pre><span class="c"># 关系的物理真相：每个节点记录里存着一个关系链表头</span>
+<span class="c"># 遍历 (a)-[:FOLLOWS]->(b) 不是"扫 follows 表再连接"</span>
+<span class="c"># 而是：从 a 的记录直接拿到它所有 FOLLOWS 关系的引用，逐个跳过去</span>
+
+<span class="c"># 关系可以带属性 —— 这是关系模型做不到的（需要额外关联表）</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[r:FOLLOWS]-&gt;(b:User)
+<span class="b">RETURN</span> b.name <span class="b">AS</span> friend, r.since <span class="b">AS</span> sinceWhen
+<span class="b">ORDER BY</span> r.since <span class="b">DESC</span></pre>
+  <div class="callout ok">
+    <b>建模小抄：</b>实体看"会不会有多个同类的属性要查"→ 做成节点；关系看"是不是两个实体间的一次具体互动"→ 做成关系；分类用标签（可以多个）；属性只放"直接描述自己"的键值。<b>拿不准时问：这个查询是"找邻居/找路径"还是"算汇总"？</b>后者可能不该用图。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Cypher 核心语法</h2></div>
+  <p class="lead">Cypher 是声明式查询语言：<b>你描述"图的形状"，引擎负责找到它</b>。核心就三个关键字家族：MATCH（读）、CREATE/MERGE（写）、REMOVE/DETACH DELETE（删）。</p>
+  <h4>MATCH：模式匹配</h4>
+  <pre><span class="c"># 1. 最基本：带标签 + 属性条件的节点</span>
+<span class="b">MATCH</span> (u:User {email: <span class="y">'alice@example.com'</span>})
+<span class="b">RETURN</span> u.name, u.city
+
+<span class="c"># 2. 遍历一层关系（-- 无向，--&gt; 有向，&lt;-- 反向）</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS]-&gt;(b:User)
+<span class="b">RETURN</span> b.name
+
+<span class="c"># 3. 关系带属性过滤 + 变量</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[r:FOLLOWS]-&gt;(b:User)
+<span class="b">WHERE</span> r.since &gt;= date(<span class="y">'2024-05-01'</span>)
+<span class="b">RETURN</span> b.name, r.since
+
+<span class="c"># 4. 变长关系：1 到 3 跳（* 表示任意跳，*..3 表示最多 3 跳）</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS*1..3]-&gt;(b:User)
+<span class="b">RETURN</span> <span class="b">DISTINCT</span> b.name
+
+<span class="c"># 5. 可选匹配（左连接）：没有也不丢行</span>
+<span class="b">MATCH</span> (u:User)
+<span class="b">OPTIONAL MATCH</span> (u)-[:FOLLOWS]-&gt;(f)
+<span class="b">RETURN</span> u.name, <span class="b">count</span>(f) <span class="b">AS</span> followsCount   <span class="c">// 没关注人的用户 count=0，不会消失</span>
+
+<span class="c"># 6. 参数化查询（生产必须用参数，防注入 + 命中查询缓存）</span>
+<span class="b">MATCH</span> (u:User {email: $email})
+<span class="b">RETURN</span> u</pre>
+  <h4>CREATE 与 MERGE：写的语义</h4>
+  <pre><span class="c"># CREATE：无脑新建。重复执行会造出重复节点 —— 幂等写入别用它</span>
+<span class="b">CREATE</span> (:User {name: <span class="y">'Eve'</span>, email: <span class="y">'eve@example.com'</span>})
+
+<span class="c"># MERGE：有就用，没有就建（类似 MySQL 的 upsert）</span>
+<span class="b">MERGE</span> (u:User {email: <span class="y">'eve@example.com'</span>})
+<span class="b">ON CREATE SET</span> u.createdAt = datetime(), u.loginCount = 0
+<span class="b">ON MATCH  SET</span> u.lastLoginAt = datetime()
+<span class="b">RETURN</span> u
+
+<span class="c"># MERGE 关系 + 属性（保证不会重复加同一条关注）</span>
+<span class="b">MATCH</span> (a:User {email:<span class="y">'alice@example.com'</span>}), (b:User {email:<span class="y">'eve@example.com'</span>})
+<span class="b">MERGE</span> (a)-[:FOLLOWS {since: date(<span class="y">'2026-10-17'</span>)}]-&gt;(b)
+
+<span class="c"># ✗ 经典错误：一次 MERGE 整个长 pattern</span>
+<span class="c">#   MERGE (a:User {email:'x'})-[:FOLLOWS]->(b:User {email:'y'})</span>
+<span class="c">#   如果 a 存在但关系不存在，它会尝试 MERGE 关系部分，语义容易失控</span>
+<span class="c"># ✓ 正确姿势：先分别 MERGE 两个节点，再 MERGE 关系</span></pre>
+  <h4>最短路径与路径函数</h4>
+  <pre><span class="c"># shortestPath：找两点间最短的一条路径（按跳数）</span>
+<span class="b">MATCH</span> p = shortestPath((a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS*..6]-(b:User {name:<span class="y">'Dave'</span>}))
+<span class="b">RETURN</span> p, length(p) <span class="b">AS</span> hops
+
+<span class="c"># allShortestPaths：所有最短路径之一组</span>
+<span class="b">MATCH</span> p = allShortestPaths((a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS*..6]-(b:User {name:<span class="y">'Dave'</span>}))
+<span class="b">RETURN</span> p
+
+<span class="c"># 路径常用函数</span>
+<span class="c">// length(p)          路径跳数</span>
+<span class="c">// nodes(p)            路径上的节点列表</span>
+<span class="c">// relationships(p)    路径上的关系列表</span>
+<span class="c">// [n IN nodes(p) | n.name]  列表推导，取所有节点名</span>
+
+<span class="c"># 二度好友推荐（社交图谱最经典查询）</span>
+<span class="b">MATCH</span> (me:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS]-&gt;()-[:FOLLOWS]-&gt;(fof)
+<span class="b">WHERE</span> <span class="b">NOT</span> (me)-[:FOLLOWS]-&gt;(fof) <span class="b">AND</span> fof &lt;&gt; me
+<span class="b">RETURN</span> fof.name, <span class="b">count</span>(*) <span class="b">AS</span> mutualFriends
+<span class="b">ORDER BY</span> mutualFriends <span class="b">DESC</span>
+<span class="b">LIMIT</span> 10</pre>
+  <h4>删除</h4>
+  <pre><span class="c"># 删节点前必须先删关系，否则报错（防止孤儿关系）</span>
+<span class="b">MATCH</span> (u:User {name:<span class="y">'Eve'</span>})
+<span class="b">DETACH DELETE</span> u          <span class="c">// DETACH = 先删所有关系再删节点</span>
+
+<span class="c"># 只删关系，保留节点</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[r:FOLLOWS]-&gt;(b:User {name:<span class="y">'Bob'</span>})
+<span class="b">DELETE</span> r
+
+<span class="c"># 批量删（大图慎用，长事务阻塞别人）</span>
+<span class="b">MATCH</span> (u:User {city: <span class="y">'深圳'</span>})
+<span class="b">DETACH DELETE</span> u</pre>
+  <div class="callout warn">
+    <b>MERGE 是 Cypher 里唯一容易埋雷的写操作。</b>记住三条：① MERGE 的匹配部分<b>必须有唯一约束兜底</b>，否则并发下两个事务都判断"不存在"、都去创建，产生重复；② 复杂 pattern 拆成"节点 MERGE + 关系 MERGE"两步；③ MERGE 的 <span class="k">ON CREATE SET</span> / <span class="k">ON MATCH SET</span> 分别处理新建和命中两种路径，初始化逻辑放 ON CREATE。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>索引与约束</h2></div>
+  <p class="lead">图数据库的索引用途和关系库一样：<b>让"找到起始节点"这一步不要全图扫描</b>。Neo4j 4.x 之前只有 schema 索引；5.x 默认创建 token lookup 索引，标签查找也是索引化的。</p>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:250px">语法</th><th>说明</th></tr>
+    <tr><td><b>范围索引</b></td><td class="f">CREATE INDEX ... FOR (u:User) ON (u.email)</td><td>单属性 B-Tree，支持 =、&lt;、&gt;、范围、存在性</td></tr>
+    <tr><td><b>复合索引</b></td><td class="f">... ON (u.lastName, u.firstName)</td><td>多属性联合，前缀规则和 MySQL 一样</td></tr>
+    <tr><td><b>文本索引</b></td><td class="f">CREATE TEXT INDEX ... ON EACH [a.title, a.body]</td><td>全文分词检索，支持 CONTAINS 谓词</td></tr>
+    <tr><td><b>查找索引</b></td><td class="f">CREATE LOOKUP INDEX ... ON EACH labels(n)</td><td>5.x 引入，按标签/关系类型快速定位起始节点</td></tr>
+    <tr><td><b>唯一约束</b></td><td class="f">CREATE CONSTRAINT ... REQUIRE u.email IS UNIQUE</td><td><b>自动建索引</b> + 强制唯一，MERGE 的最佳搭档</td></tr>
+    <tr><td><b>存在约束</b></td><td class="f">... REQUIRE u.name IS NOT NULL</td><td>强制属性必填</td></tr>
+    <tr><td><b>节点键</b></td><td class="f">... REQUIRE (u.a, u.b) IS NODE KEY</td><td>多属性联合唯一 + 必填</td></tr>
+  </table>
+  <pre><span class="c"># ===== 索引创建（5.x 语法）=====</span>
+<span class="b">CREATE CONSTRAINT</span> user_email <span class="b">IF NOT EXISTS</span>
+<span class="b">FOR</span> (u:User) <span class="b">REQUIRE</span> u.email <span class="b">IS UNIQUE</span>
+
+<span class="b">CREATE INDEX</span> person_lastname_firstname <span class="b">IF NOT EXISTS</span>
+<span class="b">FOR</span> (p:Person) <span class="b">ON</span> (p.lastName, p.firstName)
+
+<span class="b">CREATE TEXT INDEX</span> article_content <span class="b">IF NOT EXISTS</span>
+<span class="b">FOR</span> (a:Article) <span class="b">ON EACH</span> [a.title, a.body]
+
+<span class="b">CREATE LOOKUP INDEX</span> node_label_lookup <span class="b">IF NOT EXISTS</span>
+<span class="b">FOR</span> (n) <span class="b">ON EACH</span> labels(n)
+
+<span class="b">CREATE LOOKUP INDEX</span> rel_type_lookup <span class="b">IF NOT EXISTS</span>
+<span class="b">FOR</span> ()-[r]-() <span class="b">ON EACH</span> type(r)
+
+<span class="c"># 索引是后台创建的，大图上要先等它 online 再跑依赖查询</span>
+<span class="b">CALL</span> db.awaitIndex(<span class="y">'user_email'</span>, 300)
+
+<span class="c"># 查看索引状态（POPULATING = 还在建，ONLINE 才可用）</span>
+<span class="b">SHOW INDEXES</span> <span class="b">YIELD</span> name, type, state, populationPercent</pre>
+  <h4>约束：MERGE 的并发安全网</h4>
+  <pre><span class="c"># 没有唯一约束的 MERGE 在并发下会创建重复节点：</span>
+<span class="c">#   两个事务同时 MATCH 不到 email=x 的节点 → 同时 CREATE → 库里有俩</span>
+<span class="c"># 唯一约束让数据库在提交时强制检查，第二个事务直接报</span>
+<span class="c">#   Neo.ClientError.Schema.ConstraintValidationFailed</span>
+
+<span class="c"># 建约束前先清洗存量重复数据，否则约束创建失败</span>
+<span class="b">MATCH</span> (u:User)
+<span class="b">WITH</span> u.email <span class="b">AS</span> email, <span class="b">collect</span>(u) <span class="b">AS</span> nodes
+<span class="b">WHERE</span> size(nodes) &gt; 1
+<span class="b">UNWIND</span> tail(nodes) <span class="b">AS</span> dup
+<span class="b">DETACH DELETE</span> dup</pre>
+  <div class="callout ok">
+    <b>顺序很重要：</b>① 先建唯一约束（它会自动建配套索引）；② 再让业务用 MERGE 做幂等写入。反过来的话，先上线 MERGE 后补约束，期间可能已经产生重复数据，补约束时会失败，还得先做数据清洗。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>遍历性能：免索引邻接</h2></div>
+  <p class="lead">这是图数据库对抗关系数据库的<b>唯一核心技术优势</b>，叫 <b>Index-Free Adjacency（免索引邻接）</b>。不理解它，就无法解释"为什么图查询快"。</p>
+  <h4>原理</h4>
+  <p>每个节点在存储里<b>物理保存着指向自己所有关系的直接引用</b>（类似链表指针，且进出方向分开存）。从节点 A 跳到邻居 B，就是一次指针解引用，<b>不需要查索引、不需要扫关系表、不需要按外键做哈希连接</b>。</p>
+  <table>
+    <tr><th style="width:170px">查询</th><th style="width:220px">关系库（递归 CTE / 多 JOIN）</th><th>Neo4j</th></tr>
+    <tr><td>1 跳邻居</td><td>按外键索引查 friends 表</td><td>指针跳一次</td></tr>
+    <tr><td>3 跳邻居</td><td>3 层自连接，中间结果集膨胀</td><td>指针跳三次</td></tr>
+    <tr><td>10 跳路径</td><td>递归 CTE 层数爆炸，基本不可用</td><td>指针跳十次，依然线性</td></tr>
+    <tr><td>数据翻倍时</td><td>每次 JOIN 成本<b>随之增长</b></td><td><b>同一个查询成本不变</b>（只与走过的子图有关）</td></tr>
+  </table>
+  <pre><span class="c"># 查询计划里看得到区别：NodeByLabelScan 之后直接 Expand（扩展）</span>
+<span class="b">EXPLAIN</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS]-&gt;(b)-[:FOLLOWS]-&gt;(c)
+<span class="b">RETURN</span> c.name
+
+<span class="c"># PROFILE 会显示每个算子的实际行数和命中（db hits）</span>
+<span class="b">PROFILE</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS]-&gt;(b)-[:FOLLOWS]-&gt;(c)
+<span class="b">RETURN</span> c.name</pre>
+  <h4>性能上限来自哪里</h4>
+  <p>既然每跳这么便宜，瓶颈在哪？答案是<b>起始节点的定位</b>和<b>结果集的规模</b>：</p>
+  <ul>
+    <li><b>起始点没索引</b>：不带标签和属性的 <span class="k">MATCH (a)</span> 触发 AllNodesScan 全节点扫描，大图上直接卡死</li>
+    <li><b>中间结果爆炸</b>：高度节点（supernode）一跳出来几百万邻居，内存和耗时都爆</li>
+    <li><b>无界变长遍历</b>：<span class="k">[:FOLLOWS*]</span> 不限跳数，组合爆炸</li>
+  </ul>
+  <pre><span class="c"># ✗ 反例：全节点扫描 + 无界变长路径</span>
+<span class="b">MATCH</span> (a)-[:FOLLOWS*]-(b) <span class="b">WHERE</span> a.name = <span class="y">'Alice'</span> <span class="b">RETURN</span> b
+
+<span class="c"># ✓ 正例：标签+属性定位起点（走索引），限定跳数，限定类型</span>
+<span class="b">MATCH</span> (a:User {name:<span class="y">'Alice'</span>})-[:FOLLOWS*1..4]-(b:User)
+<span class="b">RETURN</span> b</pre>
+  <div class="callout danger">
+    <b>Supernode（超高度节点）是图库的头号性能杀手。</b>典型场景：<span class="k">(:User)-[:HAS_ROLE]-&gt;(:Admin)</span> 里 Admin 节点挂了几百万条关系；或"大 V 有几千万粉丝"。遍历到它的一跳会瞬间拉取全部关系。<b>解法：</b>拆分关系类型（把关注按时间/地区拆成不同类型）、加中间节点分层、或者查询时用 <span class="k">LIMIT</span> 与更精确的中间条件收敛。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>集群架构：因果集群</h2></div>
+  <p class="lead">Neo4j 的集群叫<b>因果集群（Causal Cluster）</b>，核心是 Raft 共识协议。架构简单到只有两种服务器角色，但"因果一致性"四个字很多人没搞懂。</p>
+  <table>
+    <tr><th style="width:130px">角色</th><th style="width:230px">职责</th><th>要点</th></tr>
+    <tr><td><b>核心服务器 Core</b></td><td>参与 Raft 共识，复制所有数据，可读可写</td><td><b>写只能发生在 leader</b>。大多数存活才能选举新 leader</td></tr>
+    <tr><td><b>只读副本 Read Replica</b></td><td>异步复制 leader 的数据，<b>只提供读</b></td><td>不参与投票。可无限水平扩展读能力</td></tr>
+  </table>
+  <h4>部署形态</h4>
+  <ul>
+    <li><b>最小高可用：3 个 core</b>，容忍 1 个故障。生产中<b>核心至少 3，推荐奇数个</b></li>
+    <li>读压力大：加 read replica，查询走 <span class="k">neo4j://</span> 路由自动负载均衡</li>
+    <li>客户端连接协议分两种：<span class="k">neo4j://</span>（集群路由，自动选 leader/副本）和 <span class="k">bolt://</span>（直连单节点）——<b>生产必须用 neo4j://</b></li>
+    <li>副本是<b>异步</b>复制，所以副本上的读可能滞后于 leader</li>
+  </ul>
+  <pre><span class="c"># 查看集群拓扑</span>
+<span class="b">CALL</span> dbms.cluster.overview()
+
+<span class="c"># 典型输出（简化）：每台机器的角色、地址、状态</span>
+<span class="c">// name        addresses       role       state</span>
+<span class="c">// core-1      localhost:7687  LEADER     ENABLED</span>
+<span class="c">// core-2      localhost:7688  FOLLOWER   ENABLED</span>
+<span class="c">// core-3      localhost:7689  FOLLOWER   ENABLED</span>
+<span class="c">// replica-1   localhost:7690  READ_REPLICA  ENABLED</span>
+
+<span class="c"># 客户端连接串（Java 示例）</span>
+<span class="c">// GraphDatabase.driver("neo4j://core-1:7687", AuthTokens.basic("neo4j","password"))</span>
+<span class="c">// driver.executeQuery(...) 会自动路由：写去 leader，读去副本</span></pre>
+  <div class="callout warn">
+    <b>为什么不能把只读副本当强一致读：</b>副本是异步复制。在副本上执行"写完立刻读"，可能读到旧值——这不是 bug，是设计。<b>需要读到最新已提交数据时，要么读 leader（路由 <span class="k">bolt://</span> 到 core leader），要么用因果链（bookmark），见下一模块。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>ACID 与因果一致性</h2></div>
+  <p class="lead">Neo4j 在单节点上是<b>完整 ACID</b> 的——这点经常被忽视，很多人以为"图数据库 = 最终一致 = 不能做交易"。集群下的一致性是"ACID + 因果一致性"的组合。</p>
+  <h4>ACID 保证（单节点）</h4>
+  <table>
+    <tr><th style="width:80px">特性</th><th>Neo4j 的实现</th></tr>
+    <tr><td><b>A 原子性</b></td><td>一个事务里的多个 CREATE/MERGE 要么全提交要么全回滚。事务用 <span class="k">BEGIN ... COMMIT</span> 或客户端 API</td></tr>
+    <tr><td><b>C 一致性</b></td><td>约束（唯一/存在/节点键）在提交时强制校验，事务级生效</td></tr>
+    <tr><td><b>I 隔离性</b></td><td>写写冲突用悲观锁，先到先得，后到的等或失败</td></tr>
+    <tr><td><b>D 持久性</b></td><td>事务日志（WAL）+ 定期 checkpointer 刷盘</td></tr>
+  </table>
+  <pre><span class="c"># 显式多语句事务</span>
+<span class="b">BEGIN</span>
+<span class="b">CREATE</span> (a:User {email:<span class="y">'a@x.com'</span>})
+<span class="b">CREATE</span> (b:User {email:<span class="y">'b@x.com'</span>})
+<span class="b">CREATE</span> (a)-[:FOLLOWS]-&gt;(b)
+<span class="b">COMMIT</span>
+
+<span class="c"># 上面的三条是一个原子单元：b 创建失败，a 也不会留下</span></pre>
+  <h4>因果一致性：集群下的"读写你自己的写"</h4>
+  <p>问题场景：写请求打到 leader，写完立刻发一个读请求——负载均衡把它路由到了<b>还没同步的副本</b>，读到了旧值。对用户来说就是"我刚关注的人，刷新一下关注列表居然没了"。</p>
+  <p>解法是 <b>bookmark（书签）机制</b>：</p>
+  <ul>
+    <li>每个写事务返回一个 <b>bookmark</b>（本质是事务在 Raft 日志里的位置）</li>
+    <li>下一个请求<b>携带上一个 bookmark</b>，驱动保证该请求只在"至少应用了那个写入"的节点上执行</li>
+    <li>官方驱动自动完成这条链（<span class="k">session.lastBookmark()</span>），业务无感</li>
+  </ul>
+  <pre><span class="c"># Java 驱动的标准写法（伪代码）</span>
+<span class="c">// try (var session = driver.session(SessionConfig.builder().withDefaultAccessMode(AccessMode.WRITE).build())) {</span>
+<span class="c">//   session.executeWrite(tx -&gt; tx.run("CREATE (u:User {email:$e})", params).consume());</span>
+<span class="c">//   bookmark = session.lastBookmark();   // 拿到写事务的书签</span>
+<span class="c">// }</span>
+<span class="c">// // 后续读请求带着这个 bookmark，保证读到刚才的写</span>
+<span class="c">// driver.executableQuery("...").withBookmark(bookmark)...</span></pre>
+  <div class="callout ok">
+    <b>三句话记住一致性全景：</b>① 单节点 = 全 ACID，可以做资金类强一致写入；② 集群 = 写走 Raft 多数派确认，读副本异步；③ "写后读一致"靠 bookmark 因果链，不是靠随机路由碰运气。<b>框架（Spring Data Neo4j 等）都内置了 bookmark 传递，自己拼驱动时千万别丢。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>对比：Cypher vs 递归 CTE</h2></div>
+  <p class="lead">"图查询用 SQL 递归 CTE 不行吗？"——能写，又慢又难读。同一个"三度人脉"需求，两种写法的差距就是图数据库的存在意义。</p>
+  <h4>SQL 递归 CTE 写法</h4>
+  <pre><span class="c">-- 表结构：follows(follower_id, followee_id)</span>
+<span class="b">WITH RECURSIVE</span> reach AS (
+  <span class="c">-- 锚点：我关注的人（第 1 跳）</span>
+  <span class="b">SELECT</span> followee_id <span class="b">AS</span> uid, 1 <span class="b">AS</span> depth
+  <span class="b">FROM</span> follows <span class="b">WHERE</span> follower_id = 1
+  <span class="b">UNION ALL</span>
+  <span class="c">-- 递归：沿关注边继续走，最多 3 跳</span>
+  <span class="b">SELECT</span> f.followee_id, r.depth + 1
+  <span class="b">FROM</span> follows f <span class="b">JOIN</span> reach r <span class="b">ON</span> f.follower_id = r.uid
+  <span class="b">WHERE</span> r.depth &lt; 3
+)
+<span class="b">SELECT</span> u.name, <span class="b">MIN</span>(depth) <span class="b">AS</span> min_depth
+<span class="b">FROM</span> reach <span class="b">JOIN</span> users u <span class="b">ON</span> u.id = reach.uid
+<span class="b">GROUP BY</span> u.name;</pre>
+  <h4>Cypher 写法</h4>
+  <pre><span class="b">MATCH</span> (me:User {id: 1})-[:FOLLOWS*1..3]-(f:User)
+<span class="b">RETURN</span> f.name, <span class="b">min</span>(length(p)) <span class="b">AS</span> minDepth</pre>
+  <p>（严谨的带最短深度版本：<span class="k">MATCH p=(me:User {id:1})-[:FOLLOWS*1..3]-(f:User) RETURN f.name, min(length(p)) AS minDepth</span>）</p>
+  <h4>差距在哪</h4>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:250px">递归 CTE</th><th>Cypher</th></tr>
+    <tr><td>可读性</td><td>锚点/递归/终止条件三段式，3 跳就要 20 行</td><td>一行声明式模式匹配</td></tr>
+    <tr><td>关系属性</td><td>边上加属性要建关联表再 JOIN</td><td>关系直接带属性，随跳过滤</td></tr>
+    <tr><td>方向控制</td><td>两张列谁是 follower 要记清楚</td><td><span class="k">-&gt;</span> <span class="k">&lt;-</span> <span class="k">-</span> 直观</td></tr>
+    <tr><td>环处理</td><td>递归可能死循环，要自己记访问集合</td><td>引擎自动处理环</td></tr>
+    <tr><td>多类型边</td><td>UNION 多个递归分支</td><td><span class="k">[:FOLLOWS|:FRIEND*]</span> 一行搞定</td></tr>
+    <tr><td>执行性能</td><td>每跳一次自连接 + 中间结果物化</td><td>指针跳转，无中间物化</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>但别走另一个极端：</b>图数据库<b>不擅长聚合分析</b>。"统计每个城市所有订单金额并按品类汇总"这种多维分析，列存数仓（ClickHouse）比图快一个数量级。<b>图的正确姿势是"找关系和路径"，不是"算账"。</b>选型前先数一下查询里有多少"跳"。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>典型场景：权限、风控、知识图谱</h2></div>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>细粒度权限</div><div class="cd"><b>最高频场景。</b>"Alice 能看订单 O-100 吗？"建模为 (用户)-[:成员于]->(组)-[:有权限]->(资源) 的图，一次遍历得到答案，改权限就是改一条边。IAM、数据行级权限的标准解</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>风控反欺诈</div><div class="cd">找"欺诈环"：共享设备、共享 IP、共享联系人的账号团伙。环形模式匹配是图的杀手级查询，关系库要 JOIN 几十层</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>知识图谱</div><div class="cd">实体-关系-实体，问答推理。配合 NLP 抽取实体入图，回答"岳飞的岳父的儿子的父亲是谁"这类多跳问题</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>依赖与影响分析</div><div class="cd">微服务调用链、IT 资产依赖："机房 A 挂了会影响哪些业务？"沿依赖边向下遍历，秒级出爆炸半径</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>推荐系统</div><div class="cd">协同过滤的图式表达：共同购买、共同关注的人、最短兴趣路径。实时性好</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>主数据/血缘</div><div class="cd">数据表之间的字段级血缘，一条链路出问题能反向定位所有下游报表</div></div>
+  </div>
+  <h4>权限场景完整示例</h4>
+  <pre><span class="c"># 建模：用户-组-资源，组可嵌套（组也是"成员"）</span>
+<span class="b">CREATE</span> (alice:User {name:<span class="y">'Alice'</span>})
+<span class="b">CREATE</span> (admins:Group {name:<span class="y">'订单管理员'</span>})
+<span class="b">CREATE</span> (super:Group {name:<span class="y">'超级管理员'</span>})
+<span class="b">CREATE</span> (o100:Order {id:<span class="y">'O-100'</span>, region:<span class="y">'CN'</span>})
+<span class="b">CREATE</span> (alice)-[:属于]-&gt;(admins)
+<span class="b">CREATE</span> (admins)-[:属于]-&gt;(super)
+<span class="b">CREATE</span> (super)-[:可读]-&gt;(:Resource {type:<span class="y">'订单'</span>})
+
+<span class="c"># 鉴权查询：Alice 对某订单的可见性（嵌套组 + 继承一次算完）</span>
+<span class="b">MATCH</span> (u:User {name: $username})-[:属于*0..5]-&gt;(g:Group)-[:可读]-&gt;(r:Resource {type: <span class="y">'订单'</span>})
+<span class="b">WHERE</span> r.region = $userRegion <span class="b">OR</span> g.name = <span class="y">'超级管理员'</span>
+<span class="b">RETURN</span> <span class="b">DISTINCT</span> r.id
+<span class="b">LIMIT</span> 1   <span class="c">// 只要查到一条就放行，命中即返回</span>
+
+<span class="c"># 反向查询："这个订单现在谁能看？"（权限审计，图独有的便利）</span>
+<span class="b">MATCH</span> (o:Order {id:<span class="y">'O-100'</span>})&lt;-[:可读*0..5]-(g:Group)&lt;-[:属于*0..5]-(u:User)
+<span class="b">RETURN</span> u.name</pre>
+  <div class="callout ok">
+    <b>选型自检：</b>满足这三条再上 Neo4j —— ① 关系本身是核心业务数据（不是附属信息）；② 查询是"多跳遍历/路径/环检测"型；③ 深度会变（今天 2 跳，明年 5 跳）。只满足一两条的话，PostgreSQL + 递归 CTE 或物化路径字段可能就够了，别为了时髦引入新组件。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 CREATE 做幂等写入</div><div class="pd">重复执行就造重复节点。幂等写必须用 MERGE，且 MERGE 的属性上要有唯一约束兜底，否则并发下照样重复。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">一次 MERGE 整个长 pattern</div><div class="pd">节点和关系混在一个 MERGE 里，部分命中时语义失控，可能建出意想不到的边。拆成"先 MERGE 节点，再 MERGE 关系"两步。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">删节点忘了 DETACH</div><div class="pd">直接 DELETE 带关系的节点会报错（防止孤儿关系）。要么 DETACH DELETE 节点，要么先删关系。批量删大关系量的节点要分批，防长事务。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">查询不带标签和起始条件</div><div class="pd">MATCH (a)-[:R]->(b) 不带标签触发 AllNodesScan，亿级图上直接跑挂。所有查询以"标签 + 属性（走索引）"定位起始节点。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">变长路径不设上限</div><div class="pd">[:FOLLOWS*] 不限跳数，遇到环或密集子图就是组合爆炸。永远写 [:TYPE*1..N]，N 按业务最深需求设定。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">撞上 supernode 而不自知</div><div class="pd">一个节点挂几百万关系（大 V 粉丝、热门标签），遍历到它的一跳瞬间拉爆内存。按时间/地区拆分关系类型，或加中间节点分层。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">导入数据一条一个 CREATE</div><div class="pd">百万级导入逐条执行，几个小时都跑不完。用 LOAD CSV + USING PERIODIC COMMIT 批量导入，或 apoc.periodic.iterate 分批；先建索引再导（否则唯一约束校验也慢）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">不用 bookmark，副本读到旧值</div><div class="pd">写完立刻读，请求被路由到未同步的副本，用户以为数据丢了。用官方驱动 + 因果链（自动带 bookmark）；裸写 Bolt 手动维护。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 Neo4j 当关系库/数仓用</div><div class="pd">大量单表 CRUD、group by 汇总、报表分析，图库既不比 PostgreSQL 快也不比 ClickHouse 快，还多一套运维。图只干遍历的活。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">查询字面量写死</div><div class="pd">MATCH (u:User {email:'a@b.com'}) 字面量不进查询缓存，还容易注入。生产全部参数化 {email: $email}，驱动层自动走计划缓存。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. "免索引邻接（index-free adjacency）"指的是什么？</div>
+      <button class="opt">查询完全不需要任何索引</button>
+      <button class="opt">每个节点物理保存指向自己所有关系的引用，遍历一跳就是指针跟随，不需要查索引或扫关系表</button>
+      <button class="opt">索引被自动同步到所有副本，所以查索引也很快</button>
+      <div class="ans">正确答案：<b>节点直接持有关系引用</b>。这是图遍历成本与全图规模无关的原因——代价只在找起始节点时才付（那时才需要索引）。注意起始定位仍然需要索引，"免索引"仅指遍历阶段。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 需要"有就复用、没有就创建"的幂等写入，应该用？</div>
+      <button class="opt">CREATE，执行前先 MATCH 检查是否存在</button>
+      <button class="opt">MERGE，并在匹配属性上建唯一约束</button>
+      <button class="opt">SET，配合 ON CONFLICT 子句</button>
+      <div class="ans">正确答案：<b>MERGE + 唯一约束</b>。单独 MERGE 在并发下仍可能重复创建（两个事务同时判定不存在）；唯一约束让数据库在提交时兜底。Cypher 没有 ON CONFLICT 语法，那是 PostgreSQL 的。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 找 Alice 到 Dave 的最短关注路径，正确的 Cypher 是？</div>
+      <button class="opt">MATCH p = shortestPath((a:User {name:'Alice'})-[:FOLLOWS*..6]-(b:User {name:'Dave'})) RETURN p</button>
+      <button class="opt">MATCH p = shortestPath((a)-[:FOLLOWS]-(b)) RETURN p</button>
+      <button class="opt">MATCH (a:User {name:'Alice'}) RETURN shortestPath(a, 'Dave')</button>
+      <div class="ans">正确答案：<b>shortestPath 配变长模式</b>。shortestPath 只接受单条关系模式，所以必须写成 -[:FOLLOWS*..6]- 的形式，且必须给出跳数上限。第二项少了 * 会变成固定一跳，第三项不是合法语法。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于 Neo4j 因果集群，哪个说法正确？</div>
+      <button class="opt">只读副本参与 Raft 投票，挂多了会影响写入可用性</button>
+      <button class="opt">核心服务器（core）参与 Raft 共识，写只发生在 leader；只读副本异步复制、不投票、只扩展读能力</button>
+      <button class="opt">所有节点都可以写，靠因果一致性自动合并冲突</button>
+      <div class="ans">正确答案：<b>core 管共识、副本管读</b>。读副本不投票，挂多少个都不影响集群写入（只影响读容量）；写必须经过 leader 走 Raft 多数派确认，不存在多主合并。这也是"最小 3 个 core"的原因。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 为什么删除带关系的节点必须用 DETACH DELETE？</div>
+      <button class="opt">因为 DETACH 能级联删除相连的其他节点</button>
+      <button class="opt">因为 DETACH DELETE 比 DELETE 快得多</button>
+      <button class="opt">因为节点删除前必须先删掉它的关系，否则数据库会留下指向不存在节点的孤儿关系</button>
+      <div class="ans">正确答案：<b>防止孤儿关系</b>。DETACH 的作用是先删除该节点的所有关系再删节点本身，不是级联删别的节点。不加 DETACH 会报 Neo.ClientError.Schema.ConstraintValidationFailed 类型的删除错误。大批量删要注意分批，避免长事务。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 和关系库的递归 CTE 相比，Cypher 处理多跳遍历的优势是？</div>
+      <button class="opt">声明式模式匹配 + 指针级跳转，无需每跳自连接和中间结果物化，深度增加时代价仍是线性</button>
+      <button class="opt">Cypher 是图灵完备的编程语言，递归 CTE 不是</button>
+      <button class="opt">递归 CTE 不支持循环检测，Cypher 会自动去重所有结果</button>
+      <div class="ans">正确答案：<b>声明式 + 免索引邻接</b>。同一个 3 跳查询，递归 CTE 要锚点/递归/终止三段共 20 行且每跳一次自连接，Cypher 一行；深度从 3 跳到 10 跳，图库代价仍是走过的子图大小，递归 CTE 则加速恶化。注意 Cypher 不自动去重，要 DISTINCT。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查语句</h3>
+  <div class="cmds">
+    <div class="crow"><code>MATCH (u:User {email:$e}) RETURN u</code><span class="desc">按标签+属性定位节点（走索引）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MATCH (a)-[:FOLLOWS]-&gt;(b) RETURN a,b</code><span class="desc">遍历一层有向关系</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MATCH (a)-[:FOLLOWS*1..3]-(b) RETURN b</code><span class="desc">1~3 跳变长遍历（必须设上限）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MATCH p=shortestPath((a)-[*..6]-(b)) RETURN p</code><span class="desc">最短路径</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MERGE (u:User {email:$e}) ON CREATE SET ... ON MATCH SET ...</code><span class="desc">幂等写入（配唯一约束）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MATCH (u) DETACH DELETE u</code><span class="desc">删节点及其所有关系</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CREATE CONSTRAINT ... REQUIRE u.email IS UNIQUE</code><span class="desc">唯一约束（自动建索引）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN / PROFILE MATCH ...</code><span class="desc">看查询计划与实际 db hits</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CALL dbms.cluster.overview()</code><span class="desc">集群拓扑与角色</span><button class="copy">复制</button></div>
+    <div class="crow"><code>LOAD CSV WITH HEADERS FROM 'url' AS row ...</code><span class="desc">CSV 批量导入（配 PERIODIC COMMIT）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CALL db.awaitIndex('name', 300)</code><span class="desc">等索引建完再跑查询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MATCH (n) DETACH DELETE n</code><span class="desc">清空全库（练习前重置数据）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>常用内置函数</h3>
+  <pre><span class="c">// 路径函数</span>
+length(p)                    <span class="c">// 路径跳数</span>
+nodes(p) / relationships(p)  <span class="c">// 路径上的节点/关系列表</span>
+
+<span class="c">// 聚合函数</span>
+count(x) / count(*)          <span class="c">// 计数</span>
+sum(x) / avg(x) / min(x) / max(x)
+collect(x)                   <span class="c">// 收集成列表</span>
+
+<span class="c">// 标量函数</span>
+toUpper(s) / toLower(s) / size(list) / coalesce(a, b)
+date() / datetime() / timestamp()   <span class="c">// 当前时间</span>
+
+<span class="c">// 列表推导：过滤 + 变换一行完成</span>
+<span class="b">RETURN</span> [n <span class="b">IN</span> nodes(p) <span class="b">WHERE</span> n.age &gt; 18 | n.name] <span class="b">AS</span> adults</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>属性图</b></td><td>节点带标签和属性、关系带类型/方向/属性的图模型</td></tr>
+    <tr><td><b>节点 Node</b></td><td>图里的实体，如一个用户</td></tr>
+    <tr><td><b>关系 Relationship</b></td><td>节点间有类型、有方向的连接，可带属性</td></tr>
+    <tr><td><b>标签 Label</b></td><td>节点的分类，一个节点可多个标签</td></tr>
+    <tr><td><b>属性 Property</b></td><td>节点/关系上的键值对，值不能为 null</td></tr>
+    <tr><td><b>Cypher</b></td><td>Neo4j 的声明式查询语言，用 ASCII 艺术描述图模式</td></tr>
+    <tr><td><b>MATCH</b></td><td>模式匹配子句，图的"SELECT"</td></tr>
+    <tr><td><b>MERGE</b></td><td>匹配则复用、否则创建，upsert 语义</td></tr>
+    <tr><td><b>DETACH DELETE</b></td><td>先删节点所有关系再删节点</td></tr>
+    <tr><td><b>免索引邻接</b></td><td>节点物理保存关系引用，遍历一跳即指针跟随</td></tr>
+    <tr><td><b>因果集群</b></td><td>Neo4j 集群形态：core + read replica</td></tr>
+    <tr><td><b>Core 服务器</b></td><td>参与 Raft 共识的节点，写只发生在其中的 leader</td></tr>
+    <tr><td><b>Read Replica</b></td><td>异步复制的只读节点，不投票，扩展读能力</td></tr>
+    <tr><td><b>Raft</b></td><td>leader 选举 + 日志复制的共识协议</td></tr>
+    <tr><td><b>bookmark</b></td><td>写事务在日志中的位置，用于因果链保证写后读一致</td></tr>
+    <tr><td><b>因果一致性</b></td><td>保证"读到自己的写"及因果顺序，弱于线性一致</td></tr>
+    <tr><td><b>APOC</b></td><td>Neo4j 官方过程库，几百个实用存储过程</td></tr>
+    <tr><td><b>supernode</b></td><td>关系数超高的节点，遍历性能杀手</td></tr>
+    <tr><td><b>唯一约束</b></td><td>属性唯一 + 自动建索引，MERGE 的安全网</td></tr>
+    <tr><td><b>shortestPath</b></td><td>两点间最短路径函数，必须配跳数上限</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 Neo4j，完成这五件事 —— ① 按本文学一遍 CREATE + MERGE 写一个关注关系，故意重复执行 CREATE 看重复节点，再用 MERGE + 唯一约束改正；② 写二度好友推荐查询，用 PROFILE 看 db hits；③ 灌 1 万节点 10 万关系，对比带标签和不带标签查询的耗时；④ 建一个 (用户)-[:属于*0..5]-&gt;(组)-[:可读]-&gt;(资源) 的权限图并写鉴权查询；⑤ 用 cypher-shell 连一次，试试参数化查询。<br><br>
+    <b>之后值得单独学：</b>APOC 过程库（批量导入、图算法）、Graph Data Science 库（PageRank、社区发现等图算法）、Neo4j Aura 托管版、以及与 Spring Data Neo4j 的集成方式。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Neo4j · 上线前务必检查：唯一约束、起始索引、变长路径上限</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（免索引邻接）和模块 6（因果一致性）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在浏览器里敲 Cypher。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 Neo4j 跟着敲：docker run -d -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:5';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

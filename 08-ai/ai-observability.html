@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 AI 应用可观测性</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · AI 篇 · 第 6 期 · 高密度版</span>
+    <h1>二十分钟学透 AI 应用可观测性</h1>
+    <p class="sub">GPU、延迟、错误率全都正常，模型回答质量却悄悄崩了——传统可观测性对此完全失明。这篇讲<b>trace 怎么切 span、指标多哪几个维度、日志怎么留、在线评估怎么接、质量告警怎么设计</b>，以及 Langfuse/Phoenix/Helicone 怎么选。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip">OTel GenAI <b>语义约定</b></span>
+      <span class="chip"><b>4</b> 类工具链对比</span>
+      <span class="chip"><b>10</b> 个工程坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边对照你现在的监控大盘：延迟、错误率之外，你有几个 AI 专属指标？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先搞清楚：传统监控失明在哪</h2></div>
+  <p class="lead">传统可观测性假设系统是<b>确定性的</b>：同样的输入必然产生同样的输出，所以"请求 200、延迟 50ms"就等于"服务正常"。LLM 应用打破了这个假设——</p>
+  <pre><span class="c"># 同一个请求，两次调用，HTTP 层完全一致：</span>
+curl -s -o /dev/null -w <span class="g">"%{http_code} %{time_total}s\n"</span> -X POST $API/chat \
+  -d <span class="g">'{"q":"我们支持7天无理由退货吗"}'</span>
+<span class="g">200 1.832s</span>
+curl -s -o /dev/null -w <span class="g">"%{http_code} %{time_total}s\n"</span> -X POST $API/chat \
+  -d <span class="g">'{"q":"我们支持7天无理由退货吗"}'</span>
+<span class="g">200 1.805s</span>
+
+<span class="c"># 但响应内容可能是：</span>
+<span class="g">"支持。签收后7天内可无理由退货，运费由商家承担。"</span>   <span class="c"># 正确</span>
+<span class="g">"不支持。本公司商品一经售出概不退换。"</span>               <span class="c"># 与知识库矛盾（幻觉/检索失败）</span>
+<span class="g">"抱歉，我无法回答这个问题。"</span>                         <span class="c"># 过度拒答</span>
+
+<span class="c"># → 监控一切正常，业务已经在出事。这就是本篇要解决的问题。</span></pre>
+  <div class="callout danger">
+    <b>核心差异三条：</b>① <b>非确定性</b>——同样的输入可能有不同的输出，质量是个分布不是开关；② <b>token 成为一等公民</b>——延迟、成本、限流都由 token 驱动，请求数不再够用；③ <b>质量本身成为观测对象</b>——必须把"回答得好不好"变成可持续采集的信号，而不只是上线前跑一遍评测。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>传统 vs AI 可观测性</h2></div>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:250px">传统 Web 服务</th><th>LLM 应用</th></tr>
+    <tr><td><b>健康定义</b></td><td>状态码 200 + 延迟达标 = 健康</td><td>还要加<b>质量信号</b>：相关性、groundedness、拒答率、用户反馈</td></tr>
+    <tr><td><b>延迟度量</b></td><td>总延迟，P50/P99</td><td>总延迟 + <b>TTFT（首 token 延迟）</b> + 每 token 生成速率，流式场景三者体感不同</td></tr>
+    <tr><td><b>计量单位</b></td><td>QPS、请求数</td><td><b>token 数</b>（输入/输出分开）、上下文长度、模型版本、缓存命中</td></tr>
+    <tr><td><b>成本信号</b></td><td>基础设施成本（CPU/内存/带宽）</td><td>按请求/按 token 的<b>模型调用成本</b>，通常远超基础设施成本</td></tr>
+    <tr><td><b>故障模式</b></td><td>5xx、超时、连接拒绝</td><td>还包括：格式崩坏、幻觉、过度拒答、内容审核拦截、token 截断（finish_reason=length）</td></tr>
+    <tr><td><b>归因难度</b></td><td>服务 → 接口 → 依赖</td><td>请求 → <b>检索质量？prompt 版本？模型版本？缓存？</b> 变量多且互相纠缠</td></tr>
+    <tr><td><b>变更影响</b></td><td>代码发布</td><td>代码 + prompt + 模型版本 + 知识库更新，<b>四个变量都能改变行为</b></td></tr>
+  </table>
+  <div class="callout">
+    <b>推论：AI 可观测性 = 传统三支柱（指标/日志/追踪）+ 两个新增量：token 维度与质量维度。</b>前者是计量问题，后者是评估问题（评估体系详见本系列评估篇），本篇讲怎么把它们接进日常运维。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>追踪：一次请求的 trace 长什么样</h2></div>
+  <p class="lead">RAG/Agent 应用的一次用户请求，天然是一条多段流水线。trace 的设计目标：<b>任何质量问题，能沿着 span 树定位到是哪一段出的错</b>。</p>
+  <pre><span class="c"># 一次 RAG 问答的 span 树（每个 span 记录耗时 + 关键属性）</span>
+trace: rag-query (整个请求，根 span)
+├── s1  input_guard          输入审核/注入检测        12ms
+├── s2  embed_query          查询向量化                45ms
+├── s3  vector_search        向量检索 top-k            38ms   ← 检索质量
+│       attrs: k=5, 命中数, 最高分 0.82, 阈值过滤后剩 3
+├── s4  rerank               重排序                    60ms   ← 可选
+├── s5  prompt_build         prompt 组装                2ms   ← prompt 版本 v2.3
+│       attrs: system_hash, 模板版本, 上下文 token 数 2143
+├── s6  llm_chat             模型生成（流式）          2100ms  ← 生成质量
+│       attrs: model=gpt-4o-mini, ttft=380ms, 输出 token=612,
+│              finish_reason=stop, temperature=0.3
+├── s7  output_guard         输出审核/脱敏/schema     180ms
+└── s8  log_persist          落库                       15ms
+
+<span class="c"># 定位问题的标准路径：</span>
+<span class="c"># 回答与知识库矛盾 → 先看 s3 检索命中了什么 → 命中对但 s6 没用上 → prompt/生成问题</span>
+<span class="c"># 回答引用不存在 → s6 生成问题 → 看 prompt 版本和模型版本有没有变</span>
+<span class="c"># 延迟突增 → 看哪段 span 变长（s6 的 ttft 还是 s3 的检索）</span></pre>
+  <h3>span 设计的四条军规</h3>
+  <ul>
+    <li><b>每个外部调用一个 span</b>：模型调用、检索、rerank、工具调用各占一个，不要揉成一个"处理中"的大 span。</li>
+    <li><b>属性（attribute）带上定位所需的全部上下文</b>：模型名、prompt 模板版本、top-k、阈值、token 数、缓存命中与否。<b>缺了这些，出了事只能看耗时。</b></li>
+    <li><b>prompt 全文不要塞进 span 属性</b>（体量爆炸、隐私风险），存<b>哈希 + 版本号</b>，全文去日志系统按需查。</li>
+    <li><b>流式生成记两个时间点</b>：请求发出到首 token（TTFT）、首 token 到结束（生成阶段），合并记一个总延迟会丢掉关键信息。</li>
+  </ul>
+  <h3>OpenTelemetry GenAI 语义约定</h3>
+  <p>OTel 社区制定了 GenAI 专用语义约定（semantic conventions），让不同厂商的 LLM 追踪可以落到同一套属性名上。<b>属性名以 semconv 当前版本为准</b>，以下为常见核心属性：</p>
+  <table>
+    <tr><th style="width:300px">属性</th><th>示例值 / 说明</th></tr>
+    <tr><td class="f">gen_ai.operation.name</td><td>chat / embeddings / execute_tool</td></tr>
+    <tr><td class="f">gen_ai.system</td><td>openai / gcp.gemini 等，标识提供商</td></tr>
+    <tr><td class="f">gen_ai.request.model</td><td>请求的模型名</td></tr>
+    <tr><td class="f">gen_ai.request.temperature / top_p / max_tokens</td><td>采样参数</td></tr>
+    <tr><td class="f">gen_ai.usage.input_tokens / output_tokens</td><td>token 用量（部分厂商拆更细，如 cached_tokens）</td></tr>
+    <tr><td class="f">gen_ai.response.model</td><td>实际响应的模型（可能与请求不同）</td></tr>
+    <tr><td class="f">gen_ai.response.finish_reasons</td><td>stop / length / tool_calls</td></tr>
+    <tr><td class="f">server.address / server.port</td><td>调用的服务端点</td></tr>
+    <tr><td class="f">error.type</td><td>错误分类，遵循 OTel 通用约定</td></tr>
+  </table>
+  <pre><span class="c"># 用 OpenTelemetry Python SDK 给 LLM 调用打 span（伪代码，API 以当前文档为准）</span>
+<span class="b">from</span> opentelemetry <span class="b">import</span> trace
+tracer = trace.get_tracer(<span class="g">"rag-service"</span>)
+
+<span class="b">def</span> chat_with_span(messages, model):
+    <span class="b">with</span> tracer.start_as_current_span(<span class="g">"chat "</span> + model) <span class="b">as</span> span:
+        t0 = time.time()
+        first_token_at = <span class="b">None</span>
+        chunks = []
+        <span class="b">for</span> chunk <span class="b">in</span> client.chat.completions.create(model=model, messages=messages, stream=<span class="b">True</span>):
+            <span class="b">if</span> first_token_at <span class="b">is</span> <span class="b">None</span>:
+                first_token_at = time.time()
+            chunks.append(chunk)
+        <span class="c"># ---- 落属性：出问题时就靠这些定位 ----</span>
+        span.set_attribute(<span class="g">"gen_ai.system"</span>, <span class="g">"openai"</span>)
+        span.set_attribute(<span class="g">"gen_ai.request.model"</span>, model)
+        span.set_attribute(<span class="g">"gen_ai.usage.input_tokens"</span>, usage.input_tokens)
+        span.set_attribute(<span class="g">"gen_ai.usage.output_tokens"</span>, usage.output_tokens)
+        span.set_attribute(<span class="g">"gen_ai.usage.time_to_first_token_ms"</span>, (first_token_at - t0) * 1000)
+        span.set_attribute(<span class="g">"gen_ai.response.finish_reasons"</span>, finish_reason)
+        <span class="b">return</span> <span class="g">""</span>.join(chunks)</pre>
+  <div class="callout warn">
+    <b>token 用量拿不到怎么办？</b>流式响应的最后几个 chunk 才带 usage（且部分厂商默认不返回，需要在请求里开 <span class="k">stream_options: {"include_usage": true}</span> 之类的开关——<b>具体参数以厂商文档为准</b>）。拿不到就按 tokenizer 本地估算，并在文档里注明"估算值"，别让成本大盘建立在不准的数上。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>指标：AI 应用该看哪些数</h2></div>
+  <table>
+    <tr><th style="width:180px">指标</th><th style="width:200px">说明</th><th>告警参考</th></tr>
+    <tr><td><b>TTFT P99</b></td><td>首 token 延迟，流式体感的核心</td><td>P99 &gt; 2s 持续 5 分钟</td></tr>
+    <tr><td><b>端到端延迟 P99</b></td><td>含检索、审核、生成全链路</td><td>P99 &gt; SLO 的 1.5 倍</td></tr>
+    <tr><td><b>token 吞吐</b></td><td>输出 token/秒（生成速率），反映模型侧拥塞</td><td>较基线下降 40%</td></tr>
+    <tr><td><b>每请求成本</b></td><td>按模型、按业务线分别统计</td><td>日成本超预算 120%</td></tr>
+    <tr><td><b>token 总量趋势</b></td><td>输入/输出分开看</td><td>输入 token 突增 3 倍（上下文膨胀/缓存失效/攻击）</td></tr>
+    <tr><td><b>缓存命中率</b></td><td>prompt 缓存 / 语义缓存命中比例</td><td>命中率较基线掉 20 个百分点</td></tr>
+    <tr><td><b>错误率</b></td><td>5xx、超时、限流 429、内容拦截</td><td>错误率 &gt; 1% 持续 5 分钟</td></tr>
+    <tr><td><b>截断率</b></td><td>finish_reason=length 的请求占比</td><td>&gt; 5% 说明 max_tokens 偏小</td></tr>
+    <tr><td><b>质量分（在线）</b></td><td>抽样评估 + 用户反馈合成</td><td>24h 滑动均值下降 10%</td></tr>
+  </table>
+  <pre><span class="c"># Prometheus 指标定义（prometheus_client 风格）</span>
+<span class="b">from</span> prometheus_client <span class="b">import</span> Counter, Histogram, Gauge
+
+llm_ttft = Histogram(
+    <span class="g">"llm_ttft_seconds"</span>, <span class="g">"time to first token"</span>,
+    [<span class="g">"model"</span>, <span class="g">"route"</span>], buckets=[.1, .3, .5, 1, 2, 5, 10])
+
+llm_duration = Histogram(
+    <span class="g">"llm_request_duration_seconds"</span>, <span class="g">"end-to-end latency"</span>,
+    [<span class="g">"model"</span>, <span class="g">"route"</span>, <span class="g">"status"</span>], buckets=[.5, 1, 2, 5, 10, 30])
+
+llm_tokens = Counter(
+    <span class="g">"llm_tokens_total"</span>, <span class="g">"token usage"</span>,
+    [<span class="g">"model"</span>, <span class="g">"team"</span>, <span class="g">"type"</span>])   <span class="c"># type=input|output</span>
+
+llm_cost = Counter(
+    <span class="g">"llm_cost_dollars_total"</span>, <span class="g">"estimated cost"</span>,
+    [<span class="g">"model"</span>, <span class="g">"team"</span>])
+
+cache_hit = Gauge(<span class="g">"llm_cache_hit_ratio"</span>, <span class="g">"cache hit ratio"</span>, [<span class="g">"layer"</span>])
+
+<span class="c"># 查询：每个业务线每小时成本（PromQL）</span>
+<span class="c"># sum by (team) (increase(llm_cost_dollars_total[1h]))</span>
+
+<span class="c"># 查询：TTFT P99 按模型拆分</span>
+<span class="c"># histogram_quantile(0.99, sum by (model, le) (rate(llm_ttft_seconds_bucket[5m])))</span></pre>
+  <div class="callout ok">
+    <b>成本指标必须按"业务线/租户"打标签。</b>没有 team 标签的成本大盘，出事时你只能回答"这个月烧了两万"，回答不了"是哪条产品线烧的、该找谁"。标签体系要在第一版就设计好，事后补不了历史数据。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>日志：prompt/response 留存与隐私</h2></div>
+  <p class="lead">LLM 日志是<b>双刃剑</b>：不留，出问题无法复盘；全留，就是一份完整的"用户敏感信息 + 商业机密"档案，还面临删除权（用户要求删除个人数据时，日志算不算？）的合规难题。</p>
+  <h3>分层留存策略（推荐默认值）</h3>
+  <table>
+    <tr><th style="width:150px">数据类型</th><th style="width:150px">保留期限</th><th>说明</th></tr>
+    <tr><td><b>trace 元数据</b><br>（耗时、token、模型、状态码）</td><td>永久 / ≥1 年</td><td>不含内容，体积小，是成本和质量趋势分析的基础</td></tr>
+    <tr><td><b>prompt/response 全文</b></td><td>30~90 天</td><td>明文留存便于调试；到期自动清除，写入存储桶生命周期策略</td></tr>
+    <tr><td><b>脱敏后全文</b><br>（PII 替换后）</td><td>1 年</td><td>用于长期质量分析、评测集构建，不触碰原始敏感信息</td></tr>
+    <tr><td><b>被拦截/降级的请求</b></td><td>≥6 个月</td><td>安全审计与合规留证需要（与备案要求对齐，以现行规定为准）</td></tr>
+  </table>
+  <h3>落到工程的四个动作</h3>
+  <div class="steps">
+    <div class="txt"><b>采样落盘</b>：全量 trace 太贵，正文按 5%~10% 抽样存（出错请求、被拦截请求 100% 存），元数据全量存。</div>
+    <div class="txt"><b>写入前脱敏</b>：PII 检测做在"离开应用进程之前"（Presidio 或正则，见护栏篇），脱敏规则和业务库保持一致。</div>
+    <div class="txt"><b>删除链路</b>：用户行使用户 ID 索引所有日志（trace 带 user_id 属性），收到删除请求能定位并清除——<b>做不到可删除的留存等于给未来埋雷</b>。</div>
+    <div class="txt"><b>访问控制</b>：明文日志按"需知才给"授权，访问本身记审计；调试走脱敏环境，生产明文要审批。</div>
+  </div>
+  <pre><span class="c"># 日志管线的两个关键点：先脱敏后落盘；user_id 贯穿全链路</span>
+<span class="b">def</span> persist_trace(trace, user_id, sample_rate=<span class="y">0.1</span>):
+    <span class="c"># 1. 元数据全量落（便宜）</span>
+    metrics_store.write(trace.metrics_only())
+
+    <span class="c"># 2. 正文抽样 + 脱敏后落（合规）</span>
+    <span class="b">if</span> random.random() &lt; sample_rate <span class="b">or</span> trace.blocked:
+        redacted = pii_redactor.redact(trace.full_text())      <span class="c"># 先脱敏</span>
+        object_store.put(
+            key=f<span class="g">"traces/{date}/{trace.id}.json"</span>,
+            body=redacted,
+            tags={<span class="g">"user_id"</span>: user_id},                    <span class="c"># 删除链路靠它</span>
+            lifecycle_days=365,                      <span class="c"># 存储桶策略兜底</span>
+        )</pre>
+  <div class="callout danger">
+    <b>最贵的错误：把 prompt 日志当"普通应用日志"处理。</b>它会顺理成章地流进 ELK/Loki，跟着应用日志的默认保留期（有的团队是永久）活下来，且没有按 user_id 删除的能力。等合规审计或用户行使删除权时，你会发现要改的是整个日志架构。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>评估与观测的结合：在线抽样评估</h2></div>
+  <p class="lead">离线评测回答"这个版本好不好"，在线评估回答"<b>线上现在好不好</b>"。后者是观测系统的核心增量：把评估从"发布前跑一次"变成"持续在跑的采样任务"。</p>
+  <h3>在线信号的四个来源</h3>
+  <table>
+    <tr><th style="width:150px">信号</th><th style="width:210px">采集方式</th><th>优缺点</th></tr>
+    <tr><td><b>显式用户反馈</b></td><td>点赞/点踩、评分、投诉入口</td><td>最真实但<b>覆盖率低</b>（通常 &lt;5% 用户会点），且生气的人更爱点</td></tr>
+    <tr><td><b>隐式行为信号</b></td><td>重新生成率、复制率、会话放弃率、转人工率</td><td>覆盖全量用户；"重新生成"是质量差的最强代理指标之一</td></tr>
+    <tr><td><b>LLM-as-Judge 抽样</b></td><td>对 1%~5% 请求自动评分（相关性、groundedness、安全性）</td><td>覆盖可控、维度全；judge 自身有偏，要定期和人工对齐</td></tr>
+    <tr><td><b>规则校验</b></td><td>schema 通过率、引用有效率、拒答率、截断率</td><td>零成本确定性信号，先于一切复杂评估</td></tr>
+  </table>
+  <pre><span class="c"># 在线抽样评估的最小实现</span>
+<span class="b">def</span> online_eval(trace):
+    <span class="b">if</span> not should_sample(trace, rate=<span class="y">0.02</span>):     <span class="c"># 2% 抽样，按流量自适应</span>
+        <span class="b">return</span>
+    score = judge_score(
+        question=trace.question,
+        answer=trace.answer,
+        contexts=trace.retrieved_chunks,
+        rubric=<span class="g">"faithfulness,relevance,safety"</span>,
+    )
+    quality_gauge.labels(model=trace.model, route=trace.route).set(score)
+    <span class="b">if</span> score &lt; <span class="y">0.6</span>:
+        bad_case_queue.push(trace.id)     <span class="c"># 进人工复盘队列</span>
+
+<span class="c"># judge 的 prompt 要固定版本，评分口径变化 = 指标断点</span>
+<span class="c"># 定期抽 100 条人工复评 judge 结论，偏差 &gt;15% 就校准 judge prompt</span></pre>
+  <div class="callout warn">
+    <b>judge 评分是"合成指标"，有两个已知坑：</b>① <b>位置偏置</b>——judge 倾向于给长回答高分、给第一个出现的选项高分， rubric 里要显式约束；② <b>自我偏好</b>——用 GPT-4 评 GPT-4 的输出分会虚高，跨厂商组合更稳。改 judge 的 prompt 或模型版本，等于换了尺子，历史曲线要在看板上标注"口径变更"。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>告警设计：质量退化怎么发现</h2></div>
+  <p class="lead">AI 应用最典型的故障不是 5xx 风暴，而是<b>无声的质量退化</b>：prompt 改版、模型静默更新、知识库变更、缓存策略调整，任何一个都可能让错误率保持 0% 的同时质量崩掉。告警必须覆盖这类"看起来正常"的故障。</p>
+  <h3>告警分层</h3>
+  <table>
+    <tr><th style="width:150px">层级</th><th style="width:260px">信号（示例规则）</th><th>响应</th></tr>
+    <tr><td><b>P0 可用性</b></td><td>错误率 &gt; 1% 持续 5min；TTFT P99 &gt; 5s；模型侧 429/5xx 飙升</td><td>电话 + 自动降级（切备用模型/备用路由）</td></tr>
+    <tr><td><b>P1 质量</b></td><td>judge 质量分 24h 滑动均值降 &gt; 10%；截断率 &gt; 5%；引用失效率 &gt; 10%</td><td>IM 告警，当班排查 prompt/模型/知识库变更</td></tr>
+    <tr><td><b>P1 成本</b></td><td>日成本 &gt; 预算 120%；输入 token 量较 7 日基线 &gt; 3 倍</td><td>查缓存命中、查异常流量、必要时限流</td></tr>
+    <tr><td><b>P2 趋势</b></td><td>缓存命中率连降 3 天；输出 token 均长逐周上升 15%</td><td>周报跟进，不打扰当班</td></tr>
+  </table>
+  <pre><span class="c"># 质量退化告警（PromQL 示例）</span>
+<span class="c"># 规则：24h 滑动均值较前 24h 下降超过 10%</span>
+<span class="c"># expr:</span>
+<span class="c">#   (</span>
+<span class="c">#     avg_over_time(llm_quality_score[24h])</span>
+<span class="c">#     / avg_over_time(llm_quality_score[24h] offset 24h)</span>
+<span class="c">#   ) &lt; 0.9</span>
+<span class="c"># for: 30m</span>
+
+<span class="c"># 成本突增（输入 token 3 倍突增，抓缓存失效/上下文膨胀/恶意刷量）</span>
+<span class="c"># expr:</span>
+<span class="c">#   sum(increase(llm_tokens_total{type="input"}[1h]))</span>
+<span class="c">#     &gt; 3 * sum(increase(llm_tokens_total{type="input"}[1h] offset 25h))</span>
+<span class="c"># for: 15m</span></pre>
+  <div class="callout ok">
+    <b>告警要能指向"最近的变更"。</b>给看板和告警通知带上"最近 24h 内的 prompt 版本 / 模型版本 / 知识库更新时间"——80% 的质量退化是变更引起的，值班人第一眼看到变更记录，排查从半小时缩到五分钟。变更事件本身也要作为指标/事件流接入（deploy 事件、prompt 发布事件、模型路由切换事件）。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>工具链选型</h2></div>
+  <table>
+    <tr><th style="width:130px">工具</th><th style="width:110px">形态</th><th style="width:230px">强项</th><th>注意点</th></tr>
+    <tr><td><b>Langfuse</b></td><td>OSS 可自托管 + 云</td><td>trace/评估/prompt 管理一体；SDK 包裹主流 LLM 客户端；自托管门槛低（Docker Compose）</td><td>高写入量下存储要规划；团队协作功能在自托管版有边界</td></tr>
+    <tr><td><b>Phoenix<br>(Arize)</b></td><td>OSS 库/SaaS</td><td>trace 可视化强；RAG 评估模板（faithfulness 等）开箱即用；embedding 聚类分析</td><td>偏"分析工具"，生产告警要外接；重度场景性能要调</td></tr>
+    <tr><td><b>Helicone</b></td><td>代理网关 + OSS</td><td><b>改 base_url 即接入</b>，零代码；自带缓存、限流、按用户统计</td><td>走代理 = 流量过第三方（自托管可解）；粒度粗于 SDK 埋点</td></tr>
+    <tr><td><b>LangSmith</b></td><td>SaaS</td><td>LangChain 生态深度集成；数据集+评测+观测闭环</td><td>绑定 LangChain 技术栈；数据出境与成本要想清楚</td></tr>
+    <tr><td><b>OpenLLMetry<br>(Traceloop)</b></td><td>OSS 库</td><td><b>OTel 原生</b>，trace 导出到任意 OTel 后端（Jaeger/Tempo/Datadog）</td><td>只做追踪不做评估 UI；后端要自己搭</td></tr>
+    <tr><td><b>自建</b><br>(OTel + Prometheus + 对象存储)</td><td>拼装</td><td>完全可控、无数据外传、和现有栈统一</td><td>工作量最大：采集器、存储、保留策略、看板全自己来</td></tr>
+  </table>
+  <h3>按场景选</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>已有 OTel/Prometheus 栈</div><div class="cd">选 <b>OpenLLMetry</b> 做埋点导出到现有后端，指标用 Prometheus，成本最低、统一运维</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>要快，本周上线</div><div class="cd"><b>Helicone 代理</b>改 base_url 五分钟接入，先看到 trace 和成本，再补精细埋点</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>评估是重头戏</div><div class="cd"><b>Langfuse</b>（自托管）+ Phoenix 做分析，评估任务、prompt 版本、bad case 管理一体</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>数据不能出境</div><div class="cd">只用可自托管方案（Langfuse/Phoenix/OpenLLMetry），SaaS 全部排除，接入前过一遍安全评审</div></div>
+  </div>
+  <div class="callout">
+    <b>选型的第一性问题不是功能，是"trace 数据流向哪里"。</b>代理类工具（Helicone）流量过它的网关；SDK 类工具数据落在你指定的后端。先定数据边界，再比功能清单——这个顺序反了，选型会反复推倒重来。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个工程坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只观测基础设施，不观测模型行为</div><div class="pd">CPU/内存/GPU/网络全套大盘，唯独没有"模型回答质量"任何一个指标。正确率跌到 60% 监控一片绿。质量指标（judge 分、引用有效率、拒答率）必须进大盘。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">全量 prompt/response 明文无限期留存</div><div class="pd">日志系统成了敏感信息档案馆，用户行使删除权时无法响应，合规审计直接卡死。分层留存 + 写入前脱敏 + user_id 索引，三件套必须在第一版就做。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只有聚合指标，没有 trace 明细</div><div class="pd">"平均延迟涨了 800ms"然后呢？没有 span 树，定位不到是检索慢、生成慢还是审核慢。聚合指标告警，trace 明细定位，两者缺一不可。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">延迟只看平均值，不看 P99 和 TTFT</div><div class="pd">流式产品用户体感由首 token 决定：均值 1s 但 TTFT P99 8s，用户早以为死了。分位数 + TTFT 单独看，生成速率（token/s）也要看。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">评估只在上线前跑，线上没有持续评估</div><div class="pd">上线时 95 分，三个月后知识库污染、prompt 被顺手改过、模型静默更新，质量悄悄滑坡没人知道。在线抽样评估是"质量监控"，不是可选项。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">告警只看错误率，不看质量分</div><div class="pd">错误率 0% 和质量全崩可以同时成立——模型稳定地返回错误答案时 HTTP 层毫无异常。质量类指标要有独立告警通道。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">prompt 没有版本管理</div><div class="pd">线上回答风格突变，排查时发现有人上周手动改过 prompt，没人记得改了什么。prompt 进 git，发布带版本号，trace 属性里记录 prompt 版本——和代码发布同等纪律。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">span 粒度过粗，一个"处理中"包打天下</div><div class="pd">请求内部 2 秒花在哪完全黑盒。至少拆出：审核、检索、rerank、prompt 组装、模型调用、输出校验，每段带属性。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">忽略 token 用量突增信号</div><div class="pd">输入 token 三倍暴涨，可能是缓存集体失效、上下文无限增长、有人刷量、或 retry 风暴——每一个都直接等于成本事故。token 曲线要和延迟曲线同等地位。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把抽样评估的结论当全量真相</div><div class="pd">2% 抽样的 judge 分只代表那 2%，流量结构变化（比如某渠道占比升高）会让分数漂移。抽样要分层（按路由/模型/渠道），看板标注样本量，结论要带置信意识。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 模型稳定地开始返回错误答案，但 HTTP 200、延迟正常、错误率为 0。传统监控能发现吗？</div>
+      <button class="opt">能，延迟和错误率会先出现波动</button>
+      <button class="opt">能，QPS 下降会反映质量问题</button>
+      <button class="opt">不能，必须引入质量类指标（judge 分、引用有效率、用户反馈）才能发现</button>
+      <div class="ans">正确答案：<b>不能，必须引入质量信号</b>。这正是 AI 可观测性的核心增量：LLM 应用"稳定地返回错误"在基础设施层是完全健康的。在线抽样评估 + 隐式行为信号（重新生成率、转人工率）+ 规则校验（截断率、引用失效率）构成质量观测的最小集合。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. OpenTelemetry GenAI 语义约定中，记录一次 chat 调用 token 用量的属性是？</div>
+      <button class="opt">gen_ai.usage.input_tokens 与 gen_ai.usage.output_tokens</button>
+      <button class="opt">llm.tokens.in 与 llm.tokens.out</button>
+      <button class="opt">http.tokens_consumed</button>
+      <div class="ans">正确答案：<b>gen_ai.usage.input_tokens / gen_ai.usage.output_tokens</b>。遵循 semconv 的好处是跨厂商、跨后端（Jaeger/Tempo/Datadog）属性名一致，看板和告警不用为每个模型重写。具体属性清单以 semconv 当前版本为准。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 流式输出场景，为什么必须单独观测 TTFT（首 token 延迟）？</div>
+      <button class="opt">因为 TTFT 决定计费金额</button>
+      <button class="opt">因为用户对"等待开始响应"的感知由首 token 决定，总延迟相同 TTFT 不同体感差异巨大</button>
+      <button class="opt">因为 TTFT 是模型厂商 SLA 的唯一指标</button>
+      <div class="ans">正确答案：<b>TTFT 决定用户体感</b>。总延迟 3s 里 TTFT 0.3s（边说边出）和 TTFT 2.5s（干等后齐出）是两个完全不同的产品体验。此外 TTFT 突增通常指向检索/上下文过长/网关排队，是独立于生成速率的故障信号。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于 prompt/response 日志留存，正确的策略是？</div>
+      <button class="opt">全量明文永久留存，出了问题才能查</button>
+      <button class="opt">完全不存，隐私第一</button>
+      <button class="opt">分层：元数据长期、明文短期（30~90 天）、脱敏后中期（约 1 年），并支持按 user_id 删除</button>
+      <div class="ans">正确答案：<b>分层留存 + 可删除</b>。全量永久明文 = 合规地雷（删除权、审计）；完全不存 = 无法复盘。元数据（耗时/token/模型）不含内容、体积小，值得长期存做趋势分析；正文抽样 + 脱敏后留存平衡调试与隐私；被拦截请求按合规要求保留更久（以现行规定为准）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 设计"质量退化告警"，最直接的触发信号是？</div>
+      <button class="opt">GPU 利用率连续 10 分钟高于 90%</button>
+      <button class="opt">在线抽样评估的 judge 质量分 24h 滑动均值较前日下降超过 10%</button>
+      <button class="opt">当日请求量较昨日下降</button>
+      <div class="ans">正确答案：<b>judge 质量分滑动窗口下降</b>。配套信号还有：截断率上升、引用失效率上升、重新生成率上升、转人工率上升。单看请求量没有意义（下降可能是正常的时段波动）；GPU 利用率是基础设施指标，与质量无因果。告警规则建议 for: 30m，避免单次抽样抖动误报。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 团队已有 Prometheus + Grafana + Jaeger，想最快给 LLM 应用加上观测，选型思路是？</div>
+      <button class="opt">用 OTel 原生埋点（如 OpenLLMetry）导出到现有后端，指标进 Prometheus</button>
+      <button class="opt">上一套全新 SaaS 观测平台，替换现有栈</button>
+      <button class="opt">让模型厂商后台的用量页面充当观测系统</button>
+      <div class="ans">正确答案：<b>OTel 原生埋点，复用现有栈</b>。OpenLLMetry 这类工具按 OTel GenAI 语义约定生成 span 和指标，直接进你已有的 Jaeger/Prometheus，运维、告警、看板全部复用。另两个选项的问题：新 SaaS 意味着数据外传 + 双套运维；厂商后台只有聚合用量，没有 trace、没有质量维度、没有按业务线的归因。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>核心 span 属性清单（照此埋点）</h3>
+  <div class="cmds">
+    <div class="crow"><code>gen_ai.system / request.model / response.model</code><span class="desc">模型身份三件套，实际模型可能与请求不同</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gen_ai.usage.input_tokens / output_tokens</code><span class="desc">token 用量，成本与限流的基础</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gen_ai.request.temperature / top_p / max_tokens</code><span class="desc">采样参数，行为变化的解释变量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gen_ai.response.finish_reasons</code><span class="desc">stop / length / tool_calls，length 偏高要调 max_tokens</span><button class="copy">复制</button></div>
+    <div class="crow"><code>prompt_template_version</code><span class="desc">prompt 版本号，线上行为突变的头号嫌疑人</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rag.k / rag.threshold / rag.hits</code><span class="desc">检索参数与命中，定位"答非所问"先看这段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ttft_ms / gen_duration_ms</code><span class="desc">流式两段计时，合并记会丢信息</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cache_hit / cache_layer</code><span class="desc">命中情况，成本突增排查第一站</span><button class="copy">复制</button></div>
+    <div class="crow"><code>user_id / team / route</code><span class="desc">成本归因 + 日志删除链路，全靠它们</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>常用 PromQL</h3>
+  <pre><span class="c"># TTFT P99 按模型</span>
+histogram_quantile(0.99, sum by (model, le) (rate(llm_ttft_seconds_bucket[5m])))
+
+<span class="c"># 每业务线每小时成本</span>
+sum by (team) (increase(llm_cost_dollars_total[1h]))
+
+<span class="c"># 输入 token 突增（较 25 小时前同时段 3 倍）</span>
+sum(increase(llm_tokens_total{type=<span class="g">"input"</span>}[1h]))
+  &gt; 3 * sum(increase(llm_tokens_total{type=<span class="g">"input"</span>}[1h] offset 25h))
+
+<span class="c"># 截断率（finish_reason=length 占比）</span>
+sum(rate(llm_requests_total{finish_reason=<span class="g">"length"</span>}[1h]))
+  / sum(rate(llm_requests_total[1h]))</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>可观测性 Observability</b></td><td>从系统外部输出推断内部状态的能力，AI 场景要加上"质量状态"</td></tr>
+    <tr><td><b>Trace / Span</b></td><td>一次请求的完整调用链 / 链中的一段（带起止时间与属性）</td></tr>
+    <tr><td><b>Attribute</b></td><td>span 上的键值对，定位问题的原料；缺属性等于只有耗时</td></tr>
+    <tr><td><b>OpenTelemetry (OTel)</b></td><td>厂商中立的可观测性标准：SDK + 协议 + 语义约定</td></tr>
+    <tr><td><b>GenAI 语义约定 Semconv</b></td><td>OTel 为 LLM 调用定义的属性名规范（gen_ai.*），版本会演进</td></tr>
+    <tr><td><b>TTFT</b></td><td>Time To First Token，首 token 延迟，流式体感的核心指标</td></tr>
+    <tr><td><b>Token 吞吐</b></td><td>生成速率（token/秒），反映模型侧拥塞程度</td></tr>
+    <tr><td><b>成本归因</b></td><td>按业务线/租户/功能分摊模型花费，靠指标标签实现</td></tr>
+    <tr><td><b>缓存命中率</b></td><td>prompt 缓存/语义缓存命中的请求占比，成本与延迟的关键杠杆</td></tr>
+    <tr><td><b>LLM-as-Judge</b></td><td>用模型给模型输出打分；有位置偏置和自我偏好，需人工校准</td></tr>
+    <tr><td><b>在线评估 Online Eval</b></td><td>对线上流量抽样持续评估，把"质量"变成可观测指标</td></tr>
+    <tr><td><b>隐式反馈</b></td><td>重新生成率、复制率、转人工率等不需用户主动评价的行为信号</td></tr>
+    <tr><td><b>质量退化</b></td><td>错误率正常但回答质量下降的故障形态，AI 应用典型事故</td></tr>
+    <tr><td><b>分层留存</b></td><td>元数据长期/明文短期/脱敏中期的日志保留策略</td></tr>
+    <tr><td><b>删除权</b></td><td>用户要求删除个人数据的法定权利，日志系统必须支持按 ID 清除</td></tr>
+    <tr><td><b>采样偏差</b></td><td>抽样评估结论只代表被抽中的部分，流量结构变化会令分数漂移</td></tr>
+    <tr><td><b>Prompt 版本管理</b></td><td>prompt 进 git、发布带版本、trace 记录版本号的工程纪律</td></tr>
+    <tr><td><b>Langfuse / Phoenix / Helicone</b></td><td>三类主流 LLM 观测工具：一体化平台 / 分析向 OSS / 代理网关</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>给你现在的 LLM 应用补三样东西 —— ① 给模型调用加上带 gen_ai.* 属性的 span（或先用 Helicone 代理顶一周）；② 建一个质量分指标（先用规则：截断率 + 引用有效率），接 24h 滑动窗口告警；③ 给日志加 user_id 标签和 30 天生命周期策略。<br><br>
+    <b>之后值得单独学：</b>评估体系的系统建设（评测集、judge 校准、A/B）、多模型路由下的观测一致性、以及把 trace 数据变成评测数据（bad case 自动入池）的闭环。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 AI 应用可观测性 · 监控一切正常，可能正是最大的不正常</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（span 设计）和模块 6（质量告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 对照你现在的监控大盘，数一数 AI 专属指标。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边对照你现在的监控大盘：延迟、错误率之外，你有几个 AI 专属指标？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

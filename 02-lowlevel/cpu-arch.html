@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 CPU 架构</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透 CPU 架构</h1>
+    <p class="sub">你写的每一行代码，最后都要落到<b>流水线、乱序窗口、缓存和分支预测器</b>上。这篇不背名词，只讲清楚：为什么同一个程序换台机器就慢三倍，以及你手上的 <span class="k">lscpu</span> 输出到底该怎么读。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>2</b> 大指令集对比</span>
+      <span class="chip"><b>6</b> 个量化指标</span>
+      <span class="chip"><b>10</b> 个认知坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议先跑一遍 lscpu，对着自己的机器看</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先把你自己这台机器看清楚</h2></div>
+  <p class="lead">后面所有结论都要落到具体数字上。先花一分钟，把下面几条命令的输出留在手边。</p>
+  <pre><span class="c"># 1. 一句话看清拓扑：几路、几核、几线程、缓存多大</span>
+lscpu
+
+<span class="c"># 2. 缓存行大小（写并发数据结构时必须知道，通常是 64 字节）</span>
+getconf LEVEL1_DCACHE_LINESIZE
+
+<span class="c"># 3. 每个核心的缓存大小（index0 一般是 L1d）</span>
+<span class="b">for</span> i <span class="b">in</span> /sys/devices/system/cpu/cpu0/cache/index*; <span class="b">do</span>
+  <span class="b">echo</span> "$(<span class="b">cat</span> $i/level) $(<span class="b">cat</span> $i/type) $(<span class="b">cat</span> $i/size)"
+<span class="b">done</span>
+
+<span class="c"># 4. 看指令集扩展（x86 才有 Flags 这一行，ARM64 叫 Features）</span>
+grep -m1 <span class="y">'^flags'</span> /proc/cpuinfo | tr <span class="y">' '</span> <span class="y">'\n'</span> | grep -E <span class="y">'avx|sse|amx|aes'</span> | sort -u
+
+<span class="c"># 5. 看每个逻辑核的最大频率（判断大小核最直接的办法）</span>
+lscpu -e=CPU,CORE,SOCKET,NODE,MAXMHZ,MINMHZ</pre>
+  <div class="callout">
+    <b>一个前提：</b>在虚拟机或云主机里，<span class="k">lscpu</span> 看到的往往是<b>被 hypervisor（虚拟机监视器）裁剪过的视图</b>。型号字符串可能是编的，缓存大小可能是宿主机的，某些 flag 会被屏蔽（尤其是 AVX-512 和拓扑信息）。真要看穿，得上物理机或者看云厂商的规格说明。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>x86 与 ARM 的本质差异</h2></div>
+  <p class="lead">先给结论：<b>CISC 和 RISC 的分界，在今天已经基本消失了。</b>真正影响你的是指令编码方式、寄存器数量、内存模型和生态，而不是教科书上那句"复杂指令 vs 精简指令"。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:280px">x86-64</th><th>ARM64（AArch64）</th></tr>
+    <tr><td><b>指令长度</b></td><td><b>变长，1~15 字节</b>。有大量历史遗留的前缀字节</td><td><b>定长 4 字节</b>。取指和解码的边界天然对齐</td></tr>
+    <tr><td><b>通用寄存器</b></td><td>16 个（rax~r15），其中 rsp/rbp 有专用用途</td><td><b>31 个</b>（x0~x30）+ 零寄存器 xzr + 栈指针 sp</td></tr>
+    <tr><td><b>操作数形式</b></td><td>经典是二操作数（dest 兼作 src），AVX 引入三操作数</td><td>三操作数为主：<span class="k">add x0, x1, x2</span></td></tr>
+    <tr><td><b>访存</b></td><td>算术指令可以直接带内存操作数，一条指令完成"读+算"</td><td>严格 load/store 架构，必须先 ldr 到寄存器再算</td></tr>
+    <tr><td><b>条件执行</b></td><td>依赖 RFLAGS 标志位，配合 jcc 跳转</td><td>NZCV 标志 + 几乎每条指令都可条件执行（<span class="k">csel</span>、<span class="k">b.eq</span>）</td></tr>
+    <tr><td><b>内存模型</b></td><td><b>TSO（Total Store Order）</b>，较强，硬件保证 store-store 顺序</td><td><b>弱内存模型</b>，需要显式屏障（dmb/ldar/stlr）</td></tr>
+    <tr><td><b>典型场景</b></td><td>PC、服务器、几乎所有商业软件的第一优先平台</td><td>手机、嵌入式、Apple Silicon、云服务器（Graviton / 倚天 / 鲲鹏）</td></tr>
+  </table>
+
+  <h4>变长 vs 定长，差在哪</h4>
+  <p>x86 的变长编码带来两个后果：<b>代码密度高</b>（同样逻辑占的内存少，i-cache 命中率好），但<b>解码极难</b>——CPU 必须先判断这条指令有几个字节，才能知道下一条从哪开始。所以现代 x86 前端会一次抓 16~32 字节，用多路并行的预解码器去猜边界，猜错了就浪费解码带宽。</p>
+  <p>ARM64 定长 4 字节，解码器可以无条件并行切分，前端简单得多。代价是代码体积大 20%~30%，对 i-cache 压力更大。这是纯粹的工程权衡，不是谁更先进。</p>
+  <pre><span class="c">; x86-64：同一条 add，编码长度随操作数变化</span>
+55                    push   rbp
+48 89 e5              mov    rbp, rsp
+8b 45 fc              mov    eax, [rbp-0x4]     <span class="c">; 3 字节</span>
+03 45 f8              add    eax, [rbp-0x8]     <span class="c">; 3 字节，一条指令完成读+加</span>
+
+<span class="c">; AArch64：全部 4 字节，必须先 load 再 add</span>
+a9bf7bfd              stp    x29, x30, [sp, #-16]!
+910003fd              mov    x29, sp
+b9400fe0              ldr    w0, [sp, #12]
+b9400be1              ldr    w1, [sp, #8]
+0b010000              add    w0, w0, w1</pre>
+  <p>数一下：x86 用 4 条指令 11 个字节完成的事，ARM64 用了 5 条指令 20 个字节。但 ARM64 的每一条都能在一个周期内被无歧义地解码，而 x86 那条 <span class="k">add eax,[rbp-8]</span> 到了后端会被拆成 <b>load + add 两个微操作</b>（micro-op，简称 uop）。</p>
+
+  <h4>寄存器多，到底有什么用</h4>
+  <p>寄存器是 CPU 里最快、也最贵的存储。31 个通用寄存器意味着编译器可以把更多局部变量<b>一直留在寄存器里</b>，减少访存。x86-64 只有 16 个，编译器经常被迫 spill（把变量写回栈），函数调用一深，栈上的读写就上来了。</p>
+  <p>但这条优势被两个因素抵消了大半：① x86 有强大的 store-to-load forwarding（存储转发），刚写进栈的值再读出来延迟只有 4~5 个周期；② 现代乱序执行引擎用寄存器重命名（register renaming）把 16 个架构寄存器映射到几百个物理寄存器上，消除了假依赖。所以"寄存器少所以慢"是个过度简化的说法。</p>
+
+  <div class="callout warn">
+    <b>最容易踩的认知坑：</b>"ARM 是 RISC 所以更省电、更快"。<br>
+    省电主要来自<b>工艺、电压频率曲线和芯片设计目标</b>，不是 ISA。Intel 的 Atom 系列也是 x86，一样能做到几瓦；Apple M 系列快，靠的是超宽的乱序窗口、巨大的缓存和统一内存架构，不是因为它是指令集更"精简"。<br>
+    真正由 ISA 决定差异的，是<b>内存模型</b>——这一点在写无锁代码时会要你的命，后面模块 4 会再提。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>微架构的六个关键指标</h2></div>
+  <p class="lead">指令集是"语言"，微架构是"说话的人"。同一句 x86 指令，在不同代 CPU 上执行需要的周期数可以差一倍。看微架构，主要看这六个数字。</p>
+  <table>
+    <tr><th style="width:130px">指标</th><th style="width:110px">典型范围</th><th>它决定了什么</th></tr>
+    <tr><td><b>流水线深度</b></td><td>12~20 级（NetBurst 曾到 31 级）</td><td>决定<b>分支预测失败的惩罚</b>。深流水线频率容易拉高，但一预测错就要清空整条流水线，代价 = 深度 × 周期</td></tr>
+    <tr><td><b>发射宽度</b></td><td>4~8 条/周期</td><td>每周期最多能"发射"多少条微操作到执行单元。这是<b>吞吐上限</b></td></tr>
+    <tr><td><b>乱序窗口 / ROB</b></td><td>224~630 项</td><td>能同时在"飞行中"的指令数量。<b>窗口越大，越能靠乱序填满流水线气泡</b></td></tr>
+    <tr><td><b>分支预测器</b></td><td>TAGE 类，数千~数万项历史</td><td>决定控制流的可预测性。<b>预测错误一次，代价 15~20 个周期</b></td></tr>
+    <tr><td><b>执行单元数量</b></td><td>ALU 4~6，FP 2~4，Load 2~3</td><td>决定某类指令（整数、浮点、访存）的并行度上限</td></tr>
+    <tr><td><b>缓存层级</b></td><td>L1 32~48KB / L2 0.5~2MB / L3 8~96MB</td><td>决定<b>实际内存延迟</b>，往往是真实业务里差距最大的那一项</td></tr>
+  </table>
+
+  <h4>用数字感受一下几代产品的演进</h4>
+  <table>
+    <tr><th style="width:200px">微架构（举例）</th><th style="width:100px">发射宽度</th><th style="width:100px">ROB 项数</th><th>备注</th></tr>
+    <tr><td>Skylake（2015，服务端主力多年）</td><td>4</td><td>224</td><td>14~19 级流水线，一个时代的基线</td></tr>
+    <tr><td>Sunny Cove（2019）</td><td>5</td><td>352</td><td>Ice Lake 服务端</td></tr>
+    <tr><td>Golden Cove（2021）</td><td>6</td><td>512</td><td>Sapphire Rapids 的 P-core</td></tr>
+    <tr><td>Zen 3 / Zen 4（AMD）</td><td>6</td><td>256 / 320</td><td>Zen 4 支持 AVX-512，但用双 256 位单元实现</td></tr>
+    <tr><td>Apple Firestorm（M1）</td><td>8</td><td>约 630</td><td>超宽 + 巨大缓存，单核性能标杆</td></tr>
+  </table>
+  <p class="lead">注意：这些数字各家口径不完全一致（有的算宏指令、有的算微操作），只用来建立量级感，别拿去做精确对比。</p>
+
+  <h4>性能 = IPC × 频率，但两者互相拉扯</h4>
+  <p><b>IPC（Instructions Per Cycle，每周期执行指令数）</b>衡量"每个周期能干多少活"。同一个程序跑出 IPC 3.0，说明平均每周期退休 3 条指令；如果只有 0.8，说明流水线大部分时间在等。</p>
+  <pre><span class="c"># 实测 IPC（需要 perf，Linux）</span>
+perf stat -e cycles,instructions,branches,branch-misses,cache-misses ./your_program
+
+<span class="c"># 输出里自己算：</span>
+<span class="c">#   IPC = instructions / cycles</span>
+<span class="c">#   分支预测失败率 = branch-misses / branches   （一般应 &lt; 1%）</span>
+<span class="c">#   cache-misses 高 → 瓶颈在内存，不在 CPU</span></pre>
+  <p>深流水线能上高频，但预测失败惩罚更重；宽发射能提 IPC，但功耗和面积上去了，频率就得降。<b>所以没有"全面更强"的微架构，只有针对某类负载的取舍。</b></p>
+
+  <h4>为什么"发射宽度 8"不等于"快 8 倍"</h4>
+  <p>因为程序本身没那么多可并行的指令。看这段代码：</p>
+  <pre><span class="c">// A：依赖链 —— 每条都等上一条的结果</span>
+<span class="b">for</span> (i = 0; i &lt; n; i++) s = s + a[i] * b[i];
+
+<span class="c">// B：四条独立累加 —— 打断依赖链</span>
+<span class="b">for</span> (i = 0; i + 3 &lt; n; i += 4) {
+    s0 += a[i]   * b[i];
+    s1 += a[i+1] * b[i+1];
+    s2 += a[i+2] * b[i+2];
+    s3 += a[i+3] * b[i+3];
+}
+s = (s0 + s1) + (s2 + s3);</pre>
+  <p>A 的问题不是加法慢（延迟 1 个周期），而是<b>浮点加法延迟通常 3~4 个周期</b>，而循环里下一次加法必须等上一次的结果。这时候发射宽度是 8 还是 4 完全没用，CPU 每个周期只能推进 1/4 条加法。</p>
+  <p>B 把一条依赖链拆成四条，理论吞吐直接提升 4 倍。这就是<b>指令级并行（ILP，Instruction Level Parallelism）</b>：硬件能榨出多少并行，取决于你给了它多少。</p>
+  <div class="callout ok">
+    <b>一条实用判据：</b>如果 <span class="k">perf stat</span> 显示 IPC 很低（&lt; 1）而 cache-miss 和 branch-miss 都不高，那多半是<b>依赖链太长</b>，而不是 CPU 不行。这时候改算法（拆累加器、用前缀和、改数据布局）比换机器有用得多。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>大小核异构：调度器怎么选核</h2></div>
+  <p class="lead">手机早就这么干了，服务器和 PC 从 2021 年开始全面跟进。核心思想很朴素：<b>用大核保峰值性能，用小核保能效和面积</b>。</p>
+  <table>
+    <tr><th style="width:150px">方案</th><th style="width:240px">代表产品</th><th>结构</th></tr>
+    <tr><td><b>ARM big.LITTLE</b></td><td>早期的 Exynos、麒麟</td><td>大簇 + 小簇，<b>同一时刻只有一簇工作</b>（集群迁移），切换有开销</td></tr>
+    <tr><td><b>ARM DynamIQ</b></td><td>近年的移动 SoC</td><td>大中小核可以在<b>同一个簇内混排</b>，共享 L3，支持每核独立 DVFS</td></tr>
+    <tr><td><b>Intel P-core / E-core</b></td><td>Alder Lake（2021）起</td><td>P-core 支持超线程且宽而深；E-core（Gracemont）<b>没有超线程</b>，但面积效率极高</td></tr>
+    <tr><td><b>Apple P/I 核</b></td><td>M 系列、A 系列</td><td>P 核极宽，I 核极省电，靠系统统一调度</td></tr>
+  </table>
+
+  <h4>为什么 E-core 划算</h4>
+  <p>Intel 官方口径是：<b>4 个 E-core 占用的面积大致相当于 1 个 P-core（不含超线程）</b>，而在多线程吞吐上能提供更高的总性能。代价是单线程性能弱、没有 AVX-512、缓存更小。</p>
+  <p>所以异构芯片的设计意图非常明确：<b>把"多任务并行"和"单任务冲刺"分开处理</b>。你的构建任务、日志压缩、批处理，跑在 E-core 上很划算；你的数据库主线程、低延迟 RPC，必须待在 P-core 上。</p>
+
+  <h4>调度器到底怎么选</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>ARM 侧：EAS（Energy Aware Scheduling，能耗感知调度）。</b>内核里维护一张能耗模型表（EM，Energy Model），描述"某个 CPU 在某个频率下跑某个负载要多少毫瓦"。调度时它同时优化性能和能耗，把轻负载往小核推。</div></div>
+    <div class="step"><div class="txt"><b>Intel 侧：Thread Director + 硬件反馈。</b>CPU 通过 MSR 上报每个逻辑核的"class"（性能等级）和建议，内核的调度器据此把任务优先放到 P-core。Windows 11 上这套是系统级支持的；Linux 上支持是近几年才逐步补齐的，老内核会把所有核当同质的用。</div></div>
+    <div class="step"><div class="txt"><b>兜底：schedutil / 频率调节器。</b>如果内核不认识异构拓扑，就只能靠 CPU 频率和负载猜测，效果会明显打折。</div></div>
+  </div>
+
+  <h4>运维视角：怎么确认自己踩没踩到小核</h4>
+  <pre><span class="c"># 每个逻辑 CPU 的最大频率：大核明显更高</span>
+lscpu -e=CPU,CORE,SOCKET,NODE,MAXMHZ,MINMHZ
+
+<span class="c"># 更细的：直接读每个核的 cpuinfo_max_freq（单位 kHz）</span>
+<span class="b">for</span> c <span class="b">in</span> /sys/devices/system/cpu/cpu[0-9]*; <span class="b">do</span>
+  <span class="b">echo</span> "$c $(<span class="b">cat</span> $c/cpufreq/cpuinfo_max_freq 2&gt;/dev/null)"
+<span class="b">done</span>
+
+<span class="c"># 判断两个逻辑核是不是同一个物理核的两个超线程</span>
+<span class="b">cat</span> /sys/devices/system/cpu/cpu0/topology/thread_siblings_list
+
+<span class="c"># 把进程绑到大核（假设 0-7 是 P-core）</span>
+taskset -cp 0-7 $PID</pre>
+  <div class="callout warn">
+    <b>Kubernetes 里的坑：</b><span class="k">cpu-manager-policy=static</span> 只保证把 Pod 绑到独占的 CPU 集合，<b>不保证绑到 P-core</b>。在异构节点上，延迟敏感的服务可能被绑到 E-core，P99 直接翻倍。<br>
+    解法：① 用节点标签 + taint 把关键业务调度到纯 P-core 的节点池；② 或者用 cpuset 显式指定物理核编号；③ 上线前用 <span class="k">lscpu -e</span> 在节点上核对一遍，别信云厂商的"通用型"描述。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>多核与超线程：共享了什么，争了什么</h2></div>
+  <p class="lead"><b>SMT（Simultaneous Multithreading，同时多线程）</b>，Intel 叫 Hyper-Threading。它的本质不是"多了一个核"，而是<b>让两个线程共用一套执行资源</b>，用线程 A 的停顿去填线程 B 的空洞。</p>
+  <table>
+    <tr><th style="width:200px">资源</th><th style="width:110px">是否共享</th><th>后果</th></tr>
+    <tr><td>通用寄存器、PC、APIC</td><td><b>私有</b></td><td>每个线程有独立的架构状态，操作系统看到两个"逻辑 CPU"</td></tr>
+    <tr><td>执行单元（ALU/FP/Load-Store）</td><td><b>共享</b></td><td>两个线程抢同一批端口，<b>单线程性能会下降</b></td></tr>
+    <tr><td>ROB、发射队列</td><td><b>共享</b>（通常静态或动态分区）</td><td>一个线程占满窗口，另一个线程就被饿死</td></tr>
+    <tr><td>L1 / L2 缓存</td><td><b>共享</b></td><td>两个线程互相驱逐对方的缓存行，<b>这是性能下降的主因</b></td></tr>
+    <tr><td>L3 缓存</td><td>全核共享</td><td>跨核、跨线程都在抢</td></tr>
+    <tr><td>分支预测器 / BTB</td><td>部分共享</td><td>两个线程的分支历史互相污染</td></tr>
+  </table>
+
+  <h4>什么时候超线程是赚的</h4>
+  <table>
+    <tr><th style="width:230px">负载类型</th><th style="width:100px">SMT 收益</th><th>原因</th></tr>
+    <tr><td>Web 服务、API 网关（大量等待 IO）</td><td><b>+20%~30%</b></td><td>线程经常阻塞，正好用另一个线程填空</td></tr>
+    <tr><td>编译、日志处理、批处理</td><td>+15%~25%</td><td>指令混合度高，执行单元利用率不满</td></tr>
+    <tr><td>纯浮点密集（LINPACK 类）</td><td>0%~10%</td><td>FP 单元本来就跑满了，第二个线程抢不到</td></tr>
+    <tr><td>大内存随机访问（数据库、Redis）</td><td><b>可能为负</b></td><td>L1/L2 被对半砍，cache miss 上升，延迟变差</td></tr>
+    <tr><td>已开启 Spectre/MDS 等缓解</td><td>明显缩水</td><td>部分缓解手段会刷新缓冲区、限制推测，抵消收益</td></tr>
+  </table>
+
+  <h4>为什么对延迟敏感的服务，超线程有害</h4>
+  <p>假设一个 32 核 64 线程的机器跑 Redis。Redis 是单线程处理命令的，你给了它 64 个"CPU"，但它只用得上 1 个。如果这个线程和另一个忙线程恰好是<b>同一个物理核的两个超线程</b>，那么：</p>
+  <ul>
+    <li>L1d（32KB）被两个线程分着用，有效容量可能只剩一半多</li>
+    <li>分支预测器被污染，分支失败率上升</li>
+    <li>执行端口被抢占，单线程 IPC 下降 10%~30%</li>
+  </ul>
+  <p>结果就是<b>平均延迟没变，P99 抖了</b>。这类问题极难排查，因为 CPU 利用率看起来只有 3%。</p>
+  <pre><span class="c"># 确认是不是超线程：Thread(s) per core 为 2 就是</span>
+lscpu | grep -E <span class="y">'Thread|Core|Socket'</span>
+
+<span class="c"># 找出成对的逻辑核（0 和 1 是一对，绑定 0 就够了）</span>
+<span class="b">for</span> c <span class="b">in</span> /sys/devices/system/cpu/cpu[0-9]*/topology/thread_siblings_list; <span class="b">do</span>
+  <span class="b">echo</span> "$c: $(<span class="b">cat</span> $c)"
+<span class="b">done</span> | sort -u
+
+<span class="c"># 关闭 SMT（需要重启，且影响全机）</span>
+<span class="b">echo</span> off &gt; /sys/devices/system/cpu/smt/control
+<span class="b">cat</span> /sys/devices/system/cpu/smt/active</pre>
+  <div class="callout danger">
+    <b>绑核最容易犯的错：</b>把两个关键线程分别绑到 CPU 0 和 CPU 1，以为"一人一个核"，实际上它们是<b>同一个物理核的两个超线程</b>，抢得更凶。<br>
+    正确做法是先读 <span class="k">thread_siblings_list</span>，只绑每个物理核的第一个逻辑 CPU（比如 0,2,4,6…），或者干脆在 BIOS 里关掉 SMT。
+  </div>
+  <p>另外，云厂商的 vCPU 绝大多数就是超线程。同样标"8 vCPU"的实例，可能是 4 物理核 ×2 线程，也可能是 8 个独占物理核（部分计算型/高性能型规格），<b>实际性能能差 1.5 倍以上</b>。采购前一定确认"每核线程数"。</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>指令集扩展与 SIMD</h2></div>
+  <p class="lead"><b>SIMD（Single Instruction Multiple Data，单指令多数据）</b>：一条指令同时处理 4 个、8 个甚至 16 个数据。这是 CPU 上唯一"免费"的数量级加速来源——前提是你的数据布局和算法允许。</p>
+  <table>
+    <tr><th style="width:140px">扩展</th><th style="width:100px">位宽</th><th style="width:110px">平台</th><th>要点</th></tr>
+    <tr><td><b>SSE / SSE2</b></td><td>128 位</td><td>x86</td><td>x86-64 的<b>基线</b>，一定有。4 个 float 或 2 个 double</td></tr>
+    <tr><td><b>AVX</b></td><td>256 位</td><td>x86</td><td>仅浮点。8 个 float</td></tr>
+    <tr><td><b>AVX2</b></td><td>256 位</td><td>x86</td><td><b>补齐了 256 位整数运算</b>，实际业务里最常用的一档</td></tr>
+    <tr><td><b>AVX-512</b></td><td>512 位</td><td>x86 服务器</td><td>16 个 float + <b>掩码寄存器</b>（可以按 lane 开关），部分型号支持 VNNI/BF16 等矩阵指令</td></tr>
+    <tr><td><b>NEON / ASIMD</b></td><td>128 位</td><td>ARM64</td><td>ARM64 上<b>强制存在</b>，不需要检测。4 个 float</td></tr>
+    <tr><td><b>SVE / SVE2</b></td><td>128~2048 位<b>可变</b></td><td>ARM64</td><td>向量长度由硬件决定（"长度无关"编程），同一份二进制适配不同实现</td></tr>
+  </table>
+
+  <h4>理论加速比 vs 实际加速比</h4>
+  <table>
+    <tr><th style="width:180px">操作</th><th style="width:120px">理论加速</th><th>实测常见值</th></tr>
+    <tr><td>float32 数组加法（AVX2）</td><td>8×</td><td>5~7×（数据在 L1/L2 时）</td></tr>
+    <tr><td>float32 数组加法（AVX-512）</td><td>16×</td><td>8~12×，且可能触发降频</td></tr>
+    <tr><td>大数组 memcpy</td><td>—</td><td><b>1.1~1.3×</b>，因为瓶颈是内存带宽不是计算</td></tr>
+    <tr><td>稀疏矩阵乘</td><td>—</td><td>接近 1×，访存不连续，向量化基本失效</td></tr>
+    <tr><td>base64 编解码</td><td>—</td><td>3~8×（有专门的查表 + 位运算向量化实现）</td></tr>
+    <tr><td>SHA-256 计算</td><td>—</td><td>5~10×（用 SHA-NI 指令，不是通用 SIMD）</td></tr>
+  </table>
+  <p>规律很清楚：<b>计算密集 + 数据连续 + 数据在缓存里 = 有得赚；访存密集 = 白干。</b>因为 SIMD 只加速"算"，不加速"取"。</p>
+
+  <h4>编译器自动向量化的条件</h4>
+  <p>GCC/Clang 在 <span class="k">-O3</span>（GCC 12 起 <span class="k">-O2</span> 也默认开）会尝试向量化循环，但必须同时满足：</p>
+  <table>
+    <tr><th style="width:210px">条件</th><th>不满足会怎样</th></tr>
+    <tr><td>没有<b>循环携带依赖</b>（第 i 次迭代不依赖第 i-1 次的结果）</td><td>直接放弃，这是最常见的原因</td></tr>
+    <tr><td>访存<b>连续且步长为 1</b>（或可识别的固定步长）</td><td>退化成 gather/scatter，通常不向量化</td></tr>
+    <tr><td>指针<b>不重叠</b>（编译器能证明）</td><td>不敢向量化，怕语义改变。用 <span class="k">restrict</span> 告诉它</td></tr>
+    <tr><td>循环体内<b>没有函数调用</b>、没有不可向量的分支</td><td>放弃，或者只能部分向量化</td></tr>
+    <tr><td>迭代次数<b>可计算</b>，或有运行时检查</td><td>生成"向量化主循环 + 标量尾巴"</td></tr>
+    <tr><td>目标架构确实有该指令（<span class="k">-march</span> 要对）</td><td>默认 <span class="k">-march=x86-64</span> 只有 SSE2</td></tr>
+  </table>
+  <pre><span class="c">// 能被向量化：连续访存、无依赖</span>
+<span class="b">void</span> add(<span class="b">float</span> * <span class="y">restrict</span> a, <span class="b">const float</span> * <span class="y">restrict</span> b, <span class="b">int</span> n) {
+    <span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; n; i++) a[i] += b[i];
+}
+
+<span class="c">// 不能被向量化：a[i] 依赖 a[i-1]</span>
+<span class="b">void</span> prefix(<span class="b">float</span> *a, <span class="b">int</span> n) {
+    <span class="b">for</span> (<span class="b">int</span> i = 1; i &lt; n; i++) a[i] += a[i-1];
+}</pre>
+  <pre><span class="c"># 让编译器告诉你它干了什么（这是最有用的一条命令）</span>
+gcc -O3 -march=native -fopt-info-vec-optimized -fopt-info-vec-missed -c x.c
+
+<span class="c"># Clang 的等价写法</span>
+clang -O3 -march=native -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -c x.c
+
+<span class="c"># 看生成的汇编里有没有 ymm/zmm 寄存器</span>
+objdump -d x.o | grep -E <span class="y">'ymm|zmm|xmm'</span> | head
+
+<span class="c"># 确认本机到底支持哪一档</span>
+gcc -march=native -dM -E - &lt;/dev/null | grep -E <span class="y">'__AVX|__SSE|__ARM_NEON'</span></pre>
+
+  <div class="callout warn">
+    <b>AVX-512 的两个现实问题：</b><br>
+    ① <b>降频。</b>在部分 Intel 型号（尤其是 Skylake-SP 一代）上，持续执行 512 位重指令会让全核频率下降 10%~20%，短时间爆发型负载反而变慢。Ice Lake 之后改善很多。<br>
+    ② <b>不是所有核都有。</b>Intel 消费级 12~14 代把 AVX-512 屏蔽了（E-core 不支持），服务器才完整支持；AMD Zen 4/5 支持但用双 256 位单元实现，吞吐不如原生 512。<br>
+    <b>结论：</b>写库的时候用运行时派发（runtime dispatch，编译多份内核，启动时按 CPUID 选），别在编译期一把梭 <span class="k">-march=native</span>——那样二进制换台机器就 <span class="k">SIGILL</span> 崩了。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>为什么同样的代码，换个 CPU 差几倍</h2></div>
+  <p class="lead">这不是玄学。把差距拆开，无非六个来源，每一个都有量级。</p>
+  <table>
+    <tr><th style="width:170px">因素</th><th style="width:100px">量级</th><th>机制</th></tr>
+    <tr><td><b>主频</b></td><td>1.2~1.6×</td><td>3.0GHz vs 4.5GHz。<b>注意是全核睿频，不是标称的单核最大频率</b></td></tr>
+    <tr><td><b>微架构 IPC</b></td><td>1.3~2.0×</td><td>窗口大小、发射宽度、执行单元数量</td></tr>
+    <tr><td><b>L3 容量与命中率</b></td><td>1.5~3×</td><td>8MB vs 32MB，工作集刚好卡在边界时差距最大</td></tr>
+    <tr><td><b>分支预测能力</b></td><td>最高 5~6×</td><td>不可预测的分支在弱预测器上代价极高</td></tr>
+    <tr><td><b>内存带宽 / 通道数</b></td><td>2~4×</td><td>双通道 DDR4-3200 ≈ 51GB/s；8 通道 ≈ 205GB/s</td></tr>
+    <tr><td><b>NUMA 局部性</b></td><td>1.5~2×</td><td>跨节点访存延迟约为本地的 1.5~2 倍</td></tr>
+  </table>
+
+  <h4>最戏剧性的例子：分支预测</h4>
+  <pre><span class="c">// 同一段代码，只因为数据先排了序，快好几倍</span>
+<span class="b">long</span> sum = 0;
+<span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; N; i++)
+    <span class="b">if</span> (data[i] &gt;= 128) sum += data[i];</pre>
+  <p>数据随机分布时，这个分支有约 50% 的概率跳转，<b>分支预测器基本只能瞎猜</b>。每猜错一次，流水线要清空，代价 15~20 个周期。假设 N = 10 万，就是 5 万次失败 × 17 周期 ≈ 85 万个周期白烧。</p>
+  <p>把 <span class="k">data</span> 排序后再跑，分支变成"前一半全不跳、后一半全跳"，预测准确率接近 100%，这些周期全部省下来。业界那个著名的 StackOverflow 问题里，实测差距在 5~6 倍量级——<b>而这跟 CPU 型号一点关系都没有</b>。</p>
+  <p>工程上的启示：<b>数据布局和访问顺序，往往比换硬件更值钱。</b>把热数据排在一起、把随机访问改成顺序扫描、把 90% 命中的分支放到前面，这些改动零成本，收益却是数量级的。</p>
+
+  <h4>内存墙：真正的大头</h4>
+  <table>
+    <tr><th style="width:140px">层级</th><th style="width:130px">典型延迟</th><th style="width:150px">相对 L1</th><th>容量</th></tr>
+    <tr><td>L1d</td><td>4~5 周期（约 1.3ns）</td><td>1×</td><td>32~48KB</td></tr>
+    <tr><td>L2</td><td>12~14 周期</td><td>约 3×</td><td>0.5~2MB</td></tr>
+    <tr><td>L3</td><td>40~60 周期</td><td>约 12×</td><td>8~96MB</td></tr>
+    <tr><td>本地 DRAM</td><td><b>80~100ns（约 250 周期）</b></td><td><b>约 60×</b></td><td>GB 级</td></tr>
+    <tr><td>跨 NUMA 节点 DRAM</td><td>130~180ns</td><td>约 100×</td><td>—</td></tr>
+  </table>
+  <p>一次 cache miss 的时间，够 CPU 执行几百条指令。所以<b>现代 CPU 的性能问题，八成是"数据没在缓存里"</b>，而不是"算得慢"。这也解释了为什么 L3 从 8MB 涨到 32MB 能让某些服务快一倍：工作集刚好从"装不下"变成"装得下"。</p>
+  <div class="callout ok">
+    <b>排查顺序（照这个来，别瞎猜）：</b><br>
+    ① <span class="k">perf stat</span> 看 IPC。IPC 高（&gt;2）→ 计算密集，优化算法；IPC 低（&lt;1）→ 在等，继续往下。<br>
+    ② 看 <span class="k">cache-misses</span> 和 <span class="k">LLC-load-misses</span>。高 → 内存瓶颈，改数据布局、缩小工作集、考虑绑 NUMA。<br>
+    ③ 看 <span class="k">branch-misses</span>。高 → 改分支结构（无分支写法、排序、查表）。<br>
+    ④ 以上都不高但就是慢 → 依赖链太长，或者被同核的兄弟线程抢资源。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>ARM 服务器能不能上生产</h2></div>
+  <p class="lead">能，而且很多公司已经上了。但它不是"换个 CPU 而已"，是一次<b>全链路的多架构适配</b>。</p>
+  <table>
+    <tr><th style="width:150px">平台</th><th style="width:220px">特点</th><th>适配成本</th></tr>
+    <tr><td>AWS Graviton 系列</td><td>自研核，性价比通常比同代 x86 实例高 20%~40%</td><td>低（生态最成熟）</td></tr>
+    <tr><td>Ampere Altra</td><td>最高 80 核，<b>单核单线程（无 SMT）</b>，频率稳定</td><td>中</td></tr>
+    <tr><td>阿里倚天 710</td><td>国内云上可得，配套工具链较完整</td><td>中</td></tr>
+    <tr><td>华为鲲鹏 920</td><td>核多，适合高并发无状态服务</td><td>中</td></tr>
+  </table>
+
+  <h4>好消息：大部分代码根本不用改</h4>
+  <ul>
+    <li><b>Java / Go / Node / Python（纯 Python）/ Rust</b>：源码级可移植，重新编译或换个运行时镜像就行</li>
+    <li><b>容器化服务</b>：只要基础镜像有多架构版本，改个 platform 参数即可</li>
+    <li><b>MySQL / PostgreSQL / Redis / Nginx / Kafka</b>：官方或发行版都有 aarch64 包</li>
+  </ul>
+
+  <h4>坏消息：这几类一定会出问题</h4>
+  <table>
+    <tr><th style="width:200px">问题</th><th>表现</th><th>解法</th></tr>
+    <tr><td><b>JNI / native 依赖</b></td><td>启动报 <span class="k">UnsatisfiedLinkError</span> 或找不到 .so</td><td>找 aarch64 版本，或自己编译（netty-tcnative、rocksdb、jemalloc 是高发区）</td></tr>
+    <tr><td><b>手写 SIMD / intrinsics</b></td><td>编译直接失败，或运行结果错</td><td>抽象出可移植层，ARM 用 NEON 重写；或用 <span class="k">#ifdef</span> 分叉</td></tr>
+    <tr><td><b>闭源二进制</b></td><td>根本没有 aarch64 版本</td><td>换方案，或跑在 x86 节点上（别用 QEMU 模拟跑生产）</td></tr>
+    <tr><td><b>镜像架构不匹配</b></td><td><span class="k">exec format error</span></td><td>用 buildx 构建多架构镜像</td></tr>
+    <tr><td><b>调优参数照搬</b></td><td>性能不及预期</td><td>ARM 的缓存行、页大小、NUMA 拓扑、THP 行为都可能不同</td></tr>
+  </table>
+  <pre><span class="c"># 1. 确认当前架构</span>
+uname -m                       <span class="c"># x86_64 或 aarch64</span>
+
+<span class="c"># 2. 构建多架构镜像（一次构建，两个平台都能拉）</span>
+docker buildx create --use --name multi
+docker buildx build --platform linux/amd64,linux/arm64 -t reg/app:1.0 --push .
+
+<span class="c"># 3. 在 x86 机器上验证 arm64 镜像能不能跑（仅测试，别用于生产）</span>
+docker run --rm --platform linux/arm64 reg/app:1.0 /app --version
+
+<span class="c"># 4. 检查二进制依赖的架构</span>
+file ./app                    <span class="c"># 看 ELF 的 Machine 字段</span>
+ldd ./app                     <span class="c"># 看依赖的 .so 是否齐全</span></pre>
+
+  <div class="callout warn">
+    <b>迁移顺序建议：</b>先挑一个<b>无状态、依赖少、流量小</b>的服务做试点 → 压测对比 P99 和单位成本 → 再推有状态服务 → 最后才碰数据面（数据库、消息队列）。<br>
+    千万别一上来就把 MySQL 主库迁过去：ARM 上的页大小（常见 4KB，也有 64KB 内核）、NUMA 拓扑、内存带宽特性和 x86 都不同，参数要重调。
+  </div>
+  <p><b>什么时候不该上 ARM：</b>① 依赖 x86 专属闭源软件（某些商业数据库、加密卡驱动）；② 重度依赖 AVX-512 做数值计算；③ 超低延迟交易，每一纳秒都要抠，且已经在 x86 上调优到位；④ 团队没有多架构 CI 能力——那维护成本会吃掉全部收益。</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>怎么看机器：lscpu 逐字段拆解</h2></div>
+  <p class="lead">这是本文最实用的一节。以后拿到一台新机器，先跑 <span class="k">lscpu</span>，按下面的表逐行读。</p>
+  <pre><span class="c">$ lscpu</span>
+Architecture:            x86_64
+  CPU op-mode(s):        32-bit, 64-bit
+  Address sizes:         46 bits physical, 48 bits virtual
+  Byte Order:            Little Endian
+CPU(s):                  64
+  On-line CPU(s) list:   0-63
+Vendor ID:               GenuineIntel
+  Model name:            Intel(R) Xeon(R) Platinum 8358P CPU @ 2.60GHz
+    CPU family:          6
+    Model:               106
+    Thread(s) per core:  2
+    Core(s) per socket:  32
+    Socket(s):           1
+    Stepping:            6
+    CPU max MHz:         3400.0000
+    CPU min MHz:         800.0000
+    BogoMIPS:            5200.00
+Virtualization features:
+  Virtualization:        VT-x
+Caches (sum of all):
+  L1d:                   1.5 MiB (32 instances)
+  L1i:                   1.5 MiB (32 instances)
+  L2:                    40 MiB (32 instances)
+  L3:                    48 MiB (1 instance)
+NUMA:
+  NUMA node(s):          2
+  NUMA node0 CPU(s):     0-15,32-47
+  NUMA node1 CPU(s):     16-31,48-63
+Flags:                   fpu vme de pse ... avx512f avx512dq avx512bw avx512vl ...</pre>
+
+  <table>
+    <tr><th style="width:190px">字段</th><th>怎么读，容易误读在哪</th></tr>
+    <tr><td class="f">CPU(s)</td><td><b>逻辑 CPU 总数</b>，不是物理核数。= Socket × Core/socket × Thread/core</td></tr>
+    <tr><td class="f">Thread(s) per core</td><td><b>2 就是开了超线程</b>。这个值决定了"逻辑核"和"物理核"要除以几</td></tr>
+    <tr><td class="f">Core(s) per socket</td><td>每颗物理 CPU 的<b>物理核数</b></td></tr>
+    <tr><td class="f">Socket(s)</td><td>主板上插了几颗 CPU。<b>大于 1 就一定有 NUMA</b></td></tr>
+    <tr><td class="f">Model name</td><td>型号字符串。<b>虚拟机里可能是伪造的</b>，别太当真</td></tr>
+    <tr><td class="f">CPU max MHz</td><td><b>单核最大睿频</b>。全核睿频通常低 10%~25%，重载时看这个会高估</td></tr>
+    <tr><td class="f">BogoMIPS</td><td>内核启动时校准出的"空转速度"，<b>只用于延时循环，没有性能参考价值</b></td></tr>
+    <tr><td class="f">Address sizes</td><td>物理地址位数决定最大内存（46 位 = 64TB），虚拟地址 48 位 = 256TB</td></tr>
+    <tr><td class="f">L3</td><td>注意括号里的 <span class="k">(1 instance)</span>：说明是<b>所有核共享一块</b>，不是每核独享</td></tr>
+    <tr><td class="f">NUMA node0 CPU(s)</td><td><b>最关键的一行</b>。它告诉你哪些逻辑核属于哪个内存节点，绑核绑内存都靠它</td></tr>
+  </table>
+
+  <h4>flags 里该看什么</h4>
+  <table>
+    <tr><th style="width:180px">flag</th><th>含义 / 用途</th></tr>
+    <tr><td class="f">lm</td><td>Long Mode，支持 64 位。没有它说明是 32 位 CPU 或内核</td></tr>
+    <tr><td class="f">avx / avx2</td><td>256 位向量。AVX2 才有整数运算，实际业务的门槛线</td></tr>
+    <tr><td class="f">avx512f</td><td>AVX-512 的<b>基础</b>指令集。<b>只有 f 不代表全都有</b>，还要看 bw/vl/dq/vnni</td></tr>
+    <tr><td class="f">avx512_vnni</td><td>INT8 点积加速，推理场景能快 2~4 倍</td></tr>
+    <tr><td class="f">amx_tile / amx_int8</td><td>矩阵扩展，Sapphire Rapids 起，专为 AI 推理设计</td></tr>
+    <tr><td class="f">aes / sha_ni</td><td>加解密硬件加速。有 sha_ni 的机器算 SHA-256 能快 5~10 倍</td></tr>
+    <tr><td class="f">bmi1 / bmi2</td><td>位操作指令（如 <span class="k">tzcnt</span>、<span class="k">pdep</span>），哈希表、位图会用到</td></tr>
+    <tr><td class="f">hypervisor</td><td><b>出现这个说明你在虚拟机里</b>，看到的拓扑可能是假的</td></tr>
+    <tr><td class="f">vmx / svm</td><td>Intel / AMD 的硬件虚拟化，跑 KVM 需要</td></tr>
+  </table>
+
+  <h4>判断是否支持 AVX-512：三种方法</h4>
+  <pre><span class="c"># 方法一：查 flags（最简单，但可能被 hypervisor 屏蔽）</span>
+grep -o <span class="y">'avx512[a-z0-9_]*'</span> /proc/cpuinfo | sort -u
+
+<span class="c"># 方法二：让编译器告诉你（最可靠，直接看宏）</span>
+gcc -march=native -dM -E - &lt;/dev/null | grep -i avx512
+
+<span class="c"># 方法三：实际跑一条 512 位指令，看会不会 SIGILL</span>
+<span class="b">cat</span> &gt; t.c &lt;&lt;<span class="y">'EOF'</span>
+#include &lt;immintrin.h&gt;
+int main(void){ __m512d a = _mm512_set1_pd(1.0); a = _mm512_add_pd(a,a);
+                double o[8]; _mm512_storeu_pd(o,a); return (int)o[0]-2; }
+<span class="y">EOF</span>
+gcc -O2 -mavx512f t.c -o t &amp;&amp; ./t &amp;&amp; <span class="b">echo</span> <span class="y">"AVX-512 OK"</span></pre>
+  <div class="callout">
+    <b>为什么方法一可能骗你：</b>云厂商为了让你能在不同代际的宿主机之间热迁移，会在 hypervisor 层<b>把 CPUID 里较新的特性屏蔽掉</b>。所以你买了台新机器，<span class="k">avx512f</span> 却看不到——不是你买错了，是云平台为了保证实例族内同构。<br>
+    反过来，如果你在自己编译的软件里用了 <span class="k">-march=native</span>，然后把这台机器上编的二进制挪到另一台，很可能直接 <span class="k">Illegal instruction</span> 崩掉。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个认知与操作坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 lscpu 的 CPU(s) 当成物理核数</div><div class="pd">64 个逻辑 CPU 可能是 32 核 64 线程。按 64 核做容量规划，实际算力会差一半。看清 Thread(s) per core。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">用 -march=native 编译生产二进制</div><div class="pd">换台机器、换批实例就 Illegal instruction。要么统一用 -march=x86-64-v2/v3，要么做运行时派发（多份内核 + CPUID 选择）。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把两个关键线程绑到相邻的逻辑核编号</div><div class="pd">CPU 0 和 CPU 1 往往是同一个物理核的两个超线程，抢 L1 和分支预测器。先读 thread_siblings_list 再绑。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">在异构节点上不做核隔离就跑延迟敏感服务</div><div class="pd">K8s 的 static CPU 策略不区分 P-core 和 E-core。关键服务可能被绑到小核，P99 直接翻倍。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">以为 AVX-512 一定比 AVX2 快</div><div class="pd">部分型号跑 512 位重指令会降频 10%~20%，短时爆发负载反而更慢。而且内存带宽打满时，加宽向量毫无意义。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到 avx512f 就以为全套都有</div><div class="pd">f 只是基础集，bw/vl/dq/vnni 是独立的。写 intrinsics 前把需要的子集全部检查一遍。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">只盯着主频选机器</div><div class="pd">3.8GHz 的老架构可能打不过 2.6GHz 的新架构。同频 IPC 差 1.5 倍是常态，缓存容量差 2 倍更致命。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">认为开超线程一定提升吞吐</div><div class="pd">内存随机访问型负载（数据库、Redis）开 SMT 可能让 P99 变差。吞吐敏感开，延迟敏感关或做核隔离。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">在 ARM 上照搬 x86 的调优参数</div><div class="pd">页大小、缓存行、NUMA 拓扑、THP 行为都不同。x86 上的 THP 建议（比如 Redis 关 THP）在 ARM 上要重新验证。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">没有 perf 数据就开始优化</div><div class="pd">"感觉是 CPU 不行"十次有八次是内存或锁。先跑 perf stat 看 IPC 和 cache-miss，再决定改什么。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一台机器 lscpu 显示 CPU(s)=64、Thread(s) per core=2、Core(s) per socket=16、Socket(s)=2。它的物理核总数是？</div>
+      <button class="opt">64 核</button>
+      <button class="opt">32 核</button>
+      <button class="opt">16 核</button>
+      <div class="ans">正确答案：<b>32 核</b>。2 路 × 16 核/路 = 32 物理核，再乘以每核 2 线程 = 64 逻辑 CPU。<b>容量规划和绑核都要按物理核算。</b></div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. x86-64 与 ARM64 在<b>内存模型</b>上的关键差异是？</div>
+      <button class="opt">x86 是弱内存模型，ARM64 是强内存模型</button>
+      <button class="opt">两者都是强内存模型，可以随便写无锁代码</button>
+      <button class="opt">x86 是 TSO（较强），ARM64 是弱内存模型，需要显式屏障</button>
+      <div class="ans">正确答案：<b>x86 TSO，ARM64 弱内存模型</b>。在 x86 上"碰巧能跑"的无锁代码，到 ARM 上可能因为指令重排而出现可见性错误。跨架构的无锁代码必须用 <span class="k">std::atomic</span> 的 acquire/release 语义。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 程序 IPC 只有 0.6，cache-miss 和 branch-miss 都不高。最可能的原因是？</div>
+      <button class="opt">存在很长的依赖链，流水线在等结果</button>
+      <button class="opt">CPU 主频太低</button>
+      <button class="opt">需要开启超线程</button>
+      <div class="ans">正确答案：<b>依赖链太长</b>。缓存和分支都没问题，说明指令取到了、也猜对了，但每条都要等上一条算完。解法是拆累加器、改算法增加并行度，而不是换硬件。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于超线程（SMT），哪个说法正确？</div>
+      <button class="opt">超线程等于多了一个物理核，性能直接翻倍</button>
+      <button class="opt">两个线程共享执行单元和 L1/L2，对内存随机访问型负载可能有害</button>
+      <button class="opt">超线程只影响浮点性能，对整数程序没有影响</button>
+      <div class="ans">正确答案：<b>共享执行单元和 L1/L2</b>。收益来自"用 A 的停顿填 B 的空洞"，所以只在执行单元没跑满时有效。数据库、Redis 这类缓存敏感负载，开了 SMT 反而可能让 P99 变差。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 想让编译器把循环向量化，下面哪个做法<b>没有帮助</b>？</div>
+      <button class="opt">用 restrict 告诉编译器指针不重叠</button>
+      <button class="opt">用 -O3 -march=native 并查看 -fopt-info-vec-missed</button>
+      <button class="opt">在循环体里调用一个外部函数做小计算</button>
+      <div class="ans">正确答案：<b>在循环体里调用外部函数</b>。除非函数被内联且可向量化，否则编译器会直接放弃。另外要注意：-march=native 编出的二进制不能跨机器分发。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 在云主机上 grep 不到 avx512f，最可能的原因是？</div>
+      <button class="opt">hypervisor 屏蔽了 CPUID 特性，以保证实例族内可热迁移</button>
+      <button class="opt">Linux 内核不支持 AVX-512</button>
+      <button class="opt">必须安装额外的驱动才能启用</button>
+      <div class="ans">正确答案：<b>被 hypervisor 屏蔽</b>。为了保证同一实例族里不同批次宿主机行为一致、支持热迁移，云平台会裁剪 CPUID。想确认真实能力，只能在物理机上验证，或看厂商的规格文档。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>lscpu</code><span class="desc">拓扑、缓存、NUMA、指令集一次看全</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lscpu -e=CPU,CORE,SOCKET,NODE,MAXMHZ</code><span class="desc">逐核视图，判断大小核最直接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lscpu --extended --parse</code><span class="desc">可解析格式，方便脚本处理</span><button class="copy">复制</button></div>
+    <div class="crow"><code>getconf LEVEL1_DCACHE_LINESIZE</code><span class="desc">缓存行大小，通常是 64</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/cpu/cpu0/cache/index*/size</code><span class="desc">逐级缓存大小</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/cpu/cpu0/topology/thread_siblings_list</code><span class="desc">找出超线程兄弟核</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/cpu/smt/active</code><span class="desc">当前 SMT 是否生效（1 为开启）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -m1 '^flags' /proc/cpuinfo</code><span class="desc">x86 的指令集特性（ARM 看 Features）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -o 'avx512[a-z0-9_]*' /proc/cpuinfo | sort -u</code><span class="desc">列出所有 AVX-512 子集</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -march=native -dM -E - &lt;/dev/null | grep AVX</code><span class="desc">编译器认为本机支持什么</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e cycles,instructions,branch-misses,cache-misses ./app</code><span class="desc">算 IPC、定位瓶颈类型</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -d ./app</code><span class="desc">带缓存层级明细的统计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>taskset -cp 0-7 $PID</code><span class="desc">把进程绑到指定 CPU</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numactl --hardware</code><span class="desc">看 NUMA 节点与各节点内存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>uname -m</code><span class="desc">x86_64 还是 aarch64</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker buildx build --platform linux/amd64,linux/arm64</code><span class="desc">一次构建多架构镜像</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>编译选项速查</h3>
+  <pre><span class="c"># 保守可移植：支持到 SSE4.2/POPCNT 级别，2010 年后的 x86 都能跑</span>
+gcc -O2 -march=x86-64-v2
+
+<span class="c"># 主流服务器：AVX2 + BMI2，2015 年后的机器基本都有</span>
+gcc -O3 -march=x86-64-v3
+
+<span class="c"># 只在本机跑：榨干所有特性，但二进制不可移植</span>
+gcc -O3 -march=native
+
+<span class="c"># 看编译器到底向量化了哪些循环</span>
+gcc -O3 -march=native -fopt-info-vec-optimized -fopt-info-vec-missed -c x.c
+
+<span class="c"># 看生成的汇编用了哪些向量寄存器</span>
+objdump -d x.o | grep -E <span class="y">'xmm|ymm|zmm'</span>
+
+<span class="c"># ARM64 上：NEON 是基线，不用额外开</span>
+aarch64-linux-gnu-gcc -O3 -march=armv8-a+simd</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>CISC / RISC</b></td><td>复杂/精简指令集。今天的分界已模糊，x86 内部也把指令拆成微操作执行</td></tr>
+    <tr><td><b>uop（微操作）</b></td><td>x86 指令解码后的内部原子操作，后端真正执行的是它</td></tr>
+    <tr><td><b>IPC</b></td><td>每周期退休的指令数，衡量"每个周期干了多少活"</td></tr>
+    <tr><td><b>流水线深度</b></td><td>一条指令从取指到退休经过的级数，越深频率越高、预测失败越贵</td></tr>
+    <tr><td><b>发射宽度</b></td><td>每周期最多能发射多少条微操作，吞吐的硬上限</td></tr>
+    <tr><td><b>ROB</b></td><td>重排序缓冲，暂存已执行但未提交的指令，是乱序窗口的物理载体</td></tr>
+    <tr><td><b>乱序执行</b></td><td>不按程序顺序执行，但按程序顺序提交结果</td></tr>
+    <tr><td><b>寄存器重命名</b></td><td>把少量架构寄存器映射到大量物理寄存器，消除假数据依赖</td></tr>
+    <tr><td><b>分支预测</b></td><td>提前猜跳转方向并预取指令，猜错要清空流水线</td></tr>
+    <tr><td><b>TAGE</b></td><td>现代主流分支预测算法，用多条不同长度的历史做索引</td></tr>
+    <tr><td><b>SMT / 超线程</b></td><td>两个线程共享一个物理核的执行资源，填满流水线气泡</td></tr>
+    <tr><td><b>big.LITTLE / DynamIQ</b></td><td>ARM 的大小核方案，后者支持同簇混排和共享 L3</td></tr>
+    <tr><td><b>P-core / E-core</b></td><td>Intel 的性能核 / 能效核，后者无超线程但面积效率高</td></tr>
+    <tr><td><b>EAS</b></td><td>能耗感知调度，ARM 上按能耗模型选核</td></tr>
+    <tr><td><b>SIMD</b></td><td>单指令多数据，一条指令并行处理多个数据元素</td></tr>
+    <tr><td><b>AVX / AVX2 / AVX-512</b></td><td>x86 的 256/256/512 位向量扩展，AVX2 才有 256 位整数</td></tr>
+    <tr><td><b>NEON / SVE</b></td><td>ARM 的 128 位固定向量 / 128~2048 位可变长向量</td></tr>
+    <tr><td><b>自动向量化</b></td><td>编译器自动把标量循环改写成 SIMD 指令</td></tr>
+    <tr><td><b>restrict</b></td><td>告诉编译器指针不重叠，是向量化的关键提示</td></tr>
+    <tr><td><b>TSO</b></td><td>x86 的总存储顺序内存模型，比 ARM 的弱模型强</td></tr>
+    <tr><td><b>NUMA</b></td><td>非统一内存访问，跨节点访存延迟更高</td></tr>
+    <tr><td><b>缓存行</b></td><td>缓存与内存之间传输的最小单位，x86 上通常 64 字节</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在自己机器上跑 <span class="k">lscpu -e</span>，标出哪些是 P-core、哪些是超线程兄弟；② 写一个数组求和的程序，分别用 <span class="k">-O2</span> 和 <span class="k">-O3 -march=native</span> 编译，用 <span class="k">perf stat</span> 对比 IPC；③ 把那个"排序后快 5 倍"的分支例子亲手跑一遍；④ 用 <span class="k">-fopt-info-vec-missed</span> 看编译器为什么拒绝向量化你的循环。<br><br>
+    <b>之后值得单独学：</b>缓存一致性与伪共享（false sharing）、NUMA 绑核绑内存、perf 的采样与火焰图、以及无锁数据结构里的内存序问题。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 CPU 架构 · 先量后调：没有 perf 数据的优化都是猜</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（微架构指标）和模块 6（性能差距来源）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在自己机器上跑 lscpu。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议先跑一遍 lscpu，对着自己的机器看';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透短链系统设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+/* 架构链路图（HTML/CSS 表达） */
+.layer{border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden}
+.layer .lt{background:var(--bg);border-bottom:1px solid var(--line);padding:7px 14px;font-size:13px;font-weight:600;color:var(--muted)}
+.layer .lb{padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px}
+.box{font-size:12.5px;border:1px solid var(--line);border-radius:7px;padding:5px 11px;background:var(--card);color:#3A3A36;white-space:nowrap}
+.box b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 9 期 · 实战篇</span>
+    <h1>二十分钟学透短链系统设计</h1>
+    <p class="sub">短链是"<b>最简单的分布式系统，也是最容易翻车的读系统</b>"。一个 6 位字符串背后是：发号器、Base62、301/302 的取舍、缓存层级、容量估算。这篇把 <b>s.url.cn/a1B2c3</b> 一次跳转背后的一切讲透。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种发号方案</span>
+      <span class="chip">6 位短码容量 <b>568 亿</b></span>
+      <span class="chip"><b>4</b> 级缓存</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边算一遍容量：给你自己的业务日点击量，算峰值 QPS、存储量、缓存命中率。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>短链到底是个什么东西</h2></div>
+  <p class="lead">剥开所有花活，短链系统只做两件事：<b>把一个长 URL 映射成一个短码</b>，<b>访问短码时 301/302 跳回长 URL</b>。全部设计问题都围绕这两个动作展开。</p>
+  <div class="layer"><div class="lt">写链路（低频，几百 QPS）</div><div class="lb"><span class="box">提交长链</span><span class="box">发号器生成短码</span><span class="box">写映射存储</span><span class="box">写缓存</span><span class="box">返回短链</span></div></div>
+  <div class="layer"><div class="lt">读链路（高频，几十万 QPS）</div><div class="lb"><span class="box">DNS 解析短域名</span><span class="box">边缘节点 / 网关</span><span class="box">本地缓存 → Redis → DB</span><span class="box">返回 302 + Location</span><span class="box">异步埋点上报</span></div></div>
+  <p>注意读写比例的悬殊：<b>写一次，读几千到几百万次</b>。所以短链是典型的"读放大"系统，<b>读链路决定架构，写链路决定正确性</b>。业内参照系：微博 t.cn 日均跳转百亿次级，腾讯 url.cn 同量级；本篇算例取<b>日均 10 亿次跳转、存量 5 亿条短链</b>。</p>
+  <div class="callout">
+    <b>一个反直觉的结论：</b>短链的技术难度不在"生成"，在<b>跳转的可用性</b>。用户对"生成慢 1 秒"无感，但对"点了不跳"零容忍。所以架构上读链路要冗余到偏执：多级缓存、多活部署、降级预案。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>核心原理：发号 + 映射</h2></div>
+  <p class="lead">短码本质上是一个<b>全局唯一 ID 的 Base62 编码</b>。理解这一点，所有方案都顺理成章。</p>
+  <h4>Base62 字符集与容量</h4>
+  <pre><span class="c">// 字符集：0-9 + a-z + A-Z = 62 个字符，避免特殊字符（URL 安全、免转义）</span>
+charset = <span class="y">"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>
+
+<span class="c">// 容量（这是选短码长度的唯一依据）</span>
+62^1 =                   62
+62^4 =             14,776,336   <span class="c">// 1400 万，4 位不够用</span>
+62^6 =         56,800,235,584   <span class="c">// 568 亿，6 位是业界标配</span>
+62^7 =      3,521,614,606,208   <span class="c">// 3.5 万亿，7 位留给超大规模</span>
+
+<span class="c">// 为什么不用更短？4 位只有 1477 万，撞库+遍历风险高；</span>
+<span class="c">// 为什么不用更长？每多 1 位字符，短信/物料成本上升，且输入易错</span></pre>
+  <h4>编码与解码（进制转换）</h4>
+  <pre><span class="b">public static final</span> String CHARS = <span class="y">"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>;
+
+<span class="c">// 10 进制 ID → 6 位短码（不足 6 位前面补 '0'）</span>
+<span class="b">public static</span> String encode(<span class="b">long</span> id) {
+  <span class="b">if</span> (id == 0) <span class="b">return</span> <span class="y">"0"</span>;
+  StringBuilder sb = <span class="b">new</span> StringBuilder();
+  <span class="b">while</span> (id &gt; 0) {
+    sb.append(CHARS.charAt((<span class="b">int</span>)(id % 62)));
+    id /= 62;
+  }
+  <span class="b">return</span> sb.reverse().toString();
+}
+
+<span class="c">// 短码 → 10 进制 ID（解码不是必须的，但调试/反查很有用）</span>
+<span class="b">public static long</span> decode(String code) {
+  <span class="b">long</span> id = 0;
+  <span class="b">for</span> (<span class="b">char</span> c : code.toCharArray()) {
+    id = id * 62 + CHARS.indexOf(c);
+  }
+  <span class="b">return</span> id;
+}
+
+<span class="c">// 关键细节：发号器给出的是"全局唯一整数"，短码 = encode(id)</span>
+<span class="c">// 所以问题立刻收敛为：如何高性能地发号？—— 这是模块 2 的全部内容</span></pre>
+  <h4>一个必须做的变换：短码加散列</h4>
+  <p>如果直接用自增 ID 编码，短码是连续的：<span class="k">000001、000002、000003</span>。后果是<b>任何人都能遍历你的全部短链</b>，爬走内容、估算业务量。解法：编码前对 ID 做一个<b>可逆或可查的扰乱</b>——常见做法是用一个固定密钥的<b>对称加密 / Feistel 网络</b>（FPE 保留格式加密），保证同一个 ID 永远映射到同一个"看起来随机"的短码，且不碰撞。简单场景也可以接受"随机生成 + 冲突重试"（见模块 2）。</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>发号器：四种方案</h2></div>
+  <p class="lead">发号器的唯一 KPI：<b>趋势递增、全局唯一、高可用、不泄露业务量</b>。四种方案，按规模选用。</p>
+  <table>
+    <tr><th style="width:140px">方案</th><th style="width:120px">发号速率</th><th style="width:110px">ID 位数</th><th>适用与风险</th></tr>
+    <tr><td><b>数据库自增</b></td><td>单机 ~5 千/s</td><td>短（编码后 6 位内）</td><td>最简单。<b>单点瓶颈 + 宕机丢号</b>；自增 ID 泄露总量。只适合起步期</td></tr>
+    <tr><td><b>号段模式</b></td><td>单机 ~10 万/s</td><td>短</td><td><b>最常用（美团 Leaf 号段版）。</b>批量取号段（如一次取 1000），DB 压力降到 1/1000</td></tr>
+    <tr><td><b>雪花算法</b></td><td>单机 ~10 万/s</td><td><b>长（19 位数字，Base62 后 11~12 字符）</b></td><td>无单点、自带时间信息，但<b>编码后超出 6 位</b>，且依赖机器时钟（回拨风险）</td></tr>
+    <tr><td><b>随机生成 + 冲突重试</b></td><td>~5 万/s</td><td>可控 6 位</td><td>直接随机 6 位，查重撞了重试。<b>后期碰撞率上升</b>（生日悖论），需监控重试次数</td></tr>
+  </table>
+  <h4>号段模式实现（生产主流）</h4>
+  <pre><span class="c">-- 号段表：每个业务一个 tag，step 是每次取的号段长度</span>
+<span class="b">CREATE TABLE</span> id_segment (
+  tag       <span class="y">VARCHAR</span>(32) <span class="r">PRIMARY KEY</span>,
+  max_id   <span class="y">BIGINT</span> <span class="r">NOT NULL</span>,   <span class="c">-- 当前已发到的最大号</span>
+  step      <span class="y">INT</span> <span class="r">NOT NULL</span>       <span class="c">-- 每次取的步长，如 1000</span>
+  version  <span class="y">INT</span> <span class="r">NOT NULL</span>       <span class="c">-- 乐观锁</span>
+);
+
+<span class="c">-- 取号段：一次 UPDATE 拿 1000 个号（原子）</span>
+<span class="b">UPDATE</span> id_segment
+   <span class="b">SET</span> max_id = max_id + step, version = version + 1
+ <span class="b">WHERE</span> tag = <span class="y">'short_url'</span> <span class="b">AND</span> version = ?;
+
+<span class="c">-- 拿到 max_id 后，在内存里顺序分配 [max_id-step+1, max_id]</span>
+<span class="c">-- 用完再取下一段。DB 压力 = 发号量 / step = 10万/s ÷ 1000 = 100 QPS，毫无压力</span>
+
+<span class="c">// 内存分配（应用内，无锁 AtomicLong）</span>
+AtomicLong current = <span class="b">new</span> AtomicLong(maxId - step + 1);
+<span class="b">public long</span> nextId() {
+  <span class="b">long</span> id = current.incrementAndGet();      <span class="c">// 先自增再用</span>
+  <span class="b">if</span> (id &gt; maxId) loadNextSegment();        <span class="c">// 越过段尾，异步加载下一段</span>
+  <span class="b">return</span> id;
+}</pre>
+  <div class="callout warn">
+    <b>号段模式的两个坑：</b>① <b>号段浪费</b>——每次取 1000 个，进程重启没用完的就永远丢了（可接受：6 位空间有 568 亿）；② <b>取号段时 DB 抖动 = 发号暂停</b>——解法是"双 buffer"：当前段用到 80% 时就异步预取下一段，像 GC 的卡片标记。Leaf 的"双 buffer 优化"说的就是这件事。
+  </div>
+  <h4>方案选择决策树</h4>
+  <ul>
+    <li>日增短链 &lt; 10 万：<b>号段模式单点</b>足够，别上分布式</li>
+    <li>日增短链 10 万 ~ 1 亿：<b>号段模式 + 多实例</b>（每实例独立 tag 或共享号段）</li>
+    <li>需要嵌入时间戳做运维排查：<b>雪花</b>，但接受 11 位短码或截断哈希（截断有碰撞风险，必须查重）</li>
+    <li>绝对不接受 ID 泄露业务量：<b>号段/雪花 + FPE 散列</b>输出</li>
+  </ul>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>存储选型：KV 还是关系型</h2></div>
+  <p class="lead">短链的核心操作只有一个：<b>code → long_url</b>。看起来 KV 就够了，但"管理后台"的需求会把关系型拉回来。<b>生产答案：两层都用。</b></p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:200px">纯 KV（Redis/RocksDB）</th><th>关系型（MySQL）</th></tr>
+    <tr><td>跳转读性能</td><td><b>极高</b>（单机 10 万 QPS+）</td><td>一般（需索引 + 连接池，单机 ~1 万 QPS）</td></tr>
+    <tr><td>多条件查询</td><td><b>基本不支持</b>（按创建者查、按时间查都困难）</td><td>原生支持（索引 + SQL）</td></tr>
+    <tr><td>事务/一致性</td><td>有限</td><td>完整 ACID（生成时要保证 code 不重复）</td></tr>
+    <tr><td>成本</td><td>内存贵（Redis），RocksDB 便宜</td><td>磁盘便宜，扩容靠分库分表</td></tr>
+  </table>
+  <h4>生产架构：MySQL 为源，Redis 为盾</h4>
+  <pre><span class="c">-- MySQL：唯一真相，按 code 哈希分 128 库（5 亿条 × ~300 字节 ≈ 150GB）</span>
+<span class="b">CREATE TABLE</span> short_url (
+  code       <span class="y">VARCHAR</span>(8)  <span class="r">PRIMARY KEY</span>,   <span class="c">-- 短码，唯一</span>
+  long_url  <span class="y">VARCHAR</span>(2048) <span class="r">NOT NULL</span>,   <span class="c">-- 原始长链</span>
+  long_md5  <span class="y">CHAR</span>(32)     <span class="r">NOT NULL</span>,       <span class="c">-- 长链摘要，判重用</span>
+  creator   <span class="y">BIGINT</span>       <span class="r">NOT NULL DEFAULT</span> 0,
+  status    <span class="y">TINYINT</span>      <span class="r">NOT NULL DEFAULT</span> 1, <span class="c">-- 1有效 0禁用</span>
+  expire_at <span class="y">DATETIME</span>     <span class="r">NULL</span>,          <span class="c">-- NULL=永久</span>
+  <span class="b">KEY</span> idx_creator (creator, id),
+  <span class="b">KEY</span> idx_expire (status, expire_at)   <span class="c">-- 过期扫描</span>
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c">-- Redis：跳转热数据，value 序列化 long_url（热点短链）</span>
+<span class="c">-- key: su:{code}  value: long_url  TTL: 24h + 随机偏移</span>
+<span class="c">-- 容量预估：热点 1000 万条 × 250 字节 ≈ 2.5GB，一个集群搞定</span></pre>
+  <div class="callout ok">
+    <b>为什么长链要存 md5：</b>同一个长链可能被提交多次。有 md5 就能做"相同长链返回同一短码"（幂等创建），也方便按长链反查。<b>但 md5 相同不代表长链相同</b>（碰撞），判重只在创建侧用，跳转侧永远以 code 为准。
+  </div>
+  <h4>长链长度必须限制（血泪教训）</h4>
+  <p>有的"长链"用户会贴进几 MB 的带参 URL（追踪参数堆叠）。必须限制：<b>入库前校验长度 ≤ 2048 字节，超长拒绝</b>。否则存储爆炸、MySQL 单行超限（行大小限制 65535 字节）、缓存价值归零。</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>跳转：301 还是 302</h2></div>
+  <p class="lead">这是短链第一个真正的架构决策。HTTP 重定向有两个状态码，行为差异巨大，选错要么丢统计、要么白烧带宽。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:200px">301 Moved Permanently</th><th>302 Found（临时重定向）</th></tr>
+    <tr><td>浏览器行为</td><td><b>永久缓存跳转</b>，后续点击直接去目标，不再请求短链服务</td><td>每次都请求短链服务</td></tr>
+    <tr><td>服务端压力</td><td>低（只扛首次）</td><td>高（每次都打到你）</td></tr>
+    <tr><td>点击统计</td><td><b>统计不到</b>（浏览器本地跳了）</td><td>完整统计</td></tr>
+    <tr><td>修改目标</td><td>已缓存的用户改不了</td><td>随时改，下次点击生效</td></tr>
+    <tr><td>禁用短链</td><td>缓存用户仍能打开</td><td>立即生效</td></tr>
+  </table>
+  <pre><span class="c"># 302 响应（带统计 + 风控能力，业界主流选择）</span>
+HTTP/1.1 <span class="g">302 Found</span>
+Location: https://item.example.com/detail?id=1234567
+Cache-Control: no-cache          <span class="c"># 禁止中间层缓存重定向结果</span>
+
+<span class="c"># 301 的正确用法：短链服务自身做"永久跳转"场景，如域名迁移、旧域名归档</span>
+<span class="c"># 301 + Location: 新短域名/新码 —— 让浏览器把旧短域名整个缓存掉</span></pre>
+  <div class="callout danger">
+    <b>最常见的选型错误：用了 301 又要点击统计。</b>结果是统计数字永远偏低（只有首次点击被记录），而且<b>短链被投诉下架时，浏览器缓存里的用户还能打开</b>——这在内容合规场景是严重事故。<b>需要统计/风控/可禁用，一律 302；纯粹省带宽的静态归档场景才用 301。</b>
+  </div>
+  <h4>CDN 与缓存层的配合</h4>
+  <ul>
+    <li><b>302 不缓存</b>（<span class="k">Cache-Control: no-cache</span>），所以 CDN 对跳转请求基本是"透传 + 边缘回源"，帮不上忙，别指望 CDN 抗跳转</li>
+    <li><b>CDN 真正的作用</b>是 DNS 调度到最近边缘节点 + 静态资源（管理后台、JS SDK）</li>
+    <li>如果想用 CDN 抗跳转读，可以上<b>"边缘短链"方案</b>：把热映射推到边缘节点（如腾讯云 EdgeOne 的边缘 KV），命中就直接在边缘跳，不回源。代价是数据一致性弱化，适合热点链接</li>
+  </ul>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>高并发读优化</h2></div>
+  <p class="lead">跳转是纯读、无副作用、允许最终一致——这是缓存的完美场景。<b>目标：把 40 万 QPS 的峰值挡在离用户最近的地方。</b></p>
+  <h4>四级缓存体系与命中率</h4>
+  <table>
+    <tr><th style="width:190px">层级</th><th style="width:120px">命中率</th><th>说明</th></tr>
+    <tr><td><b>OpenResty 本地缓存</b></td><td>~85%</td><td>在网关层用 Lua 直接查共享 dict 缓存（lua_shared_dict），<b>不经过应用</b>，单机 5 万+ QPS</td></tr>
+    <tr><td><b>应用本地缓存（Caffeine）</b></td><td>~10%</td><td>防 Redis 热 key，TTL 60 秒，容量 10 万条</td></tr>
+    <tr><td><b>Redis 集群</b></td><td>~4%</td><td>主力分布式缓存，热点 key 单独实例</td></tr>
+    <tr><td><b>MySQL</b></td><td>~1%</td><td>兜底 + 回填缓存。真正落到库的读要 &lt; 1%</td></tr>
+  </table>
+  <pre><span class="c">-- OpenResty 层 Lua：跳转全流程在网关完成，不回源应用</span>
+<span class="b">local</span> cache = ngx.shared.shortlink_cache   <span class="c">-- 共享内存 dict</span>
+<span class="b">local</span> code = ngx.var.code
+
+<span class="c">-- 1. 本地缓存命中</span>
+<span class="b">local</span> target = cache:get(code)
+<span class="b">if</span> target <span class="b">then</span>
+  <span class="b">return</span> redirect(target)
+<span class="b">end</span>
+
+<span class="c">-- 2. 未命中 → Redis（连接池，避免每请求新建连接）</span>
+<span class="b">local</span> redis = <span class="b">require</span>(<span class="y">"resty.redis"</span>)
+<span class="b">local</span> red = redis:new()
+red:set_timeout(50)          <span class="c">-- 50ms 超时，慢于这个值直接降级</span>
+red:connect(<span class="y">"127.0.0.1"</span>, 6379)
+target = red:get(<span class="y">"su:"</span>..code)
+red:set_keepalive(10000, 100) <span class="c">-- 连接池复用</span>
+
+<span class="b">if</span> target <span class="b">then</span>
+  cache:set(code, target, 60)  <span class="c">-- 回填本地，60 秒</span>
+  <span class="b">return</span> redirect(target)
+<span class="b">end</span>
+
+<span class="c">-- 3. 未命中 → 回源应用查 DB 并回填；DB 也没有 → 404 页</span>
+<span class="b">return</span> origin_lookup(code)</pre>
+  <h4>热 key 与冷 key 的分治</h4>
+  <ul>
+    <li><b>热 key</b>（爆款短链，QPS 占单 key 万级）：本地缓存吸收 + 必要时<b>该 key 多副本</b>（如 su:{code}:1 ~ su:{code}:16 随机读，写时全写）</li>
+    <li><b>冷 key</b>（长尾，创建后无人点）：只存在于 MySQL，别灌 Redis，否则缓存 99% 是垃圾，命中率暴跌</li>
+    <li><b>缓存预热</b>：Top 100 万热短链提前灌入 OpenResty 本地缓存，大促/晚会前必做</li>
+  </ul>
+  <div class="callout warn">
+    <b>本地缓存的一致性代价：</b>本地缓存 60 秒 TTL 意味着"禁用短链"最多 60 秒后才全网生效。合规场景（诈骗链接下架）不能忍——解法是<b>主动失效广播</b>：禁用操作发 MQ，各网关节点订阅后删本地缓存，生效时间从 60 秒降到 1 秒内。<b>记住：本地缓存必须配主动失效通道，否则就是合规隐患。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>防刷与风控</h2></div>
+  <p class="lead">短链是黑产的重灾区：刷点击量骗营销结算、把短链当钓鱼入口、把服务当免费跳板。<b>防刷不是可选项，是短链系统的内置模块。</b></p>
+  <table>
+    <tr><th style="width:150px">手段</th><th style="width:200px">做法</th><th>拦什么</th></tr>
+    <tr><td><b>短码不可遍历</b></td><td>发号加散列（FPE），不用连续自增</td><td>批量爬取全部短链</td></tr>
+    <tr><td><b>IP 限流</b></td><td>网关层每 IP 100 次/分钟，超限返回 429 或验证码页</td><td>单机刷量</td></tr>
+    <tr><td><b>单短链限流</b></td><td>单 code 超过 1 万 QPS 时触发人机校验</td><td>集中刷单个链接</td></tr>
+    <tr><td><b>目标页审查</b></td><td>创建时 + 定时任务扫描目标域名，对接黑产/赌博/诈骗 URL 库</td><td>恶意内容（合规红线）</td></tr>
+    <tr><td><b>设备指纹</b></td><td>JS SDK 采集浏览器特征，识别模拟器/群控</td><td>高级刷量（换 IP 不换设备）</td></tr>
+    <tr><td><b>验证码</b></td><td>异常流量弹滑块/短信验证，通过后短期免验</td><td>机器流量</td></tr>
+  </table>
+  <pre><span class="c"># 网关限流（OpenResty，按 IP，令牌桶）</span>
+lua_shared_dict limit_store 100m;
+access_by_lua_block {
+  <span class="b">local</span> limit = <span class="b">require</span> <span class="y">"resty.limit.count"</span>
+  <span class="b">local</span> lim = limit:new(<span class="y">"limit_store"</span>, 100, 60)  <span class="c">-- 100 次 / 60 秒</span>
+  <span class="b">local</span> key = ngx.var.remote_addr
+  <span class="b">local</span> delay, err = lim:incoming(key, <span class="b">true</span>)
+  <span class="b">if not</span> delay <span class="b">then</span>
+    <span class="b">if</span> err == <span class="y">"rejected"</span> <span class="b">then</span>
+      ngx.exit(429)   <span class="c">-- 或跳验证码页</span>
+    <span class="b">end</span>
+  <span class="b">end</span>
+}</pre>
+  <div class="callout danger">
+    <b>合规是短链的生死线：</b>短链被用于钓鱼/赌博，服务方要担连带责任。必须做到：<b>创建时审核（或先跳中间页提示）+ 定时扫描 + 用户举报通道 + 一键全渠道禁用（含主动失效广播）</b>。这四件事做不到，就不要对外提供短链服务。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>数据分析：点击埋点</h2></div>
+  <p class="lead">短链的核心商业价值是<b>知道每个链接被谁、在哪、什么时候点了</b>。埋点的第一原则：<b>绝不能让统计拖慢跳转</b>。</p>
+  <h4>异步埋点链路</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>跳转时采集：</b>在网关层拿 IP（解析地域）、UA（解析设备/浏览器）、Referer、时间戳、code——不查库，纯内存操作</div></div>
+    <div class="step"><div class="txt"><b>发 MQ 不等待：</b>采集数据写 Kafka（本地聚合 100 条或 100ms 批量发），<b>不等 ACK，失败就丢</b>——统计允许秒级丢失，跳转不能慢 1ms</div></div>
+    <div class="step"><div class="txt"><b>双路消费：</b>实时路（Flink 聚合分钟级 PV/UV/地域，进 Redis 供实时看板）+ 离线路（落 ClickHouse/Hive，T+1 报表）</div></div>
+    <div class="step"><div class="txt"><b>UV 去重：</b>实时 UV 用 HyperLogLog（误差 0.81% 可接受）；精确 UV 用 (code, 日期, 设备指纹) 离线去重</div></div>
+  </div>
+  <h4>埋点字段设计</h4>
+  <table>
+    <tr><th style="width:130px">字段</th><th>说明</th></tr>
+    <tr><td class="f">code / ts / trace_id</td><td>短码、点击时间（毫秒）、链路 ID（串起跳转和后续转化）</td></tr>
+    <tr><td class="f">ip / geo</td><td>IP 及解析出的国家省市运营商</td></tr>
+    <tr><td class="f">ua / os / device</td><td>UA 原文 + 解析出的操作系统、设备类型</td></tr>
+    <tr><td class="f">referer / channel</td><td>来源（微信/微博/短信）、UTM 参数透传</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>统计数字永远对不齐是常态，提前和业务达成一致：</b>实时 PV 与离线 PV 差 1%~3%（MQ 丢消息、Flink 窗口边界）；UV 误差 1% 左右（HyperLogLog）。<b>结算类数据（分润、计费）一律以离线 T+1 为准，实时数据只做监控看板。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>容量估算与过期回收</h2></div>
+  <p class="lead">容量估算是短链面试/评审的必答题。套路固定：<b>从业务量出发，分读写两条链路算，每步给公式。</b></p>
+  <h4>读链路（跳转）</h4>
+  <pre><span class="c">// 输入：日均 10 亿次跳转，峰值集中在晚 8-9 点占 15%</span>
+峰值 QPS = 10亿 × 0.15 / 3600 = <span class="g">41.7 万 QPS</span>
+
+<span class="c">// 分层吸收（命中率见模块 5）</span>
+OpenResty 本地缓存扛掉 85% → 剩余 6.3 万 QPS 穿透
+Redis 扛掉剩余的大部分 → MySQL 实际读 = 41.7万 × 4% × 1% ≈ <span class="g">167 QPS</span>
+
+<span class="c">// 带宽（大头是响应，跳转响应 ≈ 300~500 字节）</span>
+41.7 万 QPS × 400 字节 ≈ <span class="g">167 MB/s</span> 出站带宽
+<span class="c">// → 单机 1Gbps=125MB/s，至少 2 台起步；按 3 台 + 30% 冗余 = 4 台网关</span>
+
+<span class="c">// Redis 容量：热点 1000 万条 × 250 字节 ≈ 2.5GB → 1 主 2 从足够</span></pre>
+  <h4>写链路与存储</h4>
+  <pre><span class="c">// 输入：日均 200 万次创建，存量 5 亿条，保留 5 年</span>
+<span class="c">// 单条存储：code 7B + long_url 平均 300B + 元数据 100B ≈ 407B，按 512B 算</span>
+5 亿 × 512B ≈ <span class="g">256 GB</span>（MySQL 分 128 库，每库 2GB，非常轻松）
+
+<span class="c">// 写 QPS：200 万 / 86400 ≈ 23 QPS 平均，晚高峰 × 5 ≈ 115 QPS</span>
+<span class="c">// 23 QPS 的写，单库 MySQL 都富余 —— 短链的写在存储层根本不是问题</span>
+
+<span class="c">// 冷数据归档：3 年前且 90 天无点击 → 迁 HBase/对象存储，MySQL 只留 3 年</span></pre>
+  <div class="callout ok">
+    <b>容量估算的三个结论（记住这些数量级）：</b>① 短链是<b>读:写 ≈ 5000:1</b> 的系统，所有容量问题都是读问题；② 10 亿次日跳转发号量只有几十 QPS，<b>号段模式绰绰有余</b>；③ 真正贵的是<b>带宽和网关机器</b>（40 万 QPS 不是缓存能全挡的），不是存储。
+  </div>
+  <h4>过期与回收</h4>
+  <ul>
+    <li><b>过期判定在跳转侧</b>：读到映射先查 <span class="k">expire_at &lt; now</span> 或 <span class="k">status=0</span>，是则返回"已过期"页，不给跳</li>
+    <li><b>物理回收</b>：每日任务扫描 <span class="k">idx_expire</span> 索引，批量删除 + 删 Redis key + 发失效广播</li>
+    <li><b>短码绝不回收复用</b>：用户书签、已发出的短信里的旧码必须继续有效或明确提示失效。<b>复用短码 = 把 A 的用户导去 B 的页面</b>，是重大事故</li>
+    <li><b>Redis TTL 设 24h + 随机 0~600 秒</b>：避免同时失效引发缓存雪崩，同时保证禁用操作最长 1 天内生效</li>
+  </ul>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 301 又要点击统计</div><div class="pd">浏览器永久缓存跳转，后续点击不再请求服务端，统计永远偏低；禁用短链也不生效。要统计/风控一律用 302。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">短码用连续自增 ID，可被遍历</div><div class="pd">000001、000002 顺序可猜，竞品能爬走你全部链接。发号后必须做散列（FPE/Feistel）输出。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">跳转链路同步写埋点</div><div class="pd">每次跳转等 Kafka ACK，P99 从 5ms 涨到 50ms，40 万 QPS 下网关全被打挂。埋点必须本地聚合 + 异步发，丢就丢。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">本地缓存没有主动失效通道</div><div class="pd">60 秒 TTL 意味着禁用一个钓鱼链接要等 1 分钟，合规事故事故。禁用操作必须发广播删各节点本地缓存。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">不限制长链长度</div><div class="pd">用户贴进几 MB 的追踪参数长链，MySQL 单行超限、缓存价值归零。入库前强制 ≤ 2048 字节。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">所有短链无脑灌 Redis</div><div class="pd">冷 key 占满内存，命中率暴跌还浪费钱。只灌 Top 100 万热链，长尾留在 MySQL。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">回收的短码重新分配给新链接</div><div class="pd">用户书签/旧短信里的码跳到别人的页面，重大事故。短码一次性，永不复用。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">号段模式单发号实例，没有预取</div><div class="pd">号段用完同步等 DB，发号 P99 飙到几十毫秒；DB 抖动直接发号中断。用双 buffer 预取下一段。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">没有防刷，被当成免费跳板</div><div class="pd">黑产刷量骗结算、挂钓鱼页，服务方担连带责任。IP 限流 + 单链限流 + 目标页审查 + 验证码，一个不能少。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">创建短链不做幂等</div><div class="pd">同一长链重复提交生成多个短码，统计分散、管理混乱。用 long_md5 做唯一约束或创建前查重，相同长链返回同一短码。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 短链系统需要完整统计每次点击、并能随时禁用某个链接，应该用哪个状态码？</div>
+      <button class="opt">301 Moved Permanently</button>
+      <button class="opt">302 Found（临时重定向）</button>
+      <button class="opt">307 Temporary Redirect，语义更精确</button>
+      <div class="ans">正确答案：<b>302</b>。301 会被浏览器永久缓存，后续点击不再请求服务端，统计不到也禁不掉。302 每次都回服务端，统计和禁用都能生效（代价是服务端要扛全部读流量，靠缓存体系解决）。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 6 位 Base62 短码的总容量约为多少？</div>
+      <button class="opt">约 6200 万</button>
+      <button class="opt">约 3.5 万亿</button>
+      <button class="opt">约 568 亿</button>
+      <div class="ans">正确答案：<b>约 568 亿（62 的 6 次方 = 56,800,235,584）</b>。3.5 万亿是 7 位的容量；6200 万是混淆项。5 亿存量短链用 6 位，空间余量 100 倍以上。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 美团 Leaf 的"号段模式"核心思想是？</div>
+      <button class="opt">每次从数据库批量取一段号（如 1000 个），在内存里顺序分配，把 DB 压力降低三个数量级</button>
+      <button class="opt">每台机器用不同网段保证 ID 不重复</button>
+      <button class="opt">用时间戳左移保证全局唯一</button>
+      <div class="ans">正确答案：<b>批量取号段 + 内存分配</b>。10 万 QPS 的发号需求，DB 实际只承受 10 万/1000 = 100 QPS。进阶是双 buffer 预取，避免号段用完时同步等待。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于短链的埋点，正确做法是？</div>
+      <button class="opt">跳转前同步写 Kafka 并等 ACK，保证不丢</button>
+      <button class="opt">网关本地聚合后异步发 Kafka，不等 ACK，丢就丢</button>
+      <button class="opt">写 MySQL，保证数据可靠</button>
+      <div class="ans">正确答案：<b>本地聚合 + 异步发送</b>。跳转延迟是生死线（40 万 QPS），统计允许秒级丢失。同步等 ACK 会让 P99 从 5ms 恶化到 50ms，直接打挂网关。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 日跳转 10 亿次、峰值 15% 集中在 1 小时，峰值 QPS 约为多少？</div>
+      <button class="opt">约 1.2 万 QPS</button>
+      <button class="opt">约 280 万 QPS</button>
+      <button class="opt">约 42 万 QPS</button>
+      <div class="ans">正确答案：<b>约 42 万 QPS</b>。10 亿 × 0.15 ÷ 3600 秒 ≈ 41.7 万。1.2 万是"除以 24 小时"的日均值错误算法；280 万是没乘峰值系数的错误。容量规划必须用峰值，用均值备容量等于裸奔。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 一个短链过期被回收后，它的短码应该如何处理？</div>
+      <button class="opt">永不复用，留着废弃或提示"已失效"</button>
+      <button class="opt">回收给新链接用，节省号段空间</button>
+      <button class="opt">保留映射但改为跳首页</button>
+      <div class="ans">正确答案：<b>永不复用</b>。用户书签、已发出的短信/物料里的旧码还在流传，复用会把 A 的用户导去 B 的页面，是重大事故。568 亿的空间完全不需要靠复用节省。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>核心决策速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>302 + Cache-Control: no-cache</code><span class="desc">要统计/可禁用就用它，301 会丢统计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>encode(id) = id 转 62 进制，6 位</code><span class="desc">短码本质：唯一 ID 的 Base62 编码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>UPDATE id_segment SET max_id=max_id+step</code><span class="desc">号段发号：批量取号，DB 压力降三个数量级</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Redis: SET su:{code} {long_url} EX 86400</code><span class="desc">跳转缓存，TTL 24h + 随机偏移</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Cache-Control: no-cache + 禁用广播</code><span class="desc">本地缓存必须配主动失效，合规底线</span><button class="copy">复制</button></div>
+  </div>
+  <h3>容量估算速查表（算例数字）</h3>
+  <table>
+    <tr><th style="width:220px">指标</th><th>本篇算例值</th></tr>
+    <tr><td>峰值跳转 QPS</td><td>10 亿 × 15% / 3600 ≈ 42 万</td></tr>
+    <tr><td>出站带宽</td><td>42 万 × 400B ≈ 167 MB/s</td></tr>
+    <tr><td>Redis 缓存容量</td><td>1000 万热链 × 250B ≈ 2.5GB</td></tr>
+    <tr><td>MySQL 存储（5 亿条）</td><td>5 亿 × 512B ≈ 256GB，分 128 库</td></tr>
+    <tr><td>创建写 QPS</td><td>200 万/日 ≈ 23 平均 / 115 峰值</td></tr>
+    <tr><td>读写比</td><td>约 5000:1（纯读放大系统）</td></tr>
+  </table>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Base62</b></td><td>0-9+a-z+A-Z 共 62 字符，URL 安全且免转义</td></tr>
+    <tr><td><b>短码</b></td><td>唯一 ID 的 Base62 编码，6 位容量 568 亿</td></tr>
+    <tr><td><b>发号器</b></td><td>生成全局唯一趋势递增 ID 的服务</td></tr>
+    <tr><td><b>号段模式</b></td><td>批量取号在内存分配，DB 压力降三个数量级</td></tr>
+    <tr><td><b>雪花算法</b></td><td>时间戳 + 机器号 + 序列号的自包含 ID</td></tr>
+    <tr><td><b>FPE</b></td><td>保留格式加密，把连续 ID 变成"随机但唯一"的短码</td></tr>
+    <tr><td><b>301 / 302</b></td><td>永久 / 临时重定向；前者浏览器缓存，统计失效</td></tr>
+    <tr><td><b>Cache-Control: no-cache</b></td><td>禁止中间层缓存重定向结果</td></tr>
+    <tr><td><b>读扩散 / 读放大</b></td><td>写一次读千万次，容量问题集中在读侧</td></tr>
+    <tr><td><b>热 key</b></td><td>访问量集中的短码，用本地缓存 + 多副本吸收</td></tr>
+    <tr><td><b>生日悖论</b></td><td>随机短码碰撞概率随存量快速上升的理论</td></tr>
+    <tr><td><b>主动失效广播</b></td><td>禁用操作发 MQ，各节点删本地缓存，秒级生效</td></tr>
+    <tr><td><b>HyperLogLog</b></td><td>12KB 统计亿级 UV，误差约 0.81%</td></tr>
+    <tr><td><b>埋点</b></td><td>跳转时采集 IP/UA/Referer 等，异步发 MQ</td></tr>
+    <tr><td><b>边缘短链</b></td><td>热映射推到 CDN 边缘节点，命中即跳不回源</td></tr>
+    <tr><td><b>短码复用</b></td><td>回收后重新分配，重大事故源，永不复用</td></tr>
+    <tr><td><b>中间页</b></td><td>跳转前的提示/审核页，合规场景常用</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用号段表 + 内存 AtomicLong 实现一个发号器，压测单实例发号上限；② 写 encode/decode，验证 6 位容量和补零逻辑；③ 用 OpenResty + shared_dict 实现一个 302 跳转服务，压到单机 5 万 QPS；④ 给自己业务算一遍容量（峰值 QPS、带宽、Redis 容量），对比本篇算例。<br><br>
+    <b>之后值得单独学：</b>边缘 KV 方案（EdgeOne/CloudFront Functions）、Flink 实时 UV 管道、以及短链与风控体系的联动设计。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透短链系统设计 · 上线前务必检查：302 还是 301、短码散列、主动失效通道</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（301/302 取舍）和模块 8（容量估算）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边算一遍你自己业务的容量。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边算一遍容量：给你自己的业务日点击量，算峰值 QPS、存储量、缓存命中率。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

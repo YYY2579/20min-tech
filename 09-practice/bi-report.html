@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 BI 报表平台设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 BI 报表平台设计</h1>
+    <p class="sub">BI 平台的生死线只有两条：<b>指标口径别打架、慢查询别拖垮库</b>。这篇讲语义层怎么统一口径、查询加速的三板斧、行列级权限怎么做，以及和数仓怎么分层配合。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 层数仓配合</span>
+      <span class="chip"><b>3</b> 种加速手段</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边画数据流向：业务库 → ODS → DWD → DWS → ADS → 报表，标出每层的加工动作。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>BI 平台架构：四段流水线</h2></div>
+  <p class="lead">所有 BI 平台（自研或 Superset/Metabase 系）都是同一条流水线：<b>数据源 → 建模 → 计算 → 展示</b>。每段解决一个问题，段与段之间的契约就是平台设计的核心。</p>
+  <table>
+    <tr><th style="width:110px">层</th><th style="width:220px">职责</th><th>关键技术</th></tr>
+    <tr><td><b>数据源</b></td><td>接业务库、数仓、日志、API，统一元数据</td><td>JDBC/连接池、数据源管理、查询下推</td></tr>
+    <tr><td><b>建模</b></td><td>把物理表变成业务能懂的"数据集"（表关联、字段语义、指标定义）</td><td>星型模型、语义层、连接管理</td></tr>
+    <tr><td><b>计算</b></td><td>执行查询：翻译成 SQL、下推引擎、缓存、加速</td><td>SQL 生成、预计算、列存、向量化执行</td></tr>
+    <tr><td><b>展示</b></td><td>报表、仪表盘、大屏、导出、订阅</td><td>图表渲染、权限过滤、定时任务</td></tr>
+  </table>
+  <pre><span class="c">一次报表查询的完整链路（P99 要控在 3 秒内）</span>
+<span class="c">1. 用户打开"销售日报" → 前端请求 POST /api/query</span>
+<span class="c">2. API 层：鉴权 + 权限注入（行级：自动追加 WHERE region='华东'）</span>
+<span class="c">3. 计算层：查缓存（查询指纹一致直接返回，命中率目标 &gt;70%）</span>
+<span class="c">4. 未命中 → SQL 生成：语义层把"销售额"翻译成 SUM(amount*quantity)</span>
+<span class="c">5. 下推执行：SQL 发给 ClickHouse/Doris（列存，亿行聚合 &lt;1s）</span>
+<span class="c">6. 结果集 → 缓存（TTL 5~30 分钟，按数据更新频率）→ 返回前端</span>
+<span class="c">7. 前端渲染图表；明细超 1000 行走服务端分页，不全量拉</span>
+
+<span class="c">分层边界原则：</span>
+<span class="c">- 建模层不知道数据存在哪（MySQL/CH/Doris 对上层透明）</span>
+<span class="c">- 计算层不知道业务语义（只执行语义层翻译出的 SQL）</span>
+<span class="c">- 展示层不做任何计算（只渲染，避免同一指标前端后端口径不一致）</span></pre>
+  <div class="callout">
+    <b>自研还是买？</b>日活报表用户 &lt; 50、数据量 &lt; 亿级：<b>Metabase/Superset 直接上</b>，别自研。用户 &gt; 500、有强定制（嵌入业务系统、复杂权限、国产化）：自研或基于开源二次开发。<b>中间的灰色地带，先买后改，不要一上来就造轮子。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>语义层与指标一致性</h2></div>
+  <p class="lead">BI 平台最大的价值不是画图，是<b>让"销售额"在全公司只有一个定义</b>。没有语义层的 BI，每个报表的 SQL 各写各的，三个月后同一个月度会有 7 个数字。</p>
+  <h3>1.1 语义层的三个组成部分</h3>
+  <table>
+    <tr><th style="width:110px">概念</th><th style="width:230px">定义</th><th>示例</th></tr>
+    <tr><td><b>维度</b><br>Dimension</td><td>观察业务的角度，来自维度表</td><td>日期、地区、渠道、商品类目</td></tr>
+    <tr><td><b>指标</b><br>Metric</td><td>可度量的数值，带聚合函数</td><td>销售额、订单数、转化率</td></tr>
+    <tr><td><b>关系</b><br>Join</td><td>事实表与维度表的关联路径</td><td>订单表.user_id → 用户表.id</td></tr>
+  </table>
+  <pre><span class="c"># 语义层定义（YAML，指标平台的标配，与 Superset/Doris 语义层同思路）</span>
+<span class="b">metrics</span>:
+  - name: <span class="y">sales_amount</span>            <span class="c"># 指标唯一标识</span>
+    label: <span class="y">销售额</span>
+    description: <span class="y">"已支付订单的实付金额合计，不含退款单"</span>
+    type: <span class="y">sum</span>                      <span class="c"># 聚合方式</span>
+    expr: <span class="y">amount</span>                    <span class="c"># 底层字段（可含表达式）</span>
+    filters:                       <span class="c"># 指标自带过滤条件——口径的核心</span>
+      - status = <span class="y">'paid'</span>
+      - refund_status != <span class="y">'refunded'</span>
+    format: <span class="y">currency</span>                <span class="c"># 展示格式</span>
+
+  - name: <span class="y">order_count</span>
+    label: <span class="y">订单数</span>
+    type: <span class="y">count_distinct</span>
+    expr: <span class="y">order_id</span>
+    filters:
+      - status = <span class="y">'paid'</span>
+
+  - name: <span class="y">conversion_rate</span>          <span class="c"># 派生指标 = 组合指标</span>
+    label: <span class="y">支付转化率</span>
+    type: <span class="y">ratio</span>
+    numerator: <span class="y">order_count</span>
+    denominator: <span class="y">visit_count</span>       <span class="c"># 引用另一个指标，不是裸写 SQL</span>
+
+<span class="b">dimensions</span>:
+  - name: <span class="y">region</span>
+    label: <span class="y">大区</span>
+    expr: <span class="y">dim_user.region</span>           <span class="c"># 关联维度表</span>
+  - name: <span class="y">pay_date</span>
+    label: <span class="y">支付日期</span>
+    expr: <span class="y">toDate(fact_order.pay_time)</span>  <span class="c"># 表达式维度</span>
+
+<span class="c"># 关键机制：口径变更 = 改一处 YAML，全平台所有引用该指标的报表同步生效</span>
+<span class="c"># 反例（没有语义层）：30 张报表里 30 段 SQL 各写各的 SUM(amount)，改口径要改 30 处</span></pre>
+  <h3>1.2 为什么指标平台是刚需</h3>
+  <ul>
+    <li><b>单一事实来源：</b>指标定义入库、可查、可 review。口径变更走审批，不是某个开发改完 SQL 偷偷上线</li>
+    <li><b>防止"指标漂移"：</b>新报表只能引用已注册指标，不允许裸写 SQL（或裸写 SQL 要过评审）——<b>这是治理，不是技术</b></li>
+    <li><b>口径可追溯：</b>每个数字能点进去看定义、负责人、变更历史。会上吵架时直接看定义</li>
+    <li><b>计算下推优化：</b>语义层知道指标含派生关系（ratio），可以生成更优 SQL 或走预计算</li>
+  </ul>
+  <div class="callout danger">
+    <b>指标口径打架的经典案例：</b>运营看板的"GMV"含未支付订单，财务的"销售额"只含已支付，两个数差 30%，会上互相甩截图。根因：两个团队各自写 SQL。<b>解法不是对齐一次数字，是建立"指标注册 + 唯一 owner + 变更评审"机制。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>报表类型与适用场景</h2></div>
+  <p class="lead">四种报表类型对应四种用户、四种技术方案。<b>选错类型是 BI 项目失败的第一原因</b>——让运营用固定报表，或让高管看自助分析，都是灾难。</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:160px">用户</th><th style="width:180px">特征</th><th>技术方案</th></tr>
+    <tr><td><b>固定报表</b></td><td>一线运营、财务</td><td>指标/维度固定，每天看同一张表</td><td>预计算 + 缓存，P99 &lt; 1s。SQL 固化，只允许筛选时间</td></tr>
+    <tr><td><b>自助分析</b></td><td>分析师、业务负责人</td><td>拖拽维度/指标，查询组合千变万化</td><td>语义层 + 即席 SQL，查询队列 + 资源隔离，超时 30s</td></tr>
+    <tr><td><b>仪表盘</b></td><td>管理层</td><td>多图组合、全局筛选联动、下钻</td><td>多查询并行 + 结果缓存，联动参数下推</td></tr>
+    <tr><td><b>数据大屏</b></td><td>展厅、监控中心</td><td>全屏视觉、实时刷新、地图</td><td>WebSocket/SSE 推送，秒级刷新，只查聚合值</td></tr>
+  </table>
+  <h3>2.1 各类型的技术要点</h3>
+  <pre><span class="c"># 固定报表（90% 的查询量在这里，必须快）</span>
+<span class="c">- 查询指纹 = (report_id, 筛选参数) → 缓存 key，命中直接返回</span>
+<span class="c">- 底层用物化视图/预计算表，报表 SQL 只查预计算表（行数少 3 个量级）</span>
+<span class="c">- 数据更新（T+1 或小时级）后主动失效缓存，不用等 TTL</span>
+
+<span class="c"># 自助分析（防止一个分析拖垮库）</span>
+<span class="c">- 每次查询必须带 LIMIT（下推）和超时（如 30s），无限制扫描直接拒绝</span>
+<span class="c">- 资源组隔离：分析师用 adhoc 资源组，限并发 10、限单查询 CPU/内存</span>
+<span class="c">- 慢查询引导：查询预估扫描行数 &gt; 1亿 时提示"建议加筛选条件或走预计算"</span>
+
+<span class="c"># 仪表盘（10 个图 = 10 个查询，体验生死线）</span>
+<span class="c">- 并行发 10 个查询，不是串行（串行 P99 = 10 × 单图耗时）</span>
+<span class="c">- 全局筛选参数注入每个查询；图表间下钻 = 换维度重查</span>
+<span class="c">- 骨架屏 + 逐图加载，不要等全齐才渲染</span>
+
+<span class="c"># 数据大屏</span>
+<span class="c">- 轮询 5~15s 一次或 SSE 推送；只展示聚合数字，不渲染明细</span>
+<span class="c">- 地图数据用预聚合 GeoJSON，前端渲染不查库</span>
+<span class="c">- 断线重连 + 数据陈旧标识（超过 30s 没更新要显示"数据延迟"）</span></pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>查询加速：预计算 / 物化视图 / 列存</h2></div>
+  <p class="lead">查询加速三板斧，按成本从低到高：<b>缓存 → 预计算 → 换列存引擎</b>。原则：<b>能用缓存解决的不要预计算，能用预计算的不要扫原始表。</b></p>
+  <h3>3.1 三板斧对比</h3>
+  <table>
+    <tr><th style="width:130px">手段</th><th style="width:220px">机制</th><th>适用与代价</th></tr>
+    <tr><td><b>结果缓存</b></td><td>查询指纹 → 结果集，TTL 5~30 分钟</td><td>固定报表首选。代价：内存；失效依赖数据更新通知</td></tr>
+    <tr><td><b>预计算表</b></td><td>定时任务按维度组合预聚合，写 ADS 层表</td><td>组合爆炸：维度 10 个全排列 = 1023 组合。<b>只预 top 20 常用组合</b></td></tr>
+    <tr><td><b>物化视图</b></td><td>引擎自动维护（Doris/StarRocks/CH 的 MV，或 PG 的 matview）</td><td>写入时增量维护，查询自动路由。代价：写入变慢、存储翻倍</td></tr>
+    <tr><td><b>列存引擎</b></td><td>ClickHouse / Doris / StarRocks 替换 MySQL 做分析</td><td>亿行聚合亚秒级。代价：数据同步链路（CDC）、运维成本</td></tr>
+  </table>
+  <pre><span class="c"># Doris 物化视图（查询自动命中，无需改 SQL）</span>
+<span class="b">CREATE MATERIALIZED VIEW</span> mv_sales_daily
+<span class="b">BUILD IMMEDIATE</span> <span class="b">REFRESH</span> AUTO              <span class="c">-- 数据变更自动增量刷新</span>
+<span class="b">AS SELECT</span>
+  pay_date, region, channel,                  <span class="c">-- 常用维度组合</span>
+  <span class="b">SUM</span>(amount) <span class="b">AS</span> sales_amount,           <span class="c">-- 预聚合指标</span>
+  <span class="b">COUNT</span>(<span class="b">DISTINCT</span> order_id) <span class="b">AS</span> order_count
+<span class="b">FROM</span> fact_order
+<span class="b">GROUP BY</span> pay_date, region, channel;
+<span class="c">-- 用户按"日期+大区+渠道"查销售额 → 引擎自动路由到 MV，秒回</span>
+<span class="c">-- 用户按"日期+商品类目"查 → MV 不覆盖，回退查原始表（慢）</span>
+<span class="c">-- 工程要点：上线前分析历史查询日志，MV 只覆盖高频组合，别全建</span>
+
+<span class="c"># 预计算表（MySQL 系分析库的老办法，可控性最强）</span>
+<span class="b">CREATE TABLE</span> ads_sales_daily (
+  stat_date  <span class="b">DATE</span> <span class="b">NOT NULL</span>,
+  region     <span class="b">VARCHAR</span>(32) <span class="b">NOT NULL</span>,
+  channel    <span class="b">VARCHAR</span>(32) <span class="b">NOT NULL</span>,
+  sales      <span class="b">DECIMAL</span>(18,2) <span class="b">NOT NULL</span>,
+  orders     <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,
+  <span class="b">PRIMARY KEY</span> (stat_date, region, channel)   <span class="c">-- 覆盖索引，点查 O(1)</span>
+);
+<span class="c">-- 报表 SQL：SELECT region, SUM(sales) FROM ads_sales_daily</span>
+<span class="c">--           WHERE stat_date BETWEEN ? AND ? GROUP BY region</span>
+<span class="c">-- 扫 30 行聚合 vs 扫 2 亿行聚合 —— 差 6 个数量级</span></pre>
+  <h3>3.2 加速效果算例</h3>
+  <pre><span class="c">场景：查"近 30 天各大区每日销售额"，事实表 fact_order = 2亿行</span>
+<span class="c">- 直接扫原始表（ClickHouse）：1.2s（列存 + 分区裁剪，可接受但不快）</span>
+<span class="c">- MySQL 扫原始表：18s（必须避免）</span>
+<span class="c">- 预计算表（30天 × 8大区 = 240 行）：3ms（含索引点查）</span>
+<span class="c">- 结果缓存命中：0.5ms</span>
+
+<span class="c">成本账：</span>
+<span class="c">- 预计算任务：每天凌晨 30 分钟，扫全表一次聚合 → 换取白天 10万次查询每次 3ms</span>
+<span class="c">- 结论：查询:计算 = 10000:1 以上时，预计算永远划算</span>
+<span class="c">- 存储账：2亿行 × 200B = 40GB 事实表 → MV 240 行 × 100B ≈ 24KB（忽略不计）</span></pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>权限：行列级数据权限</span2>
+  </div>
+  <p class="lead">BI 权限分两层：<b>功能权限</b>（能不能看这张报表）和<b>数据权限</b>（能看哪些行、哪些列）。<b>数据权限做漏了，就是一次数据泄露事故。</b></p>
+  <h3>4.1 三级数据权限</h3>
+  <table>
+    <tr><th style="width:130px">级别</th><th style="width:230px">控制</th><th>实现</th></tr>
+    <tr><td><b>列级权限</b><br>CLS</td><td>手机号、金额字段对某些角色不可见</td><td>语义层字段加权限标签，查询生成时对无权限字段直接报错或返回脱敏值（138****5678）</td></tr>
+    <tr><td><b>行级权限</b><br>RLS</td><td>华东区经理只能看华东的数据</td><td>查询时自动向 SQL 注入 WHERE 条件（用户改不了、绕不过）</td></tr>
+    <tr><td><b>行列组合</b></td><td>既能看到部分行、又对某列脱敏</td><td>两层规则叠加生效</td></tr>
+  </table>
+  <pre><span class="c"># 行级权限的注入（必须在服务端 SQL 生成层，绝不能前端传参）</span>
+<span class="c">-- 权限规则表：rule(user_role, table, column, operator, value)</span>
+<span class="c">-- (manager_east, fact_order, region, =, '华东')</span>
+
+<span class="c"># SQL 生成器拿到语义层 AST 后：</span>
+<span class="c"># 1. 用户请求 = "按大区销售额"（没带任何地区筛选）</span>
+<span class="c"># 2. 权限引擎查出该用户的 RLS 规则 → region = '华东'</span>
+<span class="c"># 3. 生成的 SQL（注意 AND 的位置，必须包住整个用户条件，防 OR 注入）</span>
+<span class="b">SELECT</span> region, <span class="b">SUM</span>(amount) <span class="b">FROM</span> fact_order
+<span class="b">WHERE</span> pay_date &gt;= <span class="y">'2026-09-18'</span>
+  <span class="b">AND</span> region = <span class="y">'华东'</span>              <span class="c">-- 权限注入，用户无感知</span>
+<span class="b">GROUP BY</span> region;
+
+<span class="c"># 渗透测试必测的三种绕过：</span>
+<span class="c"># 1. 用户传 region='华北' 筛选 → 注入条件 AND region='华东' 后结果为空（正确，拦住了）</span>
+<span class="c"># 2. 用户传 region IN ('华东','华北') → 必须 AND (region='华东')，不能被 IN 展开绕过</span>
+<span class="c"># 3. 用户直接请求明细下载接口 → 下载也要过同一个 SQL 生成器，不能另走一条 SQL</span>
+
+<span class="c"># 列级脱敏（phone 字段）</span>
+<span class="c">def mask(value, field_perm):</span>
+<span class="c">    if field_perm == MASK: return value[:3] + <span class="y">'****'</span> + value[-4:]</span>
+<span class="c">    if field_perm == HIDE: return None        <span class="c"># 字段不出现在结果集</span>
+<span class="c">    return value                              <span class="c"># 明文（仅高敏角色）</span></pre>
+  <div class="callout danger">
+    <b>权限穿透的三个真实入口：</b>① <b>导出/订阅接口</b>不过权限层——报表页挡住了，点"导出 Excel"全量数据出去；② <b>下钻接口</b>单独拼 SQL，忘了注入 RLS；③ <b>明细行点击</b>按 ID 查单条记录（GET /detail?id=123），没校验该行是否属于用户的可见范围。<b>铁律：所有出数据的接口必须走同一个 SQL 生成器，权限注入在这一层统一完成。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>大数据量下的性能：下推、分页、抽样</span2>
+  </div>
+  <p class="lead">亿行表的即席查询，靠三个手段把 P99 压在 3 秒内：<b>计算下推</b>（让引擎干粗活）、<b>服务端分页</b>（别把 100 万行拉前端）、<b>抽样加速</b>（看趋势不需要精确值）。</p>
+  <h3>5.1 计算下推</h3>
+  <pre><span class="c"># 下推 = 把过滤/聚合/排序推到数据源执行，只传结果集回 BI 层</span>
+<span class="c"># 反例（拉回内存再算）：SELECT * FROM fact_order → 2亿行传到应用层 → OOM + 网络爆炸</span>
+<span class="c"># 正例（下推）：</span>
+<span class="b">SELECT</span> pay_date, <span class="b">SUM</span>(amount) <span class="b">FROM</span> fact_order      <span class="c">-- 聚合下推</span>
+<span class="b">WHERE</span> pay_date &gt;= <span class="y">'2026-09-01'</span>                <span class="c">-- 过滤下推（分区裁剪）</span>
+<span class="b">GROUP BY</span> pay_date <span class="b">ORDER BY</span> pay_date;          <span class="c">-- 排序下推</span>
+<span class="c"># 返回 30 行。数据源只回 30 行，网络传输 &lt; 1KB</span>
+
+<span class="c"># ClickHouse 的进一步下推（索引 + 分区 + 列裁剪）</span>
+<span class="c"># - 分区裁剪：PARTITION BY toYYYYMM(pay_time)，WHERE 带月份直接跳过分区</span>
+<span class="c"># - 列裁剪：只 SELECT 用到的列，列存下 IO 减少 10 倍</span>
+<span class="c"># - 跳数索引：WHERE amount &gt; 1000 走 minmax 索引，跳过 90% 数据块</span></pre>
+  <h3>5.2 明细分页</h3>
+  <pre><span class="c"># 明细报表（如订单明细 500 万行）的正确分页姿势</span>
+<span class="c"># 1. 服务端分页：每页 100 行，SQL 带 LIMIT，前端只渲染当前页</span>
+<span class="c">-- SELECT * FROM fact_order WHERE ... ORDER BY id DESC LIMIT 100 OFFSET 0;</span>
+<span class="c">-- 深分页用游标替代 offset：WHERE id &lt; {last_id} ORDER BY id DESC LIMIT 100</span>
+
+<span class="c"># 2. 异步导出：用户点"导出" → 生成任务 ID 立即返回 → 后台流式写 CSV</span>
+<span class="c">#    （MySQL 用流式游标/CH 用 INTO OUTFILE）→ 完成通知下载链接（有效期 24h）</span>
+<span class="c">#    500 万行 CSV ≈ 300MB，同步导不出（超时 + 内存）</span>
+
+<span class="c"># 3. 抽样（趋势类图表的加速器）</span>
+<span class="c">-- 查"近 90 天订单量趋势"，不需要逐日精确：</span>
+<span class="b">SELECT</span> <span class="b">toStartOfWeek</span>(pay_time) <span class="b">AS</span> wk, <span class="b">COUNT</span>(*) <span class="b">FROM</span> fact_order
+<span class="b">WHERE</span> pay_time &gt;= now() - <span class="b">INTERVAL</span> 90 <span class="b">DAY</span> <span class="b">GROUP BY</span> wk;   <span class="c">-- 周聚合，13 个点</span>
+<span class="c"># 或 SAMPLE 0.1（CH 抽样查询，误差 &lt;1%，速度 ×10，适合超长周期趋势）</span></pre>
+  <h3>5.3 查询治理</h3>
+  <table>
+    <tr><th style="width:200px">治理项</th><th>规则</th></tr>
+    <tr><td><b>强制 LIMIT</b></td><td>任何明细查询默认 LIMIT 10000，超过需申请；聚合查询不设上限</td></tr>
+    <tr><td><b>超时熔断</b></td><td>单查询 30s 超时；连续 3 次超时自动禁用该报表并通知 owner</td></tr>
+    <tr><td><b>资源隔离</b></td><td>固定报表走 batch 资源组（保吞吐），自助分析走 adhoc 组（限并发），互不挤占</td></tr>
+    <tr><td><b>慢查询日志</b></td><td>记录 Top 50 慢查询（SQL + 耗时 + 用户），每周 review，该优化的优化、该加 MV 的加 MV</td></tr>
+    <tr><td><b>夜间窗口</b></td><td>大查询（全量回溯、模型训练取数）只允许 0:00-6:00 执行，白天排队拒绝</td></tr>
+  </table>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>与数仓的分层配合</h2></div>
+  <p class="lead">BI 平台是数仓的"最后一公里"。<b>BI 查询哪一层，决定了快慢和数据质量。</b>经典四层（阿里系 OneData 体系）：</p>
+  <table>
+    <tr><th style="width:90px">层</th><th style="width:210px">内容</th><th>BI 怎么用</th></tr>
+    <tr><td><b>ODS</b></td><td>贴源层：业务库原样同步，未加工</td><td><b>BI 不要查。</b>脏数据、无模型、量最大</td></tr>
+    <tr><td><b>DWD</b></td><td>明细层：清洗、标准化、维度退化的事实宽表</td><td>仅明细报表、下钻场景查。行数亿级，慢</td></tr>
+    <tr><td><b>DWS</b></td><td>汇总层：按主题轻度聚合（用户日汇总、商品日汇总）</td><td>自助分析主查这层。千万级，秒级</td></tr>
+    <tr><td><b>ADS</b></td><td>应用层：面向具体报表预聚合，百/千行级</td><td><b>固定报表、仪表盘只查这层</b>，毫秒级</td></tr>
+  </table>
+  <pre><span class="c"># 星型模型示例（DWS 层的"销售主题"）</span>
+<span class="c"># 事实表（亿级）：fact_order</span>
+<span class="c">#   order_id, user_id, product_id, shop_id, pay_time, amount, quantity, channel, status</span>
+
+<span class="c"># 维度表（万/百万级）：</span>
+<span class="b">CREATE TABLE</span> dim_user (
+  user_id     <span class="b">BIGINT</span> <span class="b">PRIMARY KEY</span>,
+  region      <span class="b">VARCHAR</span>(32),      <span class="c">-- 大区</span>
+  city        <span class="b">VARCHAR</span>(32),
+  register_dt <span class="b">DATE</span>,             <span class="c">-- 注册日期（新老客判定）</span>
+  level       <span class="b">TINYINT</span>           <span class="c">-- 会员等级</span>
+);
+<span class="b">CREATE TABLE</span> dim_product (
+  product_id  <span class="b">BIGINT</span> <span class="b">PRIMARY KEY</span>,
+  category_l1 <span class="b">VARCHAR</span>(32),      <span class="c">-- 一级类目</span>
+  category_l2 <span class="b">VARCHAR</span>(32),
+  brand       <span class="b">VARCHAR</span>(64),
+  price_band  <span class="b">VARCHAR</span>(16)       <span class="c">-- 价格带（分析常用，提前分好）</span>
+);
+
+<span class="c"># 典型分析 SQL（查各大区各价格带的销售额，DWS + 维度退化）</span>
+<span class="b">SELECT</span> u.region, p.price_band, <span class="b">SUM</span>(f.amount) <span class="b">AS</span> sales
+<span class="b">FROM</span> fact_order f
+<span class="b">JOIN</span> dim_user u    <span class="b">ON</span> f.user_id = u.user_id
+<span class="b">JOIN</span> dim_product p <span class="b">ON</span> f.product_id = p.product_id
+<span class="b">WHERE</span> f.pay_time &gt;= <span class="y">'2026-09-01'</span> <span class="b">AND</span> f.status = <span class="y">'paid'</span>
+<span class="b">GROUP BY</span> u.region, p.price_band;
+<span class="c"># 关键：region/price_band 是"维度退化"——常用维度直接冗余进事实表，</span>
+<span class="c">#       免 join 也能按大区聚合。join 在大表上永远是性能灾难</span></pre>
+  <div class="callout ok">
+    <b>BI 与数仓的契约：</b>① 报表需求先问"ADS 层有没有"，有则毫秒级上线，没有则走排期（加 ADS 表 = 开发 + 调度，按天计）；② DWD 只给明细和下钻用，且必须带分区和分区裁剪；③ 数仓的调度延迟（T+1 还是小时级）决定了报表能承诺的时效——<b>向业务承诺"实时"前先看数仓链路，这是 BI 项目经理的保命常识。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>导出与订阅</h2></div>
+  <p class="lead">导出和订阅是 BI 的"隐形杀手"：<b>一个用户点一次全量导出，等于跑一次全表扫描。</b>设计不好，一个人的操作能拖垮整个数仓。</p>
+  <h3>7.1 异步导出</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>提交即返回：</b>点"导出" → 生成导出任务（task_id）→ 立即返回"导出中，完成后通知"。前端轮询或 WebSocket 等结果，<b>绝不能同步等</b></div></div>
+    <div class="step"><div class="txt"><b>后台流式生成：</b>任务队列消费 → 走同一个 SQL 生成器（过权限！）→ 流式写 CSV/XLSX（边查边写，不落全量内存）→ 上传对象存储</div></div>
+    <div class="step"><div class="txt"><b>限流与配额：</b>单用户同时最多 3 个导出任务；单次导出上限 100 万行 / 500MB；全平台并发导出 worker 数固定（如 8），超出排队</div></div>
+    <div class="step"><div class="txt"><b>安全下发：</b>下载链接带过期签名（24 小时有效），不暴露永久 URL；导出操作落审计日志（谁、什么时间、导了什么范围）</div></div>
+  </div>
+  <h3>7.2 订阅推送</h3>
+  <pre><span class="c"># 订阅 = 定时执行报表 + 结果推送（邮件/IM/Webhook）</span>
+<span class="c"># 订阅表：sub(id, report_id, user_id, cron_expr, channel, filter_json, status)</span>
+<span class="c"># cron_expr = "0 9 * * 1" → 每周一 9 点</span>
+
+<span class="c"># 执行链路：</span>
+<span class="c"># 1. 调度器（每分钟扫一遍）到点的订阅任务 → 推送到执行队列</span>
+<span class="c"># 2. 执行器：按订阅时保存的筛选参数跑查询（带权限注入，按订阅人身份）</span>
+<span class="c"># 3. 渲染：图表渲染成图片/PDF + 核心数字摘要（邮件正文直接看数）</span>
+<span class="c"># 4. 推送：邮件附件 / IM 卡片 / Webhook（企业微信、钉钉、飞书机器人）</span>
+
+<span class="c"># 关键设计：</span>
+<span class="c"># - 同一报表 100 人订阅 → 只跑 1 次查询，渲染 100 份推送（查询合并，省 99% 算力）</span>
+<span class="c"># - 失败重试 3 次，仍失败通知 owner；订阅人离职/无权限自动跳过并告警</span>
+<span class="c"># - 推送内容带"数据截止时间"（如 数据截至 2026-10-17 08:00），防误解</span>
+<span class="c"># - 邮件里禁止放全量明细（附件限 1 万行），要明细走异步导出</span></pre>
+  <div class="callout warn">
+    <b>订阅的幂等与轰炸防护：</b>调度系统重投会导致同一封邮件发 3 遍（任务按 sub_id + 执行日期做唯一键去重）；有人订阅了"每分钟刷新"的报表并开邮件推送，一早上 60 封——<b>推送频率限制：邮件最少每天 1 次，IM 最少每 30 分钟 1 次，超频需求走大屏/监控。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">没有语义层，各报表 SQL 各写各的，同一指标 7 个数字</div><div class="pd">会上互相甩截图，业务对 BI 失去信任。指标必须统一定义（YAML/指标平台），变更走评审，新报表只准引用注册指标。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">报表直接查 ODS 贴源层</div><div class="pd">脏数据无清洗、无分区、量最大，一个报表扫 2 亿行 18 秒。报表只查 ADS/DWS，ODS 是数仓的原料不是 BI 的餐桌。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">导出接口不过权限层，绕过 RLS 全量出数</div><div class="pd">报表页挡住了数据，点导出拿到全公司明细——数据泄露事故。所有出数接口必须走同一个 SQL 生成器，权限在这一层统一注入。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">明细查询无 LIMIT，一次拉 100 万行到前端</div><div class="pd">浏览器内存爆炸、接口超时、数据库缓冲池被打满。明细强制服务端分页 + LIMIT 上限，深分页用游标。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">自助分析无资源隔离，一个分析师拖垮全平台</div><div class="pd">一条 30s 的全表扫描占满连接池，所有报表一起超时。分析师走独立资源组限并发，慢查询熔断禁用。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">仪表盘 10 个图串行发查询，P99 十几秒</div><div class="pd">用户体验生死线。多查询必须并行，配骨架屏逐图加载，全局筛选参数一次注入所有子查询。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">缓存不失效，业务看了 3 小时前的数据</div><div class="pd">数据更新（T+1 完成）后缓存还在，运营按旧数做决策。缓存 TTL 只是一层兜底，数据管线完成事件要主动失效缓存。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">导出同步生成，大报表直接超时 + OOM</div><div class="pd">500 万行同步导出必挂。必须异步化：任务队列 + 流式写文件 + 对象存储 + 完成通知。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">物化视图全维度组合都建，写入性能崩了</div><div class="pd">10 个维度全排列 = 1023 个 MV，写入放大 1000 倍。只建历史查询日志里的 top 20 高频组合，其余回退原表。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">订阅推送不过滤离职账号，邮件继续发</div><div class="pd">离职员工持续收到经营数据——既泄露又尴尬。订阅按身份鉴权，账号失效/无权限自动跳过并通知 owner。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 为什么 BI 平台必须有语义层（指标定义）？</div>
+      <button class="opt">因为前端画图需要结构化的数据接口</button>
+      <button class="opt">因为要让同一指标在全平台只有一个定义，防止各报表口径打架</button>
+      <button class="opt">因为语义层能让查询速度更快</button>
+      <div class="ans">正确答案：<b>统一指标口径</b>。没有语义层时每个报表各自写 SQL，"销售额"能出现 7 个版本。语义层把指标定义（聚合方式+过滤条件+格式）集中管理，口径变更改一处全平台生效，且每个数字可追溯定义和 owner。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 华东区经理打开"全国销售报表"（他没带任何地区筛选），系统返回的数据应该是？</div>
+      <button class="opt">全国数据，报表本来就是看全国的</button>
+      <button class="opt">空数据，提示无权限</button>
+      <button class="opt">只有华东的数据，因为服务端 SQL 生成时自动注入了 region='华东' 的行级权限条件</button>
+      <div class="ans">正确答案：<b>自动注入 RLS 条件</b>。行级权限必须在服务端 SQL 生成层统一注入，用户无感知也绕不过（包括导出、下钻、明细等所有出数接口）。返回空数据是过度拦截，返回全量就是权限穿透事故。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 查询"近 30 天各大区每日销售额"（事实表 2 亿行），最快的方案是？</div>
+      <button class="opt">直接扫事实表聚合，列存引擎 1.2s 可以接受</button>
+      <button class="opt">建预计算表/物化视图（30天×8大区=240 行），查询 3ms</button>
+      <button class="opt">把 2 亿行全量拉到应用层内存里算</button>
+      <div class="ans">正确答案：<b>预计算/物化视图</b>。固定报表的组合是已知的，预聚合后行数少 6 个数量级，查询从秒级降到毫秒级。扫描原始表只适合即席分析（组合不可预知）；拉内存算是最差方案，直接 OOM。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 用户要求导出一张 500 万行的明细报表，正确的做法是？</div>
+      <button class="opt">同步生成 CSV，等 30 秒总能下完</button>
+      <button class="opt">生成异步任务立即返回，后台流式写文件到对象存储，完成后通知下载（链接带签名和有效期）</button>
+      <button class="opt">拒绝导出，让用户自己筛小范围</button>
+      <div class="ans">正确答案：<b>异步导出</b>。500 万行同步导出必超时/ OOM。异步化 = 任务队列 + 流式写入 + 对象存储 + 签名 URL。同时必须限流（并发数、行数上限）和过权限（导出不能绕过 RLS）。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. BI 报表查询数仓时，固定报表和自助分析分别应该主要查哪一层？</div>
+      <button class="opt">都查 ODS 贴源层，数据最新</button>
+      <button class="opt">都查 DWD 明细层，最灵活</button>
+      <button class="opt">固定报表查 ADS 应用层（预聚合，毫秒级）；自助分析查 DWS 汇总层（轻度聚合，秒级）</button>
+      <div class="ans">正确答案：<b>ADS + DWS</b>。ADS 是面向具体报表预聚合的百/千行级表，固定报表组合已知，毫秒返回；DWS 是主题汇总的千万级，支撑即席组合。ODS 是原料层不能直接查，DWD 亿级明细只给下钻场景。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 仪表盘有 10 个图表，每个查询 800ms，怎么做能让首屏最快？</div>
+      <button class="opt">串行发 10 个查询，总耗时 8s</button>
+      <button class="opt">并行发 10 个查询，配骨架屏逐图渲染，总耗时约 1s+ 网络开销</button>
+      <button class="opt">合并成 1 个大 SQL 一次查完</button>
+      <div class="ans">正确答案：<b>并行 + 逐图渲染</b>。串行 P99 = 10×800ms = 8s，用户必流失。并行后总耗时 ≈ 单查询最慢者。合并成一条 SQL 通常不可行（不同图表维度/粒度不同），且一条慢查询会阻塞整页。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>语义层定义示例（指标平台）</h3>
+  <pre><span class="c"># 最小可用指标定义（YAML）</span>
+<span class="b">metrics</span>:
+  - name: <span class="y">gmv</span>
+    label: <span class="y">GMV</span>
+    type: <span class="y">sum</span>
+    expr: <span class="y">amount</span>                       <span class="c"># 含未支付，电商口径</span>
+  - name: <span class="y">sales_amount</span>
+    label: <span class="y">销售额</span>
+    type: <span class="y">sum</span>
+    expr: <span class="y">amount</span>
+    filters: [<span class="y">"status = 'paid'"</span>, <span class="y">"refund_status != 'refunded'"</span>]
+  - name: <span class="y">pay_conversion</span>
+    label: <span class="y">支付转化率</span>
+    type: <span class="y">ratio</span>
+    numerator: <span class="y">order_count</span>
+    denominator: <span class="y">visit_count</span></pre>
+  <h3>核心 SQL 与配置速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>CREATE MATERIALIZED VIEW mv ... REFRESH AUTO</code><span class="desc">Doris/StarRocks 物化视图，自动增量维护，查询自动路由</span><button class="copy">复制</button></div>
+    <div class="crow"><code>WHERE pay_time &gt;= '2026-09-01'（分区裁剪）</code><span class="desc">查询必带分区字段条件，跳过分区扫描</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT ... LIMIT 10000（强制）</code><span class="desc">明细查询默认上限，防全量拉取</span><button class="copy">复制</button></div>
+    <div class="crow"><code>WHERE id &lt; {last_id} ORDER BY id DESC LIMIT 100</code><span class="desc">深分页游标，替代 OFFSET</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rule(role, table, column, op, value)</code><span class="desc">行级权限规则表，SQL 生成时注入 WHERE</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SAMPLE 0.1（ClickHouse）</code><span class="desc">抽样查询，趋势类图表误差 &lt;1%，速度 ×10</span><button class="copy">复制</button></div>
+    <div class="crow"><code>export_task(task_id, user, sql_hash, rows, status)</code><span class="desc">导出任务表，异步流式生成 + 签名 URL 下发</span><button class="copy">复制</button></div>
+  </div>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>语义层</b></td><td>指标/维度的统一定义层，让"销售额"全平台只有一个口径</td></tr>
+    <tr><td><b>指标 Metric</b></td><td>带聚合函数的可度量值（SUM/COUNT DISTINCT），可带过滤条件</td></tr>
+    <tr><td><b>维度 Dimension</b></td><td>观察业务的角度（日期/地区/渠道），来自维度表</td></tr>
+    <tr><td><b>派生指标</b></td><td>由其他指标组合而成（转化率 = 订单数/访客数），不裸写 SQL</td></tr>
+    <tr><td><b>星型模型</b></td><td>中心事实表 + 周围维度表，BI 建模的标准形态</td></tr>
+    <tr><td><b>维度退化</b></td><td>常用维度冗余进事实表，免 join 聚合，大表性能关键</td></tr>
+    <tr><td><b>ODS / DWD / DWS / ADS</b></td><td>数仓四层：贴源 → 明细 → 汇总 → 应用，BI 主要查后两层</td></tr>
+    <tr><td><b>列存引擎</b></td><td>ClickHouse/Doris/StarRocks，列式存储，亿行聚合亚秒级</td></tr>
+    <tr><td><b>物化视图</b></td><td>预计算的物理结果，写入时维护，查询自动命中</td></tr>
+    <tr><td><b>预计算表</b></td><td>定时任务按维度组合预聚合的 ADS 表，只建高频组合</td></tr>
+    <tr><td><b>查询下推</b></td><td>过滤/聚合/排序推到数据源执行，只回传结果集</td></tr>
+    <tr><td><b>分区裁剪</b></td><td>查询带分区字段条件，引擎跳过无关分区，IO 降一个量级</td></tr>
+    <tr><td><b>行级权限 RLS</b></td><td>按用户注入 WHERE 条件，控制能看到哪些行</td></tr>
+    <tr><td><b>列级权限 CLS</b></td><td>控制字段可见性：隐藏或脱敏（138****5678）</td></tr>
+    <tr><td><b>自助分析</b></td><td>即席拖拽查询，组合不可预知，查 DWS 层 + 资源隔离</td></tr>
+    <tr><td><b>异步导出</b></td><td>任务化导出：流式生成 + 对象存储 + 签名 URL，限流限行数</td></tr>
+    <tr><td><b>订阅推送</b></td><td>定时执行报表推送到邮件/IM/Webhook，同报表多人订阅合并执行</td></tr>
+    <tr><td><b>资源组隔离</b></td><td>固定报表与分析查询走不同资源组，互不挤占</td></tr>
+    <tr><td><b>慢查询治理</b></td><td>Top 慢查询日志 + 超时熔断 + 夜间窗口，平台稳定的三件套</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>搭一个最小 BI：① 建 2 亿行订单表（ClickHouse 或 Doris）+ 用户/商品维度表；② 用 YAML 定义 3 个指标（GMV/销售额/转化率）；③ 实现查询 API：语义层翻译 SQL + 权限注入 + 结果缓存；④ 建一个物化视图（日期×大区×渠道）对比加速效果；⑤ 做异步导出（任务队列 + 流式 CSV）。跑通这五步，BI 平台的主干就齐了。<br><br>
+    <b>之后值得深入：</b>Apache Superset 二次开发（嵌入 + 行级权限）、指标平台的开源方案（dbt + Metrics Layer）、实时数仓（Flink → Doris）的秒级报表、以及数据地图与资产治理。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 BI 报表平台设计 · 上线前务必检查：指标口径、RLS 注入、导出限流</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（语义层）和模块 4（行列级权限）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边画数仓四层图。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边画数据流向：业务库 → ODS → DWD → DWS → ADS → 报表，标出每层的加工动作。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

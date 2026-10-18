@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟理解 Kubernetes</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 4 期 · 20 分钟加长版</span>
+    <h1>二十分钟理解 Kubernetes</h1>
+    <p class="sub">K8s 概念多、名词吓人，但骨架只有一句话：<b>你声明期望状态，它负责让现实向期望靠拢。</b>这份文档就围绕这一句展开。</p>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">别试图一次记住所有名词 —— 先抓住那一条主线，剩下的都是它的展开。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>前置条件与练习环境</h2></div>
+  <div class="callout warn">
+    <b>你需要先会 Docker。</b>K8s 是"管理容器的系统"，不懂镜像和容器的话，这份文档会处处卡壳。如果还没学，先看本系列第 2 期《十分钟理解并学会 Docker》。
+  </div>
+  <h3>怎么搞到一个能练的集群</h3>
+  <p>你不需要真的买服务器。三种方式，按省事程度排序：</p>
+  <table>
+    <tr><th style="width:170px">方式</th><th>说明</th></tr>
+    <tr><td><b>在线沙盒</b>（最省事）</td><td>浏览器搜 "killercoda kubernetes" 或 "play with kubernetes"，打开就是一个现成的集群，命令行直接能用，不用装任何东西</td></tr>
+    <tr><td><b>Docker Desktop</b></td><td>设置里勾选 Enable Kubernetes，等它跑起来，你的电脑上就有一个单节点集群了</td></tr>
+    <tr><td><b>minikube / kind</b></td><td>命令行工具，<span class="k">minikube start</span> 或 <span class="k">kind create cluster</span>，适合长期练习</td></tr>
+  </table>
+  <p><b>先认识一个工具：kubectl</b>（读作 cube-control）是装在<b>你自己电脑上</b>的命令行工具，用来和集群对话。注意它不在集群里 —— 你不需要登录任何服务器，敲命令，它通过网络把指令发给集群。本文所有以 kubectl 开头的命令，都是在你自己电脑的终端里敲的。</p>
+  <p>装好后验证：</p>
+  <pre>kubectl version --client
+kubectl get nodes      <span class="c"># 能看到一个 Ready 的节点就成功了</span></pre>
+  <div class="callout">
+    <b>本文出现的所有术语，文末都有一张术语表。</b>K8s 的名词密度很高，看不懂随时翻到最后。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">0-2 分钟</span><h2>它到底在解决什么问题</h2></div>
+  <p class="lead">上一期你学会了用 Docker 跑一个容器。现在把规模放大一百倍。</p>
+  <p>假设你有 100 台服务器、要跑 1000 个容器。那么下面这些问题，Docker 一个都答不上来：</p>
+  <ul>
+    <li>某个容器半夜挂了，<b>谁来自动重启它？</b></li>
+    <li>流量涨了要扩到 20 个副本（副本 = 同一份应用的多个相同实例），<b>谁来启动这 20 个、并把流量分发过去？</b></li>
+    <li>要发布新版本，<b>怎么做到不中断服务地逐步替换？</b>出问题怎么一键回滚？</li>
+    <li>100 台机器，<b>哪个容器该放哪台？</b>怎么知道哪台还有余量？</li>
+    <li>容器重启后 IP 变了，<b>其他服务怎么还能找到它？</b></li>
+  </ul>
+  <div class="callout ok">
+    <b>K8s 就是回答这些问题的。</b>一句话定位：<b>它是数据中心的操作系统</b> —— Docker 管一个容器，K8s 管一整个集群的容器。<br><br>
+    它自己不跑容器，它只是<b>指挥</b>：告诉各台机器上的代理该跑什么、该停什么、流量该往哪走。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">2-5 分钟</span><h2>灵魂：声明式与控制循环</h2></div>
+  <p class="lead">这是整份文档最重要的一节。理解了它，K8s 剩下的部分都是自然推论。</p>
+  <h3>命令式 vs 声明式</h3>
+  <table>
+    <tr><th style="width:110px">方式</th><th style="width:230px">打车类比</th><th>在 K8s 里的样子</th></tr>
+    <tr><td><b>命令式</b></td><td>告诉司机"前面路口左转，再直行 200 米……"</td><td><span class="k">docker run</span>：我命令你启动一个容器</td></tr>
+    <tr><td><b>声明式</b></td><td>告诉司机"我要去天安门"，怎么走他自己决定</td><td><span class="k">kubectl apply</span>：我要 3 个副本，怎么实现你自己决定</td></tr>
+  </table>
+  <p>K8s 选了后者。你写一份 YAML 描述"我期望的样子"，提交给集群，然后就不管了。</p>
+
+  <h3>它凭什么能"不管"</h3>
+  <p>因为集群里有一群叫<b>控制器（Controller）</b>的程序，它们在做一件很笨但很有效的事：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>读取期望状态。</b>从存储集群状态的数据库（etcd）里，读出你声明的"我要 3 个副本"。</div></div>
+    <div class="step"><div class="txt"><b>读取实际状态。</b>去看一眼现在集群里真的跑着几个。</div></div>
+    <div class="step"><div class="txt"><b>对比。</b>期望 3 个、实际 2 个，差 1 个。</div></div>
+    <div class="step"><div class="txt"><b>修正。</b>那就再启动一个。然后回到第一步，永远循环。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>这个循环就是"自愈"的全部秘密。</b>容器挂了、节点宕机了、你手动删了一个 Pod —— 都只是让"实际状态"偏离了"期望状态"，控制器下一轮就会把它拉回来。<br><br>
+    <b>所以：你永远不需要写"如果挂了就重启"这种逻辑。你只需要声明你想要什么。</b>
+  </div>
+  <div class="callout danger">
+    <b>由此推出一个新手必踩的坑：</b>直接修改一个正在运行的 Pod，改了会发现过一会儿又变回去了 —— 因为它是被 Deployment 管理的，控制器发现实际状态和期望不一致，就把它重建了。<b>要改，就改 Deployment。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">5-9 分钟</span><h2>四个核心对象</h2></div>
+  <p class="lead">K8s 有几十种对象，但日常 90% 的工作只涉及这四个。</p>
+
+  <h3>Pod —— 最小的调度单位</h3>
+  <p>K8s <b>不直接管理容器，而是管理 Pod</b>。一个 Pod 里可以有一个或多个容器，它们共享网络和存储，像住在一个房间里。</p>
+  <div class="callout">
+    <b>新手疑问：为什么不能直接管容器？</b>因为有时候两个进程必须待在一起（比如主应用 + 日志收集侧车），必须共享同一个网络命名空间。Pod 就是为这种"必须在一起"的场景准备的最小单元。<b>日常你只需要记住：一个 Pod 通常放一个容器。</b>
+  </div>
+  <div class="callout warn">
+    <b>Pod 是易耗品。</b>它随时可能被删掉重建，重建后 IP 会变、名字会变。<b>所以绝对不要直接依赖 Pod 的 IP。</b>那怎么办？往下看 Service。
+  </div>
+
+  <h3>Deployment —— 管副本数和发布</h3>
+  <p>你不直接创建 Pod，而是创建 Deployment，由它去创建和管理 Pod。它负责三件事：</p>
+  <ul>
+    <li><b>副本数</b>：始终保持你要求的 Pod 数量</li>
+    <li><b>滚动更新</b>：换镜像时逐个替换，服务不中断</li>
+    <li><b>回滚</b>：新版出问题，一条命令退回上一版</li>
+  </ul>
+  <p>中间其实还有一层叫 <b>ReplicaSet</b>（负责保证"有 N 个 Pod 在跑"），Deployment 管 ReplicaSet，ReplicaSet 管 Pod。日常你不用管 ReplicaSet，但 <span class="k">kubectl get all</span> 时会看到它。</p>
+
+  <h3>Service —— 给 Pod 一个稳定入口</h3>
+  <p>这是新手最困惑的对象，但它的存在理由极其简单：</p>
+  <div class="callout danger">
+    <b>Pod 的 IP 会变。</b>今天 3 个副本的 IP 是 A、B、C，明天重启后变成 D、E、F。如果别的服务写死了 IP，立刻就挂了。
+  </div>
+  <p>Service 就是解决这个的：它给一组 Pod 一个<b>永远不会变的虚拟 IP 和域名</b>，内部自动把请求转发到当前活着的 Pod 上。</p>
+  <table>
+    <tr><th style="width:150px">类型</th><th>用途</th></tr>
+    <tr><td><b>ClusterIP</b>（默认）</td><td>只在集群内部可访问。集群内的其他服务用它互访</td></tr>
+    <tr><td><b>NodePort</b></td><td>在每个节点上开一个端口，供集群外部访问。练习时最常用</td></tr>
+    <tr><td><b>LoadBalancer</b></td><td>向云厂商申请一个真实负载均衡器。生产环境用，要花钱</td></tr>
+  </table>
+  <p>Service 怎么知道该转发给哪些 Pod？靠 <b>label（标签）</b>。你给 Pod 打上 <span class="k">app: web</span> 标签，Service 的 selector 写 <span class="k">app: web</span>，两者就匹配上了。这就是 K8s 里所有对象互相"找到对方"的通用机制。</p>
+
+  <h3>Namespace —— 逻辑隔离</h3>
+  <p>把集群从逻辑上切成若干块，比如 <span class="k">dev</span> / <span class="k">test</span> / <span class="k">prod</span>。不同 Namespace 里的同名资源互不冲突。<span class="k">kubectl get pods -n dev</span> 就是指定看哪个命名空间。</p>
+
+  <h3>四个对象的关系</h3>
+  <pre>Deployment  <span class="c"># 你写的，声明副本数和镜像</span>
+   └── ReplicaSet  <span class="c"># 自动生成，保证数量</span>
+          ├── Pod 1
+          ├── Pod 2
+          └── Pod 3
+                 ↑
+             Service  <span class="c"># 按 label 选中这组 Pod，提供稳定入口</span></pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">9-12 分钟</span><h2>集群里都住着谁</h2></div>
+  <p class="lead">这节是"了解"级别，知道每个组件负责什么就行，不用记细节。</p>
+  <h3>控制面（Control Plane）—— 大脑</h3>
+  <table>
+    <tr><th style="width:190px">组件</th><th>职责</th></tr>
+    <tr><td><b>kube-apiserver</b></td><td><b>唯一入口。</b>你敲的每条 kubectl 命令、集群里所有组件之间的通信，全都经过它。所有操作都要先问它</td></tr>
+    <tr><td><b>etcd</b></td><td>存整个集群的状态，包括你声明的期望状态。它挂了集群就失忆，所以生产环境必须备份</td></tr>
+    <tr><td><b>kube-scheduler</b></td><td>决定新 Pod 放到哪个节点上。它看每个节点还剩多少资源，以及你设的约束规则（比如"这个 Pod 只能放在有 SSD 的节点上"，这类规则叫亲和性）</td></tr>
+    <tr><td><b>kube-controller-manager</b></td><td>跑着一大堆控制器，前面说的"控制循环"就在这里。Deployment 控制器就在这</td></tr>
+  </table>
+  <h3>工作节点（Node）—— 干活的</h3>
+  <table>
+    <tr><th style="width:190px">组件</th><th>职责</th></tr>
+    <tr><td><b>kubelet</b></td><td>节点上的"工头"。收到"在这台机器上跑一个 Pod"的指令，就去调用容器运行时把它跑起来，并持续汇报状态</td></tr>
+    <tr><td><b>kube-proxy</b></td><td>实现 Service 的网络转发规则，让虚拟 IP 真正能把流量导到 Pod</td></tr>
+    <tr><td><b>容器运行时</b></td><td>真正执行"跑容器"这个动作的（如 containerd）。这一层就是上一期学的 Docker 的底层</td></tr>
+  </table>
+  <div class="callout">
+    <b>一句话串起来：</b>你写 YAML → 提交给 <b>apiserver</b> → 存进 <b>etcd</b> → <b>controller-manager</b> 发现少了 Pod，创建它 → <b>scheduler</b> 决定放哪个节点 → 该节点的 <b>kubelet</b> 收到指令，让容器运行时跑起来 → <b>kube-proxy</b> 配好网络转发。全程你只写了一份 YAML。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">12-15 分钟</span><h2>写第一个 YAML</h2></div>
+  <p class="lead">K8s 里所有东西都用 YAML 描述。YAML 就是一种<b>用缩进表示层级的纯文本格式</b>（表达能力和 JSON 类似，但更适合手写），没有花括号，全靠空格缩进体现从属关系。</p>
+  <p>别怕，格式高度规律，四个字段几乎固定：</p>
+  <table>
+    <tr><th style="width:150px">字段</th><th>含义</th></tr>
+    <tr><td class="f">apiVersion</td><td>用哪个版本的 API 来描述这个对象（照抄即可）</td></tr>
+    <tr><td class="f">kind</td><td>你要创建的是什么类型的东西 —— Deployment？Service？</td></tr>
+    <tr><td class="f">metadata</td><td>元信息：名字、标签、属于哪个命名空间</td></tr>
+    <tr><td class="f">spec</td><td><b>最重要的部分</b>：你期望它长什么样。所有具体配置都写在这</td></tr>
+  </table>
+
+  <h3>Deployment</h3>
+  <pre><span class="b">apiVersion:</span> apps/v1
+<span class="b">kind:</span> Deployment
+<span class="b">metadata:</span>
+  <span class="b">name:</span> web
+<span class="b">spec:</span>
+  <span class="b">replicas:</span> 3                <span class="c"># 我要 3 个副本</span>
+  <span class="b">selector:</span>
+    <span class="b">matchLabels:</span>
+      <span class="b">app:</span> web               <span class="c"># 它管的是带 app=web 标签的 Pod</span>
+  <span class="b">template:</span>                   <span class="c"># 以下就是 Pod 的模板</span>
+    <span class="b">metadata:</span>
+      <span class="b">labels:</span>
+        <span class="b">app:</span> web
+    <span class="b">spec:</span>
+      <span class="b">containers:</span>
+      - <span class="b">name:</span> web
+        <span class="b">image:</span> nginx:alpine
+        <span class="b">ports:</span>
+        - <span class="b">containerPort:</span> 80     <span class="c"># 容器里 nginx 监听的端口</span>
+        <span class="b">resources:</span>
+          <span class="b">limits:</span>
+            <span class="b">memory:</span> "128Mi"
+            <span class="b">cpu:</span> "500m"</pre>
+  <p>两个新手看不懂的写法：<span class="k">128Mi</span> 表示内存 128 兆字节（Mi 和 MB 几乎一样）；<span class="k">500m</span> 表示 CPU 半个核（m 是 millicore，1000m = 1 核）。<b>resources.limits 是给这个容器设的资源上限</b>，超出会被限制或杀掉 —— 第 17 分钟会再提到它的重要性。</p>
+  <div class="callout warn">
+    <b>YAML 两条铁律：</b>① 缩进必须用<b>空格</b>，绝不能用 Tab，用 Tab 一定报错。② 层级靠缩进表示，<b>缩进错了语义就全变了</b>，而且报错信息往往很含糊。建议用支持 YAML 高亮的编辑器。
+  </div>
+
+  <h3>Service</h3>
+  <pre><span class="b">apiVersion:</span> v1
+<span class="b">kind:</span> Service
+<span class="b">metadata:</span>
+  <span class="b">name:</span> web-svc
+<span class="b">spec:</span>
+  <span class="b">type:</span> NodePort
+  <span class="b">selector:</span>
+    <span class="b">app:</span> web               <span class="c"># 关键！必须和 Pod 的 label 完全一致</span>
+  <span class="b">ports:</span>
+  - <span class="b">port:</span> 80                  <span class="c"># Service 自己的端口，集群内访问 web-svc:80</span>
+    <span class="b">targetPort:</span> 80            <span class="c"># 转发到 Pod 的哪个端口</span>
+    <span class="b">nodePort:</span> 30080           <span class="c"># 节点上对外开放的端口，集群外访问用</span></pre>
+
+  <h3>四个端口，一次讲清（新手最大卡点）</h3>
+  <pre>外部用户访问 节点IP:30080
+        ↓  <span class="c">nodePort —— 每个节点上开的端口，范围 30000-32767</span>
+   Service (web-svc)
+        ↓  <span class="c">port —— Service 自己的端口，集群内其他服务访问 web-svc:80</span>
+        ↓  <span class="c">targetPort —— 转发到 Pod 的哪个端口</span>
+      Pod
+        ↓  <span class="c">containerPort —— 容器里应用真正监听的端口</span>
+    容器内的 nginx</pre>
+  <div class="callout ok">
+    <b>记忆法：</b>数据从外往里流 —— nodePort（最外层，节点）→ port（Service 层）→ targetPort（Pod 层）→ containerPort（容器层）。<b>targetPort 和 containerPort 通常一样</b>，所以新手主要记 nodePort 和 port 的区别就够了。
+  </div>
+
+  <h3>提交并观察</h3>
+  <pre>kubectl apply -f app.yaml
+kubectl get pods
+kubectl get svc
+<span class="c"># 不想暴露端口的话，临时映射到本地最方便：</span>
+kubectl port-forward svc/web-svc 8080:80</pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">15-17 分钟</span><h2>排障三板斧</h2></div>
+  <p class="lead">K8s 排障比 Docker 简单，因为顺序是固定的。<b>任何问题都按这三步走，不要跳。</b></p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一步：看状态。</b><span class="k">kubectl get pods</span> —— 状态栏写着什么？这是最重要的线索。</div></div>
+    <div class="step"><div class="txt"><b>第二步：看事件。</b><span class="k">kubectl describe pod 名字</span> —— 拉到底部的 Events 区域。调度失败、镜像拉取失败、健康检查（探针）失败，原因都写在这里。</div></div>
+    <div class="step"><div class="txt"><b>第三步：看日志。</b><span class="k">kubectl logs 名字</span> —— 前面两步都正常，说明是应用自己报错，看日志。</div></div>
+  </div>
+
+  <h3>状态码速查（看到就知道往哪查）</h3>
+  <table>
+    <tr><th style="width:190px">状态</th><th>含义与常见原因</th></tr>
+    <tr><td class="f">Pending</td><td>还没被调度到节点。通常是节点资源不够（内存或 CPU 被占满），或你设的调度约束没有节点能满足</td></tr>
+    <tr><td class="f">ContainerCreating</td><td>正在准备：拉镜像、挂载卷。停太久多半是镜像太大或存储有问题</td></tr>
+    <tr><td class="f">ImagePullBackOff</td><td><b>镜像拉不下来。</b>镜像名拼错、tag 不存在、私有仓库没配密钥、网络不通</td></tr>
+    <tr><td class="f">CrashLoopBackOff</td><td><b>容器反复启动又退出。</b>说明镜像能拉下来、能启动，但应用自己崩了 —— 去 <span class="k">kubectl logs</span> 看</td></tr>
+    <tr><td class="f">Running</td><td>正常运行。注意：Running 不代表健康，还要看 READY 列的 1/1</td></tr>
+    <tr><td class="f">Terminating</td><td>正在删除。卡很久通常是卡在存储卷卸载上，或者还有控制器没处理完清理逻辑</td></tr>
+    <tr><td class="f">OOMKilled</td><td>内存超过 limits 被系统杀掉。调大 resources.limits.memory 或排查内存泄漏</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>CrashLoopBackOff 和 ImagePullBackOff 的区别，记住这个就不会白折腾：</b><br>
+    <b>ImagePull</b> = 连镜像都没拿到 → 问题在配置（名字、权限、网络）。<br>
+    <b>CrashLoop</b> = 镜像拿到了、跑起来了，但应用自己退出了 → 问题在应用（配置、依赖、启动命令）。
+  </div>
+
+  <h3>其他常用排障命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get pods -o wide</code><span class="desc">多显示 Pod 的 IP 和所在节点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get events --sort-by=.lastTimestamp</code><span class="desc">按时间看集群最近发生了什么</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec -it Pod名 -- sh</code><span class="desc">进容器里排查，注意 Pod 名后面要有两个横杠</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs -f Pod名 --previous</code><span class="desc">看上一次崩溃前的日志（容器重启后就看不到了，加 --previous）</span><button class="copy">复制</button></div>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">17-20 分钟</span><h2>配置、存储，和六个坑</h2></div>
+  <h3>配置与密钥</h3>
+  <p>别把配置写死在镜像里 —— 那样同一个镜像就没法在测试环境和生产环境通用。</p>
+  <table>
+    <tr><th style="width:150px">对象</th><th>用途</th></tr>
+    <tr><td><b>ConfigMap</b></td><td>存普通配置：配置文件、环境变量。以明文存储</td></tr>
+    <tr><td><b>Secret</b></td><td>存敏感信息：密码、Token、证书。内容是 base64 编码的（<b>注意：编码不等于加密</b>，生产环境要开静态加密）</td></tr>
+  </table>
+  <pre>kubectl create configmap app-config --from-literal=ENV=prod
+kubectl create secret generic db-secret --from-literal=password=123456</pre>
+  <p>然后在 Pod 里引用它们：</p>
+  <pre><span class="b">env:</span>
+- <span class="b">name:</span> APP_ENV
+  <span class="b">valueFrom:</span>
+    <span class="b">configMapKeyRef:</span>
+      <span class="b">name:</span> app-config
+      <span class="b">key:</span> ENV</pre>
+
+  <h3>存储：Pod 重建了数据怎么办</h3>
+  <p>和 Docker 一样，Pod 里的数据随 Pod 一起销毁。持久化要用 <b>Volume</b>，而在集群里通常还要经过一层 <b>PVC（持久卷声明）</b> —— 你可以把它理解成"我要 10G 存储"的申请单，系统自动去找一块符合条件的存储给你。</p>
+  <div class="callout">
+    <b>记忆：</b>ConfigMap / Secret 解决"配置从哪来"，Volume / PVC 解决"数据存哪去"。这两个问题在 Docker 里也遇到过 —— 概念是通的。
+  </div>
+
+  <h3>六个必踩的坑</h3>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">直接改 Pod，改完又变回去了</div><div class="pd">Pod 由 Deployment 管理，控制器会把它拉回期望状态。<b>改 Deployment，或者改 YAML 后重新 apply。</b></div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">Service 选不到 Pod，访问直接超时</div><div class="pd">九成是 label 对不上。Service 的 selector 必须和 Pod 的 labels <b>完全一致</b>（包括大小写）。用 <span class="k">kubectl describe svc</span> 看 Endpoints 是不是空的。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">端口搞混，怎么都访问不到</div><div class="pd">nodePort / port / targetPort / containerPort 四个端口含义不同，回头再看那一节。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">不写 resources.limits</div><div class="pd">一个失控的 Pod 可能吃光整个节点的内存，把同节点上其他服务一起拖死。<b>任何上生产的 Pod 都必须设 limit。</b></div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">镜像用 :latest 或不写 tag</div><div class="pd">滚动更新时无法判断该不该拉新镜像，回滚也说不清回滚到哪一版。<b>永远用明确的版本号。</b></div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把数据库直接跑在 Deployment 里</div><div class="pd">有状态服务（数据库、消息队列）需要稳定的存储和身份，应该用 <b>StatefulSet</b>，并且存储必须走 PVC。用 Deployment 跑数据库，重启一次数据就悬了。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>五道题，检验是不是真懂了</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 你手动删掉了一个被 Deployment 管理的 Pod，会发生什么？</div>
+      <button class="opt">服务就此少一个副本，需要手动补回来</button>
+      <button class="opt">控制器发现实际状态偏离期望，自动新建一个补上</button>
+      <button class="opt">整个 Deployment 一起被删除</button>
+      <div class="ans">正确答案：<b>自动补回来</b>。这就是控制循环的作用 —— 期望 3 个、实际 2 个，差 1 个就补 1 个。整个过程你什么都不用做。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 为什么不能直接依赖 Pod 的 IP 地址？</div>
+      <button class="opt">Pod 的 IP 是加密的，看不到</button>
+      <button class="opt">Pod 的 IP 只在集群外有效</button>
+      <button class="opt">Pod 是易耗品，重建后 IP 会变，必须靠 Service 提供稳定入口</button>
+      <div class="ans">正确答案：<b>Pod 重建后 IP 会变</b>。所以要用 Service 给一组 Pod 一个固定的虚拟 IP 和域名，由它来做转发。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. Pod 状态是 CrashLoopBackOff，说明什么？</div>
+      <button class="opt">镜像已经拉下来了、容器能启动，但应用自己反复崩溃退出</button>
+      <button class="opt">镜像拉取失败，配置有问题</button>
+      <button class="opt">节点资源不足，无法调度</button>
+      <div class="ans">正确答案：<b>应用自己反复崩溃</b>。镜像拉取失败是 ImagePullBackOff；资源不足是 Pending。CrashLoop 说明问题在应用层，去 <span class="k">kubectl logs</span> 看日志。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. Service 靠什么找到它该转发给哪些 Pod？</div>
+      <button class="opt">靠 Pod 的 IP 地址列表</button>
+      <button class="opt">靠 Pod 的名字前缀</button>
+      <button class="opt">靠 label 标签匹配（selector 必须和 Pod 的 labels 一致）</button>
+      <div class="ans">正确答案：<b>靠 label 标签</b>。这是 K8s 里所有对象互相发现对方的通用机制。label 写错是最常见的"Service 访问不通"原因。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 在 K8s 里，"声明式"指的是什么？</div>
+      <button class="opt">用 YAML 而不是命令行来操作</button>
+      <button class="opt">你只描述期望的最终状态，由控制器持续对比并修正实际状态</button>
+      <button class="opt">所有操作都需要人工审批确认</button>
+      <div class="ans">正确答案：<b>描述期望状态，由控制器负责达成</b>。用 YAML 只是形式，核心在于"你不管过程，只管结果"。这也正是自愈能力的来源。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>kubectl 常用命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get nodes</code><span class="desc">看集群有哪些节点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pods -o wide</code><span class="desc">看 Pod，含 IP 和所在节点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get all</code><span class="desc">一次看全部资源，最常用的一条</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl describe pod Pod名</code><span class="desc">看详情和事件，排障第二步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs -f Pod名</code><span class="desc">看日志，排障第三步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl apply -f app.yaml</code><span class="desc">提交配置（创建或更新），最常用的一条</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl delete -f app.yaml</code><span class="desc">删除配置里定义的所有资源</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl scale deployment web --replicas=5</code><span class="desc">手动扩缩容</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl rollout status deployment/web</code><span class="desc">看滚动更新进度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl rollout undo deployment/web</code><span class="desc">回滚到上一版，救火必备</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec -it Pod名 -- sh</code><span class="desc">进容器内部</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl port-forward svc/web-svc 8080:80</code><span class="desc">把 Service 映射到本地端口，调试神器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl top pods</code><span class="desc">看资源占用（需要装 metrics-server）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表（看不懂的回来查）</h3>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>集群 Cluster</b></td><td>一组机器 + K8s 软件，对外像一个整体</td></tr>
+    <tr><td><b>节点 Node</b></td><td>集群里的一台机器（物理机或虚拟机）</td></tr>
+    <tr><td><b>控制面 Control Plane</b></td><td>集群的大脑，负责决策和存储状态</td></tr>
+    <tr><td><b>Pod</b></td><td>最小调度单位，一个或多个共享网络的容器</td></tr>
+    <tr><td><b>Deployment</b></td><td>管 Pod 的副本数、滚动更新和回滚</td></tr>
+    <tr><td><b>ReplicaSet</b></td><td>Deployment 和 Pod 之间的中间层，保证"有 N 个 Pod 在跑"</td></tr>
+    <tr><td><b>Service</b></td><td>给一组 Pod 提供固定入口和负载均衡</td></tr>
+    <tr><td><b>Namespace</b></td><td>集群内的逻辑分区，用于隔离</td></tr>
+    <tr><td><b>Label / Selector</b></td><td>标签与选择器，K8s 里对象互相发现的机制</td></tr>
+    <tr><td><b>声明式 Declarative</b></td><td>只描述期望状态，不描述实现步骤</td></tr>
+    <tr><td><b>期望状态 Desired State</b></td><td>你声明"应该是什么样"，存在 etcd 里</td></tr>
+    <tr><td><b>控制器 Controller</b></td><td>持续对比期望与实际并修正的程序</td></tr>
+    <tr><td><b>调度 Scheduling</b></td><td>决定一个 Pod 该放到哪个节点上</td></tr>
+    <tr><td><b>etcd</b></td><td>存储集群全部状态的数据库</td></tr>
+    <tr><td><b>kubelet</b></td><td>节点上的代理，负责把 Pod 真正跑起来</td></tr>
+    <tr><td><b>kubectl</b></td><td>你用来和集群对话的命令行工具</td></tr>
+    <tr><td><b>ConfigMap / Secret</b></td><td>存放配置 / 敏感信息，与镜像解耦</td></tr>
+    <tr><td><b>Volume / PVC</b></td><td>数据持久化，PVC 是"我要多大存储"的申请单</td></tr>
+    <tr><td><b>StatefulSet</b></td><td>用于有状态服务（数据库等），提供稳定身份和存储</td></tr>
+    <tr><td><b>滚动更新 Rolling Update</b></td><td>逐个替换旧 Pod，服务不中断</td></tr>
+    <tr><td><b>探针 Probe</b></td><td>健康检查，决定是否重启容器、是否接入流量</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用在线沙盒或 Docker Desktop 起一个集群，把本文的 Deployment + Service YAML 抄一遍 apply 上去，看到 3 个 Pod 变成 Running，再用 port-forward 打开页面。然后故意把镜像名写错，观察 ImagePullBackOff，走一遍排障三板斧。这一个来回，抵得上读十篇文章。<br><br>
+    <b>之后值得单独学：</b>Ingress（外部访问入口）、Helm（包管理）、HPA（自动扩缩容）、Prometheus（监控），以及生产级的存储与网络方案。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟理解 Kubernetes · 学完记得把练习集群停掉，minikube stop 一下省点电</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。K8s 是练出来的 —— 起个集群，把 YAML 抄一遍 apply 上去，再故意搞崩它走一遍排障。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 抓住"声明式 + 控制循环"这一条主线，其他都是它的展开。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='别试图一次记住所有名词 —— 先抓住那一条主线，剩下的都是它的展开。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

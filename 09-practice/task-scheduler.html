@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透分布式任务调度系统</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 9 期 · 实战篇</span>
+    <h1>二十分钟学透分布式任务调度系统</h1>
+    <p class="sub">任务调度的本质是<b>在正确的时间、把任务交给正确的机器、执行一次且仅一次</b>。这篇讲机制：调度中心/执行器/注册中心怎么分层、触发与路由的完整链路、分片广播怎么把 500 万行的任务拆给 8 台机器、重试与幂等怎么配合、Quartz Cluster / XXL-Job / ElasticJob 怎么选，以及<b>重复执行、单点、任务堆积、时钟漂移</b>四个经典死法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>9</b> 种路由策略</span>
+      <span class="chip"><b>4</b> 个框架对比</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边问：你现在跑得最慢的那个定时任务，瓶颈在哪一层</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <p class="lead">XXL-Job 有官方镜像，一条命令起调度中心；执行器就是一个普通 Java 进程，引入 starter 即可。</p>
+  <pre><span class="c"># XXL-Job 调度中心（官方镜像，内置 H2，生产用 MySQL）</span>
+docker run -d -p 8080:8080 --name xxl-job-admin xuxueli/xxl-job-admin:2.4.1
+
+<span class="c"># 浏览器打开 http://127.0.0.1:8080/xxl-job-admin</span>
+<span class="c"># 默认账号密码 admin / 123456（生产必须改，且不要暴露到公网）</span>
+
+<span class="c"># 执行器接入（Maven 依赖）</span>
+<span class="c">// &lt;dependency&gt;</span>
+<span class="c">//   &lt;groupId&gt;com.xuxueli&lt;/groupId&gt;</span>
+<span class="c">//   &lt;artifactId&gt;xxl-job-core&lt;/artifactId&gt;</span>
+<span class="c">// &lt;/dependency&gt;</span>
+
+<span class="c"># Quartz Cluster 模式需要先建表（官方脚本在 quartz.jar 内）</span>
+<span class="c"># docs/dbTables/tables_mysql_innodb.sql，核心表：QRTZ_LOCKS / QRTZ_TRIGGERS</span>
+
+<span class="c"># ElasticJob-Lite 依赖 ZooKeeper 做注册与协调</span>
+<span class="c"># docker run -d -p 2181:2181 --name zk zookeeper:3.9</span></pre>
+  <div class="callout warn">
+    <b>三个容易混淆的角色：</b><b>调度中心</b>决定"何时触发、触发谁"（无状态，可集群）；<b>执行器</b>是干活的业务进程（有状态，跑真实业务代码）；<b>注册中心/数据库</b>让调度中心知道有哪些执行器在线。把三者合在一个进程里"看起来更简单"，实际是把自己绑死在单点上——<b>分层的目的就是让调度可以集群扩容，而业务机器各自独立。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>调度系统核心与架构</h2></div>
+  <p class="lead">一句话定义：<b>调度系统 = 触发器 + 路由器 + 执行器注册表 + 监控告警</b>。所有功能都围绕"把一次任务触发准确送到一台健康的机器上并执行成功"展开。</p>
+  <table>
+    <tr><th style="width:130px">职责</th><th style="width:250px">机制</th><th>失败形态</th></tr>
+    <tr><td><b>触发</b></td><td>按 CRON/延迟/事件产生触发信号，记录任务实例</td><td>漏触发（时间漂移）、重复触发（多调度节点）</td></tr>
+    <tr><td><b>路由</b></td><td>从在线执行器列表里按策略选一台派发</td><td>选到已下线机器、全部选中一台（热点）</td></tr>
+    <tr><td><b>执行</b></td><td>执行器线程池接收、执行业务逻辑、回报结果</td><td>线程池打满、执行中进程被杀无感知</td></tr>
+    <tr><td><b>监控重试</b></td><td>超时检测、失败重试、故障转移、日志汇总</td><td>失败无人知、重试无幂等越重越错</td></tr>
+  </table>
+  <h3>XXL-Job 的完整链路</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>执行器启动</b>：向调度中心注册（appName + IP + 端口），之后每 30 秒心跳续约</div></div>
+    <div class="step"><div class="txt"><b>调度线程到点</b>：调度中心集群通过 DB 锁竞争选出唯一节点，读取未来 5 秒内需要触发的任务</div></div>
+    <div class="step"><div class="txt"><b>生成任务实例</b>：写入任务日志表（状态=待执行），按路由策略选一台执行器</div></div>
+    <div class="step"><div class="txt"><b>派发执行</b>：Netty/HTTP 推送执行请求，执行器线程池领取执行，日志实时回传调度中心</div></div>
+    <div class="step"><div class="txt"><b>结果回报</b>：成功/失败回报；失败按配置重试（重新走一遍路由）；超时未回报触发故障转移</div></div>
+  </div>
+  <pre><span class="c"># 调度中心的 DB 锁竞争（XXL-Job 用轻量行锁 + 时间片）</span>
+<span class="c"># quartz 集群用 LOCKS 表对 TRIGGER_ACCESS 行加悲观锁，锁竞争的节点：</span>
+<span class="c">#   - Quartz Cluster：每触发一次都抢一次锁，节点多时锁冲突严重</span>
+<span class="c">#   - XXL-Job：按"未来时间片"预锁，锁粒度粗、冲突少，集群规模不受锁限制</span>
+<span class="c"># 结论：调度节点数 Quartz 建议 &lt;= 3，XXL-Job 可以水平扩到 10+</span></pre>
+  <div class="callout ok">
+    <b>调度中心必须无状态。</b>所有任务定义、触发记录、执行日志都在数据库，调度节点只做计算和转发。这样任何一个调度节点宕机，剩下的节点接管触发，任务不丢不重。把任务配置缓存在调度节点内存里、或者依赖节点本地文件，是分布式调度的大忌。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>触发方式与 misfire 处理</h2></div>
+  <table>
+    <tr><th style="width:120px">方式</th><th style="width:250px">机制</th><th>适用</th><th>坑</th></tr>
+    <tr><td><b>CRON</b></td><td>表达式描述触发时刻（秒 分 时 日 月 周 [年]）</td><td>绝大多数定时场景</td><td>时区、不存在的日期（2 月 30 日）、表达式写错静默不触发</td></tr>
+    <tr><td><b>固定延迟</b></td><td>上次执行结束后间隔 N 秒再触发</td><td>怕任务重叠的轮询（如拉消息）</td><td>执行慢时触发频率自动降低，可能永远追不上产出</td></tr>
+    <tr><td><b>固定速率</b></td><td>无论上次是否结束，每 N 秒触发一次</td><td>心跳、指标采集</td><td><b>会重叠执行</b>，必须配"单实例并发策略"</td></tr>
+    <tr><td><b>API/事件触发</b></td><td>外部系统调接口触发一次（带参数）</td><td>补数据、手动重跑、工作流下游</td><td>无鉴权就是任意执行入口，必须加 token + 限流</td></tr>
+    <tr><td><b>工作流 DAG</b></td><td>上游任务成功事件触发下游</td><td>多步骤数据管道、发布流水线</td><td>依赖成环、部分失败时下游状态机复杂</td></tr>
+  </table>
+  <pre><span class="c"># CRON 表达式（6 位：秒 分 时 日 月 周；7 位带年）</span>
+0 0 2 * * ?          <span class="c"># 每天 02:00 —— 最常用的离线跑批</span>
+0 0/5 * * * ?        <span class="c"># 每 5 分钟</span>
+0 0 0 L * ?          <span class="c"># 每月最后一天</span>
+0 0 12 ? * WED       <span class="c"># 每周三中午</span>
+0 0 0 1 1 ?          <span class="c"># 每年 1 月 1 日</span>
+
+<span class="c"># 高危表达式（能解析但语义危险）</span>
+0 0 0 29 2 ?         <span class="c"># 2 月 29 日 —— 只有闰年存在，平年永不触发</span>
+0 0 0 * * ?          <span class="c"># 每天 0 点但没考虑时区，容器 UTC 时差 8 小时</span>
+0 0/30 * * * ?       <span class="c"># 每 30 分钟，但如果任务要跑 40 分钟，就会背靠背重叠</span></pre>
+  <h4>misfire（错过触发）策略</h4>
+  <p>任务到点但系统繁忙/重启，恢复后这一拍要不要补？不同框架语义不同，选错要么丢一次要么补十次：</p>
+  <table>
+    <tr><th style="width:150px">策略</th><th style="width:250px">行为</th><th>适用</th></tr>
+    <tr><td class="f">fire now（立即补）</td><td>错过的全部立即补触发</td><td>金融类一次都不能丢；<b>小心补出十次</b></td></tr>
+    <tr><td class="f">next with current count</td><td>立即触发一次，计数正常推进</td><td>幂等任务的折中</td></tr>
+    <tr><td class="f">next with remaining count</td><td>丢弃错过的，只触发下一拍</td><td>指标采集类可丢场景</td></tr>
+    <tr><td class="f">do nothing</td><td>错过就错过</td><td>强节流任务（如限频拉取）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>错过的触发补不补，先问"这次任务重复执行的代价"。</b>发券任务错过 10 拍 = 补 10 次重复发券（必须幂等兜底）；对账任务错过 1 拍 = 当天账不平（必须补）。<b>统一建议：补偿语义在框架层配置，幂等保证在业务层实现，两层都要有，别指望单层。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>分片广播：大数据量任务拆分</h2></div>
+  <p class="lead">场景：<b>凌晨给 500 万沉睡用户发券</b>。单机顺序处理按 2000 条/秒算要 4 小时，早过了业务窗口。解法是<b>分片广播</b>：把任务广播给所有在线执行器，每台机器只处理 1/N。</p>
+  <h4>分片广播执行时序</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>触发</b>：调度中心向该任务<b>所有在线执行器</b>同时派发执行请求（不是选一台）</div></div>
+    <div class="step"><div class="txt"><b>携带分片参数</b>：每台机器收到自己的 <span class="k">shardIndex</span>（我是第几片）和 <span class="k">shardTotal</span>（总共几片）</div></div>
+    <div class="step"><div class="txt"><b>取数</b>：每台机器按 <span class="k">WHERE id % shardTotal = shardIndex</span> 只捞自己那片数据</div></div>
+    <div class="step"><div class="txt"><b>扩容加速</b>：分片总数随在线执行器数量自动变化，8 台机器就是 8 片，时间从 4 小时降到 30 分钟</div></div>
+  </div>
+  <pre><span class="c">// XXL-Job 分片任务代码（真实 API：XxlJobHelper）</span>
+@XxlJob(<span class="g">"sendCouponHandler"</span>)
+<span class="b">public</span> ReturnT&lt;String&gt; sendCouponHandler() {
+    <span class="b">int</span> shardIndex = XxlJobHelper.getShardIndex();   <span class="c">// 当前机器分片号 0~N-1</span>
+    <span class="b">int</span> shardTotal = XxlJobHelper.getShardTotal();   <span class="c">// 总片数 = 在线执行器数</span>
+    XxlJobHelper.log(<span class="g">"分片 {}/{} 开始"</span>, shardIndex, shardTotal);
+
+    <span class="c">// 关键：按取模分片，保证同一用户始终落到同一台机器（幂等键不变）</span>
+    List&lt;User&gt; users = userMapper.selectSleepUsers(shardIndex, shardTotal);
+    <span class="b">for</span> (User u : users) {
+        <span class="b">if</span> (couponService.exists(u.getId())) <span class="b">continue</span>;  <span class="c">// 幂等：已发过跳过</span>
+        couponService.issue(u.getId());
+    }
+    <span class="b">return</span> ReturnT.SUCCESS;
+}
+
+<span class="c"># 对应 SQL：id % #{shardTotal} = #{shardIndex}</span>
+<span class="c"># 注意：取模字段必须分布均匀（自增 ID 可以，手机号后四位也可以）</span>
+<span class="c"># 如果取模字段倾斜（如 status 只有 3 个值），某片会拿 90% 数据</span></pre>
+  <h4>分片策略对比</h4>
+  <table>
+    <tr><th style="width:130px">策略</th><th style="width:250px">机制</th><th>特点</th></tr>
+    <tr><td><b>取模分片</b></td><td>id % total = index</td><td>简单均匀；扩容时 total 变化，<b>数据会重新分布</b>（本轮做完即稳定）</td></tr>
+    <tr><td><b>哈希取模+一致性</b></td><td>按业务键哈希后映射</td><td>扩容时只迁 1/N 数据，适合有状态分片</td></tr>
+    <tr><td><b>ElasticJob 数据分片</b></td><td>基于注册中心的分片项，支持自定义分片算法</td><td>分片与执行器解耦，弹性伸缩最优雅</td></tr>
+    <tr><td><b>按范围分片</b></td><td>时间范围/ID 区间切给各机器</td><td>适合天然分区数据（按天、按城市）</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>分片任务的三个暗坑：</b>① <b>扩容时 total 变了</b>——跑到一半加了机器，本轮不同机器用的 total 不一致，会有用户漏处理或重复处理（幂等键兜底）；② <b>某片失败整体语义</b>——8 片里 1 片失败，是算整体失败重跑全部 8 片，还是只补失败那片？建议<b>按片记录状态，只补失败片</b>；③ <b>执行器缩容</b>——机器下线时它那片数据没人处理，必须等下线机器回报结果或由其他机器接管未完成分片。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>失败重试与超时控制</h2></div>
+  <h4>重试的三层配置</h4>
+  <table>
+    <tr><th style="width:130px">层</th><th style="width:250px">配置</th><th>建议</th></tr>
+    <tr><td><b>任务级重试</b></td><td>失败后自动重新触发 N 次，间隔递增（1min、5min、15min）</td><td>瞬时故障（网络抖动）有效，3 次足够</td></tr>
+    <tr><td><b>failover 故障转移</b></td><td>执行器超时未回报 → 换一台机器重跑</td><td>应对机器宕机；<b>要求任务可整体重入</b></td></tr>
+    <tr><td><b>busyover 忙碌转移</b></td><td>目标执行器线程池忙 → 换一台</td><td>避免全部任务挤在同一台</td></tr>
+  </table>
+  <pre><span class="c">// XXL-Job 失败即重试的语义：返回 FAIL 或抛异常都会按重试次数重新触发</span>
+@XxlJob(<span class="g">"syncOrderHandler"</span>)
+<span class="b">public</span> ReturnT&lt;String&gt; syncOrderHandler() {
+    <span class="b">try</span> {
+        orderSyncService.sync();          <span class="c">// 内部按批次幂等</span>
+        XxlJobHelper.handleSuccess(<span class="g">"同步完成，共 1200 单"</span>);
+        <span class="b">return</span> ReturnT.SUCCESS;
+    } <span class="b">catch</span> (RetryableException e) {
+        <span class="c">// 可重试错误（下游超时）：返回 FAIL，框架自动重试</span>
+        XxlJobHelper.handleFail(<span class="g">"下游超时: {}"</span>, e.getMessage());
+        <span class="b">return</span> ReturnT.FAIL;
+    } <span class="b">catch</span> (FatalException e) {
+        <span class="c">// 致命错误（数据格式错）：重试也没用，标失败让人工介入</span>
+        XxlJobHelper.handleFail(<span class="g">"数据格式错误，需人工介入"</span>);
+        <span class="b">return</span> ReturnT.FAIL;
+    }
+}
+
+<span class="c"># 重试间隔配置（XXL-Job 2.4.1 支持）</span>
+<span class="c"># 任务管理页：重试次数=3，重试间隔按指数退避由框架默认策略处理</span>
+<span class="c"># 自研调度：建议存 3 个间隔值 [60s, 300s, 1800s]，别固定间隔猛敲</span></pre>
+  <h4>超时控制：三层防线</h4>
+  <ol>
+    <li><b>框架级超时</b>：执行请求超过 N 分钟未回报 → 判定失败，触发 failover。<b>阈值按任务 P99 时长 × 2 设置</b>，太短会误杀长任务。</li>
+    <li><b>业务级超时</b>：任务内部对下游调用设超时（HTTP 3s、DB 5s），别让一个慢下游拖垮整个任务线程。</li>
+    <li><b>进程级看护</b>：任务线程注册取消回调，任务被放弃时能中断正在进行的批处理（检查中断标志），避免"僵尸执行"继续写数据。</li>
+  </ol>
+  <div class="callout warn">
+    <b>failover 与幂等是绑定的。</b>开启故障转移意味着"同一个任务实例可能被两台机器各跑一部分"。如果任务没有幂等设计（如直接 INSERT 发券记录），failover 就是把单点故障升级成数据事故。<b>没有幂等保证的任务，宁可让 failover 只做告警不做自动重跑。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>路由策略与幂等设计</h2></div>
+  <table>
+    <tr><th style="width:170px">策略</th><th style="width:230px">选择逻辑</th><th>适用</th></tr>
+    <tr><td class="f">FIRST</td><td>固定选注册列表第一台</td><td>单机任务"假装分布式"，无意义</td></tr>
+    <tr><td class="f">ROUND（轮询）</td><td>依次轮转，负载最均匀</td><td>无状态批任务，默认推荐</td></tr>
+    <tr><td class="f">RANDOM</td><td>随机选一台</td><td>与轮询近似，胜在无顺序状态</td></tr>
+    <tr><td class="f">CONSISTENT_HASH</td><td>按任务参数哈希，同参数尽量落同一台</td><td><b>利用本地缓存/本地状态</b>的任务</td></tr>
+    <tr><td class="f">LEAST_FREQUENTLY_USED</td><td>选累计使用最少的机器</td><td>长尾均衡，机器性能差异大时</td></tr>
+    <tr><td class="f">LEAST_RECENTLY_USED</td><td>选最久未被使用的机器</td><td>与 LFU 近似</td></tr>
+    <tr><td class="f">FAILOVER</td><td>按注册顺序探测，找到第一台健康的</td><td>关心"别选到挂的机器"，不关心均衡</td></tr>
+    <tr><td class="f">BUSYOVER</td><td>目标忙则顺延下一台，都忙则排队</td><td>任务时长差异大的混合集群</td></tr>
+    <tr><td class="f">SHARDING_BROADCAST</td><td>广播给全部在线执行器</td><td><b>分片任务</b>（模块 3）</td></tr>
+  </table>
+  <h4>一致性哈希的真实价值</h4>
+  <p>某报表任务每次跑要加载 2GB 维度数据到本地缓存，ROUND 策略下每次都换机器、每次都重新加载 2GB。换成 CONSISTENT_HASH 后，同一任务固定落在同一台机器，<b>本地缓存命中，任务从 20 分钟降到 4 分钟</b>。代价是那台机器负载偏高——用 LFU 或给缓存预热单独留一组执行器来平衡。</p>
+  <h4>幂等设计：任务重复执行的防火墙</h4>
+  <pre><span class="c"># 幂等三件套：唯一键 + 状态机 + 去重表</span>
+
+<span class="c"># 1. 唯一键：任务实例 ID（调度框架生成，全局唯一）</span>
+<span class="c">#    每个触发都带 logId，业务表存 biz_key = logId，重复执行撞唯一键即拒</span>
+<span class="b">CREATE TABLE</span> task_execution (
+  log_id      BIGINT PRIMARY KEY,      <span class="c">-- 调度实例 ID = 幂等号</span>
+  task_name   VARCHAR(64),
+  status      VARCHAR(16),             <span class="c">-- RUNNING / SUCCESS / FAILED</span>
+  started_at  TIMESTAMP,
+  updated_at  TIMESTAMP
+);
+
+<span class="c"># 2. 状态机：先查状态再执行，RUNNING 直接返回（不并发重入）</span>
+<span class="c">#   UPDATE task_execution SET status='RUNNING' WHERE log_id=? AND status IS NULL</span>
+<span class="c">#   影响行数 = 0 → 说明已在跑或已跑过 → 直接返回</span>
+
+<span class="c"># 3. 业务侧幂等：发券先查 unique(user_id, coupon_batch_id)，存在即跳过</span>
+<span class="b">INSERT INTO</span> user_coupon(user_id, batch_id, log_id)
+<span class="b">VALUES</span> (?, ?, ?)
+<span class="b">ON DUPLICATE KEY UPDATE</span> id=id;   <span class="c">-- 撞唯一键静默成功，不重复发</span></pre>
+  <div class="callout ok">
+    <b>幂等的边界要想清楚：框架给的是"同一个任务实例不会并发执行"的保证，但 failover、重试、人工补触发都会创造新的实例 ID。</b>所以幂等不能只靠 log_id，业务侧必须有独立于调度系统的幂等键（user_id + batch_id）。<b>原则：调度的幂等防"同时跑"，业务的幂等防"跑两次"，两层缺一不可。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>框架对比：Quartz / XXL-Job / ElasticJob / PowerJob</h2></div>
+  <table>
+    <tr><th style="width:130px">框架</th><th style="width:250px">架构与一致性</th><th>优势</th><th>短板</th></tr>
+    <tr><td><b>Quartz Cluster</b></td><td>JDBCJobStore + LOCKS 表悲观锁，集群节点抢锁触发</td><td>嵌入简单，无额外组件</td><td>节点多锁冲突剧烈（建议 ≤3 节点）；无管理界面；无分片广播</td></tr>
+    <tr><td><b>XXL-Job</b></td><td>调度中心（DB）+ 执行器（注册心跳），轻量锁 + 时间片</td><td>Web 管理、日志在线看、路由/分片/重试齐全、社区活跃、学习成本低</td><td>依赖中心化 DB；执行器非无状态（机器与任务有绑定关系）</td></tr>
+    <tr><td><b>ElasticJob</b></td><td>ZooKeeper 协调（3.x 也支持 etcd），数据分片 + 弹性伸缩</td><td>分片模型优雅、扩容自动重分片、适合海量数据分片</td><td>依赖 ZK；概念多（分片项/分片策略/监听器）；无 Web 控制台</td></tr>
+    <tr><td><b>PowerJob</b></td><td>调度服务器 + Worker，支持 DAG 工作流</td><td>功能最全（工作流/MapReduce 式/容器化）</td><td>组件更重，社区规模小于前两者</td></tr>
+    <tr><td><b>云调度</b></td><td>阿里 SchedulerX / AWS EventBridge Scheduler 等托管</td><td>免运维、自带监控告警</td><td>厂商绑定、单价、定制受限</td></tr>
+  </table>
+  <pre><span class="c"># ElasticJob-Lite 3.x 配置示例（Spring Boot Starter）</span>
+elasticjob:
+  zk:
+    serverLists: zk1:2181,zk2:2181,zk3:2181
+    namespace: scheduler-prod
+  jobs:
+    orderCloseJob:
+      elasticJobClass: com.example.job.OrderCloseJob
+      cron: 0 0 2 * * ?
+      shardingTotalCount: 8
+      shardingItemParameters: 0=order0,1=order1,2=order2
+      jobExceptionHandler: com.example.handler.IgnoreExceptionHandler
+      jobErrorStrategy: THROW        <span class="c"># 失败策略：THROW / IGNORE / LOG</span>
+      description: 关闭超时未支付订单
+      overwrite: true                <span class="c"># 用代码配置覆盖注册中心旧配置</span>
+
+<span class="c"># XXL-Job 执行器 application.properties</span>
+xxl.job.admin.addresses=http://xxl-job-admin:8080/xxl-job-admin
+xxl.job.accessToken=default_token          <span class="c"># 执行器与调度中心的通信令牌</span>
+xxl.job.executor.appname=order-executor
+xxl.job.executor.port=9999                 <span class="c"># 执行器通信端口</span>
+xxl.job.executor.logpath=/data/applogs/xxl-job/jobhandler
+xxl.job.executor.logretentiondays=30       <span class="c"># 日志保留，防磁盘打满</span></pre>
+  <div class="callout">
+    <b>选型决策（按团队现状）：</b>① 单体应用内嵌定时任务、量小 → <b>Quartz/Spring Schedule</b> 就够，别上分布式；② 需要管理界面、多团队、任务多且杂 → <b>XXL-Job</b>（国内事实标准）；③ 单任务数据量大到必须分片、且执行器数量频繁变 → <b>ElasticJob</b>；④ 重工作流编排（DAG）→ PowerJob 或 Airflow（数据向）。<b>已经跑稳的别迁移，选型成本远高于框架差异。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>弹性扩缩容与监控</h2></div>
+  <h4>执行器上下线的完整生命周期</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>上线注册</b>：执行器启动即注册，调度中心路由表立即包含它（新机器马上参与负载）</div></div>
+    <div class="step"><div class="txt"><b>心跳维持</b>：每 30 秒心跳；连续 90 秒无心跳从路由表摘除（参数按集群规模调）</div></div>
+    <div class="step"><div class="txt"><b>优雅下线</b>：容器收到 SIGTERM → 先注销注册 → 等存量任务跑完（drain）→ 再退出。跳过注销直接杀，调度中心还以为它活着，任务派过去黑洞</div></div>
+    <div class="step"><div class="txt"><b>下线补偿</b>：已下线机器若还有未完成任务实例，靠 failover 由其他机器接管（要求幂等）</div></div>
+  </div>
+  <h4>监控大盘必备指标</h4>
+  <div class="cmds">
+    <div class="crow"><code>任务成功率 / 失败 Top10</code><span class="desc">每日失败任务排行，@ 到负责人</span><button class="copy">复制</button></div>
+    <div class="crow"><code>执行时长 P50/P99</code><span class="desc">耗时突增 50% 预警，通常是数据量或下游劣化</span><button class="copy">复制</button></div>
+    <div class="crow"><code>任务堆积量</code><span class="desc">触发频率 × 时长 &gt; 触发间隔 = 必然堆积</span><button class="copy">复制</button></div>
+    <div class="crow"><code>执行器在线数</code><span class="desc">突然减少 = 批量宕机或注册链路故障</span><button class="copy">复制</button></div>
+    <div class="crow"><code>触发延迟</code><span class="desc">计划时间 vs 实际触发时间，调度中心自身健康度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>线程池使用率</code><span class="desc">执行器线程池打满前扩容或限流</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>任务堆积的数学：</b>某任务每 10 分钟触发一次，每次执行要 12 分钟。单机必然永远追不上——队列以每次 +2 分钟的速度增长。解法不是加机器，是<b>先修慢的根因</b>（批量化、并行化、分片），机器只是掩盖问题。<b>判断公式：安全水位 = 执行时长 P99 &lt; 触发间隔 × 0.8</b>，超过就该治理了。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">集群下同一任务被触发多次</div><div class="pd">调度节点集群没有正确选主，或多节点同时触发。XXL-Job/Quartz 都靠 DB 锁选主，但自研调度如果漏了锁竞争，全网重复执行是迟早的事。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">调度中心是单点，且状态在本地</div><div class="pd">调度节点内存里存任务定义，重启后配置丢失；或单节点 DB 挂了全站定时任务停摆。调度中心必须无状态 + 多实例 + DB 高可用。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">任务堆积没人发现，日志盘先满</div><div class="pd">执行慢于触发频率，队列持续增长；同时单次日志量暴增把磁盘打满，连带其他任务挂。监控执行时长趋势 + 磁盘水位。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">节点时钟漂移，触发时间对不齐</div><div class="pd">机器间 NTP 不同步，A 节点认为 02:00 已到、B 节点认为没到，或分布式锁基于本地时间判断导致误判/漏判。所有机器同步 NTP，锁和超时判断基于单调时钟或服务端时间。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">重试没有幂等，越重越错</div><div class="pd">发券任务失败重试 3 次，用户收到 3 张券。重试次数和幂等键必须同时设计，缺一个就是数据事故。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">failover 与业务不可重入冲突</div><div class="pd">开了故障转移，但任务执行一半写坏中间状态，另一台机器从零跑完全部步骤，产生重复单据。不可重入的任务关闭 failover，改为告警人工处理。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">执行器缩容时任务派发给已下线机器</div><div class="pd">容器被强杀没走注销流程，调度中心路由表仍包含它，任务派发过去无人执行直到超时。SIGTERM 处理里先注销再 drain，强杀场景靠 failover 兜底。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">共享线程池，一个大任务堵死全部</div><div class="pd">所有任务共用一个 8 线程池，一个 30 分钟的报表任务占 6 个线程，其他任务全部排队延迟。按任务类型分池（核心池/批处理池），大任务独立队列。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">API 触发接口无鉴权无限流</div><div class="pd">手动触发接口暴露内网，被脚本刷接口触发任务，或误传超大参数把任务打挂。触发接口加 token + 参数校验 + 单任务频率限制 + 全量审计。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">补数据靠手动触发，没有审计和记录</div><div class="pd">线上出问题，有人手动触发了一次重跑，没记录没人知道，事后对账对不上。所有触发（自动/手动/API）必须落任务实例日志，可追溯到人。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一个任务要处理 500 万行数据，单机 4 小时，8 台执行器在线。最优方案是？</div>
+      <button class="opt">把 8 台机器各自跑一遍，先跑完的算</button>
+      <button class="opt">分片广播：8 台机器各领一个分片，按 id % 8 = index 处理自己那片</button>
+      <button class="opt">路由策略选 FIRST，固定用第一台机器</button>
+      <div class="ans">正确答案：<b>分片广播</b>。广播触发让所有在线执行器同时参与，每台带 shardIndex/shardTotal 只处理 1/N 数据，时间从 4 小时降到约 30 分钟，且扩容时自动加速。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 某任务每次执行要加载 2GB 本地缓存，希望尽量落在同一台机器上，应该选哪种路由策略？</div>
+      <button class="opt">ROUND 轮询</button>
+      <button class="opt">RANDOM 随机</button>
+      <button class="opt">CONSISTENT_HASH 一致性哈希</button>
+      <div class="ans">正确答案：<b>一致性哈希</b>。按任务参数哈希后固定映射到同一台机器，本地缓存可以复用。ROUND/RANDOM 每次换机器，2GB 缓存每次重新加载，任务从 4 分钟变 20 分钟。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于调度系统的幂等设计，正确的说法是？</div>
+      <button class="opt">框架保证同一实例不并发 + 业务侧按业务键幂等，两层都要有</button>
+      <button class="opt">框架生成的任务实例 ID 就是天然幂等键，业务不用再做</button>
+      <button class="opt">只要配置了重试次数为 0 就不需要幂等</button>
+      <div class="ans">正确答案：<b>两层都要</b>。框架幂等只防"同一实例并发"，但 failover、重试、人工补触发都会创造新实例 ID。业务侧必须有独立幂等键（如 user_id + batch_id）防"跑两次"。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. Quartz Cluster 模式为什么一般不建议超过 3 个调度节点？</div>
+      <button class="opt">它只支持 3 个以内的节点数，多了会报错</button>
+      <button class="opt">每次触发都要对 LOCKS 表抢悲观锁，节点越多锁冲突越严重，触发延迟显著上升</button>
+      <button class="opt">因为 Quartz 是单机的，集群模式不稳定</button>
+      <div class="ans">正确答案：<b>锁竞争</b>。Quartz 集群靠数据库行锁选主，每次触发都抢锁，节点数增加后冲突概率平方级上升，触发延迟抖动大。XXL-Job 用时间片预锁，粒度粗，集群规模基本不受限。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 多台机器时钟不同步，对分布式调度最直接的风险是？</div>
+      <button class="opt">任务日志时间戳对不上，只是不好看</button>
+      <button class="opt">执行器 CPU 频率会漂移</button>
+      <button class="opt">触发时刻判断不一致、基于本地时间的锁和超时误判，导致漏触发或重复触发</button>
+      <div class="ans">正确答案：<b>触发与锁误判</b>。节点 A 认为到点、节点 B 认为没到，集群选主和触发判断出现分歧；基于本地时间的分布式锁会提前释放或永不释放。所有节点必须同步 NTP。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. failover（故障转移）与 busyover（忙碌转移）的区别是？</div>
+      <button class="opt">failover 处理"执行器超时无响应"，busyover 处理"执行器在线但线程池忙"</button>
+      <button class="opt">failover 处理线程池忙，busyover 处理宕机</button>
+      <button class="opt">两者没有区别，只是不同框架的命名</button>
+      <div class="ans">正确答案：<b>超时无响应 vs 线程池忙</b>。failover 指目标机器派发后超时未回报，换一台重跑（要求任务可重入）；busyover 指目标机器明确回复"忙"，顺延到下一台（任务还没开始跑，代价小得多）。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查策略</h3>
+  <div class="cmds">
+    <div class="crow"><code>0 0 2 * * ?</code><span class="desc">每天 02:00，离线跑批最常用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>0 0/5 * * * ?</code><span class="desc">每 5 分钟轮询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHARDING_BROADCAST</code><span class="desc">分片广播路由，大数据量任务拆分</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CONSISTENT_HASH</code><span class="desc">有本地缓存/本地状态的任务固定机器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>FAILOVER</code><span class="desc">超时无回报换机器，需任务可重入</span><button class="copy">复制</button></div>
+    <div class="crow"><code>BUSYOVER</code><span class="desc">目标忙顺延下一台</span><button class="copy">复制</button></div>
+    <div class="crow"><code>XxlJobHelper.getShardIndex()</code><span class="desc">当前机器分片号（0~N-1）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>XxlJobHelper.getShardTotal()</code><span class="desc">总片数 = 在线执行器数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>XxlJobHelper.handleSuccess/handleFail</code><span class="desc">回报任务结果，FAIL 触发重试</span><button class="copy">复制</button></div>
+    <div class="crow"><code>执行时长 P99 &lt; 触发间隔 × 0.8</code><span class="desc">安全水位公式，超过就该治理</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>执行器核心配置</h3>
+  <pre><span class="c"># XXL-Job 执行器 application.properties（关键项）</span>
+xxl.job.admin.addresses=http://xxl-job-admin:8080/xxl-job-admin
+xxl.job.accessToken=default_token
+xxl.job.executor.appname=order-executor
+xxl.job.executor.port=9999
+xxl.job.executor.logpath=/data/applogs/xxl-job/jobhandler
+xxl.job.executor.logretentiondays=30
+
+<span class="c"># 线程池隔离（自研调度建议）：核心任务与批处理任务分池</span>
+<span class="c"># core-pool: 8 线程（业务关键任务，秒级完成）</span>
+<span class="c"># batch-pool: 4 线程（报表/大数据任务，分钟级）</span>
+<span class="c"># 队列容量 + 拒绝策略：满了进死信队列告警，绝不让任务静默丢失</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>调度中心</b></td><td>决定何时触发、触发谁的无状态集群，可水平扩容</td></tr>
+    <tr><td><b>执行器</b></td><td>跑真实业务代码的有状态进程，注册到调度中心</td></tr>
+    <tr><td><b>注册中心</b></td><td>维护执行器在线列表与元数据，DB 或 ZK/etcd</td></tr>
+    <tr><td><b>CRON 表达式</b></td><td>描述触发时刻的表达式，6 位（秒分时日周月）或 7 位（带年）</td></tr>
+    <tr><td><b>misfire 错过触发</b></td><td>到点未触发（系统忙/重启）后的补偿策略：补、丢、只补一次</td></tr>
+    <tr><td><b>分片广播</b></td><td>广播给所有执行器，每台按 shardIndex/shardTotal 处理 1/N</td></tr>
+    <tr><td><b>路由策略</b></td><td>从在线执行器里选一台的方式：轮询/随机/一致性哈希/故障转移等</td></tr>
+    <tr><td><b>failover</b></td><td>执行器超时无回报，换一台重跑（要求任务可重入）</td></tr>
+    <tr><td><b>busyover</b></td><td>目标执行器线程池忙，顺延派发给下一台</td></tr>
+    <tr><td><b>任务实例 logId</b></td><td>一次触发的唯一编号，是调度侧幂等的基础</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作执行多次结果一致，靠唯一键 + 状态机实现</td></tr>
+    <tr><td><b>状态机</b></td><td>任务执行状态流转（待执行→执行中→成功/失败），防并发重入</td></tr>
+    <tr><td><b>Quartz Cluster</b></td><td>基于数据库悲观锁选主的集群模式，节点多时锁冲突严重</td></tr>
+    <tr><td><b>XXL-Job</b></td><td>调度中心 + 执行器架构的轻量分布式任务框架，国内主流</td></tr>
+    <tr><td><b>ElasticJob</b></td><td>基于 ZK/etcd 的分片式调度框架，弹性伸缩能力最强</td></tr>
+    <tr><td><b>任务堆积</b></td><td>执行速度跟不上触发频率，队列持续增长</td></tr>
+    <tr><td><b>时钟漂移</b></td><td>多节点时间不同步，导致触发与锁判断不一致</td></tr>
+    <tr><td><b>优雅下线 drain</b></td><td>下线前先注销再等存量任务跑完，避免任务派发给已退出机器</td></tr>
+    <tr><td><b>线程池隔离</b></td><td>按任务类型分池，避免一个大任务堵死全部任务</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 XXL-Job 单机版完成这五件事 —— ① 配一个每 10 秒触发、打印 logId 的任务，在调度中心观察任务实例与日志；② 起两个执行器实例，把路由策略从 ROUND 改成 CONSISTENT_HASH，观察派发分布；③ 写一个分片任务（取模处理），配 3 个执行器看每台只处理 1/3；④ 让任务抛异常，配重试 3 次，观察重试间隔与实例记录；⑤ 任务执行中 kill 掉一台执行器，观察 failover 行为。<br><br>
+    <b>之后值得单独学：</b>ElasticJob 3.x 的分片算法与监听器、PowerJob 的工作流 DAG 编排、调度系统与 CI/CD 的联动（发版时暂停定时任务）、以及基于时间轮（Timing Wheel）的自研调度内核。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透分布式任务调度系统 · 上线前务必确认：幂等、failover 语义、时钟同步、线程池隔离</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（分片广播）和模块 5（路由与幂等）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对着你的定时任务清单逐条检查。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边问：你现在跑得最慢的那个定时任务，瓶颈在哪一层';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 RabbitMQ</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 10 期 · 高密度版</span>
+    <h1>二十分钟学透 RabbitMQ</h1>
+    <p class="sub">RabbitMQ 难的不是发消息，是<b>不丢消息、不重复、不堆积</b>。这篇的重点是 AMQP 0-9-1 模型、确认机制、死信与延迟消息、Quorum 队列，以及生产环境最常见的六个事故点。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4+1</b> 种 exchange</span>
+      <span class="chip"><b>3</b> 道确认防线</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 RabbitMQ 跟着敲：docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:3.13-management</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起 RabbitMQ（带管理界面）</span>
+docker run -d -p 5672:5672 -p 15672:15672 --name rmq rabbitmq:3.13-management
+
+<span class="c"># 管理界面：http://localhost:15672  默认 guest / guest（仅限 localhost 登录）</span>
+
+<span class="c"># 命令行工具（容器内）</span>
+docker exec -it rmq rabbitmqctl status          <span class="c"># 节点状态总览</span>
+docker exec -it rmq rabbitmq-plugins list      <span class="c"># 插件列表</span>
+
+<span class="c"># 账号权限（生产必须做：guest 不能远程登录）</span>
+rabbitmqctl add_user app AppPass123
+rabbitmqctl add_vhost /prod
+rabbitmqctl set_permissions -p /prod app ".*" ".*" ".*"
+rabbitmqctl set_user_tags app management        <span class="c"># 给监控账号的管理界面权限</span></pre>
+  <div class="callout warn">
+    <b>先记住两个端口：</b><span class="k">5672</span> 是 AMQP 协议端口（业务流量走这里），<span class="k">15672</span> 是管理界面 HTTP API。健康检查用 <span class="k">rabbitmq-diagnostics check_running</span> 或 <span class="k">check_port_connectivity</span>，别用 TCP 探活冒充业务探活——端口活着不代表队列能收发。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>AMQP 0-9-1 模型：消息怎么流动</h2></div>
+  <p class="lead">AMQP 0-9-1 的核心模型就一句话：<b>生产者从不直接发消息给队列，而是发给 exchange，由 exchange 按 binding 规则路由到队列。</b></p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>Producer 发消息</b>：指定 exchange 名、routing key、消息体（headers + body，body 是不透明的字节数组）</div></div>
+    <div class="step"><div class="txt"><b>Exchange 查 bindings</b>：每个 binding 记录"什么 routing key 的规则对应哪个队列"，exchange 按类型匹配，把消息副本投递到每个匹配的队列</div></div>
+    <div class="step"><div class="txt"><b>Queue 暂存</b>：消息在队列里排队，等消费者来取。队列可以绑定多个 exchange，一个 exchange 也可以绑定多个队列</div></div>
+    <div class="step"><div class="txt"><b>Consumer 消费并 ack</b>：确认后 broker 才删除消息；不确认就重新投递</div></div>
+  </div>
+  <table>
+    <tr><th style="width:150px">组件</th><th>关键事实</th></tr>
+    <tr><td><b>Connection</b></td><td>TCP 连接，建立成本高（TCP 握手 + AMQP 协商）。一个连接可开多个 channel</td></tr>
+    <tr><td><b>Channel</b></td><td>复用连接的逻辑通道，<b>不是线程安全的</b>。每个线程一个 channel，不要跨线程共享。绝大多数报错发生在 channel 上</td></tr>
+    <tr><td><b>Exchange</b></td><td>只做路由不存消息。默认有一个 direct 类型的匿名 exchange（名为 <span class="k">""</span>），routing key 等于队列名时直投该队列</td></tr>
+    <tr><td><b>Binding</b></td><td>exchange 与 queue 的绑定关系，可带额外参数（headers exchange 的 x-match 等）</td></tr>
+    <tr><td><b>Queue</b></td><td>真正存消息的地方。durable 队列的元数据持久化，消息是否持久化看 delivery_mode</td></tr>
+    <tr><td><b>Routing key</b></td><td>生产者给的字符串。direct 精确匹配、topic 通配匹配、fanout 忽略、headers 匹配消息头</td></tr>
+  </table>
+  <pre><span class="c"># 用 CLI 验证模型（等价于管理界面里的 bindings 页）</span>
+rabbitmqctl list_exchanges name type messages_in
+rabbitmqctl list_bindings source_name source_kind destination_name routing_key
+rabbitmqctl list_queues name messages messages_ready messages_unacknowledged consumers</pre>
+  <div class="callout">
+    <b>和 Kafka 的本质区别（选型先想清楚）：</b>RabbitMQ 是<b>智能 broker、哑消费者</b>——broker 决定消息给哪个消费者，消费完就删除，擅长复杂路由和按序分发；Kafka 是<b>哑 broker、智能消费者</b>——消息按 offset 顺序保留，消费者自己管理进度，擅长高吞吐回放。要"多条业务线复杂路由、单消息确认、延迟/死信"选 RabbitMQ；要"百万 TPS、事件回放、流处理"选 Kafka。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Exchange 四种类型与通配规则</h2></div>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:220px">匹配规则</th><th>典型场景</th></tr>
+    <tr><td><b>direct</b></td><td>routing key <b>完全相等</b>才投递</td><td>点对点任务分发：按 <span class="k">order.created</span> 精确路由到订单队列</td></tr>
+    <tr><td><b>topic</b></td><td>通配匹配：<span class="k">*</span> 匹配一个词，<span class="k">#</span> 匹配零或多个词（词以 . 分隔）</td><td>发布订阅：<span class="k">order.*.paid</span>、<span class="k">log.#</span> 收全部日志</td></tr>
+    <tr><td><b>fanout</b></td><td>忽略 routing key，广播给所有绑定队列</td><td>广播配置变更、群发通知</td></tr>
+    <tr><td><b>headers</b></td><td>不看 routing key，匹配消息头；<span class="k">x-match: all</span> 全匹配 / <span class="k">any</span> 任一匹配</td><td>多条件复杂路由（较少用，topic 通常够）</td></tr>
+  </table>
+  <pre><span class="c"># topic 通配实例：消息 routing key = "order.cn.paid"</span>
+绑定 "order.*"        <span class="c"># ✓ 命中（* 匹配 "cn"）</span>
+绑定 "order.cn.#"     <span class="c"># ✓ 命中（# 匹配 "paid"）</span>
+绑定 "order.#"        <span class="c"># ✓ 命中</span>
+绑定 "*.paid"         <span class="c"># ✗ 不命中（* 不能跨 . 匹配 "order.cn"）</span>
+绑定 "order.cn.paid"  <span class="c"># ✓ 精确相等也命中（topic 包含 direct 行为）</span>
+
+<span class="c"># headers 实例：x-match=all 时，绑定参数必须全部出现在消息头里</span>
+绑定参数：{"x-match":"all","format":"pdf","type":"report"}
+消息头带 format=pdf 且 type=report 才投递
+
+<span class="c"># 用 CLI 手工建 binding 验证路由</span>
+rabbitmqctl set_permissions -p / app ".*" ".*" ".*"
+rabbitmqadmin declare exchange name=order.topic type=topic
+rabbitmqadmin declare queue name=q.paid durable=true
+rabbitmqadmin declare binding source=order.topic destination=q.paid routing_key="order.*.paid"</pre>
+  <div class="callout danger">
+    <b>一个高频错误： unroutable 消息静默丢失。</b>direct/topic exchange 找不到匹配的 binding 时，消息<b>直接丢弃</b>，生产者不报错（除非开了 publisher confirm 也看不到路由失败的特殊处理——3.x 之后 confirm 只保证"到达 exchange"）。解法：① 开 <span class="k">alternate-exchange</span>（备份 exchange，收容无法路由的消息）；② 生产者开 mandatory 标志 + returns 回调；③ 上线前用 <span class="k">rabbitmqctl list_bindings</span> 核对 binding 拼写。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>消息确认机制：三道防线</h2></div>
+  <p class="lead">消息丢失只发生在三个环节：<b>生产者→broker、broker 自身、broker→消费者</b>。每个环节都有对应机制，但都要显式开。</p>
+  <h3>防线一：Publisher Confirm（生产者确认）</h3>
+  <pre><span class="c"># 原理：channel 进 confirm 模式后，broker 每收到（持久化）一条消息回一个 confirm</span>
+channel.confirmSelect()                        <span class="c"># 开启 confirm 模式</span>
+
+<span class="c"># 两种确认方式：</span>
+<span class="c"># 1. 同步等待：每条消息 waitForConfirms，简单但吞吐低（每条一个 RTT）</span>
+<span class="c"># 2. 异步回调（推荐）：批量 confirm，维护"已发送未确认"序号集合</span>
+channel.addConfirmListener(
+  (sequenceNumber, multiple) -&gt; { <span class="c">/* ack：从待确认集合移除 */</span> },
+  (sequenceNumber, multiple) -&gt; { <span class="c">/* nack：重发或记日志告警 */</span> }
+);
+
+<span class="c"># mandatory + returns：路由不到队列时触发的回调（publisher confirm 不覆盖这个）</span>
+channel.addReturnListener((replyCode, replyText, exchange, routingKey, properties, body) -&gt; {
+  log.error("消息无法路由: exchange={}, routingKey={}", exchange, routingKey);
+});</pre>
+  <h3>防线二：Broker 侧持久化</h3>
+  <pre><span class="c"># 三个条件同时满足，重启才不丢消息：</span>
+1. queue 声明为 durable = true          <span class="c"># 队列元数据持久化</span>
+2. 消息 properties.deliveryMode = 2      <span class="c"># PERSISTENT，消息体持久化</span>
+3. 消息落盘：默认异步刷盘；需要更强保证用 quorum 队列（Raft 多数派落盘才算提交）
+
+<span class="c"># 声明持久化队列 + 发持久化消息（Java 客户端）</span>
+channel.queueDeclare("order.paid", <span class="b">true</span>, <span class="b">false</span>, <span class="b">false</span>, <span class="b">null</span>);
+AMQP.BasicProperties props = <span class="b">new</span> AMQP.BasicProperties.Builder()
+    .deliveryMode(MessageProperties.PERSISTENT_TEXT_PLAIN.getDeliveryMode())
+    .contentType("application/json").build();
+channel.basicPublish("order.topic", "order.cn.paid", props, body);</pre>
+  <h3>防线三：Consumer Ack（消费者确认）</h3>
+  <table>
+    <tr><th style="width:150px">模式</th><th style="width:180px">行为</th><th>风险</th></tr>
+    <tr><td class="f">auto ack<br>（autoAck=true）</td><td>消息一出队就视为确认</td><td><b>处理中崩溃 = 消息丢失。</b>只适合可容忍丢失的场景（日志上报）</td></tr>
+    <tr><td class="f">manual ack</td><td>业务处理完调 <span class="k">basicAck</span></td><td><b>生产必须用。</b>忘记 ack 会导致消息一直 unacked，队列只进不出</td></tr>
+    <tr><td class="f">nack / reject</td><td><span class="k">basicNack(requeue=false)</span> 或配合死信</td><td>requeue=true 处理失败会<b>立即重投</b>，可能死循环打满 CPU</td></tr>
+  </table>
+  <pre><span class="c"># prefetch / QoS：限制通道上未确认消息的数量（关键参数）</span>
+channel.basicQos(10);        <span class="c"># 最多 10 条未 ack，处理完才会推新的</span>
+channel.basicQos(10, <span class="b">true</span>);  <span class="c"># 第二个参数 global=true 对整个连接生效（3.x 已废弃，用 channel 级）</span>
+
+<span class="c"># prefetch 设多少合适？</span>
+<span class="c"># 设 1：慢速处理（每条几十 ms）且要严格顺序时</span>
+<span class="c"># 设 10~50：常规业务，平衡吞吐与重试粒度</span>
+<span class="c"># 设 0（无限）：prefetch 关闭，broker 会一次性推完全部消息，容易 OOM 和堆积</span></pre>
+  <div class="callout warn">
+    <b>prefetch 太大会埋两个雷：</b>① 所有消息被推到一个消费者变成 unacked，该消费者崩溃后<b>全部消息重新排队</b>，其他消费者闲着；② 内存里堆几百 MB 未确认消息，触发 vm_memory_high_watermark 流控。<b>默认值 0（无限）是反模式</b>，Spring Boot 里通过 <span class="k">spring.rabbitmq.listener.simple.prefetch</span> 显式设置。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>死信队列（DLX）</h2></div>
+  <p class="lead">死信 = <b>被 broker 判定"这个消费者处理不了"的消息</b>。DLX 是给死信准备的另一条出路，是 RabbitMQ 做重试和兜底的基石。</p>
+  <h4>消息变成死信的三种条件</h4>
+  <ol>
+    <li>消费者 <span class="k">basicNack</span> / <span class="k">basicReject</span> 且 <span class="k">requeue=false</span>（显式拒绝）</li>
+    <li>消息 TTL 到期（队列级 x-message-ttl 或消息级 expiration）</li>
+    <li>队列满：超过 <span class="k">x-max-length</span> / <span class="k">x-max-length-bytes</span>，队头消息被挤出</li>
+  </ol>
+  <h4>声明方式（在队列参数里指定，不是 exchange 自己）</h4>
+  <pre><span class="c"># 声明一个带 DLX 的业务队列</span>
+Map&lt;String,Object&gt; args = <span class="b">new</span> HashMap&lt;&gt;();
+args.put("x-dead-letter-exchange", "dlx.exchange");
+args.put("x-dead-letter-routing-key", "order.retry");   <span class="c"># 不写则沿用原 routing key</span>
+channel.queueDeclare("order.paid", <span class="b">true</span>, <span class="b">false</span>, <span class="b">false</span>, args);
+
+<span class="c"># 死信队列本身 + 它的 exchange 要单独声明</span>
+channel.exchangeDeclare("dlx.exchange", "direct", <span class="b">true</span>);
+channel.queueDeclare("order.retry.q", <span class="b">true</span>, <span class="b">false</span>, <span class="b">false</span>, <span class="b">null</span>);
+channel.queueBind("order.retry.q", "dlx.exchange", "order.retry");
+
+<span class="c"># CLI 等价操作</span>
+rabbitmqctl set_policy -p /prod dlx ".*" \
+  '{"dead-letter-exchange":"dlx.exchange","message-ttl":60000}' --apply-to queues</pre>
+  <div class="callout ok">
+    <b>DLX 最实用的组合：TTL 阶梯重试。</b>业务队列（30s TTL + DLX）→ 重试队列 A（1min TTL + DLX）→ 重试队列 B（5min TTL + DLX）→ 死信兜底队列（人工处理/告警）。消息每次消费失败就 nack(requeue=false)，在各级队列里躺够时间后回到业务队列。<b>注意这是"近似延迟"</b>：RabbitMQ 的 TTL 过期检查是周期性的，且只有消息到达队头才检查，同队消息不按个体 TTL 排序。
+  </div>
+  <div class="callout danger">
+    <b>死信循环陷阱：</b>死信队列又绑回原 exchange 时，消息可能无限循环变死信。务必在最后一层设 <span class="k">x-dead-letter-exchange</span> 为空或指向一个"墓碑队列"（如 <span class="k">order.dead</span> 只告警不再投递）。另外死信消息会在 headers 里带上 <span class="k">x-death</span> 数组，记录了每次死亡的原因、队列、时间，排查时用 <span class="k">rabbitmqctl list_queues</span> 看不到，要在管理界面或消息详情里看。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>延迟消息：两种实现路线</h2></div>
+  <p class="lead">RabbitMQ <b>原生不支持任意延迟</b>，工程上就两条路：插件、或 TTL+DLX 组合。</p>
+  <table>
+    <tr><th style="width:180px">方案</th><th style="width:200px">原理</th><th>取舍</th></tr>
+    <tr><td><b>rabbitmq_delayed_message_exchange 插件</b><br><span style="color:var(--faint)">（推荐）</span></td><td>exchange 类型声明为 <span class="k">x-delayed-message</span>，消息头带 <span class="k">x-delay</span>（毫秒），broker 的 mnesia 存储到期时间，到期后按路由键投到目标 exchange</td><td>延迟<b>精确到消息级</b>，无队头阻塞；插件与集群镜像模式不兼容，仅支持持久化消息，升级需验证插件兼容性</td></tr>
+    <tr><td><b>TTL + DLX 组合</b></td><td>队列级 TTL 到期 → 进 DLX → 业务队列</td><td>零依赖；<b>队头阻塞</b>：队列按队头 TTL 检查，头部没到期后面的都卡着，只适合同一延迟时间的批量</td></tr>
+    <tr><td><b>消息级 expiration + DLX</b></td><td>每条消息单独设 TTL</td><td>看似灵活，但<b>过期消息不重排队</b>：后到的短 TTL 消息必须等前面长 TTL 消息到期才检查，队头阻塞更严重</td></tr>
+  </table>
+  <pre><span class="c"># 启用延迟插件（3.8+ 版本自带，社区插件需单独下载匹配版本）</span>
+rabbitmq-plugins enable rabbitmq_delayed_message_exchange
+rabbitmqctl list_enabled_plugins | grep delayed     <span class="c"># 确认已启用</span>
+
+<span class="c"># 声明延迟 exchange（Java）</span>
+Map&lt;String,Object&gt; args = <span class="b">new</span> HashMap&lt;&gt;();
+args.put("x-delayed-type", "direct");              <span class="c"># 内部按 direct 规则路由，可选 fanout/topic/headers</span>
+channel.exchangeDeclare("order.delay", "x-delayed-message", <span class="b">true</span>, <span class="b">false</span>, args);
+
+<span class="c"># 发一条延迟 30 秒的消息</span>
+AMQP.BasicProperties props = <span class="b">new</span> AMQP.BasicProperties.Builder()
+    .headers(Map.of("x-delay", 30000))
+    .deliveryMode(2).build();
+channel.basicPublish("order.delay", "order.paid", props, body);
+
+<span class="c"># 用 rabbitmqadmin 声明（CLI）</span>
+rabbitmqadmin declare exchange name=order.delay type=x-delayed-message \
+  arguments='{"x-delayed-type":"direct"}'</pre>
+  <div class="callout warn">
+    <b>三个必须知道的延迟消息事实：</b>① 延迟消息<b>必须持久化</b>（deliveryMode=2），否则插件不生效；② 延迟 exchange 的消息存在 mnesia 表里，节点重启后已入队的延迟消息<b>仍然有效</b>（3.8+ 做了持久化），但插件必须在新节点同样启用；③ 高精度延迟（秒级以下）或超长延迟（小时/天）都不适合用消息队列，前者用定时任务轮询，后者直接用数据库状态机 + 调度。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>镜像队列与 Quorum 队列</h2></div>
+  <p class="lead">这是 RabbitMQ 3.8 之后最大的架构变化，也是升级时最容易踩的坑。</p>
+  <table>
+    <tr><th style="width:130px">对比项</th><th style="width:210px">经典镜像队列<br>（classic mirrored）</th><th>Quorum 队列</th></tr>
+    <tr><td><b>实现</b></td><td>主队列 + 若干镜像从，主挂了一个从被提升为主</td><td>基于 <b>Raft 共识协议</b>，日志复制，多数派写入即提交</td></tr>
+    <tr><td><b>声明方式</b></td><td class="f">queue type=classic + policy ha-mode</td><td class="f">x-queue-type: quorum（策略或队列参数）</td></tr>
+    <tr><td><b>一致性</b></td><td>异步复制，主从切换可能丢消息、可能脑裂</td><td><b>强一致</b>：多数派确认才算成功，故障切换不丢已确认消息</td></tr>
+    <tr><td><b>性能</b></td><td>快（异步），但同步阻塞模式（ha-sync-mode=automatic）下慢</td><td>比经典队列慢（共识开销），但比同步镜像队列快且稳</td></tr>
+    <tr><td><b>适用场景</b></td><td>临时/非关键队列</td><td><b>所有生产队列的默认选择</b></td></tr>
+  </table>
+  <pre><span class="c"># 经典镜像队列配置（3.13 起已废弃，仅维护不支持新特性）</span>
+rabbitmqctl set_policy -p /prod ha-all "^order\." \
+  '{"ha-mode":"all","ha-sync-mode":"automatic","ha-promote-on-failure":"when-synced"}'
+
+<span class="c"># Quorum 队列（推荐）</span>
+rabbitmqctl set_policy -p /prod qq "^order\." \
+  '{"queue-type":"quorum","delivery-limit":5}' --apply-to queues
+
+<span class="c"># 也可以用 x-queue-type 声明单个 quorum 队列</span>
+Map&lt;String,Object&gt; args = Map.of("x-queue-type", "quorum");
+channel.queueDeclare("order.paid", <span class="b">true</span>, <span class="b">false</span>, <span class="b">false</span>, args);</pre>
+  <div class="callout danger">
+    <b>版本事实（2024 年起）：</b>RabbitMQ <b>3.13 正式废弃经典队列镜像</b>（deprecated），官方建议全部迁移到 Quorum 队列；<b>4.0/4.1 起经典镜像队列进入移除倒计时</b>，新集群请直接用 Quorum 队列。从镜像迁移到 Quorum 的方法：建新 quorum 队列 → 双写/ shovel 同步 → 切换 → 删旧队列。Quorum 队列还有两个好用的机制：<b>delivery-limit</b>（消息重复投递上限，达到后自动进死信，专治毒消息）和 <b>at-least-once 保证</b>（消费端仍要幂等）。
+  </div>
+  <div class="callout">
+    <b>3.13 起还推出了 Stream 队列</b>（append-only 日志，类 Kafka 语义，支持回放），适合大吞吐事件流场景；以及 <b>Khepri</b>（替代 mnesia 的元数据存储，4.x 可选启用）。常规业务队列仍然用 Quorum。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>集群、高可用与流控水位</h2></div>
+  <h4>集群基本事实</h4>
+  <ul>
+    <li>RabbitMQ 集群<b>不共享队列内容</b>：队列在哪个节点创建就存在哪个节点，其他节点只有元数据。客户端连任何节点都能收发全集群的队列（节点间转发）</li>
+    <li>所有节点必须用<b>同一个 Erlang Cookie</b>（<span class="k">/var/lib/rabbitmq/.erlang.cookie</span>），不一致直接加入失败</li>
+    <li>元数据（队列/exchange/binding 定义）全集群同步；<b>队列里的消息不做分片</b>——所以单队列吞吐上限由所在节点决定</li>
+    <li>Quorum 队列的成员分布在多个节点，用 Raft 保证多数派存活即可用</li>
+  </ul>
+  <pre><span class="c"># 组集群（三节点示例）</span>
+rabbitmqctl stop_app
+rabbitmqctl join_cluster rabbit@node1     <span class="c"># 加入已有集群</span>
+rabbitmqctl start_app
+rabbitmqctl cluster_status                <span class="c"># 查看集群成员与角色</span>
+
+<span class="c"># 节点下线维护：先摘除流量再停</span>
+rabbitmqctl forget_cluster_node rabbit@node3   <span class="c"># 在别的节点上执行</span></pre>
+  <h4>内存与磁盘水位（生产事故第一大来源）</h4>
+  <table>
+    <tr><th style="width:190px">配置</th><th style="width:150px">默认值</th><th>行为</th></tr>
+    <tr><td class="f">vm_memory_high_watermark</td><td>0.4（物理内存 40%）</td><td>超过后触发 alarm，<b>阻塞所有生产者连接</b>，消费者继续。生产常调 0.6</td></tr>
+    <tr><td class="f">disk_free_limit</td><td>50MB</td><td>磁盘剩余低于此值触发 alarm，同样阻塞生产者。<b>50MB 太小，必须调大</b>（如 2GB 或相对值）</td></tr>
+    <tr><td class="f">disk_free_limit_relative</td><td>1.0（乘内存）</td><td>相对内存的比例，比绝对值更稳</td></tr>
+  </table>
+  <pre><span class="c"># 调水位（重启不丢，写进 rabbitmq.conf 更稳）</span>
+rabbitmqctl set_vm_memory_high_watermark 0.6
+rabbitmqctl set_vm_memory_high_watermark absolute 4GB     <span class="c"># 或绝对值</span>
+rabbitmqctl set_disk_free_limit 2GB
+rabbitmqctl set_disk_free_limit_relative 2.0              <span class="c"># 相对值：2 倍内存</span>
+
+<span class="c"># rabbitmq.conf 写法</span>
+vm_memory_high_watermark.relative = 0.6
+disk_free_limit.absolute = 2GB
+
+<span class="c"># 查当前告警</span>
+rabbitmq-diagnostics alarms
+rabbitmqctl status | grep -A5 "Alarms"</pre>
+  <div class="callout danger">
+    <b>alarm 触发时的现象极具迷惑性：</b>不是报错，而是生产者<b>连接被阻塞、发送超时</b>，业务侧表现是"消息发不出去、一直在重试"。根因通常是：① 消费者挂了/消费不动，队列堆积吃光内存；② 磁盘满（未清理的队列数据 + 日志）。<b>监控必须覆盖</b>：<span class="k">rabbit_queue_messages_ready</span>（就绪消息数）、<span class="k">rabbit_queue_messages_unacked</span>、mem_used/disk_free、连接数 <span class="k">rabbit_connections</span>。日常防堆积三板斧：给队列设 <span class="k">x-max-length</span> + <span class="k">overflow: reject-publish</span>、监控积压告警、消费者加看门狗（卡住自动重启）。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>Spring Boot 集成要点</h2></div>
+  <pre><span class="c">&lt;!-- 依赖 --&gt;</span>
+&lt;dependency&gt;
+  &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-boot-starter-amqp&lt;/artifactId&gt;
+&lt;/dependency&gt;</pre>
+  <pre><span class="c"># application.yml 关键配置（逐条对应上面的防线）</span>
+spring:
+  rabbitmq:
+    host: rmq-node1
+    port: 5672
+    virtual-host: /prod
+    username: app
+    password: ${RMQ_PASSWORD}
+    publisher-confirm-type: correlated   <span class="c"># 开启 publisher confirm（simple/simple）</span>
+    publisher-returns: true              <span class="c"># 开启 returns 回调（路由失败通知）</span>
+    template:
+      mandatory: true                    <span class="c"># 配合 returns，mandatory 标志</span>
+    listener:
+      simple:
+        acknowledge-mode: manual         <span class="c"># 手动 ack（生产必须）</span>
+        prefetch: 20                     <span class="c"># 每次推送的未确认上限</span>
+        concurrency: 5                   <span class="c"># 最小消费者线程</span>
+        max-concurrency: 20              <span class="c"># 最大消费者线程（动态扩容）</span>
+        default-requeue-rejected: false  <span class="c"># 异常时不无限重投（false=丢弃进 DLX）</span>
+        retry:
+          enabled: false                 <span class="c"># 内存重试会阻塞同线程其他消息，长任务慎用</span></pre>
+  <h4>生产者：ConfirmCallback + ReturnsCallback 必须配对</h4>
+  <pre><span class="b">@Bean</span>
+<span class="b">public</span> RabbitTemplate rabbitTemplate(ConnectionFactory cf) {
+  RabbitTemplate t = <span class="b">new</span> RabbitTemplate(cf);
+  t.setConfirmCallback((correlationData, ack, cause) -&gt; {
+    <span class="b">if</span> (!ack) log.error("broker 未确认消息: {}", cause);   <span class="c">// nack：落库或告警</span>
+  });
+  t.setReturnsCallback(ret -&gt; log.error("消息无法路由: {}", ret.getRoutingKey()));
+  <span class="b">return</span> t;
+}
+
+<span class="c">// 发消息：convertAndSend，消息体自动用 MessageConverter 序列化</span>
+rabbitTemplate.convertAndSend("order.topic", "order.cn.paid", orderEvent,
+    msg -&gt; { msg.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT); <span class="b">return</span> msg; });</pre>
+  <h4>消费者：手动 ack 的标准写法</h4>
+  <pre><span class="b">@RabbitListener</span>(queues = "order.paid")
+<span class="b">public void</span> onOrderPaid(OrderEvent ev, Channel channel,
+    @Header(AmqpHeaders.DELIVERY_TAG) <span class="b">long</span> tag) <span class="b">throws</span> IOException {
+  <span class="b">try</span> {
+    orderService.process(ev);            <span class="c">// 幂等处理（按业务单号去重）</span>
+    channel.basicAck(tag, <span class="b">false</span>);       <span class="c">// 确认</span>
+  } <span class="b">catch</span> (RetryableException e) {
+    channel.basicNack(tag, <span class="b">false</span>, <span class="b">false</span>);  <span class="c">// 进死信队列，稍后重试</span>
+  } <span class="b">catch</span> (Exception e) {
+    log.error("不可重试错误，转人工", e);
+    channel.basicNack(tag, <span class="b">false</span>, <span class="b">false</span>);
+  }
+}</pre>
+  <div class="callout warn">
+    <b>序列化的大坑：</b>Spring 默认的 <span class="k">SimpleMessageConverter</span> 对 String/byte[] 没问题，但用 <span class="k">Jackson2JsonMessageConverter</span> 发 Java 对象时，会写入 <span class="k">__TypeId__</span> 头，<b>消费端必须有同一个类的依赖，否则反序列化直接失败</b>。跨语言（Java 发、Go 收）场景务必自定义 MessageConverter，只发纯 JSON + contentType。另一个坑：<span class="k">spring.rabbitmq.listener.simple.retry.enabled=true</span> 的<b>内存重试</b>是在消费线程内 sleep 重试，会把 prefetch 的槽位占满，造成队头阻塞——长重试用 DLX 阶梯，别用内存重试。
+  </div>
+  <div class="callout ok">
+    <b>Spring 侧"重试 + 死信"标准组合拳：</b>业务队列（配 <span class="k">x-dead-letter-exchange</span> 指向重试交换机，TTL 阶梯）→ 重试队列（配 DLX 指回业务交换机，TTL 逐级拉长 10s/60s/300s）→ 最终死信队列（<span class="k">order.dead</span>，只告警不消费，人工介入）。消费者侧只做<b>快速失败 + nack(requeue=false)</b>，重试节奏全部交给队列 TTL，天然分布式、不怕进程重启。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">消息没做持久化三件套</div><div class="pd">durable 队列 + deliveryMode=2 + 落盘（或 quorum 队列）缺一不可。生产默认 autoAck + 临时队列发"重要消息"，重启 broker 全丢。发消息前先问自己：这条消息值不值得持久化？</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">没开 publisher confirm，broker 丢消息无感知</div><div class="pd">没有 confirm 时生产者只管发，exchange 不存在、队列满、消息被丢弃都不知道。必须 correlated 模式 + ConfirmCallback + ReturnsCallback 三件套。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">消费者用 autoAck，处理到一半崩了</div><div class="pd">消息一出队就删了，业务没执行成功也找不回来。生产一律 manual ack，处理完再 basicAck。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">prefetch 用默认的 0（无限）</div><div class="pd">broker 一次性把所有消息推给一个消费者，全变成 unacked。该消费者一挂，全部消息重排队；同时内存暴涨触发流控。设 10~50。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">消费失败用 requeue=true 立即重投</div><div class="pd">毒消息（如 JSON 格式错误）会在"取出→抛异常→重投"之间死循环，每秒几千次，CPU 打满还刷爆日志。用 nack(requeue=false) + DLX 阶梯重试。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">重复消费不做幂等</div><div class="pd">at-least-once 语义下重投、网络抖动重连都会导致重复投递。按业务单号/唯一键做去重表或 Redis 幂等，别指望"正好一次"。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">队列不设上限，无限堆积</div><div class="pd">消费者故障几小时后，几百万条消息堆积吃光内存和磁盘，触发 alarm 阻塞所有生产者，故障扩散到整个集群。设 x-max-length + overflow，配积压告警。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">磁盘水位用默认 50MB</div><div class="pd">队列数据很快就能吃掉 50MB，然后 alarm 阻塞生产。调到 2GB 或 disk_free_limit_relative，并纳入监控。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">3.13 之后还在新建经典镜像队列</div><div class="pd">镜像队列已废弃，异步复制有丢消息和脑裂风险，新特性不再支持。新建队列一律 quorum 类型，存量制定迁移计划。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">大消息直接发</div><div class="pd">消息体超过几十 MB 会显著拖慢集群（单 channel 串行 + 复制开销），逼近 128MB 上限直接报错。大文件放对象存储（S3/OSS），消息里只传 URL。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. RabbitMQ 中生产者发送消息的正确路径是？</div>
+      <button class="opt">生产者直接发送到队列</button>
+      <button class="opt">生产者发送到 binding，由 binding 决定队列</button>
+      <button class="opt">生产者发送到 exchange，由 exchange 按 routing key 和 binding 路由到队列</button>
+      <div class="ans">正确答案：<b>生产者→exchange→queue</b>。AMQP 0-9-1 里生产者从不直接操作队列，exchange 根据类型（direct/topic/fanout/headers）和 routing key 查 bindings 决定投递到哪些队列。无法路由时消息默认被丢弃。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 关于 publisher confirm，下列说法正确的是？</div>
+      <button class="opt">confirm 能保证消息一定被路由到了某个队列</button>
+      <button class="opt">confirm 只保证 broker 收到了消息，路由失败要用 mandatory + returns 回调</button>
+      <button class="opt">开了 confirm 消息就一定不会丢</button>
+      <div class="ans">正确答案：<b>confirm 只保证"broker 收到"</b>（对持久化消息是落盘后确认）。消息到 exchange 后没有匹配的 binding 会被静默丢弃，这种丢失要开 <span class="k">mandatory</span> 标志 + <span class="k">addReturnListener</span> 才能感知。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 一条消息变成死信，不可能的原因是？</div>
+      <button class="opt">消费者用 basicAck 正常确认了消息</button>
+      <button class="opt">消息 TTL 到期</button>
+      <button class="opt">队列超过 x-max-length 被挤出</button>
+      <div class="ans">正确答案：<b>basicAck 是正常确认</b>，消息就此删除，不会进死信。死信只有三种来源：nack/reject 且 requeue=false、TTL 到期、队列溢出（max-length/max-length-bytes）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 需要"每条消息不同的延迟时间"（如 5 秒、3 分钟、1 小时后各不同），应该用？</div>
+      <button class="opt">队列级 x-message-ttl + DLX，每条消息单独设 expiration</button>
+      <button class="opt">rabbitmq_delayed_message_exchange 插件 + x-delay 头</button>
+      <button class="opt">fanout exchange 广播到多个不同 TTL 的队列</button>
+      <div class="ans">正确答案：<b>x-delayed-message 插件</b>。消息级 expiration + DLX 有严重队头阻塞：RabbitMQ 只在消息到达队头时检查 TTL，长 TTL 消息堵在后面短 TTL 消息也过期不了。插件按到期时间排序投递，没有队头问题。队列级 TTL 只适合同一批相同延迟的消息。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于 Quorum 队列与经典镜像队列，说法正确的是？</div>
+      <button class="opt">镜像队列基于 Raft，数据更安全</button>
+      <button class="opt">Quorum 队列是异步复制，速度最快</button>
+      <button class="opt">Quorum 队列基于 Raft 强一致，多数派确认才算提交，且 3.13 起官方推荐替代镜像队列</button>
+      <div class="ans">正确答案：<b>Quorum 基于 Raft 共识</b>，多数派写入成功才向生产者确认，故障切换不丢已确认消息。经典镜像队列是异步复制，主从切换可能丢消息，3.13 起已废弃。Quorum 还有 delivery-limit 机制自动处理反复失败的毒消息。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 生产者突然全部超时、连接被阻塞，消费者正常。最可能的原因是？</div>
+      <button class="opt">内存或磁盘触发 alarm（vm_memory_high_watermark / disk_free_limit）</button>
+      <button class="opt">消费者 ack 太慢</button>
+      <button class="opt">exchange 类型配错了</button>
+      <div class="ans">正确答案：<b>alarm 触发流控</b>。内存超过水位或磁盘剩余低于 disk_free_limit 时，broker 会阻塞所有生产者连接（不报错，就是卡住），消费者不受影响。常见根因是队列堆积吃光资源。默认 disk_free_limit 只有 50MB，一定要调大并监控。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>rabbitmqctl status</code><span class="desc">节点状态总览（内存、磁盘、队列数、告警）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmq-diagnostics alarms</code><span class="desc">查看当前内存/磁盘告警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl list_queues name messages messages_ready messages_unacknowledged consumers</code><span class="desc">队列积压全景（积压排查第一条命令）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl list_connections name state channels recv_oct</code><span class="desc">连接排查（找空闲连接、连接泄漏）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl list_channels connection pid number consumer_count messages_unacknowledged</code><span class="desc">channel 级未确认消息（找 prefetch 失衡）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl set_policy -p /prod qq "^order\." '{"queue-type":"quorum","delivery-limit":5}' --apply-to queues</code><span class="desc">把匹配队列设为 quorum 类型</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl set_policy -p /prod dlx ".*" '{"dead-letter-exchange":"dlx.exchange","message-ttl":60000}'</code><span class="desc">用策略批量配死信和 TTL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl set_vm_memory_high_watermark 0.6</code><span class="desc">内存水位调到 60%</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl set_disk_free_limit 2GB</code><span class="desc">磁盘水位调到 2GB（默认 50MB 太小）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmq-plugins enable rabbitmq_delayed_message_exchange</code><span class="desc">启用延迟消息插件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl cluster_status</code><span class="desc">集群成员与角色</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl purge_queue order.paid</code><span class="desc">清空指定队列（救急用，数据没了）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmqctl delete_queue order.paid</code><span class="desc">删除队列（先解绑消费者）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rabbitmq-diagnostics check_running</code><span class="desc">健康检查（容器探活用这个）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>队列声明参数速查</h3>
+  <pre><span class="c"># 队列参数（x-arguments），声明时或策略里设置</span>
+x-queue-type: quorum                  <span class="c"># quorum 队列（生产默认）</span>
+x-message-ttl: 60000                  <span class="c"># 队列级 TTL：消息在队列待 60s 未消费即过期</span>
+x-dead-letter-exchange: dlx.exchange   <span class="c"># 死信转发目标 exchange</span>
+x-dead-letter-routing-key: retry       <span class="c"># 死信用的 routing key（默认沿用原 key）</span>
+x-max-length: 100000                  <span class="c"># 最大消息数，超出丢队头（或拒绝生产）</span>
+x-max-length-bytes: 1073741824        <span class="c"># 最大字节数（1GB）</span>
+x-overflow: reject-publish            <span class="c"># 满时拒绝生产（默认 drop-head 丢队头）</span>
+x-max-priority: 10                    <span class="c"># 开启优先级队列（有性能开销，慎用）</span>
+x-expires: 3600000                    <span class="c"># 队列自身空闲 1 小时自动删除</span>
+delivery-limit: 5                     <span class="c"># quorum 队列：投递失败上限，达到自动死信</span>
+
+<span class="c"># exchange 声明参数</span>
+alternate-exchange: ae.exchange       <span class="c"># 路由失败时转投的备份 exchange</span>
+x-delayed-type: direct                <span class="c"># x-delayed-message 插件的内部路由类型</span>
+
+<span class="c"># 消息 Properties</span>
+deliveryMode: 2                       <span class="c"># 持久化消息（配合 durable/quorum 队列）</span>
+expiration: 30000                     <span class="c"># 消息级 TTL（毫秒，注意队头阻塞）</span>
+priority: 5                           <span class="c"># 消息优先级（需队列开 x-max-priority）</span>
+messageId / correlationId             <span class="c"># 业务追踪 ID，务必填，排查闭环靠它</span></pre>
+
+  <h3>Spring Boot 关键配置</h3>
+  <pre><span class="c"># 生产者防线</span>
+spring.rabbitmq.publisher-confirm-type: correlated
+spring.rabbitmq.publisher-returns: true
+spring.rabbitmq.template.mandatory: true
+
+<span class="c"># 消费者防线</span>
+spring.rabbitmq.listener.simple.acknowledge-mode: manual
+spring.rabbitmq.listener.simple.prefetch: 20
+spring.rabbitmq.listener.simple.default-requeue-rejected: false
+spring.rabbitmq.listener.simple.concurrency: 5
+spring.rabbitmq.listener.simple.max-concurrency: 20</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>AMQP 0-9-1</b></td><td>RabbitMQ 实现的线级协议，定义了 exchange/binding/queue 模型</td></tr>
+    <tr><td><b>Exchange</b></td><td>只做路由不存消息的中转站，按类型和 routing key 决定投递目标</td></tr>
+    <tr><td><b>Binding</b></td><td>exchange 到 queue 的绑定关系，携带 routing key 规则</td></tr>
+    <tr><td><b>Routing key</b></td><td>消息上的路由标签，topic 类型支持 *（一词）和 #（零或多词）通配</td></tr>
+    <tr><td><b>Durable queue</b></td><td>队列元数据持久化，broker 重启后队列定义还在</td></tr>
+    <tr><td><b>Persistent message</b></td><td>deliveryMode=2 的消息体持久化，配合 durable 队列重启不丢</td></tr>
+    <tr><td><b>Publisher confirm</b></td><td>broker 确认收到消息的机制；保证"到达 broker"而非"路由成功"，路由失败需配合 mandatory + returns 回调</td></tr>
+    <tr><td><b>Ack / Nack</b></td><td>消费者确认成功 / 拒绝（nack 可带 requeue 参数决定重投）</td></tr>
+    <tr><td><b>Prefetch (QoS)</b></td><td>单 channel 未确认消息上限，限制 broker 推送节奏</td></tr>
+    <tr><td><b>Unacked</b></td><td>已推送未确认的消息，消费者崩溃会全部回到就绪状态</td></tr>
+    <tr><td><b>DLX</b></td><td>死信交换机，接收被 nack、TTL 过期、溢出的消息</td></tr>
+    <tr><td><b>x-delay</b></td><td>延迟消息插件用的消息头，毫秒级延迟后投递</td></tr>
+    <tr><td><b>镜像队列</b></td><td>经典队列的 HA 方案，异步复制，3.13 起废弃</td></tr>
+    <tr><td><b>Quorum 队列</b></td><td>基于 Raft 的强一致队列，多数派确认，当前生产推荐</td></tr>
+    <tr><td><b>Raft</b></td><td>共识协议：日志复制到多数派节点即提交，保证一致性和可用性</td></tr>
+    <tr><td><b>vm_memory_high_watermark</b></td><td>内存水位，超过触发 alarm 阻塞生产者</td></tr>
+    <tr><td><b>disk_free_limit</b></td><td>磁盘剩余水位，低于此值阻塞生产者（默认 50MB）</td></tr>
+    <tr><td><b>Lazy queue</b></td><td>x-queue-mode=lazy，消息尽量落盘，用磁盘换内存</td></tr>
+    <tr><td><b>毒消息 poison message</b></td><td>反复处理失败的消息，需 delivery-limit + 死信兜底</td></tr>
+    <tr><td><b>Erlang Cookie</b></td><td>集群节点间认证的共享密钥，不一致无法组集群</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 RabbitMQ，完成这五件事 —— ① 声明 direct exchange + 持久化队列，写一个带 ConfirmCallback 的生产者；② 写一个手动 ack 的消费者，故意抛异常观察消息变 unacked 再重连；③ 配 DLX + TTL 30s 的重试队列，发一条失败消息看它在队列间流转；④ 启用延迟插件，发一条 x-delay=10000 的消息验证 10 秒后才到；⑤ 把队列策略改成 quorum 类型，用 rabbitmqctl list_queues 对比类型变化。<br><br>
+    <b>之后值得单独学：</b>RabbitMQ 集群跨机房部署与 Federation/Shovel、Stream 队列的 Kafka 式用法、基于 MQTT 的物联网场景、以及生产环境的镜像迁移到 Quorum 的具体步骤。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 RabbitMQ · 上线前务必检查：confirm 开了吗、ack 是手动的吗、队列有上限吗、水位调了吗</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（确认机制）和模块 9（十个坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边敲：docker exec -it rmq rabbitmqctl list_queues。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 RabbitMQ 跟着敲：docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:3.13-management';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

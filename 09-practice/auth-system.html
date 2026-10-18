@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 权限系统设计实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 权限系统设计实战</h1>
+    <p class="sub">权限系统的难点不是"能不能鉴权"，而是<b>模型扛不扛得住业务演进、缓存一致性怎么兜、越权怎么防</b>。这篇讲机制：从 SSO 落地到 RBAC→数据范围→ABAC 的演进路线，以及越权、循环继承、缓存不一致三个经典死法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>RBAC→ABAC</b> 模型演进</span>
+      <span class="chip"><b>6</b> 张核心表</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边画图：把你司的组织/角色/资源三层关系画出来对照</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>认证与授权：两个经常被混淆的词</h2></div>
+  <table>
+    <tr><th style="width:130px">概念</th><th>英文</th><th>回答的问题</th><th style="width:220px">典型载体</th></tr>
+    <tr><td><b>认证</b></td><td>Authentication</td><td>你是谁？</td><td>账号密码、短信验证码、证书、Token</td></tr>
+    <tr><td><b>授权</b></td><td>Authorization</td><td>你能干什么？</td><td>角色、权限点、数据范围、策略</td></tr>
+  </table>
+  <p><b>登录 ≠ 有权限。</b>认证通过只证明"你是张三"，每次业务请求还要回答"张三能不能看这份订单"——后者是授权，发生在每一个 API 调用上，频率比认证高几个数量级。<b>工程上的直接后果：认证可以慢一点（登录一次），授权必须快（每个请求都查）。</b></p>
+  <div class="callout">
+    <b>权限系统的三道防线：</b>① <b>网关层</b>粗粒度拦截（有没有登录、有没有这个菜单/接口的权限点）；② <b>服务层</b>细粒度鉴权（这个订单是不是你的、这个金额超没超你的审批上限）；③ <b>数据层</b>兜底（行级权限 SQL 改写、敏感字段脱敏）。<b>只做①的系统，水平越权一抓一个准。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>认证中心设计：统一登录、SSO、OAuth2/OIDC 落地</h2></div>
+  <p class="lead">认证中心（Auth Server）的职责：<b>管凭证、发令牌、单点登录、联邦登录。</b>内部系统三种落地形态，按演进顺序讲。</p>
+  <h3>形态一：统一登录 + SSO（Cookie/Session 时代）</h3>
+  <pre><span class="c"># 经典 SSO 流程（CAS 式 Ticket 模式）</span>
+用户访问 A 站 → A 站发现没登录 → 302 到认证中心
+认证中心发现也没登录 → 展示登录页 → 用户输账号密码
+认证中心签发全局 Ticket，302 回 A 站（带 ticket）
+A 站用 ticket 后台换用户信息 → 建立本地 Session
+用户访问 B 站 → B 站发现没登录 → 302 到认证中心
+认证中心发现<b>已登录</b> → 直接发新 ticket，302 回 B 站 → <span class="g">无感登录（SSO）</span></pre>
+  <h3>形态二：OAuth2 + OIDC（Token 时代，当前主流）</h3>
+  <table>
+    <tr><th style="width:160px">角色</th><th>在权限系统中的实体</th></tr>
+    <tr><td><b>Resource Owner</b></td><td>终端用户（张三）</td></tr>
+    <tr><td><b>Client</b></td><td>接入方：H5、App、第三方系统</td></tr>
+    <tr><td><b>Authorization Server</b></td><td>认证中心本身</td></tr>
+    <tr><td><b>Resource Server</b></td><td>各业务服务（订单、支付……）</td></tr>
+  </table>
+  <p><b>OIDC 是 OAuth2 的认证扩展</b>：OAuth2 只解决"委托授权"（让 A 代表你访问 B），OIDC 在其上加了 <span class="k">id_token</span>（JWT，携带用户身份声明），才真正解决"你是谁"。内部系统对接时：<b>授权码模式拿 access_token，同时拿 id_token 建本地会话。</b></p>
+  <pre><span class="c"># 授权码模式核心请求（内部系统最常用的模式）</span>
+<span class="c"># 1. 前端跳转，用户同意授权</span>
+GET /oauth2/authorize?response_type=code&amp;client_id=web-portal&amp;redirect_uri=https://portal/cb&amp;scope=openid+profile&amp;state=xyz
+
+<span class="c"># 2. 后端用 code 换 token（code 一次性，10 分钟过期）</span>
+POST /oauth2/token
+  grant_type=authorization_code&amp;code=xxx&amp;client_id=web-portal&amp;client_secret=***
+
+<span class="c"># 3. 返回</span>
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",   <span class="c"># 访问令牌，JWT，短有效期(如2h)</span>
+  "refresh_token": "rt_8f3a...",                 <span class="c"># 刷新令牌，长有效期(如30d)，可轮换</span>
+  "id_token": "eyJ...",                          <span class="c"># OIDC 身份令牌，含 sub/name/email</span>
+  "expires_in": 7200
+}</pre>
+  <h3>Token 选型：JWT vs 不透明 Token</h3>
+  <table>
+    <tr><th style="width:140px">方案</th><th>优点</th><th>缺点</th><th>适用</th></tr>
+    <tr><td><b>JWT（自包含）</b></td><td>资源服务本地验签，不查认证中心，无单点</td><td><b>签发后无法主动失效</b>（注销/改权限要等过期），payload 不能放敏感信息</td><td>短时效 access_token + 网关统一验签</td></tr>
+    <tr><td><b>不透明 Token（引用式）</b></td><td>服务端可随时作废、可查会话</td><td>每次校验都要查 Redis/DB，有单点和延迟</td><td>内部管理端、对撤销敏感的场景</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>JWT 失效问题是真实存在的坑：</b>用户被开除、密码改了、权限降级了，已签发的 JWT 在过期前照样好用。缓解手段：<b>access_token 有效期设短（15min~2h）+ refresh_token 可撤销（存 Redis 黑名单）+ 关键操作二次校验</b>。别把用户角色全塞进 JWT 然后指望改角色立即生效。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>用户体系：账号、组织、角色</h2></div>
+  <p class="lead">用户体系是权限的"主语"。三层结构：<b>账号（谁）→ 组织（属于哪）→ 角色（能干什么）</b>。</p>
+  <h3>账号设计要点</h3>
+  <table>
+    <tr><th style="width:150px">维度</th><th>设计决策</th></tr>
+    <tr><td><b>登录标识</b></td><td>支持多标识：手机号 / 邮箱 / 工号 / 用户名，各建唯一索引，登录时按格式分发</td></tr>
+    <tr><td><b>凭证</b></td><td>密码必须加盐哈希（bcrypt/argon2，<b>禁止 MD5/SHA1</b>）；密码与账号表分库存，防拖库后批量破解</td></tr>
+    <tr><td><b>账号状态</b></td><td>状态机：待激活 / 正常 / 锁定（连续输错 N 次）/ 冻结 / 注销，每个状态决定允许的操作集</td></tr>
+    <tr><td><b>主体抽象</b></td><td>用 <span class="k">principal_id</span> 统一代表人、应用、服务账号，授权模型只认 principal，不认"是不是人"</td></tr>
+  </table>
+  <h3>组织架构</h3>
+  <pre><span class="c"># 组织树（多层级，支持一人多部门）</span>
+集团
+ ├─ 交易事业部 (dept_id=100)
+ │   ├─ 订单组 (101)  ── 组长: zhangsan
+ │   └─ 支付组 (102)
+ └─ 技术中心 (200)
+     ├─ 交易平台组 (201) ── 成员: lisi(同时归属 101，<span class="y">一人多部门</span>)
+
+<span class="c"># 落地方式：closure table 或路径枚举，避免递归查全链路</span>
+dept_closure(ancestor, descendant, depth)   <span class="c"># 101→100 深度1，101→1 深度2</span></pre>
+  <div class="callout">
+    <b>一人多部门是常态不是异常：</b>矩阵组织、借调、双线汇报都很常见。<b>数据权限默认取"所有所属部门的并集"还是"主部门"是业务决策</b>，必须在模型里显式表达，不能默认取第一个匹配的部门。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>授权模型演进：RBAC → RBAC+数据范围 → ABAC</h2></div>
+  <p class="lead">授权模型不是一步到位的，是按业务复杂度逐级演进的。<b>跳级的代价是返工，倒退的代价是越权。</b></p>
+  <h3>第一级：RBAC（基于角色的访问控制）</h3>
+  <p>用户 → 角色 → 权限点，三级关联。权限点是"功能按钮/API"级：<span class="k">order:create</span>、<span class="k">report:export</span>。</p>
+  <table>
+    <tr><th style="width:120px">能力</th><th>RBAC 是否覆盖</th></tr>
+    <tr><td>功能权限（菜单/按钮/接口）</td><td><b>覆盖</b>，这是 RBAC 的主场</td></tr>
+    <tr><td>数据权限（只能看自己的订单）</td><td><b>不覆盖</b>，角色一样但数据不同</td></tr>
+    <tr><td>动态条件（工作日可批、金额上限）</td><td><b>不覆盖</b>，需要属性判断</td></tr>
+    <tr><td>委派/临时授权（离职交接）</td><td>靠加角色变通，无有效期概念</td></tr>
+  </table>
+  <h3>第二级：RBAC + 数据范围</h3>
+  <p>角色绑定功能权限的同时，绑定<b>数据范围</b>：全部 / 本部门 / 本部门及以下 / 仅自己 / 自定义部门列表。鉴权时先查角色数据范围，再转成 SQL 条件：</p>
+  <pre><span class="c"># 数据范围 → SQL 改写示例</span>
+角色"订单专员"数据范围 = 本部门及以下
+  → SELECT * FROM orders WHERE dept_id IN (
+        SELECT descendant FROM dept_closure WHERE ancestor = 102)
+
+<span class="c"># 组合判定：功能权限 AND 数据范围 AND 归属校验</span>
+canView(order) = hasPerm("order:view")          <span class="c">// 功能</span>
+             &amp;&amp; inScope(order.dept_id)          <span class="c">// 数据范围</span>
+             &amp;&amp; (order.owner == me || isSuperior) <span class="c">// 归属兜底</span></pre>
+  <h3>第三级：ABAC（基于属性的访问控制）</h3>
+  <p>用"属性 + 条件表达式"描述策略，不再预定义角色组合。<b>属性来自主体（部门、职级）、资源（金额、密级）、环境（时间、IP、设备）。</b></p>
+  <pre><span class="c"># 一条 ABAC 策略（伪代码）</span>
+allow if
+  action in ["approve"]
+  &amp;&amp; resource.type == "refund"
+  &amp;&amp; resource.amount &lt;= subject.approve_limit      <span class="c">// 审批额度</span>
+  &amp;&amp; subject.dept in resource.business_depts        <span class="c">// 业务归属</span>
+  &amp;&amp; env.time in workdays(9:00-18:00)               <span class="c">// 环境条件</span>
+  &amp;&amp; env.ip in corporate_network                    <span class="c">// 网络条件</span>
+
+<span class="c"># 演进判断标准：RBAC+数据范围搞不定的场景出现 3 次以上，才上 ABAC</span>
+<span class="c"># 典型信号：审批额度分级、密级文档、跨租户共享、临时合规策略</span></pre>
+  <table>
+    <tr><th style="width:140px">模型</th><th>适用规模</th><th>运维成本</th></tr>
+    <tr><td><b>RBAC</b></td><td>中小系统、内部管理端</td><td>低，加权限 = 改角色</td></tr>
+    <tr><td><b>RBAC + 数据范围</b></td><td>中台、多部门业务系统</td><td>中，范围规则要评审</td></tr>
+    <tr><td><b>ABAC</b></td><td>金融、合规敏感、大规模 SaaS</td><td>高，策略即代码，要测试和审计</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最常见的演进错误：直接上 ABAC。</b>策略引擎、策略 DSL、策略测试一整套设施，业务还没到那个复杂度，最后运维不动又退回硬编码 if-else。<b>正确姿势：RBAC 起步 → 数据范围补缺口 → 策略出现第三类重复模式时才抽象 ABAC。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>权限缓存与一致性</h2></div>
+  <p class="lead">授权在每个请求上发生，必须缓存；但权限变更必须尽快生效。<b>这个矛盾就是缓存一致性的全部战场。</b></p>
+  <h3>缓存什么、放哪</h3>
+  <table>
+    <tr><th style="width:170px">缓存内容</th><th style="width:120px">位置</th><th>过期策略</th></tr>
+    <tr><td>用户→角色列表</td><td>Redis</td><td>TTL 5~15 分钟 + 变更主动删</td></tr>
+    <tr><td>角色→权限点全集（展开后）</td><td>Redis</td><td>TTL 30 分钟，角色变更时删</td></tr>
+    <tr><td>单次请求的鉴权结果</td><td>请求上下文（ThreadLocal）</td><td>随请求结束销毁，防同请求重复查</td></tr>
+    <tr><td>热点用户的权限位图</td><td>本地缓存（Caffeine）</td><td>TTL 1 分钟 + Redis Pub/Sub 广播失效</td></tr>
+  </table>
+  <h3>一致性方案对比</h3>
+  <pre><span class="c"># 方案一：变更时主动删缓存（推荐）</span>
+管理员改角色 → 写 DB → 删 Redis 对应 key → <span class="y">广播失效消息</span>
+各业务实例订阅失效消息 → 清本地缓存
+<span class="c"># 生效延迟：秒级。风险：删缓存失败要靠 TTL 兜底</span>
+
+<span class="c"># 方案二：版本号比对</span>
+缓存 value = {version: 42, perms: [...]}
+每次请求带上本地 version，服务端返回最新 version，不一致则重拉
+<span class="c"># 生效延迟：一个请求周期。复杂度高，适合大规模场景</span>
+
+<span class="c"># 方案三：短 TTL 硬扛</span>
+不主动删，全靠 60 秒过期
+<span class="c"># 生效延迟：最长 60 秒。<b>高危操作（冻结、回收权限）绝不能用</b></span></pre>
+  <div class="callout warn">
+    <b>权限收紧必须"先断后用"：</b>把"允许"改成"拒绝"的敏感操作（收回权限、冻结账号），正确的顺序是：<b>先让新请求直接拒绝（同步开关/黑名单立即生效）→ 再异步更新角色关系和清理缓存。</b>反过来做（先慢慢删缓存）会在窗口期内继续放行。金融和权限场景，收紧操作永远走快速通道，放宽操作才可以等缓存。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>多租户隔离</h2></div>
+  <p class="lead">多租户（SaaS 化）的核心问题：<b>租户 A 的数据，租户 B 连看都不能看。</b>三种隔离级别，成本和安全性递增。</p>
+  <table>
+    <tr><th style="width:130px">级别</th><th>做法</th><th>成本</th><th>适用</th></tr>
+    <tr><td><b>共享库 + 租户列</b></td><td>所有表加 <span class="k">tenant_id</span>，每个查询强制带条件</td><td>最低</td><td>中小 SaaS，租户同质</td></tr>
+    <tr><td><b>共享库 + Schema 隔离</b></td><td>每租户独立 schema（PG 模式）</td><td>中</td><td>合规要求中等</td></tr>
+    <tr><td><b>独立库/实例</b></td><td>每租户一套数据库</td><td>最高</td><td>大客户、金融、强合规</td></tr>
+  </table>
+  <pre><span class="c"># 共享库模式的防线（缺一层就出事）</span>
+① 网关层：从 token 解析 tenant_id，注入请求头 X-Tenant-Id
+② ORM 层：启用多租户插件，<span class="y">所有 SQL 自动拼接 tenant_id = ?</span>（禁止手写 SQL 绕过）
+③ DB 层：行级安全（RLS）+ 连接按租户绑定，双保险
+④ 审计层：记录每次访问的 tenant_id，异常跨租访问自动告警
+
+<span class="c"># 防"串租"的关键：tenant_id 只能来自服务端 token 解析，</span>
+<span class="c"># <b>永远不要信客户端传来的任何租户标识</b></span></pre>
+  <div class="callout danger">
+    <b>多租户最典型的越权：改一个 URL 参数就能看别人的数据。</b>根因是租户标识或资源 ID 只传了租户 A 的资源 ID，服务端没校验"这个资源属于当前租户"。防御口诀：<b>资源查询必须带 tenant_id 作为查询条件，而不是查出来再比对。</b>后者在并发下会被绕过，前者在 SQL 层就断了念想。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>审计日志与系统集成</h2></div>
+  <h3>审计日志：权限系统的"黑匣子"</h3>
+  <table>
+    <tr><th style="width:170px">要素</th><th>要求</th></tr>
+    <tr><td><b>Who</b></td><td>主体 ID（含应用/服务账号）、IP、设备指纹</td></tr>
+    <tr><td><b>When</b></td><td>服务端时间戳，精度到毫秒，禁止用客户端时间</td></tr>
+    <tr><td><b>What</b></td><td>动作 + 对象 + 结果（允许/拒绝 + 拒绝原因）</td></tr>
+    <tr><td><b>不可篡改</b></td><td>只追加（append-only），WORM 存储或哈希链，保留 ≥ 180 天</td></tr>
+    <tr><td><b>可检索</b></td><td>按人、按资源、按时间范围秒级查，支持"某账号最近被拒了哪些操作"</td></tr>
+  </table>
+  <pre><span class="c"># 审计日志一条样本（JSON 落 ES/Hive）</span>
+{
+  "ts": "2026-10-18T14:32:11.882Z",
+  "principal": {"id": "u_10086", "type": "user"},
+  "action": "order.refund.approve",
+  "resource": {"type": "refund_order", "id": "rf_20261018001"},
+  "decision": "DENY",
+  "reason": "amount_exceeds_limit",
+  "ctx": {"tenant": "t_77", "ip": "10.3.1.22", "trace_id": "4f2a..."},
+  "attrs": {"amount": 50000, "limit": 10000}
+}</pre>
+  <h3>与网关/服务的集成</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>网关层：</b>统一验签（JWT 公钥本地验）+ 权限点粗筛。URL 与权限点映射表由网关维护，新接口上线必须登记，<b>未登记的 URL 默认拒绝</b></div></div>
+    <div class="step"><div class="txt"><b>服务层：</b>业务代码用注解/拦截器鉴权，如 <span class="k">@RequirePerm("order:refund:approve")</span>，权限逻辑集中在拦截器，禁止散落在 if-else 里</div></div>
+    <div class="step"><div class="txt"><b>数据层：</b>数据范围转 SQL、敏感字段脱敏、行级权限。服务层漏判时，数据层是最后一道闸</div></div>
+    <div class="step"><div class="txt"><b>管理面：</b>权限变更（加角色、改范围）走审批流 + 双人复核，变更本身也是审计事件</div></div>
+  </div>
+  <h3>性能与安全要点</h3>
+  <table>
+    <tr><th style="width:200px">要点</th><th>做法</th></tr>
+    <tr><td>鉴权延迟预算</td><td>网关鉴权 P99 &lt; 5ms（本地验签 + 本地缓存），宁可缓存不同步也不能拖慢主链路</td></tr>
+    <tr><td>防权限枚举攻击</td><td>403 和 404 分开返回要谨慎：批量试探资源 ID 时，统一返回 404 防信息泄露</td></tr>
+    <tr><td>凭证泄露响应</td><td>refresh_token 异常使用（换 IP/设备）→ 自动撤销整个 token 家族 + 告警</td></tr>
+    <tr><td>密钥管理</td><td>JWT 签名私钥在 HSM/KMS，支持密钥轮换（kid 头标识多密钥并存过渡）</td></tr>
+    <tr><td>防重放</td><td>关键 API 带 nonce + 时间戳，5 分钟内重复 nonce 拒绝</td></tr>
+  </table>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>核心表设计与代码</h2></div>
+  <h3>六张核心表</h3>
+  <pre><span class="c">-- 账号（与凭证分库存）</span>
+<span class="b">CREATE TABLE</span> account (
+  id            <span class="g">BIGINT</span> PRIMARY KEY,
+  principal_id  <span class="g">BIGINT</span> NOT NULL,          <span class="c">-- 主体ID，人也、应用也罢都认它</span>
+  login_type    <span class="g">TINYINT</span> NOT NULL,       <span class="c">-- 1手机 2邮箱 3工号</span>
+  login_id      <span class="g">VARCHAR</span>(64) NOT NULL,
+  tenant_id     <span class="g">BIGINT</span> NOT NULL,       <span class="c">-- 多租户列</span>
+  status        <span class="g">TINYINT</span> NOT NULL,       <span class="c">-- 账号状态机</span>
+  UNIQUE(tenant_id, login_type, login_id)
+);
+
+<span class="c">-- 角色（含数据范围）</span>
+<span class="b">CREATE TABLE</span> role (
+  id          <span class="g">BIGINT</span> PRIMARY KEY,
+  tenant_id   <span class="g">BIGINT</span> NOT NULL,
+  code        <span class="g">VARCHAR</span>(64) NOT NULL,    <span class="c">-- ORDER_OPERATOR 等稳定编码</span>
+  data_scope  <span class="g">TINYINT</span> NOT NULL,       <span class="c">-- 1全部 2本部门 3本部门及以下 4仅自己</span>
+  parent_id   <span class="g">BIGINT</span>,                 <span class="c">-- 角色继承，防环靠应用层</span>
+  UNIQUE(tenant_id, code)
+);
+
+<span class="c">-- 权限点（功能权限原子单位）</span>
+<span class="b">CREATE TABLE</span> permission (
+  id     <span class="g">BIGINT</span> PRIMARY KEY,
+  code   <span class="g">VARCHAR</span>(128) NOT NULL,       <span class="c">-- order:refund:approve</span>
+  type   <span class="g">TINYINT</span> NOT NULL,           <span class="c">-- 1菜单 2按钮 3API</span>
+  UNIQUE(code)
+);
+
+<span class="c">-- 用户-角色 关联（带有效期，支持临时授权）</span>
+<span class="b">CREATE TABLE</span> account_role (
+  account_id  <span class="g">BIGINT</span> NOT NULL,
+  role_id     <span class="g">BIGINT</span> NOT NULL,
+  expire_at   <span class="g">DATETIME</span>,               <span class="c">-- NULL=永久；借调/值班用</span>
+  PRIMARY KEY(account_id, role_id)
+);
+
+<span class="c">-- 角色-权限 关联</span>
+<span class="b">CREATE TABLE</span> role_permission (
+  role_id       <span class="g">BIGINT</span> NOT NULL,
+  permission_id <span class="g">BIGINT</span> NOT NULL,
+  PRIMARY KEY(role_id, permission_id)
+);
+
+<span class="c">-- 组织（含闭包表支持一人多部门）</span>
+<span class="b">CREATE TABLE</span> department (
+  id        <span class="g">BIGINT</span> PRIMARY KEY,
+  tenant_id <span class="g">BIGINT</span> NOT NULL,
+  parent_id <span class="g">BIGINT</span>,
+  path      <span class="g">VARCHAR</span>(512)             <span class="c">-- /1/100/101 路径枚举</span>
+);</pre>
+  <h3>鉴权代码骨架（含数据范围 SQL 改写）</h3>
+  <pre><span class="c">// 1. 网关层：本地验签 + 粗筛</span>
+<span class="b">public class</span> AuthFilter <span class="b">implements</span> Filter {
+  <span class="b">public void</span> doFilter(req, resp, chain) {
+    String jwt = req.getHeader(<span class="g">"Authorization"</span>);
+    Claims c = Jwts.parser().verifyWith(publicKey).build()
+                .parseSignedClaims(jwt).getPayload();   <span class="c">// 本地验签，不调认证中心</span>
+    req.setAttribute(<span class="g">"principalId"</span>, c.getSubject());
+    req.setAttribute(<span class="g">"tenantId"</span>, c.get(<span class="g">"tenant_id"</span>));   <span class="c">// 只信服务端解析</span>
+    chain.doFilter(req, resp);
+  }
+}
+
+<span class="c">// 2. 服务层：注解式功能鉴权</span>
+<span class="b">@RequirePerm</span>(<span class="g">"order:refund:approve"</span>)
+<span class="b">public</span> RefundResult approve(Long refundId, Long amount) {
+    <span class="c">// 3. 数据范围兜底：查询自带租户+范围条件，而不是查出来再比对</span>
+    RefundOrder o = refundMapper.selectForUpdate(refundId, tenantId(), dataScopes());
+    <span class="b">if</span> (o == <span class="b">null</span>) <span class="b">throw new</span> NotFoundException();   <span class="c">// 查不到=越权，统一404</span>
+    <span class="c">// 4. ABAC 属性判断（额度）</span>
+    <span class="b">if</span> (amount &gt; currentUser().getApproveLimit())
+        <span class="b">throw new</span> ForbiddenException(<span class="g">"amount_exceeds_limit"</span>);
+    <span class="b">return</span> doApprove(o);
+}</pre>
+  <div class="callout ok">
+    <b>代码纪律三条：</b>① <b>鉴权代码只走拦截器/注解</b>，业务方法里不出现 if (hasPerm(...)) 散弹枪；② <b>资源查询把 tenant_id 和范围条件拼进 SQL</b>，杜绝"查出来再判断归属"；③ <b>拒绝时记审计日志</b>，且区分"无功能权限"和"资源不存在"——前者返回 403（但要防枚举），后者统一 404。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">水平越权：改 URL 里的订单 ID 就能看别人的单</div><div class="pd">只校验了"登录没登录"，没校验"这个订单是不是你的/你部门的"。资源查询必须带 tenant_id + 数据范围作为 SQL 条件，查不到就返回 404，而不是查出来再比对。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">垂直越权：普通用户调管理员接口</div><div class="pd">接口只做了登录校验，没做权限点校验。新接口上线必须登记权限点到网关映射表，未登记的 URL 默认全拒，而不是默认放行。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">角色循环继承：A 继承 B，B 继承 A</div><div class="pd">建关系时没做环检测，展开权限时无限递归，栈溢出。写入时做拓扑检查（或限制继承深度 ≤ 3 层），展开时加访问标记防重入。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">缓存不一致：改了权限半天不生效</div><div class="pd">角色变更只写了 DB，缓存靠 30 分钟 TTL 自然过期。变更必须主动删缓存 + 广播本地缓存失效；权限收紧类操作要先走黑名单快速通道立即拒绝，再异步清理。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">JWT 里塞了角色信息，改角色后旧 token 照样放行</div><div class="pd">JWT 自包含、签发后不可改，过期前一直有效。access_token 短时效（≤2h）+ refresh_token 可撤销 + 关键操作实时查权限，三件套配齐。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">密码用 MD5 存储，拖库后批量破解</div><div class="pd">MD5 无盐、太快，彩虹表秒破。必须用 bcrypt/argon2 加盐慢哈希，且凭证表与账号表分库存，降低单点泄露面。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">403/404 不分，资源 ID 可被批量枚举</div><div class="pd">越权时返回"无权限"等于告诉攻击者"这个 ID 存在"。对资源归属类的拒绝统一返回 404，防信息泄露；功能权限缺失可以 403。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">多租户系统里信了客户端传的 tenant_id</div><div class="pd">请求头里带 X-Tenant-Id 就被服务端采信，改一个头就串租。tenant_id 只能从服务端签发的 token 解析，客户端传来的任何租户标识一律忽略。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">鉴权逻辑散落在业务代码里，新接口漏加</div><div class="pd">每个方法手写 if (hasPerm) 必然漏。鉴权必须收敛到网关 + 注解拦截器一层，配合"新接口不登记权限点就拒绝上线"的流水线卡点。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">没有审计日志，出事后说不清谁干的</div><div class="pd">账号被盗用/内部误操作后无据可查。每次鉴权决策（含拒绝及原因）都要落不可篡改日志，保留 180 天以上，支持按人、按资源反查。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 用户登录成功后访问 /order/12345，发现能看到别人的订单。这是哪类问题？根因是什么？</div>
+      <button class="opt">垂直越权，根因是没做登录校验</button>
+      <button class="opt">水平越权，根因是资源查询没有带"归属/数据范围"条件</button>
+      <button class="opt">认证失败，根因是 token 过期</button>
+      <div class="ans">正确答案：<b>水平越权</b>。同等权限的用户互相访问对方的数据。根因是只校验了"登录 + 有 order:view 权限"，没校验"订单 12345 属于当前用户的数据范围"。防御：查询 SQL 强制带 tenant_id/数据范围条件，查不到返回 404。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于 JWT 作为 access_token，下列说法正确的是？</div>
+      <button class="opt">JWT 可以随时在服务端作废，适合所有场景</button>
+      <button class="opt">JWT 签发后过期前无法主动失效，敏感场景要配短时效 + 可撤销的 refresh_token</button>
+      <button class="opt">JWT 的 payload 可以安全存放密码等敏感信息</button>
+      <div class="ans">正确答案：<b>JWT 过期前无法主动失效</b>（无状态、自包含的代价）。缓解：access_token 短时效、refresh_token 服务端可撤销、关键操作实时查权限。payload 只是 Base64 编码不是加密，任何敏感信息都不能放。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 管理员刚把某用户的角色从"审批人"改成"普通员工"，哪种做法能最快确保旧权限立即失效？</div>
+      <button class="opt">先把该用户加进权限黑名单立即拒绝，再异步更新角色关系和清理缓存</button>
+      <button class="opt">只更新数据库，等缓存 30 分钟自然过期</button>
+      <button class="opt">清空 Redis 全部权限缓存，等所有用户重新登录</button>
+      <div class="ans">正确答案：<b>先黑名单拒绝、再异步清理</b>。权限收紧操作必须"先断后用"：同步开关秒级生效，然后异步改关系、删缓存兜底。等缓存过期会有分钟级的放行窗口；清空全量缓存会把其他用户一起打挂。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. RBAC + 数据范围模型里，"只能看本部门及以下部门的订单"如何落地？</div>
+      <button class="opt">查全部订单，在内存里过滤部门</button>
+      <button class="opt">按部门闭包表把数据范围展开成 dept_id IN (...) 条件拼进 SQL</button>
+      <button class="opt">给每个子部门单独建一个角色</button>
+      <div class="ans">正确答案：<b>闭包表展开成 SQL 条件</b>。dept_closure(ancestor, descendant) 查当前部门的所有后代，作为 IN 条件在数据库层过滤。内存过滤浪费 IO 且有并发风险；每部门建角色会让角色数随组织规模爆炸。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 多租户 SaaS 系统，以下哪种做法是从客户端请求中获取租户标识的安全方式？</div>
+      <button class="opt">读取请求头 X-Tenant-Id，方便前端切换租户</button>
+      <button class="opt">从 URL 查询参数 ?tenant=xxx 获取</button>
+      <button class="opt">只从服务端签发的 token 中解析 tenant_id，客户端传的任何租户标识一律忽略</button>
+      <div class="ans">正确答案：<b>只信服务端 token 解析结果</b>。租户标识是安全边界，客户端传什么都是不可信输入。请求头、URL 参数都能被篡改，只有服务端私钥签发的 token 才可信。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 什么时候适合从 RBAC + 数据范围演进到 ABAC？</div>
+      <button class="opt">当出现"按属性动态判定"的重复模式（如审批额度分级、时间/IP 条件）且用角色组合已无法表达时</button>
+      <button class="opt">系统一上线就上 ABAC，一步到位</button>
+      <button class="opt">只要角色数量超过 10 个就上 ABAC</button>
+      <div class="ans">正确答案：<b>出现重复的属性判定模式、角色组合无法表达时</b>。ABAC 的运维成本（策略引擎、DSL、测试）很高，跳级上线通常以返工收场。信号是"同类 if-else 在多个模块重复出现"，而不是角色数量多——角色多用角色组/继承解决。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>设计决策速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>登录 = Authentication；鉴权 = Authorization</code><span class="desc">先分清：认证证明身份，授权决定能干什么</span><button class="copy">复制</button></div>
+    <div class="crow"><code>OAuth2 = 委托授权；OIDC = OAuth2 + 身份层</code><span class="desc">id_token 携带用户身份声明</span><button class="copy">复制</button></div>
+    <div class="crow"><code>bcrypt / argon2，禁止 MD5</code><span class="desc">密码哈希的底线要求</span><button class="copy">复制</button></div>
+    <div class="crow"><code>access_token ≤ 2h，refresh_token 可撤销</code><span class="desc">JWT 失效问题的标准解</span><button class="copy">复制</button></div>
+    <div class="crow"><code>资源查询带 tenant_id + 数据范围条件</code><span class="desc">防水平越权的唯一可靠姿势</span><button class="copy">复制</button></div>
+    <div class="crow"><code>权限收紧：先黑名单拒绝，再异步清理</code><span class="desc">先断后用，不留放行窗口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>新接口不登记权限点 = 默认拒绝</code><span class="desc">防垂直越权的流水线卡点</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Authentication 认证</b></td><td>验证"你是谁"，产出可信身份标识</td></tr>
+    <tr><td><b>Authorization 授权</b></td><td>决定"你能干什么"，发生在每个请求上</td></tr>
+    <tr><td><b>SSO 单点登录</b></td><td>认证中心登录一次，接入系统全部免登</td></tr>
+    <tr><td><b>OAuth2</b></td><td>委托授权框架，让第三方应用有限访问用户资源</td></tr>
+    <tr><td><b>OIDC</b></td><td>OAuth2 之上的身份层，用 id_token（JWT）传递用户身份</td></tr>
+    <tr><td><b>JWT</b></td><td>自包含签名令牌，资源服务本地验签，但过期前无法作废</td></tr>
+    <tr><td><b>refresh_token</b></td><td>长时效刷新令牌，服务端可撤销，用于续期 access_token</td></tr>
+    <tr><td><b>RBAC</b></td><td>基于角色的访问控制：用户→角色→权限点三级关联</td></tr>
+    <tr><td><b>数据范围</b></td><td>角色的数据边界：全部/本部门/本部门及以下/仅自己</td></tr>
+    <tr><td><b>ABAC</b></td><td>基于属性的访问控制：用主体/资源/环境属性 + 条件表达式定策略</td></tr>
+    <tr><td><b>权限点</b></td><td>功能权限原子单位，形如 order:refund:approve</td></tr>
+    <tr><td><b>Principal 主体</b></td><td>权限模型中的统一主语：人、应用、服务账号</td></tr>
+    <tr><td><b>多租户</b></td><td>一套系统服务多个租户，数据互相隔离</td></tr>
+    <tr><td><b>水平越权</b></td><td>同权限用户互相访问对方数据（改 ID 看别人订单）</td></tr>
+    <tr><td><b>垂直越权</b></td><td>低权限用户执行高权限操作（普通用户调管理接口）</td></tr>
+    <tr><td><b>闭包表</b></td><td>预存组织所有祖先-后代关系，避免递归查询</td></tr>
+    <tr><td><b>审计日志</b></td><td>不可篡改的鉴权决策记录：谁、何时、对什么、结果如何</td></tr>
+    <tr><td><b>联邦登录</b></td><td>用外部身份（企业 AD、微信）登录内部系统</td></tr>
+    <tr><td><b>RBAC 角色继承</b></td><td>角色可继承其他角色权限，必须防环检测</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用本文的六张表建一个最小 RBAC 库，灌入"用户-角色-权限"测试数据；② 实现一个鉴权拦截器：功能注解 + 数据范围 SQL 改写，各写一条正反测试（有权限/越权）；③ 造一次"改权限"场景：改 DB 后观察缓存多久生效，然后加上"主动删缓存 + 本地广播失效"；④ 模拟一次水平越权攻击：不带 tenant_id 查别人的资源 ID，确认返回 404；⑤ 画一次你们组织的角色矩阵，找出"只靠角色表达不了"的规则，那就是 ABAC 的候选。<br><br>
+    <b>之后值得单独学：</b>Spring Security / Casbin 的策略模型、OPA（Open Policy Agent）通用策略引擎、密钥托管与轮换（KMS）、以及零信任架构下的持续评估（设备、环境、行为）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 权限系统设计实战 · 上线前务必检查：越权用例、缓存失效、审计日志</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（模型演进）和模块 4（缓存一致性）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照你司的权限模型。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边画图：把你司的组织/角色/资源三层关系画出来对照';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

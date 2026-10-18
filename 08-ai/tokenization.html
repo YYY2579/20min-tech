@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透分词与 Token 工程</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · AI 篇 · 第 5 期 · 高密度版</span>
+    <h1>二十分钟学透分词与 Token 工程</h1>
+    <p class="sub">大模型不读"字"，读的是 <b>token id</b>。计费按 token、窗口按 token、截断按 token、出错也常常因为 token。这篇讲机制：BPE 怎么合并、词表为什么差这么多、中文为什么"一个汉字一两个 token"、以及 tiktoken 的真实用法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种分词算法</span>
+      <span class="chip"><b>3</b> 份可跑代码</span>
+      <span class="chip"><b>10</b> 个常见坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边跑：pip install tiktoken，拿你自己的业务文本实测 token 数。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>口径与一个 30 秒可跑的 Demo</h2></div>
+  <p class="lead">分词器和词表大小各厂商演进很快，具体数值以所用模型的官方文档与 tokenizer 文件为准。本篇的机制性结论（算法思想、计费方式、工程影响）长期有效。</p>
+  <pre><span class="c"># 30 秒验证"模型看到的世界"：安装 OpenAI 的官方 tokenizer 库</span>
+pip install tiktoken
+
+python3 -c "
+import tiktoken
+enc = tiktoken.get_encoding(<span class="y">'cl100k_base'</span>)
+text = <span class="y">'你好，世界！Hello world!'</span>
+ids = enc.encode(text)
+print(ids)            <span class="c"># 一串整数：模型真正"读"到的东西</span>
+print(len(ids))       <span class="c"># token 数 —— 计费和窗口都按它算</span>
+print(enc.decode(ids))  <span class="c"># 解码回来，应该和原文一致</span>
+"</pre>
+  <div class="callout">
+    <b>先建立直觉：</b>你写的每一个字、每一个空格，在到达模型之前都会被切成 token。<b>一个 token 大致是：英文 4 个字符、中文 1 个汉字、数字 3 位一组</b>。这个"大致"就是本篇所有工程问题的根源。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>模型不读字符：从文字到 token id</h2></div>
+  <p class="lead">LLM 的输入不是字符串，是一个整数序列。分词器（tokenizer）就是把字符串映射到整数序列的那张"码表 + 切分规则"。</p>
+  <pre><span class="c"># 一次 API 调用背后发生了什么</span>
+"你好，世界"
+   ↓ tokenizer 切分 + 查词表
+[144248, 8808, 2575, ...]        <span class="c"># token id 序列</span>
+   ↓ embedding 层查表
+[[0.013, -0.22, ...], ...]       <span class="c"># 每个 id 变成一个向量</span>
+   ↓ Transformer 逐层计算
+输出 logits → 采样 → 下一个 token id
+   ↓ detokenizer 拼接
+"！"</pre>
+  <h4>为什么不能用"词"做单位</h4>
+  <table>
+    <tr><th style="width:150px">方案</th><th>问题</th></tr>
+    <tr><td><b>整词查表</b></td><td><b>OOV（未登录词）灾难</b>：词表装不下所有词（几十万常见词只是冰山一角），遇到没收录的词（新造词、错别字、罕见拼写、代码变量名）直接无法编码</td></tr>
+    <tr><td><b>单字符/单字节</b></td><td>没有 OOV，但<b>序列爆炸</b>：一个英文单词平均 4~5 个字母就是 4~5 个 token，同样语义的文本 token 数多好几倍，上下文窗口和算力都被浪费</td></tr>
+    <tr><td><b>子词（当前主流）</b></td><td><b>折中</b>：常见词整体是一个 token，罕见词拆成熟悉的碎片。序列短、无 OOV、还能让"词根词缀"共享表示（如 <span class="k">un-</span> + <span class="k">believ</span> + <span class="k">able</span>）</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>子词的核心红利是"压缩率 + 泛化"两头都要：</b>高频组合整体编码省 token；低频组合拆碎仍可编码，且语义相近的碎片共享训练信号。现代 LLM 全部采用<b>字节级</b>子词（byte-level），即最终回退到 256 个字节，任何 Unicode 文本都不会出现 OOV。
+  </div>
+  <h4>一次"分词"的三步流水线（以 BPE 为例）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>Normalization（归一化）</b>：统一大小写、Unicode 规范化（NFC/NFD）、处理空白。注意：大小写归一化会让 "Apple" 和 "apple" 变得难以区分，现代模型大多<b>不做</b>大小写折叠</div></div>
+    <div class="step"><div class="txt"><b>Pre-tokenization（预切分）</b>：先按简单规则粗切——英文按单词和标点、空白单独成组、数字分组。<b>关键：合并不会跨过预切分的边界</b>，这就是"数字按 3 位一组"的来源</div></div>
+    <div class="step"><div class="txt"><b>模型编码（Model）</b>：对每个预切分片段，按词表优先级反复做"合并"直到全是单个 token，最后查 id</div></div>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>四种主流算法：BPE、WordPiece、Unigram、SentencePiece</h2></div>
+  <table>
+    <tr><th style="width:110px">算法</th><th style="width:250px">核心思想</th><th>代表</th></tr>
+    <tr><td><b>BPE</b></td><td>从"单字节/单字符"开始，统计语料中<b>相邻 pair 的出现频率</b>，每次把最高频的一对合并成新 token，重复 N 次得到 N+256 个词表</td><td>GPT 全系（GPT-2 起为字节级 BBPE）</td></tr>
+    <tr><td><b>WordPiece</b></td><td>同样做合并，但打分标准不同：选能让<b>训练语料的语言模型似然提升最大</b>的合并（用 ## 表示词中续接），是"带目标的 BPE"</td><td>BERT、DistilBERT、Electra</td></tr>
+    <tr><td><b>Unigram</b></td><td><b>反向操作</b>：先构造一个很大的种子词表，然后循环"删掉那个删了之后似然损失最小的 token"，逐步瘦身到目标大小</td><td>T5、ALBERT、LLaMA（早期版）</td></tr>
+    <tr><td><b>SentencePiece</b></td><td><b>不是第四种算法，是工具包</b>：把输入当原始字节流、不依赖预分词（空格也变成 token <span class="k">▁</span>），底层可选 BPE 或 Unigram。对中日韩这种<b>无空格分词</b>的语言天然友好</td><td>LLaMA、T5、ChatGLM、多数中文模型</td></tr>
+  </table>
+  <h4>BPE 合并过程示意（对 "low lower newest" 这种小语料）</h4>
+  <pre><span class="c"># 初始：每个字符是一个 token，词表 = 26 字母 + 特殊符号</span>
+l o w | l o w e r | n e w e s t
+
+<span class="c"># 第 1 轮：统计相邻 pair 频率，'e'+'r' / 'l'+'o' / 'o'+'w' ...</span>
+<span class="c"># 假设最高频是 ('e','r') → 合并出新 token 'er'，词表 +1</span>
+l o w | l o w er | n e w e s t
+
+<span class="c"># 继续迭代：('er','est') → 'erest'，('lo','w') → 'low' ...</span>
+<span class="c"># 最终 'lower' 可能被切成 lo w er / low er 等，取决于训练语料</span>
+<span class="c"># 训练目标：合并到预设词表大小（如 32000、100277、200000）</span></pre>
+  <div class="callout warn">
+    <b>工程上只需要记住三件事：</b>① 词表是<b>训练时定死</b>的，推理时只能查表，不能发明新 token；② 字节级词表（256 基础符号）保证<b>任何字节序列可编码</b>，代价是乱码/罕见字符会变成一串无意义碎片；③ 不同模型的 tokenizer <b>互不通用</b>，数字 id 完全相同也可能对应完全不同的文本片段。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>词表差异：为什么中文"一个汉字一两个 token"</h2></div>
+  <p class="lead">词表大小和训练语料构成，直接决定你的文本被切成多少段。<b>同样一句话，不同模型的 token 数可能差 30% 以上</b>——这直接等于成本和窗口利用率的差异。</p>
+  <table>
+    <tr><th style="width:200px">词表 / 编码</th><th style="width:110px">大小</th><th>说明</th></tr>
+    <tr><td class="f">r50k_base</td><td>50,257</td><td>GPT-3 时代，BPE 非字节级边界情况</td></tr>
+    <tr><td class="f">p50k_base</td><td>50,281</td><td>Codex / text-davinci 系列</td></tr>
+    <tr><td class="f">cl100k_base</td><td>100,277</td><td>GPT-3.5-Turbo / GPT-4 / GPT-4-Turbo，对中文明显更友好</td></tr>
+    <tr><td class="f">o200k_base</td><td>约 200,000</td><td>GPT-4o 及后续，多语言覆盖大幅提升，中文字符碎片化显著减少</td></tr>
+    <tr><td class="f">Llama 3</td><td>128,256</td><td>开源阵营大词表代表，跨语言均衡</td></tr>
+    <tr><td class="f">Qwen2</td><td>151,936</td><td>中文语料占比高，中文压缩率优秀</td></tr>
+    <tr><td class="f">bert-base-chinese</td><td>21,128</td><td>字粒度中文词表，单字即 token</td></tr>
+  </table>
+  <h4>各语言的"token 效率"（同样语义所需 token 数的相对量级）</h4>
+  <table>
+    <tr><th style="width:120px">语言</th><th style="width:200px">典型比率（每 token 承载）</th><th>工程含义</th></tr>
+    <tr><td><b>英文</b></td><td>1 token ≈ 4 字符 ≈ 0.75 个单词</td><td>词表设计的"主场"，效率最高</td></tr>
+    <tr><td><b>中文</b></td><td>常用汉字 ≈ 1 token/字；次常用字 ≈ 2~3 字节级 token</td><td>100k 词表下中文已很划算；200k 词表更省。同样信息量中文 token 通常<b>少于</b>英文</td></tr>
+    <tr><td><b>日/韩</b></td><td>假名 ≈ 1~2 token/字，谚文按音节块切分</td><td>介于中英之间</td></tr>
+    <tr><td><b>代码</b></td><td>1 token ≈ 3~4 字符，缩进与重复符号会合并</td><td>JSON/XML 这类结构化文本中，引号、括号、引号键名很吃 token</td></tr>
+    <tr><td><b>数字</b></td><td>每 3 位一组（预切分规则）</td><td><span class="k">1234567890</span> → 4 个 token；长 ID、时间戳、哈希值是 token 杀手</td></tr>
+  </table>
+  <div class="callout">
+    <b>量级结论（面试和容量估算都能用）：</b>在 100k 级词表下，<b>一个汉字约 1~2 个 token</b>，一个英文单词约 1.3 个 token，一个阿拉伯数字约 1/3 个 token。用"中文每字 1.5 token"做粗估，误差通常在 ±30% 内——但<b>上线前一定要用真实 tokenizer 校准</b>，尤其是你的 Prompt 里有大量数字、代码、专有名词时。
+  </div>
+  <div class="callout warn">
+    <b>为什么"词表大小"是厂商竞争点：</b>同样一篇中文文档，词表覆盖好的模型可能 800 token，覆盖差的要 1200 token。对用户这是 33% 的成本差和上下文差；对厂商这是"同样硬件能服务更多请求"。所以 Qwen、Llama 3 都卷到 12 万~15 万词表，且训练语料的多语言配比直接决定中文效率。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Token 计费与上下文窗口</h2></div>
+  <p class="lead">token 是 LLM 世界的"字节 + 毫秒"：既决定你花多少钱，也决定模型一次能"看"多少东西。</p>
+  <h4>计费模型</h4>
+  <table>
+    <tr><th style="width:150px">计费项</th><th>说明</th></tr>
+    <tr><td><b>输入 token（prompt）</b></td><td>每次请求都要全额付费，包括系统提示、历史消息、RAG 检索内容、工具定义。多轮对话如果不做处理，历史会线性累积</td></tr>
+    <tr><td><b>输出 token（completion）</b></td><td>通常比输入贵数倍。模型逐 token 生成，输出越长延迟越高</td></tr>
+    <tr><td><b>缓存命中 token</b></td><td>Prompt Caching / Context Caching：相同的前缀（系统提示、长文档）命中缓存时按折扣价计费、延迟更低。<b>前提是前缀逐字节一致</b></td></tr>
+    <tr><td><b>usage 字段</b></td><td>API 响应里的 <span class="k">prompt_tokens</span> / <span class="k">completion_tokens</span> / <span class="k">total_tokens</span> 是<b>真实计费依据</b>，本地 tokenizer 计数只用于预估</td></tr>
+  </table>
+  <h4>上下文窗口（context window）</h4>
+  <table>
+    <tr><th style="width:200px">概念</th><th>说明</th></tr>
+    <tr><td><b>窗口 = 输入 + 输出</b></td><td>128k 窗口不是"能读 128k"，是"输入 + 输出加起来不超过 128k"。你塞 120k 的输入，模型最多只能再写 8k</td></tr>
+    <tr><td><b>max_tokens</b></td><td>API 参数，限制<b>单次输出</b>长度。和窗口是两个独立参数，都设错都会出事</td></tr>
+    <tr><td><b>常见规格</b></td><td>4k / 8k / 16k / 32k / 128k / 200k / 1M 不等，同模型不同版本窗口也不同。<b>以所用模型当前文档为准</b></td></tr>
+    <tr><td><b>长窗口 ≠ 免费</b></td><td>128k 窗口塞满 100k 的输入，单次请求成本就是实打实的 100k token 钱。而且注意力和延迟随长度增长，超长上下文中部信息的利用率会下降（见上下文工程篇）</td></tr>
+  </table>
+  <pre><span class="c"># 一次请求的成本估算（以各厂商实时价目表为准）</span>
+cost = (prompt_tokens * price_in + completion_tokens * price_out) / 1000
+
+<span class="c"># 多轮对话的隐性爆炸：不裁剪历史时，第 N 轮的输入 ≈ 系统提示 + 前 N-1 轮全部</span>
+<span class="c"># 轮次:   1      2      3      ...   N</span>
+<span class="c"># 输入:   S      S+T1   S+T1+T2 ...   S+sum(T1..Tn)   —— 平方级增长</span>
+<span class="c"># 解法：滑动窗口 / 摘要压缩历史 / 只带必要历史（详见上下文工程篇）</span></pre>
+  <div class="callout danger">
+    <b>预算公式先算再写：</b>单次请求 token 预算 = 系统提示 + 工具定义 + 检索内容 + 历史 + 用户输入 + <b>预留输出</b>。任何一项超限，轻则触发窗口错误，重则历史被静默截断、模型"失忆"。把 <span class="k">max_tokens</span> 留足（如窗口 128k、输入 100k 时输出至少要给 4k~16k）是基本素养。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>工程三件事：计数、截断、特殊 token</h2></div>
+  <h4>① 计数：预算管理的起点</h4>
+  <pre><span class="c"># Python：tiktoken 精确计数（OpenAI 模型的官方实现）</span>
+import tiktoken
+
+<span class="k">def</span> <span class="b">count_tokens</span>(text: str, model: str = <span class="y">"gpt-4"</span>) -&gt; int:
+    enc = tiktoken.encoding_for_model(model)   <span class="c"># 自动选对编码</span>
+    <span class="k">return</span> len(enc.encode(text))
+
+<span class="c"># 注意：消息体本身（角色标记、格式包装）也占 token</span>
+<span class="c"># 粗略经验：每条消息额外 +4~8 token 的结构开销，精确值以 API 返回为准</span>
+
+<span class="c"># Anthropic / 未公开 tokenizer 的模型：用官方 count_tokens 接口</span>
+<span class="c"># POST https://api.anthropic.com/v1/messages/count_tokens</span>
+<span class="c"># 或本地用对应开源 tokenizer（sentencepiece / tokenizers 库加载 .model 文件）</span></pre>
+  <h4>② 截断：按 token 边界，不是按字符</h4>
+  <pre><span class="c"># 错误示范：按字符截断 —— 会把 UTF-8 多字节字符和 token 边界砍断</span>
+bad = text[:1000]                    <span class="c"># 中文下可能产生乱码，token 数也不可控</span>
+
+<span class="c"># 正确：编码 → 截 id → 解码，保证落在 token 边界</span>
+enc = tiktoken.get_encoding(<span class="y">"cl100k_base"</span>)
+ids = enc.encode(text)
+<span class="k">if</span> len(ids) &gt; budget:
+    ids = ids[:budget]
+truncated = enc.decode(ids)          <span class="c"># 永远是合法文本</span>
+
+<span class="c"># 截哪一端？三种策略</span>
+<span class="c"># 1) 截头部：保留最新内容（长文档问答常用，但丢开头背景）</span>
+<span class="c"># 2) 截尾部：保留开头背景（指令类任务常用，但丢最新信息）</span>
+<span class="c"># 3) 截中间：保留首尾（"Lost in the Middle"的对策，长上下文更推荐）</span>
+<span class="k">def</span> <span class="b">truncate_middle</span>(ids, budget):
+    <span class="k">if</span> len(ids) &lt;= budget: <span class="k">return</span> ids
+    half = budget // 2
+    <span class="k">return</span> ids[:half] + ids[-(budget - half):]</pre>
+  <h4>③ 特殊 token：看不见但占额度</h4>
+  <table>
+    <tr><th style="width:230px">Token</th><th>作用</th></tr>
+    <tr><td class="f">&lt;|endoftext|&gt;</td><td>文档结束符，GPT 系用于标识训练样本边界</td></tr>
+    <tr><td class="f">&lt;|im_start|&gt; / &lt;|im_end|&gt;</td><td>ChatML 等对话模板的角色边界标记，每轮消息都带</td></tr>
+    <tr><td class="f">[CLS] / [SEP] / [PAD]</td><td>BERT 系的句首、句间、填充标记</td></tr>
+    <tr><td class="f">&lt;|system|&gt; 等角色标记</td><td>不同模板命名不同，但都存在：每条消息的结构包装都要花钱</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>tiktoken 的"特殊 token 暗礁"：</b>用 <span class="k">enc.encode(text)</span> 编码一段<b>含有</b> <span class="k">&lt;|endoftext|&gt;</span> 字面量的普通文本时，默认会直接<b>抛 ValueError</b>（禁止特殊 token 混入普通文本）。处理用户输入必须先过滤或转义这些字面量，否则线上就是 500。需要放行时用 <span class="k">enc.encode(text, allowed_special="all")</span>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>中文分词四大陷阱</h2></div>
+  <table>
+    <tr><th style="width:140px">陷阱</th><th style="width:260px">现象</th><th>后果与对策</th></tr>
+    <tr><td><b>数字被打碎</b></td><td>预切分规则把连续数字按 3 位一组切开，长数字串 token 数爆炸</td><td>让模型做多位数算术、比对长 ID 时容易出错。<b>对策</b>：预算里给数字单独加权；对 ID/哈希考虑用十六进制短表示或提示模型逐位处理</td></tr>
+    <tr><td><b>代码/JSON 被切碎</b></td><td>缩进、连续空格、转义符、罕见符号各自成 token；JSON 的键名引号重复出现</td><td>结构化文本 token 效率低。<b>对策</b>：精简 schema 键名、用紧凑分隔、去掉无意义缩进；压缩历史工具结果</td></tr>
+    <tr><td><b>罕见词/生僻字</b></td><td>未收录的词被拆成字节级碎片，一个词 4~8 个 token</td><td>专有名词、新造词、化学式、人名是重灾区。<b>对策</b>：建立"术语 → 常用同义表述"的映射；对高频专有名词在提示中首次出现时给解释</td></tr>
+    <tr><td><b>中英混排</b></td><td>中英之间无空格，切分器按脚本边界处理，可能出现高 token 碎片</td><td>"用Python实现BPE算法"这类文本 token 数高于纯中文。<b>对策</b>：实测，不要按纯中文估算</td></tr>
+  </table>
+  <pre><span class="c"># 实测对比（cl100k_base，量级参考，以你本地 tokenizer 为准）</span>
+"你好，世界"                    <span class="c"># 约 4~5 token（含标点）</span>
+"你好世界你好世界你好世界"        <span class="c"># 约 9 token —— 重复模式会被合并，不是 15</span>
+"Transformer"                  <span class="c"># 约 1~2 token（高频技术词整体成 token）</span>
+"tiktokenizer"                  <span class="c"># 约 3~4 token（生僻组合被拆碎）</span>
+"1234567890"                    <span class="c"># 4 token（123/456/789/0，数字按 3 位分组）</span>
+"a1b2c3d4e5"                    <span class="c"># 约 10 token（字母数字交错，几乎全碎）</span>
+"    def foo():"                <span class="c"># 前导空格 + def + 空格 + foo + ( + ) + : 多个 token</span>
+"🚀🎉"                          <span class="c"># 每个 emoji 约 2~4 token（多字节 UTF-8 序列）</span></pre>
+  <div class="callout danger">
+    <b>血泪模式：</b>把一段含长数字 ID 的用户输入直接拼进 Prompt，token 数比你预估多 2 倍；或者 <span class="k">text[:2000]</span> 截断把汉字砍成乱码，模型读到 <span class="k">å¿</span> 这种字节碎片后行为完全不可控。<b>凡是涉及用户可控文本，一律先 tokenize 再截断。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>多语言与 Emoji 处理</h2></div>
+  <h4>多语言的三层坑</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>Unicode 规范化</div><div class="cd">同一个"é"可以是 1 个码位（NFC）或 e + 组合符（NFD），<b>字节不同但看起来一样</b>。tokenizer 通常做 NFC 归一化，但你自己做字符串比对（去重、缓存 key）时必须先 normalize，否则缓存永远打不中</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>脚本边界混排</div><div class="cd">拉丁、CJK、阿拉伯、Emoji 混排时，预切分按 Unicode 脚本类别断开。做多语言产品时，token 估算必须<b>按目标语言分别校准</b>，不能拿英文比率套中文</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>小语种碎片化</div><div class="cd">词表训练语料里占比小的语言（泰语、高棉语、非洲语言）大量走字节回退，1 个词 5~10 token。<b>面向小语种的产品，成本模型要重算</b></div></div>
+  </div>
+  <h4>Emoji 与特殊字符</h4>
+  <table>
+    <tr><th style="width:170px">字符类型</th><th style="width:150px">token 量级</th><th>说明</th></tr>
+    <tr><td>常用 emoji（😀🚀🎉）</td><td>2~4 token/个</td><td>UTF-8 多字节序列，部分被词表整体收录、部分按字节回退</td></tr>
+    <tr><td>组合 emoji（👨‍👩‍👧 零宽连接符）</td><td>5+ token/个</td><td>ZWJ 序列被拆成多个组件分别编码</td></tr>
+    <tr><td>零宽字符 / 控制字符</td><td>1 token 或字节碎片</td><td>不可见但占 token，还常导致缓存 key 不一致、日志显示异常</td></tr>
+    <tr><td>CJK 扩展区生僻字</td><td>2~4 token/字</td><td>超出基本区的汉字大多走字节回退</td></tr>
+  </table>
+  <pre><span class="c"># Python：入库前清洗"看不见"的字符，统一规范化</span>
+import unicodedata
+
+<span class="k">def</span> <span class="b">clean_text</span>(s: str) -&gt; str:
+    s = unicodedata.normalize(<span class="y">"NFC"</span>, s)          <span class="c"># 统一码位形式</span>
+    s = <span class="y">""</span>.join(
+        ch <span class="k">for</span> ch <span class="k">in</span> s
+        <span class="k">if</span> unicodedata.category(ch) <span class="k">not in</span> (<span class="y">"Cc"</span>, <span class="y">"Cf"</span>)  <span class="c"># 去控制/格式字符</span>
+    )
+    <span class="k">return</span> s
+
+<span class="c"># 缓存 key 用规范化后的文本，否则 "café"（两种编码）会 miss 两次</span></pre>
+  <div class="callout ok">
+    <b>稳妥做法：</b>① 所有进入 Prompt 的文本先过 <span class="k">clean_text</span>；② emoji 不是免费情绪表达，是 token 成本，产品文案里密集用 emoji 前先估算；③ 做国际化产品时，用<b>各语言真实语料</b>分别测 token 效率，再定定价和窗口策略。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>tiktoken 实战：预算管理三件套</h2></div>
+  <p class="lead">下面这段是可直接进项目的"token 预算管理器"：计数、截断、成本估算，覆盖多轮对话最常见的三个需求。</p>
+  <pre><span class="c"># token_budget.py —— 最小可用的 token 预算管理</span>
+import tiktoken
+
+<span class="k">class</span> <span class="b">TokenBudget</span>:
+    <span class="k">def</span> <span class="b">__init__</span>(self, model: str = <span class="y">"gpt-4"</span>):
+        self.enc = tiktoken.encoding_for_model(model)
+
+    <span class="k">def</span> <span class="b">count</span>(self, text: str) -&gt; int:
+        <span class="k">return</span> len(self.enc.encode(text, disallowed_special=()))
+
+    <span class="k">def</span> <span class="b">fit</span>(self, text: str, budget: int, keep: str = <span class="y">"tail"</span>) -&gt; str:
+        <span class="c">"""把文本压进 budget 个 token。keep=head/tail/middle"""</span>
+        ids = self.enc.encode(text)
+        <span class="k">if</span> len(ids) &lt;= budget:
+            <span class="k">return</span> text
+        <span class="k">if</span> keep == <span class="y">"head"</span>:
+            ids = ids[:budget]
+        <span class="k">elif</span> keep == <span class="y">"tail"</span>:
+            ids = ids[-budget:]
+        <span class="k">else</span>:  <span class="c"># middle：首尾各留一半</span>
+            half = budget // 2
+            ids = ids[:half] + ids[-(budget - half):]
+        <span class="k">return</span> self.enc.decode(ids)
+
+    <span class="k">def</span> <span class="b">estimate_cost</span>(self, prompt: str, completion: str,
+                      price_in: float, price_out: float) -&gt; float:
+        <span class="c">"""price 单位为 美元 / 1K token，以厂商实时价目为准"""</span>
+        p, c = self.count(prompt), self.count(completion)
+        <span class="k">return</span> (p * price_in + c * price_out) / 1000
+
+<span class="c"># 用法</span>
+tb = TokenBudget(<span class="y">"gpt-4"</span>)
+system_prompt = tb.fit(long_doc, 6000, keep=<span class="y">"head"</span>)   <span class="c"># 长文档留开头</span>
+user_input    = tb.fit(raw_input, 2000, keep=<span class="y">"tail"</span>)  <span class="c"># 用户输入留最新</span>
+<span class="c"># 别忘了给输出预留：窗口 - 输入 = max_tokens 上限</span></pre>
+  <h4>各生态的计数工具</h4>
+  <table>
+    <tr><th style="width:150px">生态</th><th>做法</th></tr>
+    <tr><td><b>OpenAI</b></td><td>Python/JS 的 <span class="k">tiktoken</span> 官方库；响应体 usage 字段是计费真相</td></tr>
+    <tr><td><b>Anthropic</b></td><td>官方 <span class="k">/v1/messages/count_tokens</span> 接口；也有开源的 <span class="k">anthropic-sdk</span> 计数封装，以当前文档为准</td></tr>
+    <tr><td><b>开源模型</b></td><td>HuggingFace <span class="k">tokenizers</span> / <span class="k">sentencepiece</span> 加载对应 tokenizer.json；vLLM 等推理框架自带计数</td></tr>
+    <tr><td><b>LangChain 等框架</b></td><td>内置 token 计数回调，但底层还是调上面这些库，别重复造轮子</td></tr>
+  </table>
+  <div class="callout">
+    <b>最终口径：</b>本地计数用于<b>事前预算和截断</b>，API 返回的 usage 用于<b>事后对账和计费</b>。两者有毫厘级差异（消息结构包装 token），做成本报表时以 usage 为准，做截断时以本地计数为准（留 5%~10% 安全余量）。
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个常见坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 len(text) 或字符数估算 token</div><div class="pd">中文一字一 token 上下浮动 50% 以上，数字和代码更是翻倍。必须用对应模型的 tokenizer 实测，或至少按"中文 1.5 token/字"估且留足余量。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">用 text[:N] 按字符截断</div><div class="pd">把 UTF-8 多字节字符和 token 边界一起砍断，模型读到字节碎片后输出不可控。先 encode 再截 id 再 decode。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">拿一个模型的 tokenizer 计数，发给另一个模型</div><div class="pd">词表不同，token 数能差 30%+。cl100k 的数不能直接当 Claude 或 Llama 的预算。每个模型用自己的 tokenizer。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">忽略特殊 token 和消息结构的开销</div><div class="pd">每条消息的角色标记、模板包装、文档结束符都占 token。系统提示 + 工具定义动辄几千 token，预算表里必须单列。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">tiktoken 编码含特殊 token 字面量的用户输入直接报错</div><div class="pd">enc.encode 默认禁止 &lt;|endoftext|&gt; 这类字面量，线上直接 500。用户输入先过滤/转义，或用 disallowed_special=() 显式放行。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">长数字串、ID、哈希不预处理</div><div class="pd">10 位数字 = 4 token，40 位 UUID = 十几个 token，让模型做算术/比对时错误率飙升。考虑分段呈现或换用更短标识。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">中英文成本估算错位</div><div class="pd">拿英文 0.75 词/token 的比率套中文，预算差一倍。中文常用字约 1 token/字，但次常用字、混排、emoji 全部超支，按真实语料测。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">max_tokens 设太小，输出被静默截断</div><div class="pd">finish_reason=length 时 JSON/代码只剩一半，下游解析全线崩。生成结构化内容时 max_tokens 至少留预计输出的 2 倍。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">只数输入不数输出，128k 窗口当 128k 输入用</div><div class="pd">窗口 = 输入 + 输出。塞满输入后模型一个字都写不了。预留输出额度是硬约束，不是优化项。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">微调或换模型时 tokenizer 悄悄变了</div><div class="pd">换了 base 模型词表变了，历史缓存、prompt 模板、截断逻辑全部偏移。升级模型时把 tokenizer 当成破坏性变更来测试。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 现代 LLM 普遍采用"字节级"（byte-level）词表，最大的好处是？</div>
+      <button class="opt">让每个汉字只占 1 个 token</button>
+      <button class="opt">让分词速度更快</button>
+      <button class="opt">任何字节序列都可编码，不会出现 OOV</button>
+      <div class="ans">正确答案：<b>任何文本可编码、无 OOV</b>。基础词表只有 256 个字节符号，任何 Unicode 文本都能回退成字节碎片表示。代价是罕见字符会变成一串无意义 token。中文"1 token/字"不是字节级保证的，而是词表覆盖的结果。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. cl100k_base 词表大约多大？</div>
+      <button class="opt">约 5 万（50,257）</button>
+      <button class="opt">约 10 万（100,277）</button>
+      <button class="opt">约 20 万（200,000）</button>
+      <div class="ans">正确答案：<b>100,277</b>，用于 GPT-3.5-Turbo / GPT-4 系列。50,257 是 GPT-2 的 r50k_base；约 20 万是 GPT-4o 起的 o200k_base。词表越大通常多语言覆盖越好、中文越省 token。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 在 cl100k 中，"1234567890" 大约是几个 token？</div>
+      <button class="opt">4 个（数字按 3 位一组预切分）</button>
+      <button class="opt">1 个（整个数字一个 token）</button>
+      <button class="opt">10 个（一个数字一个 token）</button>
+      <div class="ans">正确答案：<b>4 个</b>。预切分规则把连续数字按最多 3 位一组切开（123/456/789/0）。这是长 ID、时间戳吃 token 的根源，也让模型直接做长数字算术更困难。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 要把一段中文严格限制在 4000 token 以内，正确做法是？</div>
+      <button class="opt">text[:4000]，按字符截断最简单</button>
+      <button class="opt">text[:4000*3]，一个汉字 3 字节</button>
+      <button class="opt">enc.encode 后截 id 到 4000，再 enc.decode</button>
+      <div class="ans">正确答案：<b>先编码、按 token 数截 id、再解码</b>。字符截断会砍断多字节字符产生乱码；按字节算（*3）既不准也会破坏边界。只有 tokenize → slice → detokenize 能保证落在合法 token 边界。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 用 tiktoken 编码一段用户输入，文本里含有字面量 "&lt;|endoftext|&gt;"，会发生什么？</div>
+      <button class="opt">自动把它当成普通字符串编码，没问题</button>
+      <button class="opt">默认抛出 ValueError（特殊 token 禁止混入普通文本）</button>
+      <button class="opt">静默丢弃这个字符串</button>
+      <div class="ans">正确答案：<b>默认抛 ValueError</b>。这是 tiktoken 的防呆设计，防止用户输入注入特殊 token 污染对话结构。处理用户文本要先过滤/转义，或显式用 disallowed_special=() / allowed_special 控制。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 模型的上下文窗口标称 128k，意味着？</div>
+      <button class="opt">输入 + 输出合计不超过 128k token</button>
+      <button class="opt">输入可以最多 128k，输出不占窗口</button>
+      <button class="opt">每轮对话各自 128k，多轮不累积</button>
+      <div class="ans">正确答案：<b>输入 + 输出共享同一个窗口</b>。塞 120k 输入，输出最多剩 8k。多轮对话中历史消息还会逐轮累积占窗口，所以上下文管理（裁剪、摘要）是长对话应用的必修课，详见上下文工程篇。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查</h3>
+  <div class="cmds">
+    <div class="crow"><code>tiktoken.get_encoding("cl100k_base")</code><span class="desc">GPT-3.5/4 系列的官方编码器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tiktoken.encoding_for_model("gpt-4")</code><span class="desc">按模型名自动选编码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>enc.encode(text) / enc.decode(ids)</code><span class="desc">文本 ↔ token id 互转</span><button class="copy">复制</button></div>
+    <div class="crow"><code>len(enc.encode(text))</code><span class="desc">精确 token 计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>enc.encode(t, disallowed_special=())</code><span class="desc">放行含特殊 token 字面量的文本</span><button class="copy">复制</button></div>
+    <div class="crow"><code>usage.prompt_tokens / completion_tokens</code><span class="desc">API 返回的真实计费口径</span><button class="copy">复制</button></div>
+    <div class="crow"><code>unicodedata.normalize("NFC", s)</code><span class="desc">文本入库前统一 Unicode 形式</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_tokens = 窗口 - 输入预算 - 余量</code><span class="desc">输出额度的硬约束公式</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>估算速用表（量级参考，上线前用真实 tokenizer 校准）</h3>
+  <table>
+    <tr><th style="width:220px">内容</th><th style="width:160px">token 量级</th><th>备注</th></tr>
+    <tr><td>1 个英文单词</td><td>≈ 1.3 token</td><td>高频词 1 个，罕见词 2~4 个</td></tr>
+    <tr><td>1 个常用汉字</td><td>≈ 1 token</td><td>次常用/生僻字 2~4 个</td></tr>
+    <tr><td>1 个阿拉伯数字</td><td>≈ 0.33 token</td><td>按 3 位一组切分</td></tr>
+    <tr><td>1 个常用 emoji</td><td>≈ 2~4 token</td><td>组合 emoji 5+</td></tr>
+    <tr><td>100 字中文段落</td><td>≈ 120~180 token</td><td>含标点，随用字浮动</td></tr>
+    <tr><td>一页 A4 英文文档</td><td>≈ 500~700 token</td><td>按 500 词/页估</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Token</b></td><td>模型处理文本的最小单位，本质是词表里的一个整数 id</td></tr>
+    <tr><td><b>Tokenizer</b></td><td>文本 ↔ token id 的双向映射器，含归一化、预切分、编码三步</td></tr>
+    <tr><td><b>词表（vocab）</b></td><td>训练时定死的 token 全集，大小从 2 万到 20 万不等</td></tr>
+    <tr><td><b>BPE</b></td><td>字节对编码：迭代合并最高频相邻对，GPT 系采用</td></tr>
+    <tr><td><b>BBPE</b></td><td>字节级 BPE：基础符号是 256 个字节，无 OOV</td></tr>
+    <tr><td><b>WordPiece</b></td><td>按语言模型似然增益做合并的变体，BERT 系采用</td></tr>
+    <tr><td><b>Unigram</b></td><td>从大词表逐步删除低贡献 token 的算法，T5/早期 LLaMA 采用</td></tr>
+    <tr><td><b>SentencePiece</b></td><td>不依赖预分词的工具包，把空格也变成 token，对中文友好</td></tr>
+    <tr><td><b>OOV</b></td><td>未登录词：词表里没有的文本单元，字节级词表从根上消除它</td></tr>
+    <tr><td><b>预切分</b></td><td>编码前按规则粗切（单词/数字组/空白），合并不跨边界</td></tr>
+    <tr><td><b>特殊 token</b></td><td>词表中的控制符号（结束符、角色标记），不可见但占额度</td></tr>
+    <tr><td><b>上下文窗口</b></td><td>输入 + 输出的合计 token 上限</td></tr>
+    <tr><td><b>max_tokens</b></td><td>限制单次输出长度的 API 参数</td></tr>
+    <tr><td><b>Prompt Caching</b></td><td>相同前缀命中缓存按折扣计费，要求前缀逐字节一致</td></tr>
+    <tr><td><b>usage 字段</b></td><td>API 返回的真实 token 用量，计费和对账以它为准</td></tr>
+    <tr><td><b>tiktoken</b></td><td>OpenAI 官方的快速 BPE 实现（Rust 内核 + Python 绑定）</td></tr>
+    <tr><td><b>token 效率</b></td><td>同样语义所需 token 数，决定成本和窗口利用率</td></tr>
+    <tr><td><b>字节回退</b></td><td>词表未覆盖的字符拆成 UTF-8 字节碎片编码</td></tr>
+    <tr><td><b>Unicode 规范化</b></td><td>NFC/NFD 等形式统一，"看起来一样"的字符字节可能不同</td></tr>
+    <tr><td><b>语料配比</b></td><td>训练 tokenizer 用的多语言文本构成，直接决定中文压缩率</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 tiktoken 测你手头三个真实业务文本（中文文档、JSON 日志、代码片段）的 token 数，和字符数做比值表；② 实现上面的 TokenBudget 类，给一个长文档问答加上"保留首尾"的截断；③ 故意 text[:N] 截一次再 encode，观察乱码长什么样；④ 对比同一段中文在 cl100k 和 o200k 下的 token 数差。<br><br>
+    <b>之后值得单独学：</b>HuggingFace tokenizers 训练自己的 BPE 词表、推理框架（vLLM）的 token 级流式处理、以及各厂商 Prompt Caching 的命中条件——缓存能不能打中，往往就取决于你有没有在系统提示里插入动态时间戳。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透分词与 Token 工程 · 记住：模型不读字，读 token；预算、截断、计费全部以 token 为准</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（词表差异）和模块 6（中文陷阱）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里跑 tiktoken。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边跑：pip install tiktoken，拿你自己的业务文本实测 token 数。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

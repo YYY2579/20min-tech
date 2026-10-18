@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透进程、线程与调度</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透进程、线程与调度</h1>
+    <p class="sub">"线程池开多大"这个问题，网上有十种答案，其中九种没有推导过程。这篇把<b>地址空间、上下文切换、CFS、利特尔法则、协程</b>串成一条线，让你能从第一性原理算出自己的数字，而不是抄别人的 200。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 模块</span>
+      <span class="chip"><b>线程池公式</b>推导</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开着 top -H 和一个多线程服务，边读边看线程状态</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>准备一个能观察的环境</h2></div>
+  <p class="lead">这一篇的所有结论都可以在你的机器上验证。先把观测工具备齐。</p>
+  <pre><span class="c"># 1. 确认核数与超线程情况（物理核 vs 逻辑核）</span>
+nproc                    <span class="c"># 逻辑核数（含超线程）</span>
+lscpu | grep -E "^CPU\(s\)|Thread|Core|Socket"
+
+<span class="c"># 2. 关键观测工具（sysstat 包提供 pidstat / mpstat / iostat）</span>
+which top ps pidstat mpstat vmstat strace ltrace gdb perf
+<span class="c"># Debian/Ubuntu: apt install sysstat procps linux-tools-common</span>
+<span class="c"># RHEL/CentOS : yum install sysstat procps-ng perf</span>
+
+<span class="c"># 3. 看当前系统的调度参数</span>
+cat /proc/sys/kernel/sched_latency_ns          <span class="c"># CFS 调度周期</span>
+cat /proc/sys/kernel/sched_min_granularity_ns
+cat /proc/sys/kernel/sched_rt_runtime_us
+cat /proc/sys/kernel/threads-max
+ulimit -u                                       <span class="c"># 用户最大进程/线程数</span>
+ulimit -s                                       <span class="c"># 线程栈大小（KB）</span>
+
+<span class="c"># 4. 跑一个多线程程序来观察（用 stress-ng 或自己写）</span>
+stress-ng --cpu 4 --timeout 60s &amp;</pre>
+  <div class="callout warn">
+    <b>两个环境陷阱：</b><br>
+    ① <b>容器里的 <span class="k">nproc</span> 返回的是宿主机 CPU 数</b>，不是 cgroup 配额。用 <span class="k">cat /sys/fs/cgroup/cpu.max</span>（cgroup v2）看真实限制，形如 <span class="k">200000 100000</span> 表示 2 个核。<br>
+    ② <b><span class="k">ulimit -s</span> 通常是 8192 KB（8 MB）</b>，这是<b>虚拟</b>栈上限，不是实际占用。开 1000 个线程会预留 8 GB 虚拟地址空间，但 RSS 可能只有几十 MB。在 32 位或受限环境里这会直接失败。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>进程与线程的本质区别</h2></div>
+  <p class="lead">先说一个容易被忽略的事实：<b>Linux 内核里没有"线程"这个独立概念</b>。线程和进程都是 <span class="k">task_struct</span>，区别只在于创建时 <span class="k">clone()</span> 传了哪些标志位 —— 共享得多就是线程，共享得少就是进程。</p>
+
+  <h3>共享什么、独享什么</h3>
+  <table>
+    <tr><th style="width:200px">资源</th><th style="width:110px">线程之间</th><th>说明</th></tr>
+    <tr><td><b>地址空间</b>（mm_struct）</td><td><b>共享</b></td><td>同一份页表，一个线程改了全局变量，其他线程立刻能看到</td></tr>
+    <tr><td><b>文件描述符表</b>（files_struct）</td><td><b>共享</b></td><td>一个线程 <span class="k">close(fd)</span>，其他线程这个 fd 就废了 —— 这是很多诡异 bug 的来源</td></tr>
+    <tr><td><b>信号处理函数</b>（sighand_struct）</td><td><b>共享</b></td><td>一个线程 <span class="k">signal()</span> 改了 handler，全进程生效</td></tr>
+    <tr><td><b>工作目录 / 根目录</b>（fs_struct）</td><td><b>共享</b></td><td>一个线程 <span class="k">chdir()</span>，所有线程的 cwd 都变了</td></tr>
+    <tr><td><b>寄存器组</b></td><td>独享</td><td>包括通用寄存器、PC、SP、标志位</td></tr>
+    <tr><td><b>栈</b></td><td>独享</td><td>默认 8 MB 虚拟空间，主线程用进程启动时分配的栈</td></tr>
+    <tr><td><b>TLS</b>（线程局部存储）</td><td>独享</td><td><span class="k">__thread</span> / <span class="k">thread_local</span> 变量，靠 FS/GS 段寄存器定位</td></tr>
+    <tr><td><b>errno</b></td><td>独享</td><td>实际上是个宏，展开成 TLS 变量</td></tr>
+    <tr><td><b>信号屏蔽字</b></td><td>独享</td><td>每个线程可以屏蔽不同的信号</td></tr>
+    <tr><td><b>调度实体</b></td><td>独享</td><td>每个线程独立参与调度，有自己的 nice 值和 CPU 亲和性</td></tr>
+  </table>
+
+  <h3>clone 的六个关键标志</h3>
+  <pre><span class="c">// 创建进程：什么都不共享（除了内核对象）</span>
+clone(fn, stack, <span class="b">SIGCHLD</span>, arg);
+
+<span class="c">// 创建线程：几乎全共享（glibc 的 pthread_create 底层就是这个）</span>
+clone(fn, stack,
+      <span class="b">CLONE_VM</span>       <span class="c">// 共享地址空间 ← 最关键的一条</span>
+    | <span class="b">CLONE_FS</span>       <span class="c">// 共享 cwd / root</span>
+    | <span class="b">CLONE_FILES</span>    <span class="c">// 共享 fd 表</span>
+    | <span class="b">CLONE_SIGHAND</span>  <span class="c">// 共享信号处理函数</span>
+    | <span class="b">CLONE_THREAD</span>   <span class="c">// 放进同一个线程组（同一个 PID 视角）</span>
+    | <span class="b">CLONE_SYSVSEM</span>  <span class="c">// 共享 System V 信号量的 undo 列表</span>
+    | <span class="b">CLONE_SETTLS</span>   <span class="c">// 设置 TLS 指针</span>
+    , arg);
+
+<span class="c">// CLONE_VM 是分水岭：有没有它，决定了"切换时要不要换页表"</span>
+<span class="c">// 也就决定了上下文切换的成本量级</span></pre>
+
+  <h3>为什么线程切换比进程切换便宜</h3>
+  <table>
+    <tr><th style="width:170px">开销项</th><th style="width:130px">线程切换</th><th style="width:130px">进程切换</th><th>说明</th></tr>
+    <tr><td>保存/恢复寄存器</td><td>有</td><td>有</td><td>两者一样，约 20~30 个寄存器</td></tr>
+    <tr><td>切换页表（写 CR3）</td><td><b>无</b></td><td><b>有</b></td><td>进程切换必须换页表基址</td></tr>
+    <tr><td>TLB 失效</td><td><b>无</b></td><td><b>有</b>（PCID 可缓解）</td><td>换了页表，原来的地址翻译全部作废，重新走页表遍历</td></tr>
+    <tr><td>缓存污染</td><td>轻</td><td>重</td><td>同一进程的线程共享代码和数据，缓存还是热的</td></tr>
+    <tr><td>内核栈切换</td><td>有</td><td>有</td><td>每个 task 有自己的内核栈（通常 16 KB）</td></tr>
+  </table>
+  <p><b>PCID（Process Context Identifier，进程上下文标识）</b>是 Intel 的优化：给每个进程的页表一个 12 位 ID，切换时带上 ID，TLB 条目按 ID 打标签，就不用整体刷掉。这让进程切换的 TLB 代价从"全刷"降到"部分失效"。Linux 从 4.14 起默认启用。</p>
+  <div class="callout">
+    <b>但真正的成本不在寄存器。</b>保存 30 个寄存器大约几十纳秒，而<b>缓存和 TLB 变冷之后的间接损失是几微秒到几十微秒</b>。所以"线程切换比进程切换便宜"这句话，准确的说法是：<b>线程切换的间接损失小得多，因为地址空间没变、热点数据还在缓存里</b>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>上下文切换的成本</h2></div>
+
+  <h3>一次切换到底保存了什么</h3>
+  <pre><span class="c"># 直接成本（必须做的）</span>
+1. 通用寄存器    rax rbx rcx rdx rsi rdi rbp r8-r15   约 16 个
+2. 指令指针      rip
+3. 栈指针        rsp（用户栈）+ 内核栈指针
+4. 标志寄存器    rflags
+5. FPU/SIMD 状态 xmm0-15 / ymm0-15（AVX 有 16 个 256 位寄存器）
+                 <span class="c"># 用 AVX-512 时是 32 个 512 位寄存器，保存成本更高</span>
+6. TLS 基址       fs_base / gs_base
+7. 浮点控制字    fcw / mxcsr
+
+<span class="c"># 进程切换额外要做的</span>
+8. 页表基址      CR3 ← 这一条引发 TLB 后果
+9. 内核栈指针切换（每个 task 独立内核栈）
+
+<span class="c"># 间接成本（更大，但常被忽略）</span>
+10. L1/L2 缓存被新任务的数据挤掉
+11. TLB 条目失效，后续访问要走多级页表
+12. 分支预测器历史被污染
+13. 流水线需要重新填充</pre>
+
+  <h3>到底多贵</h3>
+  <table>
+    <tr><th style="width:180px">场景</th><th style="width:150px">典型耗时</th><th>说明</th></tr>
+    <tr><td><b>同进程线程切换</b></td><td>1~3 μs</td><td>直接成本约 0.5~1 μs，其余是缓存变冷的间接损失</td></tr>
+    <tr><td><b>跨进程切换</b></td><td>3~10 μs</td><td>加上页表切换和 TLB 失效</td></tr>
+    <tr><td><b>跨 NUMA 节点切换</b></td><td>10~20 μs</td><td>内存访问延迟本身翻倍</td></tr>
+    <tr><td><b>系统调用（非切换）</b></td><td>0.1~0.5 μs</td><td>只进出内核，不换 task，便宜得多</td></tr>
+  </table>
+  <p>换算一下：如果每秒切换 10 万次，按 2 μs 算就是 <b>0.2 秒/秒</b> —— 20% 的 CPU 时间花在切换上，业务一行代码没跑。</p>
+
+  <h3>怎么观测</h3>
+  <pre><span class="c"># vmstat 的 cs 列 = 每秒上下文切换总数（含中断引起的）</span>
+vmstat 1
+<span class="c"># procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----</span>
+<span class="c">#  r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st</span>
+<span class="c">#  8  0      0 812345  12345 456789    0    0     0    12  800 45000 60 30 10  0  0</span>
+<span class="c">#                                                          ↑    ↑</span>
+<span class="c">#                                                       中断  上下文切换</span>
+
+<span class="c"># pidstat -w 按进程看切换（-w 是关键）</span>
+pidstat -w 1
+<span class="c">#   UID   PID   cswch/s nvcswch/s  Command</span>
+<span class="c">#  1000  1234   1200.00     50.00  java</span>
+<span class="c">#   cswch/s   = 自愿切换（voluntary），主动让出 CPU，比如等锁、等 IO</span>
+<span class="c">#   nvcswch/s = 非自愿切换（non-voluntary），被时间片强制剥夺</span>
+
+<span class="c"># 单个进程的累计切换次数</span>
+grep ctxt /proc/1234/status
+<span class="c"># voluntary_ctxt_switches:     1234567</span>
+<span class="c"># nonvoluntary_ctxt_switches:    89012</span></pre>
+  <div class="callout warn">
+    <b>怎么看这两个数的比例：</b><br>
+    <b>自愿切换远多于非自愿</b> → 线程大部分时间在等（锁、IO、sleep）。说明瓶颈不在 CPU，加线程可能有帮助，但要先确认下游扛不扛得住。<br>
+    <b>非自愿切换很高</b> → 可运行的线程比核多，在抢 CPU。加线程只会更糟，应该减线程或者加机器。<br>
+    <b>两个都很高，且 <span class="k">us + sy</span> 接近 100%</b> → 典型的"线程开太多在自相残杀"，<span class="k">sy</span>（系统态）占比高说明时间都花在调度和锁上了。
+  </div>
+  <div class="callout danger">
+    <b>一个反直觉的结论：上下文切换次数高，本身不是问题；切换带来的缓存失效才是。</b><br>
+    一个 1000 线程的服务每秒切 50 万次，如果每个线程都在做短小的任务，可能完全没问题（比如 Go 的 goroutine 调度）。但如果每次切换都让 32 KB 的 L1 和 1 MB 的 L2 变冷，那每次都要重新预热几十微秒。判断标准应该是<b>吞吐和延迟</b>，不是切换次数本身。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>调度算法</h2></div>
+  <p class="lead">Linux 的默认调度器是 CFS（Completely Fair Scheduler，完全公平调度器），从 2.6.23 起取代了 O(1) 调度器。6.6 内核起默认换成了 <b>EEVDF</b>（Earliest Eligible Virtual Deadline First），但核心思想仍是"虚拟时间"。</p>
+
+  <h3>CFS 的核心：虚拟运行时间</h3>
+  <p>CFS 不用固定时间片，而是给每个任务维护一个 <b>vruntime（虚拟运行时间）</b>。每次调度都选 vruntime 最小的任务跑。任务运行时 vruntime 增长，但增长速度与权重成反比：</p>
+  <pre><span class="b">vruntime += 实际运行时间 × (NICE_0_WEIGHT / 任务权重)</span>
+
+<span class="c"># NICE_0_WEIGHT = 1024</span>
+<span class="c"># 权重 = 1024 / 1.25^nice</span>
+
+nice 值 → 权重 → 相对 CPU 份额
+  -20   →  88761  →  <span class="g">86.7 倍</span>
+  -10   →   9548  →  9.3 倍
+    0   →   1024  →  1 倍（基准）
+   10   →    110  →  0.108 倍
+   19   →     15  →  <span class="r">0.0146 倍</span>
+
+<span class="c"># 也就是说：nice -20 的任务和 nice 19 的任务同时跑，</span>
+<span class="c"># CPU 时间分配大约是 88761 : 15 ≈ 5900 : 1</span></pre>
+  <p>这就是"每个 nice 级别差 1.25 倍"的来源。注意这是<b>权重比</b>，不是绝对的 CPU 百分比 —— 实际分到多少还取决于同时有多少个任务在跑。</p>
+
+  <h3>时间片怎么定</h3>
+  <pre><span class="c"># CFS 的目标：让所有可运行任务在一个"调度周期"内都至少跑一次</span>
+sched_latency_ns       = 6 ms      <span class="c"># 默认调度周期</span>
+sched_min_granularity_ns = 0.75 ms <span class="c"># 单个任务的最小时间片</span>
+
+<span class="c"># 时间片 = 调度周期 × (本任务权重 / 所有任务权重之和)</span>
+<span class="c"># 但不少于 min_granularity</span>
+
+<span class="c"># 例：4 个同优先级任务</span>
+时间片 = 6ms × (1024 / 4096) = <span class="g">1.5 ms</span>
+
+<span class="c"># 例：100 个同优先级任务</span>
+理想时间片 = 6ms / 100 = 0.06ms &lt; 0.75ms
+实际取 <span class="y">0.75 ms</span>
+此时调度周期被拉长到 100 × 0.75 = <span class="r">75 ms</span>
+
+<span class="c"># 含义：任务越多，单个任务的响应延迟越长</span>
+<span class="c"># 这就是为什么"线程开太多"会让延迟变差，即使 CPU 没打满</span></pre>
+
+  <h3>实时调度：SCHED_FIFO 与 SCHED_RR</h3>
+  <table>
+    <tr><th style="width:150px">策略</th><th style="width:200px">行为</th><th>风险</th></tr>
+    <tr><td class="f">SCHED_NORMAL</td><td>普通 CFS/EEVDF 调度</td><td>无</td></tr>
+    <tr><td class="f">SCHED_BATCH</td><td>批处理，减少唤醒抢占，适合纯计算</td><td>延迟变高</td></tr>
+    <tr><td class="f">SCHED_IDLE</td><td>只在 CPU 空闲时跑，权重极低</td><td>可能长期得不到 CPU</td></tr>
+    <tr><td class="f">SCHED_FIFO</td><td>实时，先进先出。<b>一旦运行就一直跑，直到自己让出或被更高优先级抢占</b></td><td><b>写错就是死机</b></td></tr>
+    <tr><td class="f">SCHED_RR</td><td>实时，带时间片轮转（默认 100 ms）</td><td>同优先级之间能轮转，稍安全</td></tr>
+    <tr><td class="f">SCHED_DEADLINE</td><td>按 deadline 调度，需要指定 runtime/deadline/period</td><td>参数算错会严重超时</td></tr>
+  </table>
+  <pre><span class="c"># 实时任务的防死锁机制：RT throttling</span>
+cat /proc/sys/kernel/sched_rt_runtime_us     <span class="c"># 950000</span>
+cat /proc/sys/kernel/sched_rt_period_us      <span class="c"># 1000000</span>
+<span class="c"># 含义：每 1 秒的周期里，实时任务最多用 950 ms（95%）</span>
+<span class="c"># 剩下的 50 ms 留给普通任务，防止一个死循环的 RT 线程锁死整台机器</span>
+
+<span class="c"># 把一个线程设成实时优先级（需要 CAP_SYS_NICE 或 root）</span>
+chrt -f 50 ./realtime_app        <span class="c"># SCHED_FIFO, 优先级 50（1-99，越大越高）</span>
+chrt -r 50 ./realtime_app        <span class="c"># SCHED_RR</span>
+chrt -p 1234                     <span class="c"># 查某个进程的调度策略</span></pre>
+  <div class="callout danger">
+    <b>不要把业务线程设成 SCHED_FIFO。</b>一个跑飞的实时线程会让整台机器失去响应 —— 连 SSH 都登不进去，只能重启。<b>实时调度只用于硬实时场景</b>（音视频、工业控制、高频交易的关键路径），而且要配合 CPU 隔离（<span class="k">isolcpus</span>）和充分的测试。
+  </div>
+
+  <h3>关于"CPU 密集任务饿死 IO 任务"</h3>
+  <p>这个说法流传很广，但在 CFS 下<b>并不成立</b>，需要说清楚边界：</p>
+  <table>
+    <tr><th style="width:230px">场景</th><th>会不会饿死</th><th>真实机制</th></tr>
+    <tr><td>CFS 下的 CPU 密集 vs IO 密集</td><td><b>不会</b></td><td>IO 任务睡眠时 vruntime 不增长，醒来后 vruntime 远小于 CPU 任务，<b>会被优先调度</b>。CFS 反而偏向 IO 型任务</td></tr>
+    <tr><td>RT 任务 vs 普通任务</td><td><b>会</b></td><td>RT 优先级绝对高于 CFS，只要 RT 任务可运行，CFS 任务就得不到 CPU。靠 RT throttling 兜底</td></tr>
+    <tr><td>固定大小线程池里的 CPU 任务 vs IO 任务</td><td><b>会</b></td><td><b>这才是真正的高频事故</b>：所有工作线程都被 CPU 密集任务占满，IO 任务在队列里排队，看起来像"饿死"，其实是线程池饱和</td></tr>
+    <tr><td>cgroup 的 cpu.max 配额</td><td><b>会</b></td><td>CPU 密集任务耗尽了配额，整个 cgroup 被 throttle，里面的 IO 任务也一起被限流</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>正确的心智模型：</b>内核调度器本身是公平的，<b>饿死几乎总是发生在应用层的资源池上</b> —— 线程池、连接池、队列。所以遇到"IO 请求超时但 CPU 不高"，先看线程池是不是被慢任务占满了，而不是去调内核参数。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>线程池该开多大</h2></div>
+  <p class="lead">这是本文最值钱的一节。答案不是一个数字，而是一个公式加三个约束。</p>
+
+  <h3>CPU 密集：核数 + 1</h3>
+  <pre><span class="c"># 为什么是 +1</span>
+N_cpu = 物理核数 + 1
+
+<span class="c"># +1 的作用：当某个线程偶尔因为缺页、GC、日志刷盘而短暂阻塞时，</span>
+<span class="c"># 多出来的那个线程能顶上，不让 CPU 空转</span>
+
+<span class="c"># 注意三个前提</span>
+1. 这里的"核数"是<b>物理核</b>，不是超线程后的逻辑核
+   <span class="c"># 超线程的两个逻辑核共享执行单元，对纯计算任务提升只有 10%~30%</span>
+   <span class="c"># 所以 8 物理核 16 逻辑核的机器，CPU 密集任务开 9 个，不是 17 个</span>
+2. 线程之间没有锁竞争。如果有，加线程只会加剧争抢
+3. 任务粒度不要太细。如果一个任务只要几微秒，调度开销会盖过收益</pre>
+
+  <h3>IO 密集：用利特尔法则推</h3>
+  <p><b>利特尔法则（Little's Law）</b>是排队论的基石，形式极简：</p>
+  <pre><span class="b">L = λ × W</span>
+
+L = 系统中同时存在的请求数（并发度）
+λ = 请求到达速率（吞吐，req/s）
+W = 单个请求的平均处理时间（s）
+
+<span class="c"># 变形：要达到吞吐 λ，且每个请求耗时 W，就必须有 L 个并发</span>
+<span class="b">需要的并发数 = 目标吞吐 × 单请求耗时</span></pre>
+  <p>把它和"等待时间 / 计算时间"结合起来，就得到线程池的经验公式：</p>
+  <pre><span class="b">N_threads = N_cores × (1 + W / C)</span>
+
+N_cores = 物理核数
+W       = 每个任务的等待时间（IO、锁、RPC，不占 CPU）
+C       = 每个任务的计算时间（占 CPU）
+
+<span class="c"># 推导：要让 N_cores 个核一直忙，就得有足够的线程在"计算"状态</span>
+<span class="c"># 一个线程的占空比 = C / (C + W)</span>
+<span class="c"># 要让 N_cores 个核满载，需要 N_cores / 占空比 = N_cores × (C+W)/C 个线程</span></pre>
+
+  <h4>完整算例</h4>
+  <pre><span class="c"># 场景：8 物理核的机器，处理一个 HTTP 请求</span>
+<span class="c">#   其中 10 ms 是本地计算（JSON 解析、业务逻辑）</span>
+<span class="c">#   90 ms 是等数据库返回（纯等待，不占 CPU）</span>
+
+C = 10 ms
+W = 90 ms
+N_cores = 8
+
+N = 8 × (1 + 90/10) = 8 × 10 = <span class="g">80 个线程</span>
+
+<span class="c"># 用利特尔法则交叉验证：</span>
+<span class="c"># 假设目标吞吐 800 req/s，单请求总耗时 100 ms</span>
+L = 800 × 0.1 = <span class="g">80</span>
+<span class="c"># 两个方法得到同一个数字，说明推导是对的</span>
+
+<span class="c"># 理论 CPU 利用率</span>
+每线程占空比 = 10 / 100 = 10%
+80 个线程 × 10% = 8 个核  <span class="c">// 正好打满</span></pre>
+
+  <h4>三个必须检查的约束</h4>
+  <table>
+    <tr><th style="width:150px">约束</th><th>检查什么</th><th>不满足的后果</th></tr>
+    <tr><td><b>下游容量</b></td><td>数据库连接池多大？下游服务能扛多少 QPS？</td><td>80 个线程同时查库，连接池只有 20，剩下 60 个在等连接 —— 公式失效，实际并发被压到 20</td></tr>
+    <tr><td><b>内存</b></td><td>每线程栈 8 MB（虚拟）+ 线程私有缓冲区</td><td>80 × 8 MB = 640 MB 虚拟地址空间（通常没事），但如果每个线程有 1 MB 缓冲，就是 80 MB 实际内存</td></tr>
+    <tr><td><b>上下文切换</b></td><td>线程数远超核数时，切换开销会上升</td><td>80 线程 / 8 核 = 10 倍超配，切换频繁。如果 W 很小（比如 1 ms），这个公式给出的线程数会很小，不用担心</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>公式的三个失效场景：</b><br>
+    ① <b>W 不是纯等待</b>。如果"等待"其实是在自旋（spinlock），它占着 CPU，应该算进 C 而不是 W。<br>
+    ② <b>W 波动极大</b>。平均 90 ms 但 P99 是 2 s，那按平均值算出来的线程数会导致长尾请求堆积。要用<b>高分位</b>而不是平均值来估算。<br>
+    ③ <b>任务是混合型的</b>。一个线程池里既有 5 ms 的缓存命中请求，也有 500 ms 的慢查询，用一个公式算没意义。<b>正确做法是按任务类型拆成多个池，各自独立配置</b>，避免慢任务占满快任务的线程。
+  </div>
+  <div class="callout ok">
+    <b>实操建议：</b>先用公式算出理论值，然后<b>从理论值的 60%~70% 开始压测</b>，逐步加，观察三个指标 —— 吞吐是否还在涨、P99 延迟是否开始劣化、<span class="k">nvcswch/s</span> 是否飙升。找到吞吐拐点就停。<b>不要一步到位开到理论值</b>，因为公式里的 W 和 C 本来就是估的。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>协程是什么</h2></div>
+  <p class="lead">协程不是"更轻量的线程"，它是一个完全不同的东西：<b>在用户态自己实现调度，内核完全不知道它的存在</b>。</p>
+
+  <h3>三种并发模型</h3>
+  <table>
+    <tr><th style="width:150px">模型</th><th style="width:230px">调度者</th><th>切换成本</th></tr>
+    <tr><td><b>1:1 线程</b></td><td>内核</td><td>1~3 μs，要进内核态</td></tr>
+    <tr><td><b>N:1 协程</b></td><td>用户态库</td><td>几十纳秒，纯用户态函数调用</td></tr>
+    <tr><td><b>M:N 协程</b></td><td>用户态运行时 + 内核</td><td>M 个协程跑在 N 个线程上，兼顾两者</td></tr>
+  </table>
+  <p>M:N 的关键在于：<b>只有真正会阻塞的系统调用才占用一个内核线程</b>，其余协程的切换全在用户态完成。</p>
+
+  <h3>有栈 vs 无栈</h3>
+  <table>
+    <tr><th style="width:120px">类型</th><th style="width:200px">实现</th><th>代表</th></tr>
+    <tr><td><b>有栈</b><br>stackful</td><td>每个协程有自己的栈，切换时换 SP。可以<b>在任意函数层级挂起</b></td><td>Go goroutine、Lua coroutine、Java 的虚拟线程（Loom）</td></tr>
+    <tr><td><b>无栈</b><br>stackless</td><td>编译器把函数改写成状态机，<b>只能在 await 点挂起</b>，不保存调用栈</td><td>Rust async、JavaScript async/await、Python asyncio、Kotlin 协程</td></tr>
+  </table>
+  <pre><span class="c">// 有栈协程：可以在深层函数里挂起，调用栈自动保留</span>
+<span class="b">func</span> handler() {
+    data := fetchFromDB()      <span class="c">// 这里阻塞，整个栈被保存</span>
+    process(data)
+}
+<span class="c">// 优点：写起来和同步代码一样，没有"函数着色"问题</span>
+<span class="c">// 缺点：每个协程一个栈，内存开销大</span>
+
+<span class="c">// 无栈协程：只能在 await 处挂起，状态要显式保存</span>
+<span class="b">async fn</span> handler() {
+    <span class="b">let</span> data = fetch_from_db().<span class="b">await</span>?;   <span class="c">// 只能在这里挂起</span>
+    process(data)
+}
+<span class="c">// 优点：没有栈开销，编译后就是一个状态机，内存极小</span>
+<span class="c">// 缺点：async 会"传染"—— 调用它的函数也必须是 async</span>
+<span class="c">//       这就是常说的"函数着色（function coloring）"问题</span></pre>
+
+  <h3>为什么 Go 能开百万 goroutine</h3>
+  <pre><span class="c"># 关键数字</span>
+goroutine 初始栈大小   = <span class="g">2 KB</span>（Go 1.4 起，之前是 8 KB）
+栈增长方式            = 连续栈，按需翻倍复制（2KB → 4KB → 8KB ...）
+栈上限                = 1 GB（64 位平台，可用 runtime/debug.SetMaxStack 调整）
+GOMAXPROCS 默认值     = CPU 核数
+
+<span class="c"># 对比 pthread</span>
+pthread 默认栈        = 8 MB（虚拟，ulimit -s 决定）
+100 万个 pthread      = 8 TB 虚拟地址空间 → <span class="r">直接失败</span>
+100 万个 goroutine    = 2 GB 起 → <span class="y">可行，但要注意内存</span>
+
+<span class="c"># 所以"百万 goroutine"是真的，但不是免费的</span>
+<span class="c"># 100 万 × 2KB = 2 GB，这还没算每个 goroutine 的业务数据</span>
+<span class="c"># 实际经验：单机 10 万级 goroutine 很轻松，百万级需要精打细算</span></pre>
+
+  <h4>GMP 模型</h4>
+  <table>
+    <tr><th style="width:80px">字母</th><th style="width:180px">含义</th><th>说明</th></tr>
+    <tr><td><b>G</b></td><td>Goroutine</td><td>协程本身，包含栈、指令指针、状态</td></tr>
+    <tr><td><b>M</b></td><td>Machine</td><td>内核线程，真正被 OS 调度的实体</td></tr>
+    <tr><td><b>P</b></td><td>Processor</td><td>逻辑处理器，持有本地可运行队列。<b>数量 = GOMAXPROCS</b></td></tr>
+  </table>
+  <p>M 必须绑定一个 P 才能执行 G。当某个 G 发起阻塞系统调用时，<b>M 会和 P 解绑</b>，P 被交给另一个 M 继续跑其他 G —— 这样阻塞一个系统调用不会浪费一个 P。这就是 M:N 的核心。</p>
+  <pre><span class="c"># 关键机制：work stealing（工作窃取）</span>
+每个 P 有自己的本地运行队列（最多 256 个 G）
+P 的队列空了 → 随机去别的 P 的队列偷一半过来
+这样天然实现了负载均衡，不需要中央调度器
+
+<span class="c"># 调度点（什么时候会切换）</span>
+1. 函数调用时的栈检查（Go 1.14 起的异步抢占）
+2. channel 操作阻塞
+3. 系统调用返回
+4. go 语句创建新 G
+5. GC 的 safepoint</pre>
+  <div class="callout warn">
+    <b>三个 Go 并发的实际坑：</b><br>
+    ① <b>goroutine 泄漏</b>：启动后永远阻塞在 channel 上，没人关。进程内存缓慢上涨，<span class="k">runtime.NumGoroutine()</span> 持续增长。用 <span class="k">pprof</span> 的 goroutine profile 能看到全部栈。<br>
+    ② <b>GOMAXPROCS 在容器里不感知 cgroup 配额</b>（Go 1.25 之前）。容器限 2 核但宿主机 64 核，Go 会开 64 个 P，导致频繁切换。用 <span class="k">automaxprocs</span> 库修正。<br>
+    ③ <b>CPU 密集的 goroutine 不会主动让出</b>。Go 1.14 之前只有函数调用时才有抢占点，一个没有函数调用的死循环会让整个 P 卡住。现在有基于信号的异步抢占，但仍然建议在长循环里偶尔 <span class="k">runtime.Gosched()</span>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>进程间通信</h2></div>
+  <table>
+    <tr><th style="width:130px">方式</th><th style="width:120px">数据拷贝次数</th><th style="width:120px">适用场景</th><th>主要限制</th></tr>
+    <tr><td><b>匿名管道</b><br>pipe</td><td>2 次</td><td>父子进程、shell 管道</td><td>单向、只能亲缘进程、容量 64 KB</td></tr>
+    <tr><td><b>命名管道</b><br>FIFO</td><td>2 次</td><td>无亲缘关系的本地进程</td><td>单向、仍在内核缓冲、容量有限</td></tr>
+    <tr><td><b>共享内存</b><br>shm</td><td><b>0 次</b></td><td>大数据量、高频交换</td><td><b>必须自己做同步</b>（信号量/锁），否则数据竞争</td></tr>
+    <tr><td><b>消息队列</b><br>msgqueue</td><td>2 次</td><td>有格式的消息、需要优先级</td><td>单条消息有大小上限，队列总量有限</td></tr>
+    <tr><td><b>Unix 域 socket</b></td><td>2 次</td><td>本机 C/S，最通用</td><td>比共享内存慢，但比 TCP 快（不走协议栈）</td></tr>
+    <tr><td><b>TCP socket</b></td><td>2 次 + 协议栈</td><td>跨机器</td><td>协议栈开销、序列化成本</td></tr>
+    <tr><td><b>信号</b><br>signal</td><td>0 次（只传编号）</td><td>通知事件、进程控制</td><td><b>不能传数据</b>、会丢失、处理函数里能做的事极少</td></tr>
+  </table>
+
+  <h3>为什么共享内存最快</h3>
+  <pre><span class="c"># 管道 / socket 的数据路径（2 次拷贝）</span>
+进程 A 的用户空间
+   ↓ write() 系统调用，拷贝 1
+内核缓冲区
+   ↓ read() 系统调用，拷贝 2
+进程 B 的用户空间
+
+<span class="c"># 共享内存的路径（0 次拷贝）</span>
+进程 A 的用户空间 ──┐
+                    ├─→ 同一块物理内存页
+进程 B 的用户空间 ──┘
+<span class="c"># 建立映射后，读写就是普通的内存访问</span>
+<span class="c"># 但要自己保证：什么时候 A 写完了、B 可以读了</span>
+
+<span class="c"># 实践：POSIX 共享内存 + 信号量</span>
+shm_open("/mybuf", O_CREAT | O_RDWR, 0600);
+ftruncate(fd, SIZE);
+p = mmap(NULL, SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+<span class="c"># 之后 p 就是两个进程共享的内存</span></pre>
+  <div class="callout warn">
+    <b>共享内存的三个陷阱：</b><br>
+    ① <b>没有同步就没有意义</b>。共享内存只解决了"数据能互相看到"，没解决"什么时候能看"。必须配信号量或原子标志。<br>
+    ② <b>指针不能跨进程用</b>。两个进程的映射地址可能不同，共享结构体里只能放偏移量，不能放绝对指针。<br>
+    ③ <b>进程崩溃会留下脏数据</b>。共享内存不会自动清理，需要设计"所有者"机制或者用 <span class="k">shm_unlink</span> 明确生命周期。
+  </div>
+
+  <h3>怎么选</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先问是不是本机。</b>跨机器只能用 socket；本机优先 Unix 域 socket（比 TCP 少走协议栈，快 2~3 倍）。</div></div>
+    <div class="step"><div class="txt"><b>再问数据量大不大。</b>单次超过几百 KB 或者每秒几十万次，考虑共享内存；否则 socket 足够，开发成本低得多。</div></div>
+    <div class="step"><div class="txt"><b>再问要不要跨语言。</b>共享内存的结构体布局依赖编译器和 ABI，跨语言容易出错。socket + 明确协议更安全。</div></div>
+    <div class="step"><div class="txt"><b>最后问能不能改架构。</b>如果两个进程通信非常频繁，通常说明它们<b>本该是一个进程</b>。先考虑合并，再考虑优化 IPC。</div></div>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>同步原语</h2></div>
+  <table>
+    <tr><th style="width:130px">原语</th><th style="width:230px">语义</th><th>典型误用</th></tr>
+    <tr><td><b>互斥锁</b><br>mutex</td><td>同一时刻只有一个线程能进入临界区。<b>所有权明确</b>：谁加锁谁解锁</td><td>忘记解锁、锁粒度太大、在持锁时做 IO</td></tr>
+    <tr><td><b>条件变量</b><br>condvar</td><td>让线程等待某个条件成立，由别人唤醒。<b>必须配互斥锁使用</b></td><td>用 <span class="k">if</span> 而不是 <span class="k">while</span> 判断条件（虚假唤醒）</td></tr>
+    <tr><td><b>读写锁</b><br>rwlock</td><td>读共享、写独占。适合读远多于写的场景</td><td>读多写少时反而比 mutex 慢（引用计数开销）</td></tr>
+    <tr><td><b>信号量</b><br>semaphore</td><td>计数器，控制<b>同时访问的个数</b>。<b>没有所有权</b>：A 申请 B 释放是合法的</td><td>当成互斥锁用（count=1），失去"可跨线程释放"的特性</td></tr>
+    <tr><td><b>自旋锁</b><br>spinlock</td><td>拿不到就忙等，不睡眠。<b>只在临界区极短（几十纳秒）时划算</b></td><td>在用户态用，临界区长，白烧 CPU</td></tr>
+    <tr><td><b>屏障</b><br>barrier</td><td>让 N 个线程都到达某点后才一起继续</td><td>线程数变化时死锁</td></tr>
+  </table>
+
+  <h3>条件变量的正确写法</h3>
+  <pre><span class="c">// ===== 错误：用 if 判断 =====</span>
+pthread_mutex_lock(&amp;m);
+<span class="b">if</span> (!ready)                      <span class="c">// ✗ 虚假唤醒时会直接往下走</span>
+    pthread_cond_wait(&amp;c, &amp;m);
+pthread_mutex_unlock(&amp;m);
+consume();
+
+<span class="c">// ===== 正确：用 while 循环 =====</span>
+pthread_mutex_lock(&amp;m);
+<span class="b">while</span> (!ready)                    <span class="c">// ✓ 醒来后重新检查</span>
+    pthread_cond_wait(&amp;c, &amp;m);
+pthread_mutex_unlock(&amp;m);
+consume();
+
+<span class="c">// 为什么必须用 while：</span>
+<span class="c">// 1. 虚假唤醒（spurious wakeup）：POSIX 明确允许 cond_wait 无故返回</span>
+<span class="c">// 2. 多个等待者被唤醒后，只有一个能拿到锁，其他的要重新等</span>
+<span class="c">// 3. 条件可能在唤醒和拿锁之间被别人改回去了</span>
+
+<span class="c">// ===== 发信号端 =====</span>
+pthread_mutex_lock(&amp;m);
+ready = 1;
+pthread_cond_signal(&amp;c);          <span class="c">// 唤醒一个；broadcast 唤醒全部</span>
+pthread_mutex_unlock(&amp;m);
+<span class="c">// 注意：signal 可以在解锁前也可以在解锁后，各有性能权衡</span>
+<span class="c">// 解锁前 signal：被唤醒者立刻阻塞在锁上（可能"hurry up and wait"）</span>
+<span class="c">// 解锁后 signal：可能错过（如果没人等），但通常更高效</span></pre>
+
+  <h3>读写锁为什么常常更慢</h3>
+  <pre><span class="c"># pthread_rwlock 内部要维护读者计数</span>
+读加锁：原子递增计数 + 检查有没有写者在等
+读解锁：原子递减计数 + 可能唤醒写者
+<span class="c"># 两次原子操作，在竞争激烈时缓存行来回弹（伪共享）</span>
+
+<span class="c"># pthread_mutex 在无竞争时就是一次 CAS</span>
+<span class="c"># 所以：临界区极短 + 竞争少时，mutex 反而更快</span>
+
+<span class="c"># 经验法则</span>
+读:写 &gt; 10:1 且 临界区较长（&gt; 几百 ns） → rwlock 有优势
+其他情况 → 直接用 mutex</pre>
+  <div class="callout danger">
+    <b>四个必须知道的死锁模式：</b><br>
+    ① <b>ABBA 死锁</b>：线程 1 锁 A 再锁 B，线程 2 锁 B 再锁 A。<b>解法：全局定义锁顺序</b>，所有代码按同一顺序加锁。<br>
+    ② <b>自己锁自己</b>：非递归锁重复加锁。<b>解法：用递归锁，或者重构代码避免嵌套</b>。<br>
+    ③ <b>持锁做 IO</b>：拿着锁去查数据库，锁被持有几百毫秒，所有线程排队。<b>解法：把 IO 挪到锁外</b>，只对内存数据的修改加锁。<br>
+    ④ <b>条件变量丢失唤醒</b>：先 signal 后 wait，信号丢了线程永远等下去。<b>解法：条件判断和 wait 必须在同一个锁保护下</b>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>观测与排查</h2></div>
+  <p class="lead">"哪个线程在跑满 CPU"这个问题，答案在 <span class="k">/proc/PID/task</span> 里。下面是完整的排查路径。</p>
+
+  <h3>第一步：确认是哪个线程</h3>
+  <pre><span class="c"># top -H：按线程显示（H = Threads）</span>
+top -H -p 1234
+<span class="c"># 输出的 PID 列实际是 TID（线程 ID），能看到每个线程的 CPU%</span>
+<span class="c"># 按 P 按 CPU 排序，最上面那个就是元凶</span>
+
+<span class="c"># ps -L：列出进程的所有线程</span>
+ps -L -p 1234 -o pid,tid,psr,pcpu,stat,comm
+<span class="c">#  psr = 跑在哪个核上；stat = R/S/D/Z</span>
+
+<span class="c"># pidstat -t：按线程统计（比 top 更适合脚本）</span>
+pidstat -t -p 1234 1
+<span class="c">#   UID  TGID   TID    %usr %system  %CPU   CPU  Command</span>
+<span class="c">#  1000  1234  1234    0.00    0.00   0.0     3  java</span>
+<span class="c">#  1000  1234  1240   99.00    1.00 100.0     5  java|GC Thread#0</span>
+<span class="c">#                              ↑ 这个线程在跑满一个核</span>
+
+<span class="c"># 线程名（Java 里通过 Thread.setName 设置，会体现在 comm 里）</span>
+cat /proc/1234/task/1240/comm</pre>
+
+  <h3>第二步：看线程在干什么</h3>
+  <pre><span class="c"># 1. 用户态还是内核态？</span>
+cat /proc/1234/task/1240/stat
+<span class="c"># 第 3 个字段是状态：R=运行 S=睡眠 D=不可中断睡眠 Z=僵尸</span>
+<span class="c"># 第 39 个字段是 utime，40 是 stime（单位 jiffies）</span>
+
+<span class="c"># 2. 内核栈（需要 root）</span>
+cat /proc/1234/task/1240/stack
+<span class="c"># 如果在 D 状态且栈里有 io_schedule，说明卡在磁盘 IO</span>
+
+<span class="c"># 3. 用户态栈（C/C++）</span>
+gdb -p 1240 -batch -ex "thread apply all bt" 2&gt;/dev/null
+
+<span class="c"># 4. Java 线程栈（TID 要转成十六进制）</span>
+printf "%x\n" 1240          <span class="c"># 输出 4d8</span>
+jstack 1234 | grep -A 20 "nid=0x4d8"
+
+<span class="c"># 5. 看谁在等锁</span>
+cat /proc/1234/task/1240/wchan</pre>
+
+  <h3>第三步：整体判断</h3>
+  <div class="cmds">
+    <div class="crow"><code>top -H -p &lt;pid&gt;</code><span class="desc">按线程看 CPU，找元凶</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -L -p &lt;pid&gt; -o pid,tid,psr,pcpu,stat,comm</code><span class="desc">线程列表 + 绑在哪个核</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -t -p &lt;pid&gt; 1</code><span class="desc">按线程的持续采样，带线程名</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -w -p &lt;pid&gt; 1</code><span class="desc">自愿/非自愿切换次数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/&lt;pid&gt;/status | grep Threads</code><span class="desc">线程总数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ls /proc/&lt;pid&gt;/task | wc -l</code><span class="desc">线程总数（另一种算法）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/loadavg</code><span class="desc">1/5/15 分钟平均负载 + 运行中/总线程数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mpstat -P ALL 1</code><span class="desc">每个核的利用率，看是否单核打满</span><button class="copy">复制</button></div>
+    <div class="crow"><code>vmstat 1</code><span class="desc">cs 列看切换，r 列看运行队列长度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf top -t &lt;tid&gt;</code><span class="desc">看某个线程的热点函数</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>三种典型症状对照</h3>
+  <table>
+    <tr><th style="width:200px">现象</th><th style="width:200px">判断</th><th>下一步</th></tr>
+    <tr><td>单核 100%，其他核空闲，<span class="k">mpstat</span> 明显不均衡</td><td><b>单线程瓶颈</b></td><td>用 <span class="k">perf top -t</span> 看热点；考虑拆分任务或改多线程</td></tr>
+    <tr><td>所有核都 60~70%，<span class="k">cs</span> 很高，<span class="k">sy</span> 占比高</td><td><b>线程过多在自相残杀</b></td><td>减少线程数，或者查锁竞争（<span class="k">perf lock</span>）</td></tr>
+    <tr><td>CPU 不高但延迟很高，<span class="k">r</span> 列很大</td><td><b>等 IO 或等锁</b></td><td>看 <span class="k">D</span> 状态线程数、<span class="k">iostat</span>、连接池水位</td></tr>
+  </table>
+  <div class="callout warn">
+    <b><span class="k">load average</span> 的准确含义：</b>Linux 的 load 统计的是<b>"运行中 + 不可中断睡眠（D 状态）"</b>的任务数，不只是 CPU 队列。<br>
+    所以一个纯 IO 阻塞的服务，CPU 只有 10%，load 却可能到 20。这时候 load 高不代表 CPU 不够，而是<b>很多任务卡在 D 状态</b>（通常是磁盘 IO 或 NFS）。判断依据是 <span class="k">vmstat</span> 的 <span class="k">b</span> 列（阻塞进程数）。<br>
+    经验阈值：load / 核数 &lt; 0.7 健康，&gt; 1.0 需要关注，&gt; 2.0 基本是故障。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 <span class="k">nproc</span> 的结果当物理核数</div><div class="pd">开了超线程的机器，nproc 是逻辑核数，通常是物理核的 2 倍。CPU 密集任务的线程池按逻辑核数开，会导致两个线程抢一个物理核的执行单元，吞吐反而下降。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">线程池按公式算完直接用</div><div class="pd">公式给出的是"理论并发度"，但下游数据库连接池可能只有 20。80 个线程抢 20 个连接，实际并发被压到 20，多出来的线程只是在等连接。要先确认下游容量。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 CPU 密集和 IO 密集任务放同一个线程池</div><div class="pd">慢的 CPU 任务会把所有工作线程占满，IO 任务在队列里排队，表现为"CPU 100% 但请求全超时"。按任务类型拆池，各自独立配置。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">条件变量用 <span class="k">if</span> 判断条件</div><div class="pd">POSIX 允许虚假唤醒，而且多个等待者被唤醒后只有一个能拿到锁。必须用 <span class="k">while</span> 循环重新检查条件，否则会在条件不成立时继续执行。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">持锁做 IO 或 RPC</div><div class="pd">锁被持有几百毫秒，所有线程排队。这把锁实际上变成了串行化的瓶颈。原则：只在锁内做内存操作，IO 一律挪到锁外。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把业务线程设成 SCHED_FIFO</div><div class="pd">实时线程一旦跑飞，会占满 CPU 让整机失去响应，SSH 都登不进去。实时调度只用于硬实时场景，且要配合 CPU 隔离和 RT throttling。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">goroutine / 协程泄漏</div><div class="pd">启动后永远阻塞在 channel 或锁上，没人关闭。表现为内存缓慢上涨、<span class="k">NumGoroutine()</span> 持续增长。用 pprof 的 goroutine profile 抓全量栈，找阻塞点。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">线程栈设太大导致线程创建失败</div><div class="pd">默认 8 MB 栈 × 1000 线程 = 8 GB 虚拟地址空间。32 位进程直接失败，64 位也可能撞上 <span class="k">max_map_count</span> 限制。线程多时把 <span class="k">pthread_attr_setstacksize</span> 调到 256 KB~1 MB。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 load average 判断 CPU 是否饱和</div><div class="pd">Linux 的 load 包含 D 状态（不可中断睡眠）任务。纯 IO 阻塞的服务 CPU 只有 10%，load 也可能到 20。要看 <span class="k">vmstat</span> 的 <span class="k">r</span>（运行队列）和 <span class="k">b</span>（阻塞数）分开判断。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">在容器里相信 nproc 和 free 的输出</div><div class="pd">容器看到的是宿主机资源。CPU 配额看 <span class="k">/sys/fs/cgroup/cpu.max</span>，内存限制看 <span class="k">memory.max</span>。JVM、Go runtime 在旧版本里都不感知 cgroup 限制，会按宿主机规格开线程和堆。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 同一进程内的两个线程，哪个资源是<b>不共享</b>的？</div>
+      <button class="opt">文件描述符表</button>
+      <button class="opt">栈和寄存器组</button>
+      <button class="opt">地址空间</button>
+      <div class="ans">正确答案：<b>栈和寄存器组</b>。线程共享地址空间（CLONE_VM）、fd 表（CLONE_FILES）、信号处理函数（CLONE_SIGHAND）、工作目录（CLONE_FS），但每个线程有自己的栈、寄存器、TLS、errno 和信号屏蔽字。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 8 物理核的机器，任务平均 10 ms 计算 + 90 ms 等数据库。按公式线程池该开多大？</div>
+      <button class="opt">9 个</button>
+      <button class="opt">16 个</button>
+      <button class="opt">80 个</button>
+      <div class="ans">正确答案：<b>80 个</b>。N = 8 × (1 + 90/10) = 80。交叉验证：若目标吞吐 800 req/s、单请求 100 ms，利特尔法则给出 L = 800 × 0.1 = 80，两者一致。但前提是数据库连接池能支撑 80 并发，否则实际并发会被连接池压到更低。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 线程切换比进程切换便宜，最主要的原因是？</div>
+      <button class="opt">不需要切换页表，TLB 和缓存不会整体失效</button>
+      <button class="opt">线程的寄存器更少</button>
+      <button class="opt">线程切换不需要进内核态</button>
+      <div class="ans">正确答案：<b>不换页表</b>。两者都要进内核、都要保存寄存器。关键差别是线程共享地址空间，不需要写 CR3，TLB 不会失效，热点数据还在缓存里。直接成本只有几百纳秒，间接的缓存/TLB 损失才是大头。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. <span class="k">pidstat -w</span> 显示某进程 <span class="k">nvcswch/s</span>（非自愿切换）很高，说明？</div>
+      <button class="opt">线程大部分时间在等锁或 IO</button>
+      <button class="opt">进程内存不足</button>
+      <button class="opt">可运行的线程数超过核数，在抢 CPU，加线程只会更糟</button>
+      <div class="ans">正确答案：<b>在抢 CPU</b>。非自愿切换是被时间片强制剥夺，说明就绪队列里有更多线程等着跑。这时候加线程会加剧争抢，正确做法是减线程或加机器。反过来，自愿切换（cswch/s）高才说明在等 IO/锁。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. Go 能开百万 goroutine 的核心原因是？</div>
+      <button class="opt">goroutine 直接映射到内核线程，调度更快</button>
+      <button class="opt">初始栈只有 2 KB 且可按需增长，加上 M:N 的用户态调度</button>
+      <button class="opt">Go 用了更快的 malloc</button>
+      <div class="ans">正确答案：<b>小栈 + M:N 调度</b>。goroutine 初始栈 2 KB（pthread 默认 8 MB），按需翻倍增长。GMP 模型把 M 个 goroutine 复用到 N 个内核线程上，阻塞系统调用时 M 与 P 解绑，不浪费 P。100 万个 goroutine 约需 2 GB 栈内存，不是零成本。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 共享内存比管道快，根本原因是？</div>
+      <button class="opt">建立映射后是零拷贝，读写就是普通内存访问</button>
+      <button class="opt">共享内存用的是更快的存储介质</button>
+      <button class="opt">共享内存不需要加锁</button>
+      <div class="ans">正确答案：<b>零拷贝</b>。管道要走两次系统调用、两次数据拷贝（用户→内核→用户）。共享内存建立 mmap 之后，两个进程访问同一块物理页，没有拷贝。但代价是<b>必须自己实现同步</b>，而且共享结构体里不能放绝对指针。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+
+  <h3>线程池容量公式</h3>
+  <pre><span class="c"># CPU 密集</span>
+N = 物理核数 + 1
+
+<span class="c"># IO 密集</span>
+N = 物理核数 × (1 + W / C)
+    W = 等待时间（IO、RPC、锁等待，不占 CPU）
+    C = 计算时间（占 CPU）
+
+<span class="c"># 利特尔法则（交叉验证）</span>
+L = λ × W
+    L = 并发度，λ = 目标吞吐(req/s)，W = 单请求耗时(s)
+
+<span class="c"># 实例：8 核，10ms 计算 + 90ms 等待</span>
+N = 8 × (1 + 90/10) = 80
+<span class="c"># 验证：目标 800 req/s × 0.1s = 80 并发 ✓</span>
+
+<span class="c"># 实际取值：理论值的 60%~70% 起压，观察拐点</span></pre>
+
+  <h3>观测命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>top -H -p &lt;pid&gt;</code><span class="desc">按线程看 CPU，找元凶</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -L -p &lt;pid&gt; -o pid,tid,psr,pcpu,stat,comm</code><span class="desc">线程列表 + 所在核 + 状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -t -p &lt;pid&gt; 1</code><span class="desc">按线程持续采样，带线程名</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -w -p &lt;pid&gt; 1</code><span class="desc">自愿/非自愿上下文切换</span><button class="copy">复制</button></div>
+    <div class="crow"><code>vmstat 1</code><span class="desc">r 运行队列 / b 阻塞数 / cs 切换数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mpstat -P ALL 1</code><span class="desc">逐核利用率，看是否单核瓶颈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/&lt;pid&gt;/status | grep -i ctxt</code><span class="desc">累计切换次数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ls /proc/&lt;pid&gt;/task | wc -l</code><span class="desc">线程总数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/&lt;pid&gt;/task/&lt;tid&gt;/stack</code><span class="desc">内核栈，判断卡在哪（需 root）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gdb -p &lt;tid&gt; -batch -ex "bt"</code><span class="desc">用户态调用栈（C/C++）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jstack &lt;pid&gt; | grep -A 20 "nid=0x&lt;hex-tid&gt;"</code><span class="desc">Java 线程栈，TID 要先转十六进制</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf top -t &lt;tid&gt;</code><span class="desc">某个线程的热点函数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>chrt -p &lt;pid&gt;</code><span class="desc">查调度策略与优先级</span><button class="copy">复制</button></div>
+    <div class="crow"><code>taskset -pc &lt;pid&gt;</code><span class="desc">查 CPU 亲和性</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键参数</h3>
+  <pre><span class="c"># 调度</span>
+/proc/sys/kernel/sched_latency_ns           <span class="c"># 默认 6000000 (6ms)</span>
+/proc/sys/kernel/sched_min_granularity_ns   <span class="c"># 默认 750000 (0.75ms)</span>
+/proc/sys/kernel/sched_rt_runtime_us        <span class="c"># 默认 950000，RT 任务每周期可用时间</span>
+/proc/sys/kernel/sched_rt_period_us         <span class="c"># 默认 1000000 (1s)</span>
+
+<span class="c"># 限制</span>
+/proc/sys/kernel/threads-max                <span class="c"># 系统级最大线程数</span>
+/proc/sys/vm/max_map_count                  <span class="c"># 最大内存映射数，线程多时会撞上</span>
+/proc/sys/kernel/pid_max                    <span class="c"># PID 上限</span>
+ulimit -u                                   <span class="c"># 用户级最大进程/线程数</span>
+ulimit -s                                   <span class="c"># 线程栈大小 (KB)</span>
+
+<span class="c"># cgroup v2 里的真实配额</span>
+/sys/fs/cgroup/cpu.max                      <span class="c"># 形如 "200000 100000" = 2 核</span>
+/sys/fs/cgroup/memory.max                   <span class="c"># 内存上限（字节）</span>
+/sys/fs/cgroup/cpu.stat                     <span class="c"># nr_throttled 看被限流次数</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>task_struct</b></td><td>Linux 内核里表示一个执行实体的结构体，进程和线程都是它</td></tr>
+    <tr><td><b>clone()</b></td><td>创建执行实体的系统调用，靠标志位决定共享多少资源</td></tr>
+    <tr><td><b>CLONE_VM</b></td><td>共享地址空间的标志，是"线程"与"进程"的分水岭</td></tr>
+    <tr><td><b>TLS</b></td><td>线程局部存储，每个线程一份的变量，靠 FS/GS 段寄存器定位</td></tr>
+    <tr><td><b>上下文切换</b></td><td>保存当前任务的寄存器状态、恢复另一个任务的过程</td></tr>
+    <tr><td><b>PCID</b></td><td>进程上下文标识，让进程切换时不用整体刷 TLB</td></tr>
+    <tr><td><b>CFS</b></td><td>完全公平调度器，按 vruntime 选择下一个任务</td></tr>
+    <tr><td><b>EEVDF</b></td><td>6.6 内核起的默认调度器，在 CFS 基础上加入虚拟截止时间</td></tr>
+    <tr><td><b>vruntime</b></td><td>虚拟运行时间，CFS 的排序键，增长速率与权重成反比</td></tr>
+    <tr><td><b>nice 值</b></td><td>-20 到 19 的优先级，每级权重相差 1.25 倍</td></tr>
+    <tr><td><b>RT throttling</b></td><td>限制实时任务最多占用 95% CPU，防止锁死系统</td></tr>
+    <tr><td><b>利特尔法则</b></td><td>L = λW，并发数 = 吞吐 × 单请求耗时，排队论的基石</td></tr>
+    <tr><td><b>协程 coroutine</b></td><td>用户态调度的执行单元，切换不进内核</td></tr>
+    <tr><td><b>有栈协程</b></td><td>每个协程有独立栈，可在任意函数层级挂起（Go）</td></tr>
+    <tr><td><b>无栈协程</b></td><td>编译成状态机，只能在 await 点挂起（Rust/JS）</td></tr>
+    <tr><td><b>GMP</b></td><td>Go 的调度模型：Goroutine / Machine / Processor</td></tr>
+    <tr><td><b>work stealing</b></td><td>空闲的 P 从别的 P 队列偷任务，实现负载均衡</td></tr>
+    <tr><td><b>虚假唤醒</b></td><td>条件变量的 wait 无故返回，必须用 while 重新检查条件</td></tr>
+    <tr><td><b>ABBA 死锁</b></td><td>两个线程以相反顺序加两把锁导致的死锁</td></tr>
+    <tr><td><b>D 状态</b></td><td>不可中断睡眠，通常卡在磁盘 IO，会算进 load average</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个两线程程序，一个纯计算、一个每 10 ms 睡一次，用 <span class="k">pidstat -w</span> 观察两者的自愿切换差异；② 用 <span class="k">top -H</span> 抓一个 Java 进程里最忙的线程，再用 <span class="k">jstack</span> 定位到代码行；③ 按利特尔法则给你手上的服务算一次线程池大小，然后压测验证拐点；④ 写一个 1000 goroutine 的程序，用 <span class="k">runtime.NumGoroutine()</span> 和 pprof 观察栈内存；⑤ 用共享内存 + 信号量实现一个简易的生产者消费者，对比管道的吞吐。<br><br>
+    <b>之后值得单独学：</b>cgroup v2 的 CPU 带宽控制与 throttle 机制、NUMA 感知的调度与绑核、io_uring 对阻塞模型的影响、Java 虚拟线程（Loom）的实现细节、以及分布式系统里的背压与限流。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透进程、线程与调度 · 线程池大小是算出来的，不是抄来的</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（线程池公式）和模块 5（协程）最值得回看。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边用 pidstat -t 观察自己的服务。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开着 top -H 和一个多线程服务，边读边看线程状态';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

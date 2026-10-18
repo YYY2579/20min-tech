@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟速通 HBase</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 13 期 · 高密度版</span>
+    <h1>二十分钟速通 HBase</h1>
+    <p class="sub">HBase 的知识就一条主线：<b>LSM 树决定写入，RowKey 决定分布，Region 决定扩展</b>。这篇讲清 MemStore→HFile→Compaction 全链路、RowKey 防热点三板斧、读写路径，以及 Phoenix 二级索引怎么用。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 级 LSM 结构</span>
+      <span class="chip"><b>3</b> 种 RowKey 防热点</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 HBase 跟着敲：docker run -d -p 2181:2181 -p 16010:16010 harisekhon/hbase</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 单机 standalone（自带 ZooKeeper，学习够用）</span>
+docker run -d --name hbase -p 2181:2181 -p 16010:16010 -p 16000:16000 harisekhon/hbase
+
+<span class="c"># 进 shell</span>
+docker exec -it hbase hbase shell
+
+<span class="c"># 最小四连：建表 → 插数 → 查 → 扫</span>
+create 'student', 'info'
+put 'student', 'row1', 'info:name', 'Tom'
+put 'student', 'row1', 'info:age', '18'
+get 'student', 'row1'
+scan 'student', {LIMIT =&gt; 10}
+
+<span class="c"># 常用运维命令</span>
+status 'simple'                      <span class="c"># 集群状态</span>
+status 'detailed'                    <span class="c"># 每台 RegionServer 的 region 数、请求数</span>
+list                                 <span class="c"># 所有表</span>
+describe 'student'                   <span class="c"># 表结构、列族、压缩编码全在里面</span></pre>
+  <div class="callout warn">
+    <b>数据模型先记住三点：</b>① 没有"列"的 schema —— 列是 <span class="k">列族:限定符</span> 动态拼出来的；② 一个 <b>Cell</b> = RowKey + 列族 + 限定符 + 时间戳 + 值，<b>写一次就是一个新版本</b>；③ 行内按列族<b>字典序</b>排序存储，<b>RowKey 全局字典序</b> —— 这个排序属性是 RowKey 设计的一切基础。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>LSM 树模型：写入的哲学</h2></div>
+  <p class="lead">HBase 用 <b>LSM 树（Log-Structured Merge Tree）</b>换掉了 B+ 树的随机写。核心思想：<b>写全部是顺序追加，合并和排序留给后台</b>。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>写 WAL</b>：客户端的 put 先追加到 <b>HLog（Write-Ahead Log）</b>，崩溃后靠它恢复。这是"不丢数据"的唯一保证</div></div>
+    <div class="step"><div class="txt"><b>写 MemStore</b>：数据进入<b>每个列族独立的内存有序结构</b>（MemStore，跳表实现），写满默认 <b>128MB</b>（hbase.hregion.memstore.flush.size）触发下一步</div></div>
+    <div class="step"><div class="txt"><b>Flush 成 HFile</b>：MemStore 排序后刷成磁盘上的 <b>HFile</b>（不可变、有序、带布隆过滤器和索引块）。<b>HFile 一旦生成就不再改</b></div></div>
+    <div class="step"><div class="txt"><b>Compaction</b>：小 HFile 越写越多，读要逐个查。compaction 把多个 HFile 合并成大 HFile。<b>删除标记和过期版本在这一刻才真正物理消失</b></div></div>
+  </div>
+  <h4>两种 Compaction</h4>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:250px">行为</th><th>触发与影响</th></tr>
+    <tr><td><b>Minor</b></td><td>把若干个小 HFile 合并成一个中等 HFile，不做全量清理</td><td>触发频繁、代价小。<span class="k">hbase.hstore.compactionThreshold</span> 默认 3（文件数超过就合并）</td></tr>
+    <tr><td><b>Major</b></td><td>一个 Store 内<b>所有 HFile 合并成一个</b>，彻底清理删除标记、过期版本、TTL 数据</td><td>代价大（全 Store 重写），默认 7 天一次。<b>IO 尖刺的主要来源</b>，大表要放维护窗口</td></tr>
+  </table>
+  <pre><span class="c"># 看 LSM 各层状态（排障第一现场）</span>
+hbase hbck -summary                     <span class="c"># 一致性检查</span>
+
+<span class="c"># 手动触发 compaction（低峰期执行）</span>
+major_compact 'student'                  <span class="c"># 整表 major</span>
+compact 'student', 'cf1', 'rowkey'       <span class="c"># 只压某个 region 的某个列族</span>
+
+<span class="c"># 关键参数（hbase-site.xml）</span>
+hbase.hregion.memstore.flush.size: 128m          <span class="c"># MemStore 刷盘阈值</span>
+hbase.hstore.compactionThreshold: 3              <span class="c"># minor compaction 文件数阈值</span>
+hbase.hstore.compaction.max: 10                  <span class="c"># minor 一次最多合多少文件</span>
+hbase.hregion.majorcompaction: 604800000         <span class="c"># major 间隔，默认 7 天（ms）</span>
+hbase.regionserver.hlog.sync: true               <span class="c"># WAL 同步，见模块 4</span></pre>
+  <div class="callout danger">
+    <b>LSM 的代价是读放大和 compaction 放大：</b>一次读可能同时查 MemStore + 多个 HFile；写 1 份数据，compaction 期间可能被反复重写 10 次以上。<b>大表场景 compaction 是磁盘 IO 的最大消费者</b> —— 监控 <span class="k">compactionQueueSize</span>，长期大于 0 说明 compaction 追不上写入，要么降写入要么加机器。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>RowKey 设计：唯一的索引</h2></div>
+  <p class="lead">HBase <b>只有 RowKey 一个索引</b>，RowKey 决定了数据落在哪个 Region、读写走哪台机器。<b>RowKey 设计错 = 集群一半机器闲死一半机器忙死。</b></p>
+  <h4>三个致命错误</h4>
+  <table>
+    <tr><th style="width:220px">设计</th><th>后果</th></tr>
+    <tr><td class="f">单调递增（时间戳、自增 ID）</td><td><b>热点。</b>所有写集中在最后一个 Region（尾部 Region），单节点扛全部写入，其余节点空闲</td></tr>
+    <tr><td class="f">直接哈希（MD5(user_id)）</td><td><b>均匀但失去顺序性</b>：范围扫描退化为全集群扫，行相关数据被打散到不同 Region</td></tr>
+    <tr><td class="f">过长（100+ 字节）</td><td>RowKey 在每次读写、HFile 索引、block cache 里都存在，<b>长度直接乘上数据量</b>。建议 10~100 字节</td></tr>
+  </table>
+  <h4>防热点三板斧</h4>
+  <pre><span class="c"># 1. 盐值（Salting）：前缀散列，把均匀性拉满，牺牲范围扫描</span>
+<span class="c"># 原 key: user12345  加盐后: (hash(user12345) % N) + "_" + user12345</span>
+<span class="c"># N = Region 数量预期。写均匀了，但查单个 user 要扫 N 个 region？</span>
+<span class="c"># 不 —— 查的时候用同样的盐值函数算出前缀，单点定位。牺牲的是"范围扫描"</span>
+
+<span class="c"># 2. 哈希前缀：同盐值，更常用的说法</span>
+<span class="c"># 原 key: order_20261017_0001</span>
+<span class="c"># 加盐后: 7_order_20261017_0001   （7 = md5(key).substring(0,1) 转 int % 16）</span>
+
+<span class="c"># 3. 时间戳倒排：把"最近的最热"反转成"最早的最热"</span>
+<span class="c"># 热点数据永远在尾部？反转：Long.MAX_VALUE - timestamp 作为 key 前缀</span>
+<span class="c"># 现在最新数据的 key 最小，写在头部 Region，负载被时间摊平</span>
+<span class="c"># 时序场景标配：scan startRow=(MAX-now) 天然拿到最近的数据</span>
+
+<span class="c"># 组合示例：消息表 rowkey = salt(4位) + 倒排时间戳 + 用户ID</span>
+<span class="c"># 0a_9223372036854775807_u1001  →  写均匀 + 按用户查 + 最新消息最小</span></pre>
+  <div class="callout ok">
+    <b>RowKey 设计 checklist：</b>① 长度 ≤ 100 字节，能短则短；② 写入均匀（盐值/哈希/倒排至少用一样）；③ <b>需要范围扫描的数据必须在同一 Region</b>（盐值前缀会打散，要权衡）；④ 高频查询的过滤条件要么是 RowKey 前缀，要么接受全表扫描；⑤ 和 Cassandra 比，HBase 的 RowKey 设计就是"分片策略 + 聚簇索引 + 分区键"三合一。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Region 与 RegionServer</h2></div>
+  <p class="lead">Region 是 HBase 的<b>分布式单元和扩展单元</b>：一张表按 RowKey 范围切成多个 Region，散在集群各台 RegionServer 上。</p>
+  <table>
+    <tr><th style="width:150px">组件</th><th>职责</th></tr>
+    <tr><td><b>Region</b></td><td>一段<b>连续的 RowKey 区间</b> [startKey, endKey)。一个 Region 包含若干列族的 Store，是负载均衡和分裂的最小单位</td></tr>
+    <tr><td><b>RegionServer</b></td><td>托管 Region 的进程，处理该区间所有读写。<b>单机性能上限由它决定</b>（内存、GC、compaction 都在这里）</td></tr>
+    <tr><td><b>HMaster</b></td><td>管分配：Region 的 split、迁移、负载均衡、宕机恢复。<b>不在数据读写路径上</b>（挂了不影响读写，只影响管理）</td></tr>
+    <tr><td><b>hbase:meta</b></td><td>系统表，记录"哪个 RowKey 在哪个 RegionServer"。客户端先查它再发读写， ZooKeeper 存 meta 的位置</td></tr>
+  </table>
+  <h4>分裂与预分区</h4>
+  <ul>
+    <li>Region 超过 <span class="k">hbase.hregion.max.filesize</span>（默认 <b>10GB</b>）自动 split 成两半。<b>生产建议 Region 保持在 10~20GB</b>：太小元数据开销大，太大单点恢复慢</li>
+    <li><b>新表只有 1 个 Region，所有写先打在一台机器上</b>，直到它涨到 10GB 才分裂 —— 这就是"新表热点"的根源。解法是<b>建表时预分区</b></li>
+    <li>单台 RegionServer 托管 region 数经验值：<b>几十到一两百</b>。超过 200 要警惕（flush 和 compaction 排队）</li>
+  </ul>
+  <pre><span class="c"># 预分区：建表时直接指定分裂点</span>
+create 'student', 'info', {SPLITS =&gt; ['5', 'a', 'f', 'm', 's']}
+<span class="c"># 建表即有 6 个 region：(-∞,5) [5,a) [a,f) [f,m) [m,s) [s,+∞)</span>
+
+<span class="c"># 按盐值均匀预分区（0-f 十六进制前缀，16 个 region）</span>
+create 'events', 'cf', {SPLITS =&gt; ['1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']}
+
+<span class="c"># 查看 region 分布</span>
+hbase(main):001&gt; list regions 'student'          <span class="c"># 2.x shell 语法</span>
+<span class="c"># 或看 Web UI: http://&lt;master&gt;:16010 → Table Regions</span>
+
+<span class="c"># 手动分裂/迁移</span>
+split 'tableName', 'splitKey'
+move 'encodedRegionName', 'targetServerName'      <span class="c"># 把 region 挪到指定机器</span>
+balancer                                                        <span class="c"># 触发一次负载均衡</span></pre>
+  <div class="callout warn">
+    <b>自动 split 的坑：</b>split 瞬间产生"父子 region 并存 + 元数据变更 + 可能的 compaction 连锁"，对写入有秒级抖动。<b>高写入表在建表时就把分区规划好</b>，依赖自动 split 等于把抖动留给生产。另外 split 出的 region 不会自动再均衡，记得 balancer。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>读写路径</h2></div>
+  <h4>写路径：三步，第三步才是落内存</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>定位</b>：客户端查 ZooKeeper 拿到 hbase:meta 位置，再查 meta 找到 RowKey 所属的 RegionServer，<b>连接缓存复用</b></div></div>
+    <div class="step"><div class="txt"><b>写 WAL</b>：put 请求同时<b>追加到 HLog</b>。按 <span class="k">hbase.regionserver.hlog.sync</span>（默认 true，每个写都同步）决定何时刷盘</div></div>
+    <div class="step"><div class="txt"><b>写 MemStore + ack</b>：数据进对应列族的 MemStore（内存有序），然后才向客户端返回成功</div></div>
+  </div>
+  <pre><span class="c"># WAL 同步策略（吞吐 vs 安全的开关）</span>
+<span class="c"># hbase.regionserver.hlog.sync = true（默认）：每次 put 都 sync WAL，最安全</span>
+<span class="c"># 关掉 sync：异步批量刷，吞吐可提升 2~3 倍，但 RegionServer 宕机会丢这段 WAL</span>
+<span class="c"># 折中：批量写业务自己攒批，sync 保持 true</span></pre>
+  <h4>读路径：三层缓存 + 布隆过滤器</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>BlockCache</b>：HFile 的数据块缓存在 JVM 堆外/堆内。<b>读的第一站，命中率是读性能生命线</b></div></div>
+    <div class="step"><div class="txt"><b>MemStore</b>：还没刷盘的最新数据，第二站</div></div>
+    <div class="step"><div class="txt"><b>HFile</b>：前两级都没命中才读磁盘。每个 HFile 的<b>布隆过滤器</b>先判断"这行不可能在这个文件里"，直接跳过整个文件</div></div>
+  </div>
+  <pre><span class="c"># 删除与版本</span>
+delete 'student', 'row1', 'info:age'              <span class="c"># 删除：写墓碑标记，不是物理删</span>
+deleteall 'student', 'row1'                       <span class="c"># 删整行</span>
+
+<span class="c"># VERSIONS：每个 Cell 保留几个版本，major compaction 才真正清理</span>
+create 'orders', 'cf', {VERSIONS =&gt; 3, TTL =&gt; 2592000}   <span class="c"># 保留 3 个版本，30 天过期</span>
+get 'orders', 'row1', {COLUMN =&gt; 'cf:amount', VERSIONS =&gt; 3}   <span class="c"># 取最近 3 个版本</span>
+
+<span class="c"># scan 优化：永远带 startRow/stopRow，别全表扫</span>
+scan 'student', {STARTROW =&gt; 'row1', STOPROW =&gt; 'row2', LIMIT =&gt; 100}
+scan 'student', {COLUMNS =&gt; ['info:name'], CACHE =&gt; 500}    <span class="c"># 只取需要的列 + 大 RPC 批量</span></pre>
+  <div class="callout danger">
+    <b>全表 scan 是 HBase 头号性能杀手：</b>没有 WHERE 下推，没有二级索引，一条不带 STARTROW/STOPROW 的 scan 会把全集群数据过一遍，客户端 OOM、RS GC、网络打满三连。<b>scan 必须带 RowKey 范围</b>；要按非 RowKey 查，用 Phoenix 二级索引（模块 7）。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>强一致与单行事务</h2></div>
+  <p class="lead">HBase 的一致性模型可以一句话概括：<b>单行强一致 + 原子，跨行不保证</b>。这来自它的架构本质：一行数据只属于一个 Region，只由一台 RegionServer 负责。</p>
+  <table>
+    <tr><th style="width:220px">操作</th><th>一致性保证</th></tr>
+    <tr><td><b>单行 put / get / delete</b></td><td><b>原子 + 强一致</b>。写完立即可读（MemStore 同步），没有主从延迟</td></tr>
+    <tr><td><b>increment / append</b></td><td>原子，基于行锁实现。<b>计数器场景的安全选择</b></td></tr>
+    <tr><td><b>checkAndPut / checkAndDelete</b></td><td>检查-然后写的乐观并发，单行内原子。<b>HBase 版的 CAS</b></td></tr>
+    <tr><td><b>多行 put</b></td><td><b>不保证原子</b>。要么全成要么全败要靠业务层补偿</td></tr>
+    <tr><td><b>跨 Region 操作</b></td><td>不保证。多 Region 扫描会看到"半新半旧"的快照</td></tr>
+  </table>
+  <pre><span class="c"># checkAndPut：HBase 版的乐观锁，库存扣减的安全写法</span>
+put 'inventory', 'sku1001', 'cf:stock', '100'
+<span class="c"># 只有当前 stock 等于 100 时才扣成 99，避免并发覆盖</span>
+checkAndPut 'inventory', 'sku1001', 'cf:stock', '100', 'cf:stock', '99'
+
+<span class="c"># 原子计数器</span>
+incr 'inventory', 'sku1001', 'cf:stock', 1          <span class="c"># 不减库存反而加，演示用</span>
+incr 'metrics', 'pv', 'cf:count', 1                 <span class="c"># 高并发计数场景</span>
+
+<span class="c"># Java API 里对应 BatchOnRow 的多种原子操作</span>
+<span class="c"># Table.incrementColumnValue / checkAndMutate 是同一语义的客户端实现</span></pre>
+  <div class="callout ok">
+    <b>事务边界怎么划：</b>把需要原子性的数据<b>设计进同一行</b>（列族 + 限定符灵活），HBase 就给你免费的事务。需要多行原子（转账两边）？要么引入分布式事务（代价极高），要么改用 NewSQL（TiDB/OceanBase），要么把一致性下沉到消息队列 + 幂等消费。<b>HBase 从来不是事务数据库，别用它的短处。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>GC 优化：JVM 是 RegionServer 的命门</h2></div>
+  <p class="lead">RegionServer 是 JVM 进程，写路径全程在堆内（MemStore）。<b>GC 停顿超过 ZooKeeper 会话超时，节点会被踢出集群</b>，引发 region 迁移风暴。</p>
+  <table>
+    <tr><th style="width:230px">手段</th><th>说明</th></tr>
+    <tr><td><b>MSLAB</b></td><td>MemStore Local Allocation Buffer：MemStore 内存按 2MB 块预分配、复用，<b>消灭堆碎片</b>。默认开启，除非有特殊理由别关</td></tr>
+    <tr><td><b>堆外 MemStore</b></td><td><span class="k">hbase.regionserver.offheap.global.memstore.size</span>（默认 0.4 = 40% 堆外），把 MemStore 挪出 JVM 堆，<b>GC 压力骤降</b></td></tr>
+    <tr><td><b>堆大小</b></td><td>RegionServer 堆通常 <b>8~16GB</b>。再大收益递减而 GC 停顿变长，不如多开机器</td></tr>
+    <tr><td><b>G1 回收器</b></td><td>默认 GC 已是 G1GC（HBase 2.x 起）。关注 <span class="k">-XX:MaxGCPauseMillis</span> 和 old GC 频率</td></tr>
+    <tr><td><b>会话超时</b></td><td><span class="k">zookeeper.session.timeout</span> 与 GC 停顿赛跑。大堆 + 长 compaction 时适当调大，但会拖慢故障检测</td></tr>
+  </table>
+  <pre><span class="c"># hbase-env.sh 里的关键配置</span>
+export HBASE_HEAPSIZE=12g                      <span class="c"># RegionServer 堆，8~16g 区间</span>
+export HBASE_OFFHEAPSIZE=2g                    <span class="c"># 堆外缓存（BlockCache/索引）</span>
+export HBASE_OPTS="$HBASE_OPTS -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+export SERVER_GC_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:InitiatingHeapOccupancyPercent=45"
+export HBASE_REGIONSERVER_OPTS="-Xms12g -Xmx12g"
+
+<span class="c"># hbase-site.xml</span>
+hbase.regionserver.offheap.global.memstore.size: 0.4   <span class="c"># 40% 堆外给 MemStore</span>
+hbase.bucketcache.ioengine: offheap                    <span class="c"># BlockCache 用堆外 bucketcache</span>
+hbase.bucketcache.size: 2048                            <span class="c"># MB，二级缓存大小</span>
+hbase.regionserver.hlog.sync: true                      <span class="c"># 保持 WAL 同步</span>
+
+<span class="c"># GC 排查入口</span>
+<span class="c"># 1. RegionServer 日志里搜 "Pause" / "Full GC"</span>
+<span class="c"># 2. jstat -gcutil &lt;pid&gt; 1s 看各区占用和老年代增长</span>
+<span class="c"># 3. GC 日志：-Xlog:gc*:file=... -XX:+UseGCLogFileRotation</span>
+<span class="c"># 4. RS Web UI (16030) → JVM 环境 / 线程栈</span></pre>
+  <div class="callout warn">
+    <b>GC 问题的根因通常不在 GC：</b>① MemStore 太大（flush.size 调大 + 堆不变 = 停顿变长）；② compaction 太频繁（写太快或文件太小）；③ 一次 RPC 拿回太多数据（客户端 scan CACHE 太大）撑爆堆。<b>调 GC 参数之前先看这三条</b>。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Phoenix 二级索引</h2></div>
+  <p class="lead">原生 HBase 只有 RowKey 一个索引，按其他列查只能全表扫。<b>Phoenix 在 HBase 上加了 SQL 层和二级索引</b>，是用 HBase 又不被全表扫折磨的标准答案。</p>
+  <h4>Phoenix 是什么</h4>
+  <ul>
+    <li>一个 SQL 中间件：客户端发标准 SQL，Phoenix 编译成 HBase 的 scan/put，<b>数据还是原生的 HBase 格式</b>（Phoenix 表 = HBase 表，列映射到列族限定符）</li>
+    <li>支持完整 SQL：JOIN、子查询、聚合、事务（单行级别）、序列，还有 JDBC 驱动，BI 工具能直接连</li>
+    <li><b>没有二级索引时</b>：<span class="k">SELECT * FROM user WHERE phone = '138xxx'</span> 退化成全表 scan。这就是索引存在的理由</li>
+  </ul>
+  <h4>三种二级索引</h4>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:250px">机制</th><th>适用与代价</th></tr>
+    <tr><td><b>Global Index</b></td><td>索引是<b>独立 HBase 表</b>，更新异步。查询先查索引拿到 RowKey，再回查数据表</td><td>读多写少、点查场景。<b>两次 RPC</b>；异步更新意味着索引短暂不一致</td></tr>
+    <tr><td><b>Local Index</b></td><td>索引数据和原数据<b>在同一个 Region</b>，查询单次 RPC 搞定</td><td>写频繁也吃得消（同步维护），但只能用于该表自身查询，不支持 JOIN 下推</td></tr>
+    <tr><td><b>Covered Index</b></td><td>索引里<b>直接包含查询要返回的列</b>，不用回表</td><td>查询列固定的看板类 SQL 最快。索引体积变大</td></tr>
+  </table>
+  <pre><span class="c"># Phoenix 建二级索引</span>
+CREATE INDEX IF NOT EXISTS idx_user_phone ON user (phone);                    <span class="c"># global</span>
+CREATE LOCAL INDEX idx_user_city ON user (city);                              <span class="c"># local</span>
+CREATE INDEX idx_user_name_age ON user (name) INCLUDE (age, city);            <span class="c"># covered</span>
+
+<span class="c"># 函数索引（Phoenix 4.3+）：对表达式建索引，常见于大小写不敏感查询</span>
+CREATE INDEX idx_user_upper_name ON user (UPPER(name));
+
+<span class="c"># 确认查询走了索引</span>
+EXPLAIN SELECT * FROM user WHERE phone = '13800000000';
+<span class="c"># 计划里出现 RANGE SCAN over idx_user_phone 而不是 FULL SCAN 就对了</span>
+
+<span class="c"># 建索引后对存量数据生效：异步写入索引（global），期间查询可能走全表</span>
+<span class="c"># 大表建索引选低峰期；可用 ASYNC 关键字异步创建避免长时间阻塞</span>
+CREATE ASYNC INDEX idx_big_phone ON big_table (phone);</pre>
+  <div class="callout warn">
+    <b>二级索引的代价：写放大。</b>每写一行数据，global 索引要异步多写一份，local 索引同步多写一份。<b>写吞吐可能腰斩，存储翻倍</b>。规则：① 只给真正高频的过滤列建；② 一张表索引数控制在 3 个以内；③ 能靠 RowKey 设计解决的不建索引；④ 索引会让 compaction 更忙，GC 和 IO 都要重新评估。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>与 Cassandra 对比及典型场景</h2></div>
+  <p class="lead">Cassandra 和 HBase 是宽表存储的两大代表，<b>架构同源（LSM、列族）但哲学相反：一个 AP 一个 CP</b>。选型时的区别全在一致性上。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:240px">HBase</th><th>Cassandra</th></tr>
+    <tr><td><b>一致性</b></td><td><b>强一致（单行）</b>，CAP 里选 CP</td><td><b>可调一致性</b>（ONE/QUORUM/ALL），默认 AP</td></tr>
+    <tr><td><b>架构</b></td><td>中心化：HMaster 分配，RegionServer 分管 Region。依赖 ZooKeeper/Keeper</td><td><b>去中心化</b>：一致性哈希 + vnode， gossip 协议，无单点管理角色</td></tr>
+    <tr><td><b>数据分布</b></td><td>Region = 连续 RowKey 范围，范围扫描快</td><td>Token 环哈希分布，范围扫描要二级索引或额外设计</td></tr>
+    <tr><td><b>查询模型</b></td><td>只有 RowKey；SQL 靠 Phoenix，二级索引有代价</td><td>CQL 类 SQL，<b>按查询建模</b>（query-first），二级索引较弱</td></tr>
+    <tr><td><b>写路径</b></td><td>WAL + MemStore，单 Region 单点写入口</td><td>CommitLog + Memtable，多副本并行写</td></tr>
+    <tr><td><b>生态</b></td><td>Hadoop/HDFS 全家桶、Spark、Flink、Hive 集成最深</td><td>独立部署简单，多数据中心复制开箱即用</td></tr>
+    <tr><td><b>运维</b></td><td>重：Master/RS/ZK 三层，compaction 要盯着</td><td>较轻：加节点即可，但 vnode 和 compaction 策略要懂</td></tr>
+  </table>
+  <h4>选型一句话</h4>
+  <ul>
+    <li><b>要强一致、范围扫描、Hadoop 生态</b> → HBase（订单、库存、账号类状态数据）</li>
+    <li><b>要多活容灾、极高写入、最终一致可接受</b> → Cassandra（全球部署的 feed、消息、IoT 写入）</li>
+  </ul>
+  <h4>HBase 的典型应用场景</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>消息 / Feed</div><div class="cd">Facebook Messenger 的存储底座。RowKey = 会话 ID + 倒排时间戳，天然按时间线扫描</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>时序 / 监控</div><div class="cd">OpenTSDB 底层就是 HBase。指标按 metric+tag 编码成 RowKey，倒排时间戳保留最近数据</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>搜索 / 推荐</div><div class="cd">用户画像、行为日志的随机读写。列族动态加列，不需要预先定 schema</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>交易状态</div><div class="cd">订单、物流的宽表。单行原子操作 + 强一致，适合状态机类数据</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>历史归档</div><div class="cd">海量明细的冷存。压缩 + 分层存储，成本比关系型低一个量级</div></div>
+  </div>
+  <div class="callout ok">
+    <b>什么时候别用 HBase：</b>数据量小（TB 以下 MySQL 够了）、需要复杂二级查询（上 ES）、需要多行事务（上 NewSQL）、运维团队撑不起三层架构（上云托管版）。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">RowKey 用单调递增（时间戳、自增 ID）</div><div class="pd">所有写集中打在最后一个 Region，单节点热点、集群一半闲置。加盐值前缀、哈希前缀或时间戳倒排至少一样。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">新表不预分区，单 Region 裸奔</div><div class="pd">新表只有 1 个 region，所有读写打一台机器，直到涨到 10GB 才自动 split。建表时用 SPLITS 参数预分区。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">scan 不带 STARTROW/STOPROW</div><div class="pd">全表扫描 = 全集群数据过一遍，客户端 OOM、RS GC、网络三连击。scan 必带 RowKey 范围，LIMIT 和 CACHE 都要设。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">列族开太多</div><div class="pd">每个列族独立 MemStore + flush + compaction，5 个以上列族会让 flush 和 compaction 排队恶化。生产建议 1~2 个列族。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">major compaction 撞业务高峰</div><div class="pd">major 重写整个 Store，磁盘 IO 尖刺 + 读延迟抖动。避开高峰，或调整 compaction 策略（ ExploringCompactionPolicy/ RatioBasedCompactionPolicy）控制节奏。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">为吞吐关掉 WAL sync</div><div class="pd">hlog.sync=false 时 RegionServer 宕机会丢未刷盘的 WAL，数据静默丢失。攒批 + 保持 sync 才是正路。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">单行超大（MB 级 Cell）</div><div class="pd">读一行把整个 block 拉进内存，BlockCache 被撑爆。大对象走对象存储，HBase 只存指针；或 2.x 起用 MOB（Medium Object）特性。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">按非 RowKey 字段直接查</div><div class="pd">原生 HBase 没有 WHERE，条件查只能全表 scan。要么 RowKey 设计覆盖查询模式，要么上 Phoenix 二级索引。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">堆太小 / 不监控 GC，节点被 ZK 踢出</div><div class="pd">GC 停顿超过 session timeout，RegionServer 假死引发 region 迁移风暴。8~16g 堆 + MSLAB + 堆外 MemStore，GC 日志进监控。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">不设 TTL/VERSIONS，数据无限增长</div><div class="pd">每个 Cell 默认多版本，旧版本不清理，HFile 只涨不减。建表就设 TTL 和 VERSIONS，靠 major compaction 回收。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 用时间戳做 RowKey 前缀（如 20261017_xxx）会有什么问题？</div>
+      <button class="opt">没有问题，时间有序最适合范围扫描</button>
+      <button class="opt">RowKey 会太长影响性能</button>
+      <button class="opt">写入热点：所有新数据集中打在最后一个 Region，单节点被打满</button>
+      <div class="ans">正确答案：<b>写入热点</b>。单调递增的 RowKey 让所有写都落在尾部 Region，其他 RegionServer 闲置，直到该 Region 分裂。解法：盐值前缀（hash % N）、哈希前缀、或时间戳倒排（Long.MAX_VALUE - timestamp）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. HBase 一次 put 的正确路径顺序是？</div>
+      <button class="opt">MemStore → WAL → HFile → ack</button>
+      <button class="opt">WAL → MemStore → ack，MemStore 满后 flush 成 HFile</button>
+      <button class="opt">HFile → MemStore → WAL → ack</button>
+      <div class="ans">正确答案：<b>先 WAL 再 MemStore，然后才 ack</b>。WAL 是崩溃恢复的保证，必须落在数据进内存之前；HFile 是 MemStore 刷盘（满 128MB）的产物，不是写路径的一环。异步删除大块时 UNLINK 式的优化不存在于 HBase，ack 时机由 WAL sync 策略决定。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 HBase 的一致性，哪个说法是对的？</div>
+      <button class="opt">单行操作原子且强一致，跨行/跨 Region 不保证</button>
+      <button class="opt">所有操作最终一致，像 Cassandra 一样</button>
+      <button class="opt">支持跨行 ACID 事务，和 MySQL 一样</button>
+      <div class="ans">正确答案：<b>单行原子强一致，跨行不保证</b>。一行数据只属于一个 Region、一台 RegionServer，这是强一致的物理基础；increment、checkAndPut 提供单行 CAS。多行原子要靠业务设计（把数据放同一行）或换 NewSQL。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. Region 什么时候会自动分裂？</div>
+      <button class="opt">行数超过 100 万</button>
+      <button class="opt">写入 QPS 超过阈值</button>
+      <button class="opt">Region 大小超过 hbase.hregion.max.filesize（默认 10GB）</button>
+      <div class="ans">正确答案：<b>超过 max.filesize（默认 10GB）</b>，从中间 split 成两半。生产建议 Region 保持 10~20GB。新表只有 1 个 region 时要手动预分区，否则前期所有读写集中在一台机器。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. Phoenix 中，哪种二级索引查询时不需要回查数据表？</div>
+      <button class="opt">Global Index，因为它是独立表</button>
+      <button class="opt">Covered Index，因为索引里包含了查询要返回的列</button>
+      <button class="opt">Local Index，因为它同步更新</button>
+      <div class="ans">正确答案：<b>Covered Index</b>。用 INCLUDE 把返回列塞进索引，查询在索引表一次拿全，省掉第二次 RPC。Global 是先查索引再回表（两次 RPC），Local 是同 Region 单次 RPC 但仍要扫数据。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. HBase 和 Cassandra 最核心的区别是？</div>
+      <button class="opt">一致性模型：HBase 单行强一致（CP），Cassandra 可调一致性（AP 优先）</button>
+      <button class="opt">HBase 是行存，Cassandra 是列存</button>
+      <button class="opt">HBase 不支持 LSM，Cassandra 支持</button>
+      <div class="ans">正确答案：<b>一致性模型</b>。两者底层都是 LSM 列族存储，但 HBase 选 CP（单行强一致、中心化 Master 架构），Cassandra 选 AP（去中心化、QUORUM 可调）。HBase 强在范围扫描和 Hadoop 生态，Cassandra 强在多活部署和高写入弹性。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>create 't', 'cf', {SPLITS =&gt; ['a','f']}</code><span class="desc">建表 + 预分区，防新表单 Region 热点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>scan 't', {STARTROW =&gt; 'a', STOPROW =&gt; 'b', LIMIT =&gt; 100}</code><span class="desc">安全扫描：必带 RowKey 范围</span><button class="copy">复制</button></div>
+    <div class="crow"><code>checkAndPut 't', 'r', 'cf:c', 'old', 'cf:c', 'new'</code><span class="desc">单行 CAS，乐观并发</span><button class="copy">复制</button></div>
+    <div class="crow"><code>incr 't', 'r', 'cf:count', 1</code><span class="desc">原子计数器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>major_compact 't'</code><span class="desc">手动 major compaction，低峰期执行</span><button class="copy">复制</button></div>
+    <div class="crow"><code>split 't', 'key'</code><span class="desc">手动分裂 Region</span><button class="copy">复制</button></div>
+    <div class="crow"><code>move 'regionName', 'server'</code><span class="desc">迁移 Region 到指定机器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>balancer</code><span class="desc">触发集群负载均衡</span><button class="copy">复制</button></div>
+    <div class="crow"><code>status 'detailed'</code><span class="desc">看每台 RS 的 region 数和负载</span><button class="copy">复制</button></div>
+    <div class="crow"><code>list_regions 't'</code><span class="desc">列出表的 region 分布（2.x shell）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>flush 't'</code><span class="desc">手动触发 MemStore 刷盘</span><button class="copy">复制</button></div>
+    <div class="crow"><code>hbase hbck -details</code><span class="desc">一致性检查，修 region 不一致</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置项</h3>
+  <pre><span class="c"># hbase-site.xml 里最该盯的</span>
+hbase.hregion.max.filesize: 10g                  <span class="c"># Region 分裂大小，10~20GB 区间</span>
+hbase.hregion.memstore.flush.size: 128m          <span class="c"># MemStore 刷盘阈值</span>
+hbase.hstore.compactionThreshold: 3              <span class="c"># minor compaction 触发文件数</span>
+hbase.hregion.majorcompaction: 604800000         <span class="c"># major 间隔，默认 7 天</span>
+hbase.regionserver.hlog.sync: true               <span class="c"># WAL 同步，安全优先</span>
+hbase.regionserver.offheap.global.memstore.size: 0.4   <span class="c"># 堆外 MemStore 占比</span>
+hbase.bucketcache.size: 2048                     <span class="c"># MB，堆外 BlockCache</span>
+hbase.regionserver.region.split.policy: ConstantSizeRegionSplitPolicy  <span class="c"># 2.x 默认</span>
+
+<span class="c"># hbase-env.sh</span>
+export HBASE_HEAPSIZE=12g                        <span class="c"># RS 堆，8~16g</span>
+export HBASE_OFFHEAPSIZE=2g
+export HBASE_REGIONSERVER_OPTS="-Xms12g -Xmx12g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+
+<span class="c"># 列族建表参数</span>
+create 't', {NAME =&gt; 'cf', VERSIONS =&gt; 3, TTL =&gt; 2592000,
+             COMPRESSION =&gt; 'SNAPPY', BLOOMFILTER =&gt; 'ROW'}
+<span class="c"># VERSIONS 版本数、TTL 秒、SNAPPY 压缩、ROW 级布隆过滤器（读优化必开）</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>LSM 树</b></td><td>日志结构合并树：写全部顺序追加，排序合并后台做，用读放大换写性能</td></tr>
+    <tr><td><b>WAL / HLog</b></td><td>预写日志，崩溃恢复的唯一保证，先落 WAL 再写 MemStore</td></tr>
+    <tr><td><b>MemStore</b></td><td>每个列族的内存有序缓存（跳表），写满 128MB 刷成 HFile</td></tr>
+    <tr><td><b>HFile / StoreFile</b></td><td>磁盘上的不可变有序文件，带布隆过滤器和多级索引块</td></tr>
+    <tr><td><b>Store</b></td><td>一个列族在一个 Region 内的存储单元 = MemStore + 多个 HFile</td></tr>
+    <tr><td><b>Compaction</b></td><td>把小 HFile 合并成大 HFile 的后台过程，删除标记在此物理生效</td></tr>
+    <tr><td><b>Minor Compaction</b></td><td>合并部分小文件，代价小，触发频繁</td></tr>
+    <tr><td><b>Major Compaction</b></td><td>合并整个 Store 全部文件，彻底清理删除/过期数据，IO 尖刺来源</td></tr>
+    <tr><td><b>Region</b></td><td>一段连续 RowKey 区间，分布式和分裂的最小单元，归属单台 RegionServer</td></tr>
+    <tr><td><b>RegionServer</b></td><td>托管 Region 的进程，读写、flush、compaction 都发生在这里</td></tr>
+    <tr><td><b>HMaster</b></td><td>管理面：region 分配、split、迁移、负载均衡，不在数据路径</td></tr>
+    <tr><td><b>RowKey</b></td><td>行的唯一键，全局字典序，唯一的索引，决定数据分布</td></tr>
+    <tr><td><b>列族 ColumnFamily</b></td><td>列的物理分组，独立 MemStore 和 compaction，建议 1~2 个</td></tr>
+    <tr><td><b>Cell</b></td><td>最小存储单元 = RowKey + 列族 + 限定符 + 时间戳 + 值</td></tr>
+    <tr><td><b>盐值 Salting</b></td><td>RowKey 加哈希前缀打散写入，防热点，牺牲范围扫描</td></tr>
+    <tr><td><b>时间戳倒排</b></td><td>Long.MAX_VALUE - timestamp 做前缀，把热点从尾部摊平的技巧</td></tr>
+    <tr><td><b>BlockCache</b></td><td>HFile 数据块的读缓存，命中率是读性能生命线</td></tr>
+    <tr><td><b>布隆过滤器</b></td><td>HFile 级的"这行不在这个文件"快速判断，ROW 级读优化必开</td></tr>
+    <tr><td><b>MSLAB</b></td><td>MemStore 的块化预分配缓冲，消灭 JVM 堆碎片</td></tr>
+    <tr><td><b>checkAndPut</b></td><td>检查-然后写的单行原子操作，HBase 版乐观锁</td></tr>
+    <tr><td><b>Phoenix</b></td><td>HBase 上的 SQL 层，提供二级索引、JOIN 和 JDBC</td></tr>
+    <tr><td><b>Global Index</b></td><td>Phoenix 的独立表索引，异步更新，查询两次 RPC</td></tr>
+    <tr><td><b>Local Index</b></td><td>与数据同 Region 的索引，同步维护单次 RPC</td></tr>
+    <tr><td><b>Covered Index</b></td><td>索引含返回列的覆盖索引，查询不回表</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起一个 HBase，完成这五件事 —— ① 建一张带盐值前缀 RowKey 和预分区的表，灌 10 万行，用 Web UI 看 region 分布是否均匀；② 分别用全表 scan 和带 STARTROW 的 scan 查同样数据，对比耗时；③ 用 checkAndPut 写一个并发安全的库存扣减；④ 建一张 VERSIONS=3 的表，连续改同一个 Cell 三次，get 出全部版本；⑤ 灌数据触发 major compaction，观察 compaction 期间的读延迟变化。<br><br>
+    <b>之后值得单独学：</b>HBase 2.x 的 read replica 与 in-memory compaction、RegionServer 组（RSGroup）做资源隔离、Phoenix 的 JOIN 与统计信息、以及 Coprocessor（observer/endpoint）做服务端计算。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟速通 HBase · 上线前务必检查：RowKey 热点、预分区、scan 带范围、GC 日志</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（RowKey 设计）和模块 7（Phoenix 索引）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 hbase shell 里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 HBase 跟着敲：docker run -d -p 2181:2181 -p 16010:16010 harisekhon/hbase';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

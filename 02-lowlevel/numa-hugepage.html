@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 NUMA 与大页内存</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透 NUMA 与大页内存</h1>
+    <p class="sub">这两件事的共同点是：<b>默认配置下都能跑，但都跑不到最好</b>。NUMA 决定你的内存访问要跨多远，大页决定你的地址翻译要几步。搞懂它们，多路服务器上那些"加机器反而更慢"的怪事就有解释了。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种内存策略</span>
+      <span class="chip"><b>2MB / 1GB</b> 大页对比</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议在一台多路服务器或云上大规格实例上跟着看</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先确认你的机器到底有没有 NUMA</h2></div>
+  <p class="lead">单路家用机通常只有一个节点，这篇的一半内容用不上。先跑三条命令确认。</p>
+  <pre><span class="c"># 1. 有没有 NUMA、几个节点、节点间距离</span>
+numactl --hardware
+
+<span class="c"># 2. 系统层面的大页情况</span>
+grep -i huge /proc/meminfo
+
+<span class="c"># 3. 透明大页当前策略</span>
+<span class="b">cat</span> /sys/kernel/mm/transparent_hugepage/enabled</pre>
+  <pre><span class="c"># 典型双路服务器的输出</span>
+available: 2 nodes (0-1)
+node 0 cpus: 0 1 2 3 ... 31 64 65 ... 95
+node 0 size: 128000 MB
+node 0 free: 118432 MB
+node 1 cpus: 32 33 ... 63 96 97 ... 127
+node 1 size: 128000 MB
+node 1 free: 120911 MB
+node distances:
+node   0   1
+  0:  10  21
+  1:  21  10</pre>
+  <p><span class="k">node distances</span> 这张表是整篇的核心：<b>对角线上的 10 是本地访问，非对角线的 21 是跨节点访问</b>。这个数字是相对值不是纳秒，但比例有意义——21/10 ≈ 2.1，意味着跨节点访存的延迟大约是本地的一倍。</p>
+  <div class="callout warn">
+    <b>注意 cpus 那两行的编号规律：</b><span class="k">0-31</span> 和 <span class="k">64-95</span> 属于 node 0，中间跳过了 32-63。这是因为<b>开了超线程</b>，前一半编号是每个物理核的第一个线程，后一半是第二个线程。绑核时如果按 0-31 连续绑，实际绑到的是 32 个物理核——看起来对，但如果绑 0-63，就绑到了 32 个物理核的两个线程，全在 node 0，另一半内存完全没用上。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>NUMA 是什么：内存不再"等距"</h2></div>
+  <p class="lead"><b>NUMA（Non-Uniform Memory Access，非统一内存访问）</b>：每个 CPU 有自己直连的内存控制器和内存条，访问自己的内存快，访问别人的慢。</p>
+
+  <h4>为什么会变成这样</h4>
+  <p>早期的多路服务器是 <b>SMP（Symmetric Multiprocessing，对称多处理）</b>架构：所有 CPU 通过一条共享的前端总线（FSB）访问同一个内存控制器。问题是<b>总线是共享资源</b>，CPU 越多，抢得越厉害，加核几乎线性递减。</p>
+  <p>后来把内存控制器<b>搬进 CPU 内部</b>（Intel 从 Nehalem 开始，AMD 从 Opteron 开始），每个 CPU 管自己那几根内存条，CPU 之间用专用互联（Intel 的 UPI、AMD 的 Infinity Fabric）通信。总线争抢消失了，但代价是<b>内存访问不再等距</b>。</p>
+
+  <table>
+    <tr><th style="width:150px">架构</th><th style="width:150px">内存访问</th><th>扩展性</th></tr>
+    <tr><td><b>UMA / SMP</b></td><td>所有 CPU 等距，延迟一致</td><td>差，4 路以上总线就饱和了</td></tr>
+    <tr><td><b>NUMA</b></td><td>本地快、远端慢（1.5~2 倍）</td><td>好，可以做到 2/4/8 路甚至更多</td></tr>
+    <tr><td><b>NUMA + 单节点内多 Die</b></td><td>同一插槽内也可能有跨 Die 访问</td><td>AMD EPYC 的 CCD/IOD 结构就是这种</td></tr>
+  </table>
+
+  <h4>延迟差多少</h4>
+  <table>
+    <tr><th style="width:230px">访问路径</th><th style="width:150px">典型延迟</th><th>相对本地</th></tr>
+    <tr><td>本地节点 DRAM</td><td>80~100 ns</td><td>1.0×</td></tr>
+    <tr><td>跨 1 跳（2 路，直连）</td><td>130~160 ns</td><td>1.4~1.8×</td></tr>
+    <tr><td>跨 2 跳（4 路，经过中转）</td><td>180~250 ns</td><td>2.0~2.8×</td></tr>
+    <tr><td>同插槽跨 Die（EPYC）</td><td>110~140 ns</td><td>1.2~1.5×</td></tr>
+  </table>
+  <p>对比一下：L3 命中约 40~60 个周期（15~25ns），本地 DRAM 约 80~100ns。<b>跨节点的一次访存，够你做完 3~5 次本地访存</b>。在内存密集的负载里，这个差距会直接体现在吞吐上。</p>
+
+  <h4>不止延迟，还有带宽</h4>
+  <p>跨节点访问走的是 CPU 间互联链路（UPI/xGMI），这条链路的带宽<b>远小于</b>本地内存通道的总带宽。举例：</p>
+  <table>
+    <tr><th style="width:210px">资源</th><th style="width:180px">典型带宽</th><th>说明</th></tr>
+    <tr><td>单路 8 通道 DDR4-3200</td><td>约 205 GB/s</td><td>本地内存带宽</td></tr>
+    <tr><td>单条 UPI 链路</td><td>约 10~12 GT/s（双向）</td><td>实际可用带宽远低于本地内存</td></tr>
+    <tr><td>双路整机（各 8 通道）</td><td>约 410 GB/s 理论</td><td><b>只有当两个节点各用各的内存时才能接近</b></td></tr>
+  </table>
+  <p>所以"跨节点"的代价是<b>延迟和带宽双杀</b>。一个所有线程都去访问 node 0 内存的程序，在双路机器上的表现可能还不如单路——因为多出来的一半内存带宽根本用不上。</p>
+
+  <div class="callout danger">
+    <b>这就是"加了机器反而更慢"的经典解释：</b>你把服务从单路 32 核迁到双路 64 核，以为性能翻倍。结果所有线程的堆内存都是在主线程初始化时分配的，全部落在 node 0；node 1 上的 32 个核每次访存都要跨节点。<b>结果是 64 个核抢一个节点的内存带宽，比原来 32 个核还慢。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>拓扑查看：三个入口</h2></div>
+  <p class="lead">命令行工具看整体，sysfs 看细节，numastat 看运行时行为。三个都要会。</p>
+
+  <h4>入口一：numactl --hardware</h4>
+  <pre>$ numactl --hardware
+available: 2 nodes (0-1)
+node 0 cpus: 0-31 64-95
+node 0 size: 128000 MB
+node 0 free: 118432 MB
+node distances:
+node   0   1
+  0:  10  21
+  1:  21  10</pre>
+  <p>四个信息：<b>节点数</b>、<b>每个节点有哪些 CPU</b>、<b>每个节点多少内存/还剩多少</b>、<b>节点间距离矩阵</b>。距离是 10 进制的相对值，本地固定为 10，远端按实际延迟比例给出（常见 21、22、32）。</p>
+
+  <h4>入口二：/sys/devices/system/node/</h4>
+  <pre><span class="c"># 每个节点一个目录，里面全是纯文本，脚本友好</span>
+ls /sys/devices/system/node/
+<span class="c"># node0  node1  online  possible  has_cpu  has_memory</span>
+
+<span class="c"># 节点包含哪些 CPU</span>
+<span class="b">cat</span> /sys/devices/system/node/node0/cpulist
+<span class="c"># 0-31,64-95</span>
+
+<span class="c"># 节点间距离（按字节读出来更直观）</span>
+<span class="b">cat</span> /sys/devices/system/node/node0/distance
+<span class="c"># 10 21</span>
+
+<span class="c"># 节点的内存明细（格式和 /proc/meminfo 一样）</span>
+<span class="b">cat</span> /sys/devices/system/node/node0/meminfo | head -5
+<span class="c"># Node 0 MemTotal:       131072000 kB</span>
+<span class="c"># Node 0 MemFree:        121274368 kB</span>
+<span class="c"># Node 0 MemUsed:         9797632 kB</span>
+
+<span class="c"># 每个节点的内存策略统计（后面模块 8 细讲）</span>
+<span class="b">cat</span> /sys/devices/system/node/node0/numastat</pre>
+
+  <h4>入口三：numastat</h4>
+  <pre>$ numastat
+                           node0           node1
+numa_hit              4821337600      3912048120
+numa_miss                 12480          188320
+numa_foreign             188320           12480
+interleave_hit            88210           87904
+local_node            4821302110      3911852040
+other_node                 40810          215400</pre>
+  <p>这张表要会读，它是判断"有没有跨节点"的唯一直接证据。字段含义见模块 8。</p>
+
+  <div class="callout">
+    <b>一个容易忽略的细节：</b>虚拟机里的 NUMA 拓扑是<b>由 hypervisor 伪造的</b>。你可能看到 2 个节点，但物理上可能是 4 路机器切出来的一个切片，vNUMA 的边界和物理边界并不一致。云上做极致优化时，这一步的结论不可靠，只能靠实测。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>跨 NUMA 访问的代价：为什么多线程会莫名变慢</h2></div>
+  <p class="lead">绝大多数 NUMA 性能问题不是"配置错了"，而是<b>内存分配的位置和访问它的线程不在同一个节点</b>。而这一切的根源，是 Linux 的默认分配策略。</p>
+
+  <h4>默认策略：first touch（首次触碰）</h4>
+  <p>Linux 默认用 <b>local allocation（本地分配）</b>：<b>哪个 CPU 第一次写某一页，这一页就从那个 CPU 的本地节点分配</b>。注意是"第一次写"，不是 <span class="k">malloc</span> 的时候——<span class="k">malloc</span> 只是拿到虚拟地址，物理页要等到真正访问时才分配（缺页中断）。</p>
+  <p>这个设计在单线程下完美。多线程下就成了陷阱：</p>
+  <pre><span class="c">// 典型的有问题的初始化方式</span>
+<span class="b">char</span> *buf = malloc(64ULL &lt;&lt; 30);      <span class="c">// 64GB</span>
+memset(buf, 0, 64ULL &lt;&lt; 30);          <span class="c">// ★ 主线程一个人碰了全部页</span>
+
+<span class="c">// 然后开 64 个线程，每个线程处理 buf 的一段</span>
+<span class="c">// 结果：64GB 全部落在主线程所在的 node 0</span>
+<span class="c">//       node 1 上的 32 个线程，100% 跨节点访存</span></pre>
+  <p>这就是最经典的 NUMA 事故。表现是：CPU 利用率上不去，<span class="k">numastat</span> 里 <span class="k">numa_hit</span> 全在 node 0，node 1 的 <span class="k">other_node</span> 很高，<span class="k">free</span> 命令看到 node 0 内存快用完而 node 1 几乎没动。</p>
+
+  <h4>三种修法，代价不同</h4>
+  <table>
+    <tr><th style="width:200px">做法</th><th>原理</th><th>代价</th></tr>
+    <tr><td><b>并行初始化</b></td><td>每个线程只碰自己将来要处理的那段内存，让页在正确的节点上分配</td><td><b>零成本，最优解</b>。但要求程序结构支持</td></tr>
+    <tr><td><b>numactl --interleave</b></td><td>页按节点轮流分配，均摊到所有节点</td><td>牺牲局部性，但带宽最大化。适合共享大缓冲区</td></tr>
+    <tr><td><b>numactl --membind</b></td><td>强制只从指定节点分配</td><td>节点内存不足会直接失败，不 fallback</td></tr>
+  </table>
+  <pre><span class="c">// 并行初始化的写法（OpenMP 示例）</span>
+#pragma omp parallel for
+<span class="b">for</span> (<span class="b">size_t</span> i = 0; i &lt; n; i++)
+    buf[i] = 0;          <span class="c">// 每个线程碰自己那段 → 页落在本地节点</span>
+
+<span class="c">// 或者用 numa_alloc_onnode / numa_alloc_interleaved 直接指定</span>
+<span class="b">void</span> *p = numa_alloc_onnode(size, 1);   <span class="c">// 明确要 node 1 的内存</span>
+numa_free(p, size);</pre>
+
+  <h4>还有两个隐藏的跨节点来源</h4>
+  <table>
+    <tr><th style="width:230px">来源</th><th>说明</th></tr>
+    <tr><td><b>网卡中断与内存不在一侧</b></td><td>网卡插在 CPU0 的 PCIe 槽，但收包缓冲区在 node 1。数据要跨两次</td></tr>
+    <tr><td><b>内核的自动 NUMA 均衡</b></td><td><span class="k">numa_balancing</span> 会周期性扫描并迁移页，本身有开销，还可能引发抖动。对延迟敏感的服务建议关掉</td></tr>
+    <tr><td><b>页缓存（page cache）</b></td><td>读文件时页缓存分配在读操作的 CPU 上。如果多个节点都在读同一批文件，缓存会分裂成多份</td></tr>
+  </table>
+  <pre><span class="c"># 看内核自动均衡的统计</span>
+grep -E <span class="y">'numa_(pte_updates|hint_faults|pages_migrated)'</span> /proc/vmstat
+
+<span class="c"># 关掉它（临时）</span>
+<span class="b">echo</span> 0 &gt; /proc/sys/kernel/numa_balancing
+
+<span class="c"># 永久关：内核参数加 numa_balancing=disable</span></pre>
+
+  <div class="callout ok">
+    <b>一个判断技巧：</b>如果你的程序在多路机器上<b>核数翻倍但吞吐不涨</b>，先跑 <span class="k">numastat -p $PID</span>。如果某个节点的 <span class="k">numa_hit</span> 接近 100%，另一个节点几乎为 0，那就是典型的分配不均，不用再怀疑代码逻辑。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>绑核与绑内存：numactl 的四个选项</h2></div>
+  <p class="lead">绑定的本质是<b>让"用内存的人"和"内存所在的位置"对上</b>。只绑 CPU 不绑内存，或者反过来，效果都很有限。</p>
+
+  <table>
+    <tr><th style="width:250px">选项</th><th>行为</th><th>适用场景</th></tr>
+    <tr><td class="f">--cpunodebind=N</td><td>只允许进程跑在节点 N 的 CPU 上</td><td>配合 <span class="k">--membind</span> 使用，构成完整的节点隔离</td></tr>
+    <tr><td class="f">--physcpubind=0-7</td><td>绑到具体 CPU 编号（可用 <span class="k">-C</span> 简写）</td><td>需要精确控制到物理核时</td></tr>
+    <tr><td class="f">--membind=N</td><td><b>只</b>从节点 N 分配内存。N 内存不够就<b>分配失败</b></td><td>严格隔离，一个进程一个节点</td></tr>
+    <tr><td class="f">--preferred=N</td><td>优先从节点 N 分配，不够时<b>回退</b>到其他节点</td><td>希望本地优先但不希望失败</td></tr>
+    <tr><td class="f">--interleave=N,M</td><td>在 N 和 M 之间<b>轮流</b>分配页</td><td>大缓冲区、共享缓存、带宽优先</td></tr>
+    <tr><td class="f">--localalloc</td><td>默认策略，从当前 CPU 的本地节点分配</td><td>多线程且内存访问局部性好时</td></tr>
+  </table>
+
+  <h4>三种典型组合</h4>
+  <pre><span class="c"># 组合 1：完整隔离。进程只用 node 0 的 CPU 和 node 0 的内存</span>
+numactl --cpunodebind=0 --membind=0 ./app
+
+<span class="c"># 组合 2：带宽优先。两个节点都用，内存交错分配</span>
+numactl --interleave=all ./app
+
+<span class="c"># 组合 3：多实例部署。每个实例独占一个节点，互不干扰</span>
+numactl --cpunodebind=0 --membind=0 ./app --port 8001 &amp;
+numactl --cpunodebind=1 --membind=1 ./app --port 8002 &amp;
+
+<span class="c"># 查看进程当前的绑定情况</span>
+numactl --show
+numastat -p $PID</pre>
+  <p><b>组合 3 是数据库类服务最常见的部署方式</b>：一台双路机器跑两个 MySQL 实例，各占一个节点，等于把一台机器切成两台，NUMA 问题彻底消失。代价是故障域没变小，一台机器挂了两个实例一起没。</p>
+
+  <div class="callout warn">
+    <b>--membind 和 --preferred 的差别很关键：</b><br>
+    <span class="k">--membind=0</span> 时，如果 node 0 内存耗尽，<b>分配直接失败（返回 NULL / 进程被 OOM）</b>，不会偷偷用 node 1。这是"严格"的含义。<br>
+    <span class="k">--preferred=0</span> 时，node 0 满了会回退到 node 1，程序不会崩，但性能会悄悄退化。<br>
+    <b>所以用 --membind 一定要确认节点内存够，并且留出余量。</b>
+  </div>
+
+  <h4>注意：绑定只影响"之后的分配"</h4>
+  <p>无论是 <span class="k">numactl</span> 还是 <span class="k">mbind()</span> 系统调用，<b>都只对尚未分配的页生效</b>。已经落在错误节点的内存不会自动搬家。要迁移已存在的页，得用 <span class="k">move_pages()</span> 或 <span class="k">migrate_pages()</span>。</p>
+  <pre><span class="c"># 对已经在跑的进程改绑定（内核 4.x+ 支持）</span>
+numactl --cpunodebind=0 --membind=0 -p $PID
+
+<span class="c"># 但已有内存不会迁移。要迁移：</span>
+<span class="c"># 用 migratepages 工具（numactl 包提供）</span>
+migratepages $PID 0 1        <span class="c"># 把所有页从 node 0 迁到 node 1</span>
+<span class="c"># 或者用 C 调 move_pages() 精确控制</span></pre>
+
+  <h4>容器与 Kubernetes 里的 NUMA</h4>
+  <table>
+    <tr><th style="width:230px">机制</th><th>作用</th></tr>
+    <tr><td class="f">cpuset.cpus / cpuset.mems</td><td>cgroup v1/v2 的 cpuset 控制器，直接限制容器能用哪些 CPU 和哪些节点的内存</td></tr>
+    <tr><td class="f">CPU Manager (static)</td><td>给 Guaranteed QoS 的 Pod 分配独占 CPU，避免被其他 Pod 抢</td></tr>
+    <tr><td class="f">Topology Manager</td><td>把 CPU、内存、设备（GPU/网卡）的 NUMA 对齐，策略有 none / best-effort / restricted / single-numa-node</td></tr>
+    <tr><td class="f">Memory Manager</td><td>较新版本引入，配合 Topology Manager 做内存侧的 NUMA 对齐</td></tr>
+  </table>
+  <pre><span class="c"># Pod 里申请大页资源（K8s 原生支持）</span>
+resources:
+  limits:
+    hugepages-2Mi: 1Gi
+    memory: 4Gi
+  requests:
+    hugepages-2Mi: 1Gi
+    memory: 4Gi</pre>
+  <p><b>注意：</b>K8s 的 <span class="k">single-numa-node</span> 策略要求 Pod 的所有资源都能放进一个 NUMA 节点，放不下就<b>调度失败</b>（Pod 一直 Pending）。大内存 Pod 在小节点上很容易踩这个。</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>大页是什么：把 262144 个页表项变成 1 个</h2></div>
+  <p class="lead">CPU 访问内存要先做<b>虚拟地址到物理地址的翻译</b>。翻译靠页表，而页表在内存里——每访问一次数据，理论上要先访问好几次内存。CPU 用 TLB 缓存翻译结果来救场，但 TLB 条目很少。<b>大页的作用，就是让每个 TLB 条目覆盖更多内存。</b></p>
+
+  <h4>先算一笔账</h4>
+  <table>
+    <tr><th style="width:150px">页大小</th><th style="width:200px">映射 1GB 需要多少页</th><th style="width:200px">页表项占用</th><th>TLB 覆盖</th></tr>
+    <tr><td><b>4KB（常规页）</b></td><td>262144 个</td><td>262144 × 8B = <b>2MB</b> 页表</td><td>1536 条 × 4KB = <b>6MB</b></td></tr>
+    <tr><td><b>2MB（大页）</b></td><td>512 个</td><td>512 × 8B = 4KB（<b>一张表</b>）</td><td>1536 条 × 2MB = <b>3GB</b></td></tr>
+    <tr><td><b>1GB（超大页）</b></td><td>1 个</td><td>1 个 PUD 项</td><td>1536 条 × 1GB = <b>1.5TB</b></td></tr>
+  </table>
+  <p>这组数字值得记下来。用 4KB 页时，<b>TLB 最多只能覆盖 6MB 的热数据</b>，一旦工作集超过这个量（几乎必然），每次访问都可能 TLB miss，触发<b>页表遍历（page walk）</b>——x86-64 上是 4 级，每一级都可能是一次内存访问。</p>
+  <p>换成 2MB 页，同样的 TLB 条目能覆盖 3GB；换成 1GB 页，覆盖 1.5TB，基本等于"永不 miss"。</p>
+
+  <h4>地址翻译的四级结构</h4>
+  <pre><span class="c">48 位虚拟地址 → 4 级页表 → 物理地址</span>
+
+  PML4 (9 bit) → PDPT (9 bit) → PD (9 bit) → PT (9 bit) → offset (12 bit)
+       ↓             ↓             ↓            ↓
+    512 项         512 项        512 项       512 项
+
+<span class="c">4KB 页：四级都要走，最后一级 PT 指向 4KB 物理页</span>
+<span class="c">2MB 页：走到 PD 就停，PD 项直接指向 2MB 物理页（PS=1）</span>
+<span class="c">1GB 页：走到 PDPT 就停，直接指向 1GB 物理页</span></pre>
+  <p>少走一级，就少一次潜在的内存访问。在 TLB miss 的情况下，2MB 页的页表遍历比 4KB 页<b>少一次内存访问</b>，1GB 页少两次。叠加到每次 cache miss 上，差距就出来了。</p>
+
+  <h4>两种大页：hugetlbfs 与 THP</h4>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:200px">分配方式</th><th>特点</th></tr>
+    <tr><td><b>静态大页</b><br>hugetlbfs</td><td>启动时或运行时<b>预留</b>，从 <span class="k">nr_hugepages</span> 池子里拿</td><td><b>保证成功、不会退化</b>；但预留的内存别人用不了，浪费</td></tr>
+    <tr><td><b>透明大页</b><br>THP</td><td>内核<b>自动</b>把连续的 4KB 页合并成 2MB</td><td><b>无需配置、按需分配</b>；但合并本身有开销，可能引起延迟抖动</td></tr>
+  </table>
+  <p>一句话区分：<b>静态大页是"提前订好座位"，THP 是"现场看看能不能拼桌"。</b>前者确定性强，后者灵活但不可控。</p>
+
+  <h4>静态大页的操作</h4>
+  <pre><span class="c"># 看当前预留了多少</span>
+grep -i huge /proc/meminfo
+<span class="c"># HugePages_Total:      16        ← 预留总数</span>
+<span class="c"># HugePages_Free:       16        ← 还没被用的</span>
+<span class="c"># HugePages_Rsvd:        0        ← 已承诺但未实际分配</span>
+<span class="c"># HugePages_Surp:        0        ← 超额分配的数量</span>
+<span class="c"># Hugepagesize:       2048 kB     ← 默认大页尺寸</span>
+
+<span class="c"># 运行时调整（2MB 页）</span>
+<span class="b">echo</span> 512 &gt; /proc/sys/vm/nr_hugepages
+<span class="b">echo</span> 512 &gt; /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+
+<span class="c"># 1GB 页必须在内核参数里预留，运行时基本改不动</span>
+<span class="c"># 在 GRUB 的 GRUB_CMDLINE_LINUX 里加：</span>
+default_hugepagesz=1G hugepagesz=1G hugepages=8
+
+<span class="c"># 挂载 hugetlbfs 供应用使用</span>
+mount -t hugetlbfs none /dev/hugepages
+
+<span class="c"># 看每个尺寸的池子</span>
+ls /sys/kernel/mm/hugepages/
+<span class="c"># hugepages-1048576kB  hugepages-2048kB</span></pre>
+  <div class="callout warn">
+    <b>1GB 大页为什么必须启动时预留：</b>1GB 页要求物理内存中有<b>连续的 1GB</b> 空间。系统跑久了内存碎片化，很难再找到这么大一块连续物理内存。2MB 相对容易，但也可能失败。<br>
+    <b>所以：</b>大页预留要写进内核参数，在系统刚起来、内存还干净的时候完成。运行时 <span class="k">echo</span> 只适合小规模调整。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>透明大页 THP 的坑：为什么 Redis 让你关掉它</h2></div>
+  <p class="lead">THP 听起来全是好处——自动、无需配置、免费提速。但它有一个致命的副作用：<b>合并内存页的时候，会卡住正在运行的进程。</b></p>
+
+  <h4>THP 的三种策略</h4>
+  <table>
+    <tr><th style="width:130px">值</th><th>行为</th><th>建议</th></tr>
+    <tr><td class="f">always</td><td>只要可能就用 2MB 页，内核主动合并。<b>很多发行版的默认值</b></td><td>通用场景可以，延迟敏感服务不行</td></tr>
+    <tr><td class="f">madvise</td><td>只有应用显式调用 <span class="k">madvise(MADV_HUGEPAGE)</span> 的区域才用</td><td><b>推荐折中方案</b>：想用的自己开，不想用的不受影响</td></tr>
+    <tr><td class="f">never</td><td>完全关闭</td><td>Redis、MongoDB 等官方建议</td></tr>
+  </table>
+  <pre><span class="c"># 查看当前策略（方括号里是生效值）</span>
+<span class="b">cat</span> /sys/kernel/mm/transparent_hugepage/enabled
+<span class="c"># [always] madvise never</span>
+
+<span class="c"># 临时改</span>
+<span class="b">echo</span> madvise &gt; /sys/kernel/mm/transparent_hugepage/enabled
+
+<span class="c"># 永久改：内核参数加 transparent_hugepage=madvise</span>
+<span class="c"># 然后 grub2-mkconfig / update-grub</span></pre>
+
+  <h4>坑在哪：khugepaged 和内存规整</h4>
+  <p>THP 有两个后台机制，都会引发问题：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>khugepaged（大页合并内核线程）。</b>它周期性扫描内存，寻找可以合并成 2MB 的连续 4KB 页。默认每 10 秒扫一轮，每轮扫 4096 页。<b>扫描和合并时要拿内存锁</b>，会短暂阻塞分配内存的进程。</div></div>
+    <div class="step"><div class="txt"><b>内存规整（compaction）。</b>如果找不到连续的 2MB，内核会尝试<b>搬移</b>已有的页来腾出连续空间。搬移需要暂停相关进程的页表操作，代价比扫描更大。</div></div>
+    <div class="step"><div class="txt"><b>缺页时的直接合并。</b>分配 2MB 页时如果失败，会触发同步规整，<b>这次分配会阻塞几十微秒到几毫秒</b>。</div></div>
+  </div>
+  <p>对一个 P99 要求 1ms 的服务来说，这几毫秒就是灾难。你会看到延迟曲线平时很平，每隔十几秒冒一个尖刺——周期正好对上 khugepaged 的扫描间隔。</p>
+
+  <h4>Redis 为什么特别怕 THP</h4>
+  <p>Redis 有两个特性让它对 THP 格外敏感：</p>
+  <ul>
+    <li><b>单线程执行命令。</b>任何一次阻塞都会直接变成所有客户端的延迟。没有其他线程能顶上。</li>
+    <li><b>fork 做持久化。</b>RDB/AOF 重写时 fork 子进程，靠<b>写时复制（COW，Copy-On-Write）</b>共享内存。如果内存是 2MB 大页，<b>改一个字节就要复制整个 2MB</b>；4KB 页只需要复制 4KB。<b>写时复制的开销被放大 512 倍。</b></li>
+  </ul>
+  <p>所以 Redis 官方文档明确建议关闭 THP，原因不是"大页不好"，而是<b>它的持久化模型和 COW 与大页的粒度不匹配</b>。</p>
+  <pre><span class="c"># 检查 THP 是否已经造成问题</span>
+grep -E <span class="y">'thp_'</span> /proc/vmstat
+<span class="c"># thp_fault_alloc          ← 成功分配的大页数</span>
+<span class="c"># thp_fault_fallback       ← 分配失败退化成 4KB 的次数（高说明在反复挣扎）</span>
+<span class="c"># thp_collapse_alloc       ← khugepaged 合并成功的页数</span>
+<span class="c"># thp_collapse_alloc_failed← 合并失败次数</span>
+<span class="c"># thp_split_page           ← 大页被拆开的次数（说明大页没起到作用）</span>
+
+<span class="c"># 看 khugepaged 的扫描节奏</span>
+<span class="b">cat</span> /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs
+<span class="b">cat</span> /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
+
+<span class="c"># 临时关掉合并，只保留分配（不动应用）</span>
+<span class="b">echo</span> 0 &gt; /sys/kernel/mm/transparent_hugepage/khugepaged/defrag</pre>
+
+  <div class="callout danger">
+    <b>最隐蔽的一种情况：</b>THP 开着，Redis 平时跑得好好的，某次 BGSAVE 时延迟突然飙到几百毫秒。<br>
+    排查思路：① 确认 <span class="k">/sys/kernel/mm/transparent_hugepage/enabled</span> 是 always；② 看 <span class="k">/proc/vmstat</span> 里 <span class="k">thp_fault_alloc</span> 是否在涨；③ 关掉 THP 后重测。<b>如果关掉就好了，别再往下查了。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>什么时候该用大页</h2></div>
+  <p class="lead">判据只有一条：<b>有一个大块、长期驻留、随机访问的内存区域，而且 TLB miss 是瓶颈。</b>满足就用，不满足就别折腾。</p>
+
+  <h4>四类典型受益者</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>数据库缓冲池</div><div class="cd">MySQL InnoDB Buffer Pool、Oracle SGA、PostgreSQL shared_buffers。<b>几十 GB 到上百 GB 的随机访问</b>，TLB miss 严重。Oracle 和 MySQL 都原生支持大页。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>JVM 堆</div><div class="cd">大堆（&gt; 16GB）+ 随机对象访问。<span class="k">-XX:+UseLargePages</span>，配合 <span class="k">-XX:+AlwaysPreTouch</span> 预触所有页。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>虚拟化</div><div class="cd">KVM/QEMU 的 guest 内存。大页减少 EPT/影子页表的开销，<b>虚拟化场景收益最明显</b>。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>高性能网络</div><div class="cd">DPDK 的 mbuf 池、用户态协议栈的收发缓冲区。要求零抖动，必须用静态大页锁定内存。</div></div>
+  </div>
+
+  <h4>各家的具体配置</h4>
+  <pre><span class="c"># ---- MySQL / InnoDB ----</span>
+<span class="c"># my.cnf 里：</span>
+large_pages = ON
+innodb_buffer_pool_size = 64G
+<span class="c"># 前提：系统预留了足够的 2MB 大页</span>
+<span class="c"># 64G / 2M = 32768 个，留 10% 余量 → 36000</span>
+
+<span class="c"># ---- JVM ----</span>
+java -XX:+UseLargePages \
+     -XX:LargePageSizeInBytes=2m \
+     -XX:+AlwaysPreTouch \
+     -Xms32g -Xmx32g -jar app.jar
+<span class="c"># 注意：-Xms 和 -Xmx 必须相等，否则扩容时会失败</span>
+
+<span class="c"># ---- KVM 虚拟机 ----</span>
+<span class="c"># 在 libvirt XML 里给 guest 内存加 backend：</span>
+&lt;memoryBacking&gt;
+  &lt;hugepages&gt;&lt;page size=<span class="y">"2048"</span> unit=<span class="y">"KiB"</span>/&gt;&lt;/hugepages&gt;
+&lt;/memoryBacking&gt;
+
+<span class="c"># ---- DPDK ----</span>
+<span class="c"># 预留 1GB 大页，DPDK 启动时挂载 hugetlbfs</span>
+default_hugepagesz=1G hugepagesz=1G hugepages=8</pre>
+
+  <h4>不该用大页的场景</h4>
+  <table>
+    <tr><th style="width:250px">场景</th><th>原因</th></tr>
+    <tr><td>小内存服务（&lt; 1GB）</td><td>工作集本来就装得进 TLB，收益接近零，还浪费预留内存</td></tr>
+    <tr><td>内存碎片敏感的多租户环境</td><td>预留的大页别人用不了，机器利用率下降</td></tr>
+    <tr><td>频繁 fork 的进程</td><td>写时复制的粒度变成 2MB，fork 后性能反而变差（Redis 就是例子）</td></tr>
+    <tr><td>内存使用波动大的服务</td><td>静态大页预留了就不能给别人用，缩容时浪费</td></tr>
+    <tr><td>容器密度优先的场景</td><td>大页不可压缩、不可 swap，超卖能力下降</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>一个务实的顺序：</b>① 先确认 TLB 真的是瓶颈（<span class="k">perf stat -e dTLB-load-misses,dtlb_store_misses.walk_completed</span>）；② 如果是，先用 THP 的 <span class="k">madvise</span> 模式试，改动最小；③ 效果不够再上静态大页；④ 上静态大页前一定要算清楚"预留多少、留多少余量"。<br>
+    <b>别一上来就改内核参数</b>——大页预留是全局的，改错了影响整台机器上所有服务。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>观测：numastat 与 /proc 里的关键指标</h2></div>
+  <p class="lead">NUMA 和大页的问题都有明确的量化信号，不需要猜。</p>
+
+  <h4>numastat 的六个字段</h4>
+  <table>
+    <tr><th style="width:170px">字段</th><th>含义</th></tr>
+    <tr><td class="f">numa_hit</td><td>按预期分配在本节点的页数。<b>这个值应该占绝大多数</b></td></tr>
+    <tr><td class="f">numa_miss</td><td>本节点分配失败、被迫分到别的节点的页数</td></tr>
+    <tr><td class="f">numa_foreign</td><td>本节点的内存被<b>别的节点</b>拿走的页数</td></tr>
+    <tr><td class="f">interleave_hit</td><td>按 interleave 策略命中的页数</td></tr>
+    <tr><td class="f">local_node</td><td>在本节点 CPU 上分配的、且落在本节点的页数</td></tr>
+    <tr><td class="f">other_node</td><td><b>在本节点 CPU 上运行、但内存分到了别的节点</b>的页数。<b>这个高就是问题</b></td></tr>
+  </table>
+  <p>注意 <span class="k">numa_miss</span> 和 <span class="k">numa_foreign</span> 是<b>配对</b>的：node 0 的 miss 数，等于 node 1 的 foreign 数。看到这两个数一起涨，说明有进程在"借"别人的内存。</p>
+  <pre><span class="c"># 全系统</span>
+numastat
+
+<span class="c"># 按进程看（最有用）</span>
+numastat -p $PID
+
+<span class="c"># 按 cgroup 看</span>
+numastat -c
+
+<span class="c"># 只看内存总量分布</span>
+numastat -m
+
+<span class="c"># 更细：每个虚拟内存区域的 NUMA 分布</span>
+<span class="b">cat</span> /proc/$PID/numa_maps | head
+<span class="c"># 7f2c00000000 default anon=262144 dirty=262144 N0=262144</span>
+<span class="c">#                          ↑ 页数              ↑ 全在 node 0</span></pre>
+
+  <h4>/proc/meminfo 里的大页字段</h4>
+  <table>
+    <tr><th style="width:200px">字段</th><th>含义</th></tr>
+    <tr><td class="f">HugePages_Total</td><td>预留的大页总数。<b>为 0 说明没配静态大页</b></td></tr>
+    <tr><td class="f">HugePages_Free</td><td>还没被使用的。等于 Total 说明预留了但没人用，纯浪费</td></tr>
+    <tr><td class="f">HugePages_Rsvd</td><td>已被承诺（reserve）但还没实际写入的</td></tr>
+    <tr><td class="f">HugePages_Surp</td><td>超出 <span class="k">nr_hugepages</span> 的"超额"页，需要 <span class="k">nr_overcommit_hugepages</span> 才可能出现</td></tr>
+    <tr><td class="f">Hugepagesize</td><td>默认大页尺寸，通常是 2048 kB</td></tr>
+    <tr><td class="f">Hugetlb</td><td>大页占用的总内存</td></tr>
+  </table>
+
+  <h4>/proc/vmstat 里的 THP 字段</h4>
+  <table>
+    <tr><th style="width:260px">字段</th><th>怎么读</th></tr>
+    <tr><td class="f">thp_fault_alloc</td><td>缺页时成功分配大页的次数。<b>持续增长说明 THP 在工作</b></td></tr>
+    <tr><td class="f">thp_fault_fallback</td><td>分配大页失败、退回 4KB 的次数。<b>占比高说明内存碎片严重</b></td></tr>
+    <tr><td class="f">thp_collapse_alloc</td><td>khugepaged 合并成功的页数</td></tr>
+    <tr><td class="f">thp_collapse_alloc_failed</td><td>合并失败次数。<b>高说明后台一直在白忙</b></td></tr>
+    <tr><td class="f">thp_split_page</td><td>大页被拆回 4KB 的次数（<span class="k">madvise(MADV_NOHUGEPAGE)</span> 或内存紧张时）</td></tr>
+    <tr><td class="f">thp_zero_page_alloc</td><td>用零页填充的大页数</td></tr>
+    <tr><td class="f">thp_file_alloc</td><td>文件页的大页分配（需要 <span class="k">shmem_enabled</span> 或较新内核）</td></tr>
+  </table>
+  <pre><span class="c"># 一次性看全（间隔 1 秒采样，看增量比看绝对值有用）</span>
+<span class="b">for</span> i <span class="b">in</span> 1 2 3; <span class="b">do</span>
+  grep -E <span class="y">'thp_|numa_'</span> /proc/vmstat
+  <span class="b">echo</span> <span class="y">'---'</span>
+  sleep 1
+<span class="b">done</span>
+
+<span class="c"># 确认 TLB 是不是真的瓶颈（最直接的证据）</span>
+perf stat -e dTLB-loads,dTLB-load-misses,dtlb_store_misses.walk_completed ./app
+
+<span class="c"># 如果 dTLB-load-misses / dTLB-loads &gt; 5%，就值得考虑大页了</span></pre>
+
+  <div class="callout">
+    <b>一个诊断顺序，照做就行：</b><br>
+    ① <span class="k">numactl --hardware</span> 确认拓扑（几个节点、距离多少）。<br>
+    ② <span class="k">numastat -p $PID</span> 看进程的内存分布。如果 90% 以上集中在一个节点而 CPU 用了两个节点 → NUMA 问题。<br>
+    ③ <span class="k">perf stat -e dTLB-load-misses</span> 看 TLB 命中率。miss 率 &gt; 5% → 大页可能有帮助。<br>
+    ④ 看 <span class="k">/proc/vmstat</span> 里 <span class="k">thp_fault_fallback</span> 的增量。增长快说明大页分配在失败，THP 没起到作用。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个 NUMA 与大页的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">主线程 malloc + memset 初始化了整个大缓冲区</div><div class="pd">first touch 策略下，所有页都落在主线程所在的节点，其他节点的线程全部跨节点访存。改成并行初始化，或直接 interleave。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">只绑 CPU 不绑内存</div><div class="pd">--cpunodebind=0 只是限制了跑在哪些核上，内存还是可能从 node 1 分配。要配 --membind 或 --localalloc。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为 numactl 会迁移已有内存</div><div class="pd">绑定只影响之后的新分配。已经落在错误节点的页要显式迁移（move_pages / migratepages），或者重启进程。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用 --membind 却没算够内存</div><div class="pd">节点内存耗尽时分配直接失败，进程可能崩掉。--membind 不 fallback，这是它和 --preferred 的关键区别。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">在双路上跑单个大实例，还抱怨扩容没效果</div><div class="pd">所有内存挤在一个节点，另一个节点的带宽白白浪费。要么 interleave，要么拆成两个实例各绑一个节点。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">THP 用 always 跑延迟敏感服务</div><div class="pd">khugepaged 扫描和内存规整会带来周期性延迟尖刺。改用 madvise，或直接 never。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Redis 开着 THP 做持久化</div><div class="pd">fork 后 COW 的粒度是 2MB，改一个字节复制 2MB，BGSAVE 期间延迟暴涨。Redis 官方明确建议关 THP。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">预留了大页但应用没用</div><div class="pd">HugePages_Total 很大、Free 也很大，说明预留了没人用，这部分内存彻底浪费。要么让应用用上，要么调小。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">运行时给 1GB 大页 echo nr_hugepages</div><div class="pd">系统跑久了物理内存碎片化，找不到连续的 1GB，基本一定失败。1GB 页必须在启动参数里预留。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">在容器里用 numactl 却看不到真实拓扑</div><div class="pd">容器默认只能看到 cpuset 分配的 CPU，NUMA 节点信息可能被裁剪。要用 --privileged 或挂载 /sys，更好的做法是用 cpuset.mems + K8s Topology Manager。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. numactl --hardware 显示距离矩阵对角是 10、非对角是 21。这说明什么？</div>
+      <button class="opt">跨节点访问比本地快 2 倍</button>
+      <button class="opt">跨节点访问延迟约为本地的 2.1 倍</button>
+      <button class="opt">两个节点之间没有互联</button>
+      <div class="ans">正确答案：<b>跨节点约为本地的 2.1 倍</b>。距离是相对值，本地固定为 10。实际纳秒数要看硬件，但比例关系是可靠的。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一个多线程程序，主线程 malloc 了 64GB 并 memset 初始化，然后开 64 个线程处理。最可能的结果是？</div>
+      <button class="opt">内存均匀分布在两个节点，性能正常</button>
+      <button class="opt">内核会自动把页迁移到各线程所在的节点</button>
+      <button class="opt">64GB 全落在主线程所在节点，其他节点的线程跨节点访存</button>
+      <div class="ans">正确答案：<b>全落在主线程的节点</b>。Linux 默认 first touch 策略，物理页在第一次写入时分配，位置取决于当时的 CPU。修法是并行初始化或 interleave。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. --membind 和 --preferred 的关键区别是？</div>
+      <button class="opt">membind 在节点内存不足时分配失败，preferred 会回退到其他节点</button>
+      <button class="opt">membind 只影响 CPU，preferred 只影响内存</button>
+      <button class="opt">两者完全等价，只是写法不同</button>
+      <div class="ans">正确答案：<b>membind 严格、preferred 可回退</b>。严格意味着确定性，也意味着节点内存必须留足余量，否则进程会因为分配失败而崩。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 用 4KB 页映射 1GB 内存，需要多少个页表项？换成 2MB 页呢？</div>
+      <button class="opt">512 个；1 个</button>
+      <button class="opt">262144 个；512 个</button>
+      <button class="opt">1024 个；512 个</button>
+      <div class="ans">正确答案：<b>262144 个；512 个</b>。1GB / 4KB = 262144，1GB / 2MB = 512。页表项每个 8 字节，所以 4KB 页的页表本身就要 2MB。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. Redis 官方建议关闭 THP，最核心的原因是？</div>
+      <button class="opt">THP 会降低内存带宽</button>
+      <button class="opt">THP 与 Redis 的数据结构不兼容</button>
+      <button class="opt">fork 做持久化时，COW 的粒度从 4KB 变成 2MB，开销被放大</button>
+      <div class="ans">正确答案：<b>COW 粒度放大</b>。改一个字节就要复制整个 2MB 页，BGSAVE 期间延迟会明显上升。叠加 Redis 单线程执行命令，影响被进一步放大。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. numastat 里哪个字段高，说明"在本节点跑，但内存分到了别的节点"？</div>
+      <button class="opt">other_node</button>
+      <button class="opt">numa_hit</button>
+      <button class="opt">interleave_hit</button>
+      <div class="ans">正确答案：<b>other_node</b>。它的定义就是"在本节点 CPU 上分配、但页落在其他节点"。这个值持续增长，说明本地内存不够或者分配策略有问题。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>numactl --hardware</code><span class="desc">拓扑、节点 CPU、内存、距离矩阵</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numactl --show</code><span class="desc">当前进程的绑定策略</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numactl --cpunodebind=0 --membind=0 ./app</code><span class="desc">完整隔离到一个节点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numactl --interleave=all ./app</code><span class="desc">内存交错分配，带宽优先</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numactl --preferred=0 ./app</code><span class="desc">本地优先，不足时回退</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numastat</code><span class="desc">全系统 NUMA 命中统计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numastat -p $PID</code><span class="desc">按进程看内存分布（最常用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>numastat -m</code><span class="desc">各节点内存总量与使用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/$PID/numa_maps</code><span class="desc">每个内存区域的节点分布</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/node/node0/distance</code><span class="desc">节点距离</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/devices/system/node/node0/cpulist</code><span class="desc">节点包含的 CPU 列表</span><button class="copy">复制</button></div>
+    <div class="crow"><code>migratepages $PID 0 1</code><span class="desc">把进程的页从 node0 迁到 node1</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -i huge /proc/meminfo</code><span class="desc">静态大页的预留与使用情况</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo 512 &gt; /proc/sys/vm/nr_hugepages</code><span class="desc">运行时调整 2MB 大页数量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ls /sys/kernel/mm/hugepages/</code><span class="desc">看支持哪些大页尺寸</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/kernel/mm/transparent_hugepage/enabled</code><span class="desc">THP 策略（方括号是生效值）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>echo madvise &gt; /sys/kernel/mm/transparent_hugepage/enabled</code><span class="desc">改成按需启用 THP</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -E 'thp_' /proc/vmstat</code><span class="desc">THP 分配与合并的计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -E 'numa_' /proc/vmstat</code><span class="desc">NUMA 均衡与迁移的计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e dTLB-loads,dTLB-load-misses ./app</code><span class="desc">确认 TLB 是不是瓶颈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e dtlb_store_misses.walk_completed ./app</code><span class="desc">页表遍历次数，越高越需要大页</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>内核参数速查</h3>
+  <pre><span class="c"># ---- 大页预留 ----</span>
+default_hugepagesz=1G hugepagesz=1G hugepages=8   <span class="c"># 8 个 1GB 页</span>
+hugepages=512                                     <span class="c"># 512 个 2MB 页（=1GB）</span>
+<span class="c"># 顺序不能反：先 hugepagesz 声明尺寸，再 hugepages 给数量</span>
+
+<span class="c"># ---- THP ----</span>
+transparent_hugepage=never        <span class="c"># 完全关闭</span>
+transparent_hugepage=madvise      <span class="c"># 只对显式 madvise 的区域生效（推荐）</span>
+transparent_hugepage=always       <span class="c"># 全局开启（发行版默认）</span>
+
+<span class="c"># ---- NUMA ----</span>
+numa=off                          <span class="c"># 关闭 NUMA，仅排障用</span>
+numa_balancing=disable            <span class="c"># 关闭自动页迁移，避免抖动</span>
+numa=fake=2                       <span class="c"># 单路机器伪造两个节点（测试用）</span>
+
+<span class="c"># ---- 内存回收（配合大页调优）----</span>
+vm.min_free_kbytes=...            <span class="c"># 见 /etc/sysctl.conf</span>
+vm.overcommit_memory=1            <span class="c"># Redis 等 fork 场景常用</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>NUMA</b></td><td>非统一内存访问，本地内存快、远端慢</td></tr>
+    <tr><td><b>NUMA 节点</b></td><td>一个 CPU 加上它直连的那组内存，是一个"节点"</td></tr>
+    <tr><td><b>距离矩阵</b></td><td>节点间访问代价的相对值，本地为 10</td></tr>
+    <tr><td><b>first touch</b></td><td>物理页在第一次写入时分配，位置取决于当时的 CPU</td></tr>
+    <tr><td><b>numa_hit</b></td><td>按预期分配在本节点的页数</td></tr>
+    <tr><td><b>numa_miss</b></td><td>本节点分配失败，被迫分到别处的页数</td></tr>
+    <tr><td><b>other_node</b></td><td>在本节点运行但内存落在其他节点的页数</td></tr>
+    <tr><td><b>MPOL_BIND</b></td><td>只从指定节点分配，失败即报错（对应 --membind）</td></tr>
+    <tr><td><b>MPOL_INTERLEAVE</b></td><td>在多个节点间轮流分配，最大化带宽</td></tr>
+    <tr><td><b>自动 NUMA 均衡</b></td><td>内核周期性把页迁到访问它的 CPU 附近，有开销</td></tr>
+    <tr><td><b>cpuset</b></td><td>cgroup 的控制器，限制进程能用哪些 CPU 和内存节点</td></tr>
+    <tr><td><b>Topology Manager</b></td><td>K8s 组件，把 CPU/内存/设备的 NUMA 对齐</td></tr>
+    <tr><td><b>大页 / Huge Page</b></td><td>比常规 4KB 大得多的内存页，常见 2MB 和 1GB</td></tr>
+    <tr><td><b>TLB</b></td><td>地址翻译缓存，条目很少，miss 后要走页表遍历</td></tr>
+    <tr><td><b>页表遍历</b></td><td>TLB miss 后逐级查页表，x86-64 上是 4 级</td></tr>
+    <tr><td><b>hugetlbfs</b></td><td>静态大页的文件系统接口，应用从这里拿大页</td></tr>
+    <tr><td><b>THP</b></td><td>透明大页，内核自动把 4KB 页合并成 2MB</td></tr>
+    <tr><td><b>khugepaged</b></td><td>负责后台合并大页的内核线程，是延迟尖刺的来源</td></tr>
+    <tr><td><b>内存规整 compaction</b></td><td>搬移已有页以腾出连续物理内存，代价高</td></tr>
+    <tr><td><b>写时复制 COW</b></td><td>fork 后共享内存页，写入时才复制；大页会放大复制粒度</td></tr>
+    <tr><td><b>HugePages_Surp</b></td><td>超额分配的大页数量，需要 overcommit 配置</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在一台双路机器上跑 <span class="k">numactl --hardware</span>，画出拓扑图；② 写一个程序：主线程 memset 4GB，再开 8 个线程读，用 <span class="k">numastat -p</span> 观察分布，然后改成并行初始化再看一次；③ 给同一个程序加 <span class="k">--interleave=all</span> 跑一遍，对比吞吐；④ 用 <span class="k">perf stat</span> 测 TLB miss 率，然后开 THP 再测一次。<br><br>
+    <b>之后值得单独学：</b>cgroup cpuset 的隔离实践、K8s Topology Manager 的四种策略、DPDK 的大页与巨页池管理、以及 AMD EPYC 的 NPS 模式（一个插槽切成 1/2/4 个 NUMA 节点）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 NUMA 与大页内存 · 多路机器上，位置比容量更重要</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（跨节点代价）和模块 6（THP 的坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在自己机器上跑 numactl --hardware。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议在一台多路服务器或云上大规格实例上跟着看';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

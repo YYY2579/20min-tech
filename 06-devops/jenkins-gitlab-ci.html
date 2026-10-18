@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Jenkins 与 GitLab CI</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 Jenkins 与 GitLab CI</h1>
+    <p class="sub">两个工具代表了 CI/CD 的两条路线：<b>Jenkins 是万能插件平台，GitLab CI 是仓库内生的流水线</b>。这篇直接讲架构、Pipeline as Code、共享库、Runner、cache/artifacts 区别，以及流水线设计模式。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>2</b> 种流水线语法</span>
+      <span class="chip"><b>5</b> 类 Runner 执行器</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起个 Jenkins 练手：docker run -p 8080:8080 jenkins/jenkins:lts</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># Jenkins：一条 Docker 起 LTS（首次密码在日志里）</span>
+docker run -d -p 8080:8080 -p 50000:50000 --name jenkins \
+  -v jenkins_home:/var/jenkins_home \
+  jenkins/jenkins:lts
+docker logs jenkins 2&gt;&amp;1 | grep -A2 password   <span class="c"># 找初始管理员密码</span>
+
+<span class="c"># GitLab CI：注册一个 Runner（shell 执行器最轻）</span>
+docker run -d --name gitlab-runner --restart always \
+  -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  gitlab/gitlab-runner:latest
+
+<span class="c"># 在 GitLab 项目 Settings → CI/CD → Runners 拿 token，然后：</span>
+gitlab-runner register \
+  --url https://gitlab.com/ \
+  --token PROJECT_TOKEN \
+  --executor docker \
+  --docker-image alpine:3.19
+
+<span class="c"># 装 Jenkins 中文/推荐插件（联网环境）：</span>
+<span class="c"># Pipeline、Git、Credentials Binding、Blue Ocean、Docker Pipeline、</span>
+<span class="c"># Timestamper、AnsiColor、Lockable Resources、Job DSL / Configuration as Code</span></pre>
+  <div class="callout warn">
+    <b>第一次用 Jenkins 的经典困惑：</b>装完插件世界就变了。Jenkins 的能力 80% 来自插件，<b>插件之间会互相打架，升级 Jenkins 前先升级插件</b>。团队使用请远离匿名访问，并尽快用 Configuration as Code（JCasC）把 Jenkins 本身的配置也代码化。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Jenkins 架构：Controller / Agent / Executor</h2></div>
+  <p class="lead">Jenkins 是<b>主从（controller–agent）架构</b>：controller 管调度和状态，agent 干实际工作。</p>
+  <table>
+    <tr><th style="width:150px">角色</th><th>职责</th></tr>
+    <tr><td><b>Controller</b><br>（原 master）</td><td>调度构建、存配置与历史、提供 Web UI。<b>controller 上不跑重型构建</b>，executor 数设为 0</td></tr>
+    <tr><td><b>Agent</b><br>（原 slave/node）</td><td>真正执行构建的机器，可以是物理机、VM、Docker 容器或 K8s Pod</td></tr>
+    <tr><td><b>Executor</b></td><td>agent 上的并行构建槽位。<b>一个节点 executor=2，就是同时跑 2 个构建</b></td></tr>
+    <tr><td><b>Workspace</b></td><td>每次构建在 agent 上的工作目录，构建完默认保留，是磁盘杀手</td></tr>
+  </table>
+  <h4>Agent 连接方式</h4>
+  <div class="cmds">
+    <div class="crow"><code>SSH</code><span class="desc">controller 用 SSH 连 agent，稳定，适合固定机器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>JNLP</code><span class="desc">agent 主动外连 controller 的 50000 端口（Java Web Start），agent 在 NAT 后也能用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Docker / K8s</code><span class="desc">按需拉起容器/Pod 跑构建，用完即毁，<b>弹性与隔离的最佳实践</b></span><button class="copy">复制</button></div>
+  </div>
+  <pre><span class="c"># Jenkinsfile 里把不同阶段调度到不同 agent</span>
+<span class="b">pipeline</span> {
+  <span class="b">agent</span> none                      <span class="c"># 顶层不占 agent，每个 stage 自己指定</span>
+  stages {
+    stage(<span class="g">'Build'</span>) {
+      agent { label <span class="g">'linux &amp;&amp; docker'</span> }   <span class="c"># 表达式选节点</span>
+      steps { sh <span class="g">'make build'</span> }
+    }
+    stage(<span class="g">'Test'</span>) {
+      agent { kubernetes { yaml '''...Pod 模板...''' } }   <span class="c"># K8s 动态 Pod</span>
+      steps { sh <span class="g">'make test'</span> }
+    }
+  }
+}</pre>
+  <div class="callout ok">
+    <b>规模化的分水岭：</b>单机 Jenkins（controller 兼 executor）跑十几个 job 没问题；上百个 job 后，controller 变瓶颈。<b>标准演进路径：固定 agent 池 → Docker agent → K8s agent 弹性伸缩</b>，同时把 controller 的 executor 清零、磁盘外挂、配置进 JCasC。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Pipeline as Code：声明式 vs 脚本式</h2></div>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:270px">声明式 Declarative</th><th>脚本式 Scripted</th></tr>
+    <tr><td><b>入口</b></td><td><span class="k">pipeline { }</span> 代码块</td><td><span class="k">node { }</span> 代码块</td></tr>
+    <tr><td><b>结构</b></td><td>固定骨架：agent/stages/steps/post，有语法校验</td><td>自由 Groovy，怎么写都对，写砸了运行时才炸</td></tr>
+    <tr><td><b>可视化</b></td><td>Blue Ocean / Stage View 原生支持</td><td>展示能力弱</td></tr>
+    <tr><td><b>适用</b></td><td><b>团队标准流水线，默认选它</b></td><td>需要复杂逻辑的边角场景，或老项目</td></tr>
+  </table>
+  <pre><span class="c">// ===== 声明式：一个完整的真实 Jenkinsfile =====</span>
+<span class="b">pipeline</span> {
+  agent { label <span class="g">'linux'</span> }
+  options {
+    timeout(time: 30, unit: <span class="g">'MINUTES'</span>)        <span class="c">// 防僵尸构建占死 executor</span>
+    buildDiscarder(logRotator(numToKeepStr: <span class="g">'20'</span>, artifactNumToKeepStr: <span class="g">'5'</span>))
+    disableConcurrentBuilds()               <span class="c">// 同一 job 不并发（部署类 job 必加）</span>
+    timestamps()                            <span class="c">// 日志带时间戳，排障神器</span>
+  }
+  parameters {
+    choice(name: <span class="g">'ENV'</span>, choices: [<span class="g">'staging'</span>, <span class="g">'prod'</span>], description: <span class="g">'部署环境'</span>)
+    booleanParam(name: <span class="g">'SKIP_TESTS'</span>, defaultValue: false)
+  }
+  environment {
+    REGISTRY = <span class="g">'harbor.internal/library'</span>
+    IMAGE_TAG = <span class="g">"${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"</span>
+  }
+  tools { jdk <span class="g">'openjdk-17'</span> }
+  stages {
+    stage(<span class="g">'Checkout'</span>) { steps { checkout scm } }
+    stage(<span class="g">'Test'</span>) {
+      when { not { expression { params.SKIP_TESTS } } }
+      parallel {
+        stage(<span class="g">'Unit'</span>)  { steps { sh <span class="g">'mvn -q test'</span> } }
+        stage(<span class="g">'Lint'</span>)  { steps { sh <span class="g">'mvn -q checkstyle:check'</span> } }
+      }
+    }
+    stage(<span class="g">'Build'</span>)  { steps { sh <span class="g">'mvn -B package -DskipTests'</span> } }
+    stage(<span class="g">'Publish'</span>){ steps { sh <span class="g">"docker build -t ${REGISTRY}/app:${IMAGE_TAG} ."</span> } }
+    stage(<span class="g">'Deploy'</span>) {
+      <span class="c">// 人工审批门禁：点一下才继续</span>
+      input message: <span class="g">'确认部署到 '</span> + params.ENV + <span class="g">'？'</span>, submitter: <span class="g">'ops,sre'</span>
+      steps { sh <span class="g">"./deploy.sh ${params.ENV} ${IMAGE_TAG}"</span> }
+    }
+  }
+  post {
+    always  { junit <span class="g">'target/surefire-reports/*.xml'</span>; cleanWs() }
+    success { sh <span class="g">'curl -X POST $WEBHOOK_URL -d "build ok"'</span> }
+    failure { emailext subject: <span class="g">'FAILED: ${JOB_NAME}'</span>, to: <span class="g">'team@corp.com'</span> }
+  }
+}</pre>
+  <div class="callout warn">
+    <b>声明式的红线：</b>① <span class="k">when</span> 里用 <span class="k">expression</span> 调 Groovy，复杂逻辑请挪到共享库函数；② <span class="k">input</span> 会挂起流水线占着 agent/executor，审批门禁放在<b>没有 agent 的 stage</b> 或改用 GitLab 的 manual job；③ <span class="k">post.always</span> 里 cleanWs() 清工作区，是磁盘治理的第一道防线。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>共享库：把流水线代码变成产品</h2></div>
+  <p class="lead">20 个仓库各写一份 Jenkinsfile，是 CI 灾难的开始。<b>共享库（Shared Library）把公共步骤抽成库，Jenkinsfile 里一行引用。</b></p>
+  <pre><span class="c"># 共享库仓库的标准目录结构</span>
+shared-library/
+├── vars/                      <span class="c"># 全局步骤，每个 .groovy 文件 = 一个可调用步骤</span>
+│   ├── buildDocker.groovy     <span class="c"># → Jenkinsfile 里 buildDocker(...) 直接调</span>
+│   ├── notify.groovy
+│   └── deployApp.groovy
+├── src/                       <span class="c"># 普通 Groovy 类，按包路径引用</span>
+│   └── com/corp/ci/Version.groovy
+└── resources/                 <span class="c"># 非代码资源（配置模板、脚本）</span>
+    └── com/corp/ci/deploy.template.sh
+
+<span class="c"># vars/buildDocker.groovy —— 一个自定义步骤的写法</span>
+def call(Map config) {
+  def tag = config.tag ?: <span class="g">"${env.BUILD_NUMBER}"</span>
+  sh <span class="g">"docker build -t ${config.image}:${tag} ${config.context}"</span>
+  sh <span class="g">"docker push ${config.image}:${tag}"</span>
+  return tag
+}
+
+<span class="c"># 业务仓库的 Jenkinsfile：三行消费共享库</span>
+@Library(<span class="g">'corp-shared@v3.2.1'</span>) _          <span class="c"># 注意：固定 tag，别用 @master</span>
+pipeline {
+  agent any
+  stages {
+    stage(<span class="g">'Build'</span>) {
+      steps {
+        script {
+          def tag = buildDocker(image: <span class="g">'harbor/app'</span>, context: <span class="g">'.'</span>)
+          deployApp(env: <span class="g">'staging'</span>, tag: tag)
+        }
+      }
+    }
+  }
+  post { always { notify(currentBuild.result) } }
+}</pre>
+  <h4>共享库版本管理</h4>
+  <table>
+    <tr><th style="width:180px">引用方式</th><th>评价</th></tr>
+    <tr><td class="f">@Library('lib@master')</td><td><b>禁用</b>。库一升级，所有仓库明天集体变脸，出事无法定位是哪次改动</td></tr>
+    <tr><td class="f">@Library('lib@v3.2.1')</td><td><b>标准做法</b>。git tag 语义化版本，升级 = 逐仓库改引用 + 各自验证</td></tr>
+    <tr><td class="f">@Library('lib@main')</td><td>折中：分支相对稳定，但仍建议 tag</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>共享库的隐藏成本：</b>库的 bug 会<b>同时污染所有仓库</b>，且 Jenkinsfile 里看不出来。对策：① 库自带测试框架（Jenkins Pipeline Unit，JUnit 测 Groovy 步骤）；② 改动先在 1~2 个试点仓库灰度；③ 语义化版本 + CHANGELOG；④ <b>库代码也要过 CI</b>——它首先是代码，其次才是流水线零件。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>凭据管理：密码不进 Jenkinsfile</h2></div>
+  <p class="lead">Jenkins 的 credentials store 把密码加密存在 controller 磁盘（<span class="k">credentials.xml</span>），流水线只按 ID 引用。<b>Jenkinsfile 进 git，凭据绝不进。</b></p>
+  <h4>常见凭据类型</h4>
+  <table>
+    <tr><th style="width:200px">类型</th><th>用途</th></tr>
+    <tr><td class="f">Username with password</td><td>制品库、数据库、第三方 SaaS 的账号密码</td></tr>
+    <tr><td class="f">Secret text</td><td>API Token、Webhook 密钥</td></tr>
+    <tr><td class="f">SSH Username with private key</td><td>Git 拉取、SCP 部署</td></tr>
+    <tr><td class="f">Secret file</td><td>kubeconfig、证书、JSON 密钥文件</td></tr>
+    <tr><td class="f">Certificate</td><td>代码签名、双向 TLS</td></tr>
+  </table>
+  <pre><span class="c">// ===== 用法一：withCredentials 块，块内可用环境变量，出块即消失 =====</span>
+withCredentials([usernamePassword(credentialsId: <span class="g">'harbor-creds'</span>, usernameVariable: <span class="g">'HUB_USER'</span>, passwordVariable: <span class="g">'HUB_PASS'</span>)]) {
+  sh <span class="g">'docker login -u $HUB_USER -p $HUB_PASS harbor.internal'</span>
+}
+
+<span class="c">// 用法二：绑定成环境变量（credentials 插件）</span>
+environment {
+  KUBECONFIG = credentials(<span class="g">'prod-kubeconfig'</span>)   <span class="c">// 自动生成临时文件路径</span>
+}
+
+<span class="c">// 用法三：密文文件</span>
+withCredentials([file(credentialsId: <span class="g">'gcp-key'</span>, variable: <span class="g">'GC_KEY'</span>)]) {
+  sh <span class="g">'gcloud auth activate-service-account --key-file=$GC_KEY'</span>
+}
+
+<span class="c">// 日志里 Jenkins 会自动把凭据值打码成 ****，但注意：</span>
+<span class="c">// ① 命令 echo $HUB_PASS 仍是 ****（好事）</span>
+<span class="c">// ② 但把密码写进文件名/URL query 参数，会绕过打码泄露</span>
+<span class="c">// ③ secret text 打印到 stdout 一样被打码，别把明文二次编码（base64 后就不打码了）</span></pre>
+  <div class="callout ok">
+    <b>凭据治理清单：</b>① 按环境/项目分 Folder 放凭据，Folder 级权限隔离；② 定期轮换，轮换脚本走 Jenkins API 更新凭据；③ <b>能挂临时凭据就不挂长期凭据</b>（如 K8s 用 ServiceAccount token，不用静态 kubeconfig）；④ 离职/换岗第一时间在 credentials 页面吊销。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>GitLab CI/CD：.gitlab-ci.yml 全解</h2></div>
+  <p class="lead">GitLab CI 的哲学：<b>流水线配置和代码住在同一个仓库</b>，push/MR 自动触发，Runner 按需执行。没有中心化调度器，Runner 自己来领活。</p>
+  <pre><span class="c"># ===== 一份真实的生产级 .gitlab-ci.yml =====</span>
+stages: [lint, test, build, deploy]
+
+variables:
+  IMAGE: <span class="g">$CI_REGISTRY_IMAGE/app</span>
+  DOCKER_DRIVER: overlay2
+
+default:
+  image: node:20-alpine
+  interruptible: true                  <span class="c"># 新 push 来了就取消旧流水线</span>
+
+<span class="c"># 模板：抽公共配置，用 extends 或 !reference 复用</span>
+.node_template:
+  cache:
+    key:
+      files: [package-lock.json]
+    paths: [node_modules/]
+  artifacts:
+    expire_in: 1 week
+    paths: [dist/]
+
+lint:
+  stage: lint
+  script:
+    - npm ci --prefer-offline
+    - npm run lint
+  rules:
+    - if: $CI_PIPELINE_SOURCE == <span class="g">"merge_request_event"</span>
+    - if: $CI_COMMIT_BRANCH == <span class="g">"main"</span>
+
+unit-test:
+  stage: test
+  extends: .node_template
+  parallel:
+    matrix:
+      - NODE_VERSION: [<span class="g">"18"</span>, <span class="g">"20"</span>, <span class="g">"22"</span>]     <span class="c"># 一条配置 = 3 个并行 job</span>
+  image: node:$NODE_VERSION-alpine
+  script: [npm ci, npm test]
+
+build-image:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind                        <span class="c"># sidecar 模式的 Docker daemon</span>
+  script:
+    - docker build -t $IMAGE:$CI_COMMIT_SHA .
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin
+    - docker push $IMAGE:$CI_COMMIT_SHA
+  rules:
+    - if: $CI_COMMIT_BRANCH == <span class="g">"main"</span>          <span class="c"># 只在 main 构建镜像</span>
+      changes: [src/**/*, Dockerfile]      <span class="c"># 且这些路径有改动</span>
+
+deploy-staging:
+  stage: deploy
+  environment: { name: staging, url: https://staging.example.com }
+  script: kubectl set image deploy/app app=$IMAGE:$CI_COMMIT_SHA -n staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == <span class="g">"main"</span>
+
+deploy-prod:
+  stage: deploy
+  environment:
+    name: production                       <span class="c"># protected environment → 只允许指定人触发</span>
+  when: manual                             <span class="c"># 人工点按钮才部署</span>
+  allow_failure: false
+  script: kubectl set image deploy/app app=$IMAGE:$CI_COMMIT_SHA -n prod
+  rules:
+    - if: $CI_COMMIT_BRANCH == <span class="g">"main"</span>
+
+pages:                                    <span class="c"># GitLab Pages：产物放 public/ 即发布静态站</span>
+  stage: deploy
+  image: node:20-alpine
+  script: [npm ci, npm run build, cp -r dist/* public/]
+  artifacts: { paths: [public] }
+  rules:
+    - if: $CI_COMMIT_BRANCH == <span class="g">"main"</span></pre>
+  <h4>Runner 类型与执行器</h4>
+  <table>
+    <tr><th style="width:130px">范围</th><th>特点</th></tr>
+    <tr><td><b>Shared runner</b></td><td>实例级共享，所有项目可用，适合小团队</td></tr>
+    <tr><td><b>Group runner</b></td><td>组内项目共享，资源隔离粒度适中</td></tr>
+    <tr><td><b>Project runner</b></td><td>绑定单个项目，安全与资源保障最强</td></tr>
+  </table>
+  <div class="cmds">
+    <div class="crow"><code>shell</code><span class="desc">直接在 runner 机器上跑，最快但污染环境、无隔离</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker</code><span class="desc">每个 job 一个干净容器，最常用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker+machine</code><span class="desc">云上自动伸缩 Runner 虚拟机</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubernetes</code><span class="desc">每个 job 一个 K8s Pod，弹性与隔离天花板</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh / instance</code><span class="desc">连到指定机器执行 / 云上按需开实例</span><button class="copy">复制</button></div>
+  </div>
+  <h4>cache vs artifacts（最常搞混的一组）</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:250px">cache</th><th>artifacts</th></tr>
+    <tr><td><b>用途</b></td><td>同项目 job 之间加速（依赖、编译缓存）</td><td>把产物传给<b>后续 stage/job</b>或给人下载</td></tr>
+    <tr><td><b>存哪</b></td><td>Runner 本地（分布式场景不保证命中）</td><td>GitLab 服务器对象存储，<b>全局可见</b></td></tr>
+    <tr><td><b>生命周期</b></td><td>key 变了就换一份</td><td><span class="k">expire_in</span> 到期删除（默认 30 天）</td></tr>
+    <tr><td><b>下载控制</b></td><td>自动按 key 下载</td><td>默认全部下载，可用 <span class="k">needs: {artifacts: false}</span> 跳过</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>DAG 提速：</b>默认按 stage 串行（lint 全跑完才 test）。加 <span class="k">needs</span> 声明依赖后，GitLab 按 DAG 立即启动可并行的 job，大流水线能省 30%~60% 时间。<span class="k">needs: [{job: build, artifacts: true}]</span> 表示"等 build 完并拿它的产物"。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>流水线设计模式</h2></div>
+  <h4>标准阶段划分</h4>
+  <pre><span class="c"># 一条健康的流水线长这样（任一环节失败即中止）：</span>
+lint ──→ test ──→ build ──→ scan ──→ push ──→ deploy-staging ──→ smoke ──→ [人工] deploy-prod
+
+<span class="c"># 每层的职责与门禁：</span>
+lint      <span class="c"># 秒级反馈：格式、静态检查。不过 = 代码风格债，不配叫 CI</span>
+test      <span class="c"># 单测 + 覆盖率门禁（如 coverage &gt; 80% 才继续）</span>
+build     <span class="c"># 产出不可变制品（jar / docker image / 二进制），tag = commit SHA</span>
+scan      <span class="c"># 安全门禁：镜像漏洞（trivy）、依赖 CVE、密钥泄露（gitleaks）</span>
+push      <span class="c"># 推到制品库，从此"构建一次，到处运行"</span>
+deploy    <span class="c"># 同一制品依次晋级 staging → prod，环境间只改配置不改镜像</span>
+smoke     <span class="c"># 部署后 30 秒健康检查，失败自动回滚到上一版本</span></pre>
+  <h4>五个高频模式</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>不可变制品</div><div class="cd">只构建一次镜像，带上 commit SHA tag，staging 验证过的同一个 SHA 进 prod。<b>杜绝"重新打包导致环境差异"</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>并行矩阵</div><div class="cd">测试按 Node 版本/OS/架构分片并行。GitLab 用 <span class="k">parallel:matrix</span>，Jenkins 用 <span class="k">matrix</span> 轴 + <span class="k">failFast</span></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>审批门禁</div><div class="cd">生产部署前的人工卡点。GitLab 用 protected environment + manual job；Jenkins 用 input 步骤，<b>注意占 executor</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>制品晋级</div><div class="cd">镜像在 registry 里按环境打 tag 晋级（staging → prod），而不是重新构建。<b>晋级 = 改 tag，秒级且可追溯</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>失败即停</div><div class="cd">failFast / interruptible：新 push 到达自动取消旧流水线，省算力也避免旧结果覆盖新结果</div></div>
+  </div>
+  <h4>幂等与回滚</h4>
+  <ul>
+    <li><b>部署脚本幂等：</b><span class="k">kubectl set image</span> 跑两次结果一样；别用 <span class="k">kubectl create</span>（第二次就报错）</li>
+    <li><b>保留上一版本镜像：</b>部署脚本默认记录 current/previous tag，回滚 = 重新部署 previous</li>
+    <li><b>数据库迁移向后兼容：</b>先加字段不删字段，代码滚动发布期间老代码能跑——这是 CI 之外但被 CI 牵连的架构纪律</li>
+  </ul>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Jenkins vs GitLab CI 对比</h2></div>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:270px">Jenkins</th><th>GitLab CI</th></tr>
+    <tr><td><b>配置位置</b></td><td>Jenkinsfile 在仓库，但 job 结构大量在 Web 界面（自由式项目）</td><td>全部在仓库的 .gitlab-ci.yml，<b>GitOps 纯粹</b></td></tr>
+    <tr><td><b>执行单元</b></td><td>controller 调度 + agent 执行，executor 槽位</td><td>Runner 主动领活，无中心调度器</td></tr>
+    <tr><td><b>插件生态</b></td><td><b>2000+ 插件，万能</b>（也是债务来源）</td><td>内置为主（容器扫描、DAST、Pages），扩展靠 CI 组件/模板</td></tr>
+    <tr><td><b>K8s 集成</b></td><td>Kubernetes 插件：动态 Pod agent，成熟</td><td>Kubernetes executor：每个 job 一个 Pod，更轻</td></tr>
+    <tr><td><b>凭据</b></td><td>credentials store + withCredentials 注入</td><td>CI/CD Variables（可 masked/protected）+ File 类型</td></tr>
+    <tr><td><b>触发方式</b></td><td>Webhook（GitLab/GitHub 插件）、定时、上游下游</td><td>push/MR/tag/调度/pipeline 订阅，<b>天然绑定仓库事件</b></td></tr>
+    <tr><td><b>多仓库编排</b></td><td><b>强项</b>：一个 Jenkinsfile 触发多个仓库、聚合制品</td><td>单仓库为主，跨仓库用 trigger + CI_JOB_TOKEN</td></tr>
+    <tr><td><b>运维成本</b></td><td>高：controller HA、插件兼容、磁盘治理</td><td>低：装 Runner 即用，SaaS 版零运维</td></tr>
+    <tr><td><b>适用</b></td><td>复杂流水线、遗留系统、多仓库集中管控</td><td>已在 GitLab 的团队，<b>新项目默认选它</b></td></tr>
+  </table>
+  <div class="callout">
+    <b>混合架构很常见：</b>代码在 GitLab（用 GitLab CI 做 MR 级快速反馈），但跨仓库的集成部署、定时批处理、发布编排放在 Jenkins，通过 GitLab 的 trigger job 调用 Jenkins API。<b>选型标准只有一条：谁能用更少的自定义代码覆盖 80% 场景。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>常见坑与防御</h2></div>
+  <h4>Jenkins 侧高频问题</h4>
+  <pre><span class="c"># 1. 磁盘爆满：三大元凶 = workspace + artifacts + 构建历史</span>
+options {
+  buildDiscarder(logRotator(numToKeepStr: <span class="g">'20'</span>, artifactNumToKeepStr: <span class="g">'5'</span>))
+}
+post { always { cleanWs() } }              <span class="c"># Workspace Cleanup 插件</span>
+<span class="c"># 定期：du -sh /var/jenkins_home/* | sort -rh | head</span>
+<span class="c"># 大目录外挂到独立卷，JENKINS_HOME 只放配置</span>
+
+<span class="c"># 2. 并发构建互相踩：部署 job 必须 disableConcurrentBuilds()</span>
+<span class="c">#    跨 job 抢同一资源（如测试环境）用 lockable-resources：</span>
+lock(resource: <span class="g">'staging-env'</span>, inversePrecedence: true) {
+  sh <span class="g">'./deploy.sh staging'</span>
+}
+
+<span class="c"># 3. 共享库浮动引用：@Library('lib@master') → 固定 tag</span>
+<span class="c">#    库改动先在 canary 仓库验证，再全量升版本号</span>
+
+<span class="c"># 4. agent 版本不匹配：升级 controller 后老 agent 连不上</span>
+<span class="c">#    Jenkins 要求 agent 与 controller 大版本兼容，滚动升级：先 agent 后 controller</span>
+
+<span class="c"># 5. 安全基线：不要暴露公网；匿名用户禁 "Execute Groovy"</span>
+<span class="c">#    脚本沙箱（Script Security）默认开启，别全局关掉</span></pre>
+  <h4>GitLab CI 侧高频问题</h4>
+  <pre><span class="c"># 1. cache 不命中：key 设计错误。缓存 key 跟着分支走，每个 MR 都是新 key</span>
+cache:
+  key:
+    prefix: npm
+    files: [package-lock.json]        <span class="c"># 依赖文件没变 → key 不变 → 命中</span>
+  paths: [node_modules/]
+
+<span class="c"># 2. artifacts 不设过期：存储月月涨。永远显式写 expire_in</span>
+artifacts:
+  expire_in: 1 week
+
+<span class="c"># 3. only/except 与 rules 混用：同一 job 两个都写，rules 胜出，only 被忽略</span>
+<span class="c">#    新项目统一用 rules；迁移期逐 job 替换，不要并行两套</span>
+
+<span class="c"># 4. flaky test：网络/时序导致的偶发失败</span>
+<span class="c">#    先重试兜底（retry: max: 2, when: [runner_system_failure, stuck_or_timeout_failure]）</span>
+<span class="c">#    再把 flaky 测试隔离到 nightly 流水线，建 flaky 看板逐周清零</span>
+<span class="c">#    重试是绷带不是解药——掩盖真实 bug 的团队走不远</span>
+
+<span class="c"># 5. docker build 慢/权限乱：dind 需要 privileged runner；</span>
+<span class="c">#    更快更安全：挂宿主 docker.sock（信任前提）或用 kaniko/buildah 免 daemon 构建</span>
+
+<span class="c"># 6. secret 出现在 MR 流水线日志：fork MR 可能访问变量</span>
+<span class="c">#    protected variable + protected branch，fork 的 MR 默认拿不到敏感变量</span></pre>
+  <div class="callout danger">
+    <b>CI 系统本身就是生产系统：</b>它能改你的代码、碰你的密钥、推你的镜像。<b>被攻陷的 CI = 全线失守。</b>安全基线：① runner 与源码仓库网络隔离；② 凭据最小权限 + 短周期；③ <span class="k">CI_JOB_TOKEN</span> 范围最小化；④ 审计日志（谁改了什么流水线）接 SIEM；⑤ 第三方 action/组件固定版本，警惕供应链投毒。
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">排坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">Jenkins 磁盘三个月爆满</div><div class="pd">workspace、artifacts、构建历史不清理。buildDiscarder + cleanWs() + expire_in 三件套必须写进模板，不是运维事后打扫。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">两个部署 job 并发，环境被改乱</div><div class="pd">同一个 deploy job 忘记 disableConcurrentBuilds()，或跨 job 共享测试环境。部署类 job 一律禁并发，共享环境用 lockable-resources。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">共享库引用 @master</div><div class="pd">库升级后所有仓库同时变化，半夜全线构建失败，回滚都不知道回哪。固定 git tag 版本，升级走灰度。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">密码硬编码在 Jenkinsfile 或 .gitlab-ci.yml</div><div class="pd">文件进 git = 密码进 git 历史，删提交也删不掉。凭据进 credentials store / CI Variables，流水线只引用 ID。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">flaky test 靠重试掩盖</div><div class="pd">retry: 2 让流水线变绿，但 bug 进了生产。重试只兜系统级抖动，测试代码的 flaky 要隔离 + 修复 + 看板清零。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">GitLab cache 设计成按分支做 key</div><div class="pd">每个 MR 一套缓存，命中率 0，反而更慢。key 绑定依赖清单文件（package-lock.json），内容没变就复用。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">artifacts 不设 expire_in</div><div class="pd">产物无限期占用 GitLab 存储，费用和备份体积一起涨。显式 expire_in: 1 week，需要留存的进制品库而不是 artifacts。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Jenkins 直接暴露公网</div><div class="pd">匿名用户可创建 job、可执行 Groovy 脚本 = 远程代码执行。内网 + 反向代理 + 认证是底线，脚本沙箱别关。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">controller 升级不升 agent</div><div class="pd">remoting 版本不兼容，agent 集体掉线，构建全排队。滚动升级顺序：先 agent，后 controller，留一个兼容窗口。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">部署重新构建镜像而不是晋级制品</div><div class="pd">"staging 验证过的镜像"和"prod 的镜像"不是同一个，玄学 bug 诞生。构建一次，按环境改 tag 晋级，commit SHA 是全链路唯一身份。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. GitLab CI 中 cache 和 artifacts 的核心区别是？</div>
+      <button class="opt">两者完全等价，只是名字不同</button>
+      <button class="opt">cache 是同项目 job 间的加速数据（Runner 本地），artifacts 是传给后续 stage 的产物（GitLab 存储）</button>
+      <button class="opt">cache 一定比 artifacts 更持久</button>
+      <div class="ans">正确答案：<b>用途与存储位置不同</b>。cache 是"依赖加速"，存 Runner 本地、分布式下不保证命中；artifacts 是"产物传递"，存 GitLab、有 expire_in、下游 job 可下载。把构建产物放 cache 是最常见误用。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. Jenkins 共享库应该怎么引用？</div>
+      <button class="opt">@Library('lib@master') _，永远用最新版</button>
+      <button class="opt">把共享库代码复制到每个仓库，避免依赖</button>
+      <button class="opt">@Library('lib@v3.2.1') _，固定语义化 tag，升级走灰度</button>
+      <div class="ans">正确答案：<b>固定 tag</b>。浮动引用会让所有仓库随库升级同时变化，故障面瞬间放大且无法定位。升级 = 逐仓库改引用号 + 各自验证 + 有问题单独回滚。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 声明式流水线（pipeline { }）相比脚本式的主要优势是？</div>
+      <button class="opt">固定结构 + 语法校验 + 原生可视化，适合团队标准化</button>
+      <button class="opt">执行速度更快</button>
+      <button class="opt">不需要 Jenkinsfile，配置全在界面</button>
+      <div class="ans">正确答案：<b>结构与可维护性</b>。声明式有固定骨架和语法校验，出错信息友好，Blue Ocean 可视化直接支持。脚本式更自由但容易写出没人敢动的"祖传 Jenkinsfile"。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. GitLab CI 里想让 build 一完成 deploy-prep 就立刻开始（而不是等 build 阶段所有 job 都结束），应该用？</div>
+      <button class="opt">把两个 job 放进同一个 stage</button>
+      <button class="opt">在 deploy-prep 里写 needs: [{job: build, artifacts: true}]，按 DAG 调度</button>
+      <button class="opt">把两个 job 合并成一个 job 的顺序步骤</button>
+      <div class="ans">正确答案：<b>needs 声明依赖</b>。默认按 stage 串行：build 阶段全部结束才进下一阶段。needs 让 GitLab 按 DAG 只等待真正依赖的 job，build 一完成 deploy-prep 立即启动，大流水线通常能省 30%~60% 时间。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 防止同一 Jenkins job 的两个构建同时操作部署环境，最直接的做法？</div>
+      <button class="opt">把 executor 数加到 10</button>
+      <button class="opt">在脚本里 sleep 随机秒数错开</button>
+      <button class="opt">options { disableConcurrentBuilds() }，跨 job 用 lockable-resources</button>
+      <div class="ans">正确答案：<b>disableConcurrentBuilds()</b>。加 executor 反而更乱；sleep 是竞态赌博。跨 job 争抢同一环境时，用 lock(resource: 'env') 把临界区锁起来。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 CI 中的 flaky test，正确的处理姿势是？</div>
+      <button class="opt">重试兜底 + 隔离到 nightly + 建看板逐周修复清零</button>
+      <button class="opt">给所有测试无条件 retry: 5，流水线永远绿</button>
+      <button class="opt">删掉 flaky 的测试</button>
+      <div class="ans">正确答案：<b>兜底 + 隔离 + 清零</b>。无脑重试是把 bug 放大到生产；删测试是销毁安全网。系统性做法：retry 只兜 runner 级抖动，测试级 flaky 隔离后限期修复。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>java -jar jenkins-cli.jar -s http://jenkins:8080 who-am-i</code><span class="desc">验证 jenkins-cli 连通性与当前身份</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jenkins-cli build job -f -</code><span class="desc">从 stdin 读 Jenkinsfile 直接触发构建</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword</code><span class="desc">取 Jenkins 初始管理员密码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gitlab-runner run --config config.toml</code><span class="desc">前台调试 Runner，看实时日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gitlab-runner verify --delete</code><span class="desc">注销 Runner</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs deploy/runner -f</code><span class="desc">K8s executor 下看 Runner 实时日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CI_DEBUG_TRACE=true（GitLab）</code><span class="desc">变量开启调试日志，排 yaml 语法外的问题</span><button class="copy">复制</button></div>
+    <div class="crow"><code>du -sh /var/jenkins_home/* | sort -rh | head</code><span class="desc">Jenkins 磁盘占用定位，治理第一步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gitlab-runner exec docker job_name</code><span class="desc">本地执行某个 job，不推代码也能调试流水线</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置项</h3>
+  <pre><span class="c"># Jenkinsfile 选项模板（直接抄）</span>
+options {
+  timeout(time: 30, unit: <span class="g">'MINUTES'</span>)
+  buildDiscarder(logRotator(numToKeepStr: <span class="g">'20'</span>, artifactNumToKeepStr: <span class="g">'5'</span>))
+  disableConcurrentBuilds()
+  timestamps()
+}
+post { always { cleanWs() } }
+
+<span class="c"># .gitlab-ci.yml 健康默认值</span>
+default:
+  interruptible: true
+  retry:
+    max: 2
+    when: [runner_system_failure, stuck_or_timeout_failure]   <span class="c"># 只重试系统级失败</span>
+cache:
+  key:
+    prefix: deps
+    files: [package-lock.json]
+  paths: [node_modules/]
+artifacts:
+  expire_in: 1 week
+  when: on_success</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Controller</b></td><td>Jenkins 主节点，负责调度、配置与 UI（旧称 master）</td></tr>
+    <tr><td><b>Agent</b></td><td>Jenkins 执行节点，实际干构建的机器（旧称 slave）</td></tr>
+    <tr><td><b>Executor</b></td><td>Agent 上的并行构建槽位，决定同时跑几个 job</td></tr>
+    <tr><td><b>Jenkinsfile</b></td><td>流水线即代码的定义文件，声明式或脚本式</td></tr>
+    <tr><td><b>声明式流水线</b></td><td>固定骨架的 pipeline 语法，有校验和可视化</td></tr>
+    <tr><td><b>脚本式流水线</b></td><td>自由 Groovy 的 node 语法，灵活但难维护</td></tr>
+    <tr><td><b>共享库</b></td><td>跨仓库复用的 Jenkins 步骤库，按 tag 版本引用</td></tr>
+    <tr><td><b>凭据 store</b></td><td>Jenkins 加密保存密码/密钥的地方，按 ID 引用</td></tr>
+    <tr><td><b>buildDiscarder</b></td><td>构建历史与产物的保留策略，磁盘治理核心</td></tr>
+    <tr><td><b>Runner</b></td><td>GitLab CI 的执行器，主动领活，可选 shell/docker/k8s 等</td></tr>
+    <tr><td><b>Executor（GitLab）</b></td><td>Runner 的运行方式（docker、shell、kubernetes 等）</td></tr>
+    <tr><td><b>cache</b></td><td>同项目 job 间的依赖/编译加速数据，存 Runner 本地</td></tr>
+    <tr><td><b>artifacts</b></td><td>传递给下游 stage 或供人下载的产物，存 GitLab 服务端</td></tr>
+    <tr><td><b>needs</b></td><td>声明 job 间依赖，把流水线从阶段串行改成 DAG 调度</td></tr>
+    <tr><td><b>rules</b></td><td>GitLab CI 的条件规则，决定 job 是否进流水线（替代 only/except）</td></tr>
+    <tr><td><b>protected environment</b></td><td>受保护的部署环境，只允许指定角色触发，生产标配</td></tr>
+    <tr><td><b>GitLab Pages</b></td><td>用 artifacts 里的 public/ 目录直接发布静态站点</td></tr>
+    <tr><td><b>制品晋级</b></td><td>同一 commit 构建的镜像按环境打 tag 推进，不重新构建</td></tr>
+    <tr><td><b>flaky test</b></td><td>偶发失败的非确定性测试，靠重试掩盖等于埋雷</td></tr>
+    <tr><td><b>dind</b></td><td>Docker-in-Docker，CI 里跑 docker build 的 sidecar 方案</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>完成这五件事 —— ① 给一个真实仓库写声明式 Jenkinsfile，带 timeout + cleanWs + 审批门禁；② 把公共步骤抽成共享库并用 git tag 引用；③ 给 GitLab 项目写 .gitlab-ci.yml，用 needs + parallel:matrix 把测试时间砍半；④ 配一个 protected environment 的 manual 生产部署；⑤ 制造一次 flaky 失败，练习 retry 边界与隔离流程。<br><br>
+    <b>之后值得单独学：</b>Jenkins Configuration as Code 全面托管、Kubernetes 动态 agent 的资源配额、GitLab CI 组件目录（CI/CD components）、以及 SBOM/供应链安全（SLSA 等级）在流水线中的落地。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Jenkins 与 GitLab CI · 上线前务必检查：磁盘保留策略、凭据不硬编码、生产门禁与制品晋级链路</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 5（GitLab CI）和模块 8（坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边给仓库写条流水线。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起个 Jenkins 练手：docker run -p 8080:8080 jenkins/jenkins:lts';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

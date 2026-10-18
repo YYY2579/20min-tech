@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透日志平台设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+/* 数据流管道图（HTML/CSS） */
+.layer{border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden}
+.layer .lt{background:var(--bg);border-bottom:1px solid var(--line);padding:7px 14px;font-size:13px;font-weight:600;color:var(--muted)}
+.layer .lb{padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px}
+.box{font-size:12.5px;border:1px solid var(--line);border-radius:7px;padding:5px 11px;background:var(--card);color:#3A3A36;white-space:nowrap}
+.box b{color:var(--ink)}
+.pipe{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:14px}
+.pnode{border:1.5px solid var(--accent);background:var(--accent-soft);color:#0C447C;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;white-space:nowrap}
+.parr{flex:0 0 22px;height:2px;background:var(--faint);position:relative;margin:0 2px}
+.parr::after{content:"";position:absolute;right:-1px;top:-4px;border-left:7px solid var(--faint);border-top:5px solid transparent;border-bottom:5px solid transparent}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 9 期 · 实战篇</span>
+    <h1>二十分钟学透日志平台设计</h1>
+    <p class="sub">日志平台是<b>运维和排障的地基</b>，也是公司里<b>最容易被低估成本的系统</b>（日增 10TB 的存储账单能吓死 CFO）。这篇讲透六段管道（采集→缓冲→处理→存储→查询→告警）、三种存储选型、和一套能落地的容量账。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>6</b> 段数据管道</span>
+      <span class="chip"><b>3</b> 种存储成本对比</span>
+      <span class="chip">日增 <b>10TB</b> 算例</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边算账：估算你自己集群的日日志量、ES 存储成本、3 年后归档量。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>日志平台解决什么问题</h2></div>
+  <p class="lead">日志平台要回答运维和开发的三个日常问题：<b>"昨晚那个错误是谁打的"、"这个接口的 RT 为什么涨了"、"这次发布有没有引入异常"</b>。所有设计都围绕"存得下、查得快、花得起"这个不可能三角展开。</p>
+  <div class="pipe">
+    <span class="pnode">采集 Agent</span><span class="parr"></span>
+    <span class="pnode">Kafka 缓冲</span><span class="parr"></span>
+    <span class="pnode">解析处理</span><span class="parr"></span>
+    <span class="pnode">存储引擎</span><span class="parr"></span>
+    <span class="pnode">查询检索</span><span class="parr"></span>
+    <span class="pnode">告警联动</span>
+  </div>
+  <div class="layer"><div class="lt">六段管道的职责边界</div><div class="lb"><span class="box"><b>采集</b> 每台机器一个 agent，读文件、转发</span><span class="box"><b>缓冲</b> Kafka 削峰解耦、故障可重放</span><span class="box"><b>处理</b> 解析、丰富、脱敏、采样</span><span class="box"><b>存储</b> ES / Loki / ClickHouse 按场景选</span><span class="box"><b>查询</b> 关键词检索 + 字段聚合</span><span class="box"><b>告警</b> 错误率突增、关键词命中</span></div></div>
+  <p>本篇算例参照系：<b>1000 台容器（每台约 10 个 Pod），日增日志 10TB，峰值写入 100 万行/秒，查询以"最近 24 小时 + 关键词 + 服务名过滤"为主，QPS 约 50</b>。保留要求：热 7 天全量检索、温 30 天、冷 1 年。</p>
+  <div class="callout">
+    <b>三个反直觉的成本事实（先记住）：</b>① 日志<b>原始量:存储量 ≈ 1:1.8~2.5</b>（ES 索引膨胀），10TB/日存一年要 <b>5PB 级</b>；② <b>80% 的日志从来没人查</b>（debug 级），直接丢弃或采样能省掉一半成本；③ 存储选型比"上 ES"更影响账单——同数据量 Loki 成本通常是 ES 的 1/5。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>采集层：Filebeat / Fluentd / Vector</h2></div>
+  <p class="lead">采集 agent 跑在<b>每一台业务机器</b>上，第一纪律是<b>不能影响业务</b>：CPU &lt; 5%、内存 &lt; 200MB、磁盘 IO 可控。</p>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:170px">Filebeat</th><th style="width:170px">Fluentd</th><th>Vector</th></tr>
+    <tr><td>语言</td><td>Go</td><td>Ruby + C</td><td><b>Rust</b></td></tr>
+    <tr><td>常驻内存</td><td><b>低（20~50MB）</b></td><td>高（150MB+）</td><td>低（30~60MB）</td></tr>
+    <tr><td>吞吐（单机）</td><td>~10 万行/s</td><td>~2~5 万行/s</td><td><b>~30 万行/s</b></td></tr>
+    <tr><td>插件生态</td><td>中等（官方模块 + 社区）</td><td><b>极丰富（500+ 插件）</b></td><td>中等（增长快）</td></tr>
+    <tr><td>配置语言</td><td>YAML</td><td>自定义 DSL</td><td>TOML/YAML + VRL 脚本</td></tr>
+    <tr><td>背压控制</td><td>有（队列满自动降速）</td><td>有</td><td>有（磁盘缓冲队列）</td></tr>
+    <tr><td>适用场景</td><td><b>云原生/K8s 默认之选</b></td><td>复杂处理、遗留系统</td><td>高性能、统一采集+处理</td></tr>
+  </table>
+  <h4>Filebeat 生产配置（K8s DaemonSet）</h4>
+  <pre><span class="c"># filebeat.yml —— 生产必须调的几个点</span>
+filebeat.inputs:
+  - type: filestream        <span class="c"># 7.16+ 用 filestream 替代 log 输入，状态管理更稳</span>
+    id: app-logs
+    paths:
+      - /var/log/pods/*/*/*.log
+    parsers:
+      - container: ~        <span class="c"># 自动解析 K8s 容器日志格式（CRI）</span>
+    prospector.scanner.symlinks: true
+
+processors:
+  - drop_fields:            <span class="c"># 丢弃无用字段，省 20% 存储</span>
+      fields: [<span class="y">"agent.ephemeral_id"</span>, <span class="y">"log.offset"</span>]
+  - add_fields:             <span class="c"># 打上集群/环境标签，检索全靠它</span>
+      target: labels
+      fields:
+        cluster: prod-cn-east
+        env: production
+
+queue.mem:                  <span class="c"># 内存队列（背压缓冲）</span>
+  events: 4096
+  flush.min_events: 512
+  flush.timeout: 2s
+
+output.kafka:               <span class="c"># 输出到 Kafka，不直连 ES（原因见模块 2）</span>
+  hosts: [<span class="y">"kafka-01:9092"</span>, <span class="y">"kafka-02:9092"</span>]
+  topic: <span class="y">'app-logs-%{[labels.cluster]}'</span>
+  partition.round_robin: true
+  required_acks: 1          <span class="c"># leader 确认即可，平衡可靠与延迟</span>
+  max_message_bytes: 1048576  <span class="c"># 1MB 上限，超过直接拒（防超大行）</span></pre>
+  <div class="callout warn">
+    <b>采集层两个必须：</b>① <b>限流</b>——应用日志突发（如误开 debug）时 agent 要能顶住不拖垮机器：<span class="k">queue.mem</span> 满了就走背压降速，而不是无限吃内存；② <b>multiline 合并</b>——Java 堆栈是多行，不合并的话一次异常在检索里碎成 50 行，根本没法看。<span class="k">multiline.pattern: '^\s'</span> + <span class="k">multiline.negate: false</span> + <span class="k">match: after</span>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Kafka 缓冲：削峰与可重放</h2></div>
+  <p class="lead">为什么不 agent 直写存储？因为<b>日志流量有剧烈峰值，而存储的消费能力是平滑的</b>。Kafka 在中间做缓冲，是日志平台的标准架构。</p>
+  <h4>没有缓冲会怎样（算例）</h4>
+  <pre><span class="c">// 峰值 100 万行/s，ES 集群稳定消费能力 40 万行/s</span>
+直写：超出的 60 万行/s → ES 拒绝写入 → agent 重试 → <span class="r">雪崩</span>
+
+<span class="c">// 有 Kafka：</span>
+写入：100 万行/s 全部进 Kafka（Kafka 单集群可扛百万级/s）
+消费：按 40 万行/s 匀速消费，<b>堆积 60 万行/s</b>
+
+<span class="c">// 堆积量与恢复时间：</span>
+持续峰值 10 分钟 → 堆积 3.6 亿条
+回填时间 = 3.6 亿 / 40 万每秒 ≈ 900 秒 = 15 分钟
+<span class="c">// Kafka 磁盘成本：3.6 亿 × 1KB ≈ 360GB 峰值缓冲（保留 3 天 ≈ 1TB 磁盘）</span></pre>
+  <h4>Kafka 关键配置决策</h4>
+  <table>
+    <tr><th style="width:150px">决策点</th><th>生产选择与理由</th></tr>
+    <tr><td>分区数与键</td><td>按<b>服务名</b>做 key（同服务进同分区，保序）。分区数 = 峰值吞吐/单分区 10MB/s，算例给 <b>24 分区</b></td></tr>
+    <tr><td>副本与 acks</td><td>3 副本，<span class="k">min.insync.replicas=2</span>。日志允许少量丢失，不为强一致牺牲吞吐</td></tr>
+    <tr><td>保留策略</td><td><b>时间保留 3 天</b>（缓冲 + 故障重放窗口），不用大小保留（流量波动大）</td></tr>
+    <tr><td>压缩</td><td><span class="k">compression.type=lz4</span>——CPU 友好，压缩率约 3:1，省 2/3 磁盘</td></tr>
+    <tr><td>topic 规划</td><td>按业务域分：<span class="k">logs.app / logs.access / logs.audit</span>，隔离互相的流量突增</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>Kafka 带来的第二个红利：可重放。</b>处理逻辑改错了（解析规则写错）、存储端故障丢了数据，可以把 Kafka 里的原始日志<b>重新消费一遍</b>，从任意 offset 开始。这是"agent 直写存储"永远做不到的——<b>重放能力决定了日志平台的容错上限</b>。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>解析与丰富</h2></div>
+  <p class="lead">原始日志是给人看的文本，存储引擎要的是<b>结构化字段</b>。解析层的目标：把一行行文本变成带 <span class="k">timestamp/level/service/trace_id/message</span> 的记录。</p>
+  <h4>解析策略：JSON 优先，Grok 兜底</h4>
+  <pre><span class="c">// 策略一：应用直接输出 JSON 日志（最优，零解析成本）</span>
+<span class="c">// logback/log4j2 配 JSON layout，或直接用 logstash-logback-encoder</span>
+{<span class="y">"ts"</span>:<span class="y">"2026-10-18T14:23:01.482Z"</span>,<span class="y">"level"</span>:<span class="y">"ERROR"</span>,<span class="y">"service"</span>:<span class="y">"order-api"</span>,
+ <span class="y">"trace_id"</span>:<span class="y">"a1b2c3d4"</span>,<span class="y">"msg"</span>:<span class="y">"payment timeout, orderId=9527"</span>}
+
+<span class="c">// 策略二：非结构化文本，用 Grok（正则别名库）解析</span>
+输入：<span class="y">"2026-10-18 14:23:01 ERROR [order-api] payment timeout orderId=9527"</span>
+Grok：%{TIMESTAMP_ISO8601:ts} %{LOGLEVEL:level} \[%{DATA:service}\] %{GREEDYDATA:msg}
+输出：ts=2026-10-18 14:23:01, level=ERROR, service=order-api, msg=payment timeout...
+
+<span class="c">// 策略三：解析不了的原样存 message 字段 —— 绝不丢弃</span>
+<span class="c">// 解析失败率必须监控（&gt; 1% 告警），说明应用改日志格式没同步</span></pre>
+  <h4>字段标准化与丰富</h4>
+  <ul>
+    <li><b>标准化</b>：全公司统一字段名（对标 ECS 规范）：<span class="k">timestamp / log.level / service.name / trace.id / message</span>。不标准化的后果：A 团队叫 <span class="k">svc</span>，B 团队叫 <span class="k">app</span>，跨服务检索永远对不齐</li>
+    <li><b>丰富（enrich）</b>：IP → 地域（GeoIP 库）、UA → 设备类型、容器 ID → Pod/Service 名（K8s API 缓存）、<span class="k">trace_id</span> → 关联链路追踪</li>
+    <li><b>脱敏</b>：正则替换敏感信息——手机号 <span class="k">1[3-9]\d{9}</span> → <span class="k">138****8888</span>、身份证、银行卡。<b>这是合规红线，必须在入库前完成</b></li>
+    <li><b>采样与丢弃</b>：DEBUG 级日志采样 1%（全存也没人查）、健康检查日志（<span class="k">GET /healthz</span>）直接 drop。<b>这两步能省 30%~50% 存储</b></li>
+  </ul>
+  <div class="callout danger">
+    <b>多行日志必须在 agent 层合并，不能在解析层猜：</b>Java 异常堆栈、Python traceback 都是多行。如果 agent 按行切开，解析层拿到的是一堆没有上下文的碎片。<b>Filebeat 的 multiline 配置是所有 Java 服务上日志平台的第一个必改项。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>存储选型：ES vs Loki vs ClickHouse</h2></div>
+  <p class="lead">这是日志平台<b>最贵的一个决策</b>。三种引擎的架构哲学完全不同，成本差一个数量级。选型错误 = 每年几十万冤枉钱。</p>
+  <table>
+    <tr><th style="width:120px">维度</th><th style="width:180px">Elasticsearch</th><th style="width:170px">Loki</th><th>ClickHouse</th></tr>
+    <tr><td>索引方式</td><td><b>全文倒排索引</b>（每个 token 建索引）</td><td><b>只索引标签</b>（service/env 等少量字段）</td><td><b>列式存储 + 跳数索引</b></td></tr>
+    <tr><td>关键词检索</td><td><b>极强</b>（毫秒级任意词）</td><td>弱（要扫描压缩块，grep 式）</td><td>中（token 分词检索）</td></tr>
+    <tr><td>聚合分析</td><td>中（高基数聚合会 OOM）</td><td>弱</td><td><b>极强</b>（亿级 GROUP BY 秒出）</td></tr>
+    <tr><td>存储膨胀</td><td><b>高</b>（1GB 原始 ≈ 1.8GB 索引+数据）</td><td><b>低</b>（压缩 5~10x，约 0.2GB）</td><td>中（压缩 5~10x，约 0.15GB）</td></tr>
+    <tr><td>运维成本</td><td>高（分片、mapping、GC 调优）</td><td>低（无状态，依赖对象存储）</td><td>中</td></tr>
+    <tr><td>适用场景</td><td>排障检索（"找那条错误日志"）</td><td>K8s 容器日志、成本敏感</td><td>日志分析（"统计错误码分布"）</td></tr>
+  </table>
+  <h4>成本算例（日增 10TB，存 1 年）</h4>
+  <pre><span class="c">// Elasticsearch：</span>
+10TB/日 × 1.8 膨胀 × 365 ≈ 6570TB ≈ <span class="r">6.5 PB</span>
+<span class="c">// 就算只热 7 天，也需 126TB 热数据 → SSD 集群 20+ 节点，年账单数十万起</span>
+
+<span class="c">// Loki（日志体进对象存储 S3/OSS）：</span>
+10TB/日 × 0.2 压缩 × 365 ≈ 730TB，其中对象存储 90%（≈$0.02/GB/月）
+730TB × 0.9 × 0.02 × 12 ≈ <span class="g">15.8 万美元/年</span>（约为 ES 的 1/4 ~ 1/10）
+
+<span class="c">// ClickHouse：</span>
+10TB/日 × 0.15 × 365 ≈ 548TB，聚合查询能力反超 ES
+<span class="c">// 适合"日志即数据"的场景：错误码分布、接口 RT 分布、用户行为分析</span>
+
+<span class="c">// 结论（业界主流组合）：</span>
+<span class="c">// 排障检索（最近 7 天）→ ES 或 Loki；长期归档 → 对象存储；</span>
+<span class="c">// 分析统计（TB 级聚合）→ ClickHouse。三件套各司其职，别指望一个引擎全包</span></pre>
+  <div class="callout warn">
+    <b>选型的隐藏成本是运维，不是许可证：</b>ES 的坑（分片数失控、mapping 爆炸、JVM GC、集群再平衡）能吃掉一个全职工程师。<b>中小团队（&lt; 50 台机器）直接用 Loki + Grafana</b>，别碰 ES；数据量上来且检索是刚需，再上 ES；要做分析报表，加 ClickHouse。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>查询与检索优化</h2></div>
+  <p class="lead">日志查询有两个截然不同的模式，优化手段完全相反。<b>先想清楚你的查询是哪一种。</b></p>
+  <table>
+    <tr><th style="width:130px">模式</th><th style="width:220px">典型问题</th><th>引擎与优化</th></tr>
+    <tr><td><b>点查检索</b></td><td>"trace_id=a1b2 的日志"、"service=order 且含 timeout"</td><td>ES/Loki。靠<b>标签前缀过滤 + 倒排索引</b></td></tr>
+    <tr><td><b>聚合分析</b></td><td>"各服务错误码 TOP10"、"接口 RT P99 按小时"</td><td>ClickHouse。靠<b>列式扫描 + 预聚合</b></td></tr>
+  </table>
+  <h4>ES 查询优化清单</h4>
+  <pre><span class="c">// 1. 时间范围必须收窄（索引按天/小时切分，这是第一优化）</span>
+<span class="b">GET</span> /logs-app-2026.10.18/_search
+{ <span class="y">"query"</span>: { <span class="y">"bool"</span>: {
+    <span class="y">"filter"</span>: [
+      { <span class="y">"range"</span>: { <span class="y">"@timestamp"</span>: { <span class="y">"gte"</span>: <span class="y">"now-1h"</span> } } },
+      { <span class="y">"term"</span>:  { <span class="y">"service.name"</span>: <span class="y">"order-api"</span> } }
+    ],
+    <span class="y">"must"</span>: [ { <span class="y">"match"</span>: { <span class="y">"message"</span>: <span class="y">"timeout"</span> } } ]
+} } }
+
+<span class="c">// 关键点：filter 上下文（不打分、可缓存）放标签和时间，</span>
+<span class="c">// must 的全文检索放最后。顺序反了 = 先全文检索 10 亿文档再过滤</span>
+
+<span class="c">// 2. 高基数字段禁止聚合（如 user_id、trace_id 精确值有几亿个）</span>
+<span class="c">//    对高基数字段做 terms 聚合 → 每个 bucket 建 global ordinals → OOM</span>
+
+<span class="c">// 3. 深分页禁用 search_after/scroll 替代 from+size（from 10000 起性能断崖）</span>
+
+<span class="c">// 4. mapping 精打细算：只给"要检索的字段"建 keyword/text，</span>
+<span class="c">//    纯展示字段设 "index": false，能省 30% 索引体积</span></pre>
+  <h4>Loki 查询（LogQL）</h4>
+  <pre><span class="c"># 标签选择器必须加（这是 Loki 的性能命门）</span>
+{cluster=<span class="y">"prod-cn-east"</span>, service=<span class="y">"order-api"</span>} |= <span class="y">"timeout"</span>
+<span class="c"># 解析字段后按字段过滤（避免全文扫描）</span>
+{cluster=<span class="y">"prod"</span>} | json | level=<span class="y">"ERROR"</span> | line_format <span class="y">"{{.msg}}"</span>
+<span class="c"># 聚合（rate 是日志告警的基础）</span>
+sum(rate({cluster=<span class="y">"prod"</span>}[5m])) by (service)</pre>
+  <div class="callout ok">
+    <b>查询优化的终极手段是"查前先想"：</b>90% 的慢查询是因为没带时间范围或没带标签。<b>把"最近 1 小时 + 服务名"做成查询界面的默认值</b>，比任何索引调优都管用。另外：<b>trace_id 点查要保证 ES/Loki 侧走 keyword 精确匹配</b>，不要走全文检索（会被分词拆碎）。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>生命周期：热温冷与 ILM</h2></div>
+  <p class="lead">日志的访问规律极其鲜明：<b>昨天的日志查 100 次，上个月的日志查 1 次，去年的日志只为合规存档</b>。分层的目标就是让数据躺在"配得上它被访问频率"的介质上。</p>
+  <table>
+    <tr><th style="width:100px">层级</th><th style="width:130px">介质</th><th style="width:90px">保留</th><th>能力</th></tr>
+    <tr><td><b>热</b></td><td>SSD 节点</td><td>7 天</td><td>全索引、实时检索、聚合。承接 95% 查询</td></tr>
+    <tr><td><b>温</b></td><td>HDD 节点</td><td>30 天</td><td>索引保留、查询慢 2~3 倍。<span class="k">force_merge</span> 合并段</td></tr>
+    <tr><td><b>冷</b></td><td>对象存储（S3/OSS）</td><td>1 年</td><td>可检索（需先 restore）、压缩归档。合规审计用</td></tr>
+    <tr><td><b>删除</b></td><td>-</td><td>&gt; 1 年</td><td>合规到期删除，索引快照级删除</td></tr>
+  </table>
+  <h4>ES ILM 策略配置</h4>
+  <pre><span class="c">// 索引生命周期四阶段（节点角色：data-hot / data-warm / data-cold）</span>
+PUT _ilm/policy/logs-policy
+{
+  <span class="y">"policy"</span>: {
+    <span class="y">"phases"</span>: {
+      <span class="y">"hot"</span>:    { <span class="y">"min_age"</span>: <span class="y">"0ms"</span>,
+                 <span class="y">"actions"</span>: { <span class="y">"rollover"</span>: { <span class="y">"max_size"</span>: <span class="y">"50gb"</span>, <span class="y">"max_age"</span>: <span class="y">"1d"</span> } } },
+      <span class="y">"warm"</span>:   { <span class="y">"min_age"</span>: <span class="y">"7d"</span>,
+                 <span class="y">"actions"</span>: { <span class="y">"allocate"</span>: { <span class="y">"number_of_replicas"</span>: 1 },
+                              <span class="y">"forcemerge"</span>: { <span class="y">"max_num_segments"</span>: 1 } } },
+      <span class="y">"cold"</span>:   { <span class="y">"min_age"</span>: <span class="y">"30d"</span>,
+                 <span class="y">"actions"</span>: { <span class="y">"searchable_snapshot"</span>: { <span class="y">"snapshot_repository"</span>: <span class="y">"oss-backup"</span> } } },
+      <span class="y">"delete"</span>: { <span class="y">"min_age"</span>: <span class="y">"365d"</span>,
+                  <span class="y">"actions"</span>: { <span class="y">"delete"</span>: {} } }
+    }
+  }
+}
+
+<span class="c">// 索引模板绑定策略：logs-app-* 走 logs-policy</span>
+<span class="c">// 关键：hot 阶段 rollover 按 50GB/天切索引，避免单索引过大（检索慢、恢复难）</span></pre>
+  <div class="callout warn">
+    <b>分层不是"到期搬家"那么简单，有两个坑：</b>① <b>温层 forcemerge 是重操作</b>（合并段吃 CPU/IO），要放在低峰期且限速；② <b>冷层可检索快照（searchable snapshot）是 ES 商业功能</b>，开源版只能"恢复后才能查"（恢复 = 从对象存储拷回，小时级）。<b>规划冷数据时先问合规：冷数据到底需不需要"在线检索"——90% 的答案是不需要，那归档到 S3 + Glacier 就行，成本再降一个量级。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>多租户、配额与告警</h2></div>
+  <h4>多租户与配额</h4>
+  <ul>
+    <li><b>隔离粒度 = 索引前缀</b>：<span class="k">logs-{team}-{service}-{date}</span>，如 <span class="k">logs-trade-order-api-2026.10.18</span>。查得到、删得掉、算得清账</li>
+    <li><b>配额维度</b>：每团队每日写入量上限（GB）+ 索引数上限 + 保留天数上限。超配额动作：<b>先采样降级（DEBUG 直接丢）→ 再通知 → 最后拒绝写入</b>（拒绝要谨慎，日志是排障刚需，逼急了他们自己搭野平台）</li>
+    <li><b>RBAC</b>：索引级权限（交易团队看不到支付团队的敏感日志），字段级脱敏（手机号只对风控团队可见）</li>
+  </ul>
+  <h4>告警联动</h4>
+  <pre><span class="c"># 日志告警的三类规则（与指标告警 Prometheus 互补）</span>
+1. 错误率突增：rate({level="ERROR"}[5m]) / rate(total[5m]) &gt; 5% 持续 5min
+2. 关键词命中：|= "OOMKilled" | |= "panic" | |= "payment failed"（ES: 定时查询 count 阈值）
+3. 新模式出现：某服务首次出现的异常类型（聚类检测，进阶）
+
+<span class="c"># 告警治理（防告警疲劳）：</span>
+<span class="c"># - 分级：P1 电话 + P2 群机器人 + P3 邮件日报</span>
+<span class="c"># - 聚合：同服务 5 分钟内相似告警合并为一条</span>
+<span class="c"># - 静默：发布窗口期自动静默已知错误</span>
+<span class="c"># - 值班认领制：没人认领的告警自动升级</span>
+
+<span class="c"># 工具链：ElastAlert2（ES）/ Grafana Alerting（Loki）/ 自研 Flink 作业</span></pre>
+  <div class="callout danger">
+    <b>告警疲劳是真实的事故放大器：</b>某团队日志规则太敏感，一天 200 条告警，值班直接免打扰——<b>然后真正的 P0 事故被淹没在群里</b>。铁律：每条告警规则上线前必须回答"触发了谁、做什么、不做会怎样"，答不上来就删掉。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>容量估算与十个坑</h2></div>
+  <h4>容量账（日增 10TB 场景，给计算过程）</h4>
+  <pre><span class="c">// 1. 原始日志量</span>
+1000 台机器 × 每台 120KB/s × 86400s ≈ <span class="g">10.4 TB/日</span>
+（业务日志:访问日志:审计 ≈ 6:3:1）
+
+<span class="c">// 2. 处理后减量（解析层就该做）</span>
+丢弃健康检查 10% + DEBUG 采样 50% + 脱敏/去重 5% ≈ 留存 40%
+10.4TB × 0.4 ≈ <span class="g">4.2 TB/日</span> 真正入库
+
+<span class="c">// 3. 峰值写入</span>
+日常 12 万行/s，发布/故障时 3 倍 ≈ <span class="g">100 万行/s</span>（Kafka 扛，消费端 40 万行/s）
+
+<span class="c">// 4. Kafka 缓冲</span>
+保留 3 天 × 4.2TB × 3:1 压缩 ≈ <span class="g">38 TB 磁盘</span>，3 副本 → 114TB（约 12 台 broker）
+
+<span class="c">// 5. ES 热层（7 天）</span>
+4.2TB × 1.8 膨胀 × 7 ≈ <span class="g">53 TB</span> → SSD 节点 6~8 台（每台 8TB 可用）
+
+<span class="c">// 6. 温层（30 天）+ 冷层（1 年）</span>
+温：4.2TB × 1.8 × 23 ≈ 174TB（HDD 或可检索快照）
+冷：4.2TB × 0.2 压缩 × 335 ≈ 281TB → 对象存储（≈$0.02/GB/月 ≈ 6.7 万美元/年）
+
+<span class="c">// 7. 查询容量</span>
+50 QPS × 平均扫描 5GB/查询 ≈ 250MB/s 读吞吐（热层 SSD 可扛）</pre>
+  <h4>十个线上坑</h4>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">采集 agent 不限流，把业务机器拖垮</div><div class="pd">应用误开 debug 后日志暴涨 10 倍，agent 拼命读文件 + 发 Kafka，业务容器 CPU 被打满。队列满了必须走背压降速，agent 资源限额（limit/request）必须配。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">多行日志没合并，堆栈碎成 50 行</div><div class="pd">Java 异常每行被当独立日志入库，检索时看不到完整堆栈。Filebeat multiline 是 Java 服务第一个必改配置。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">单行超大日志（几 MB 的 payload dump）</div><div class="pd">ES 默认 http.max_content_length 100MB 但单文档过大照样拖慢集群；Kafka 单消息默认 1MB 直接拒。必须在 agent 层截断（truncate 到 10KB）+ 标记已截断。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">日志时间戳混乱（容器时区、NTP 漂移）</div><div class="pd">同一台机器日志时间差几小时，跨服务链路对不齐。统一 UTC + 入库时用 Kafka 到达时间校准漂移超 5 分钟的机器告警。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">纯文本日志，没有结构化字段</div><div class="pd">只能全文 grep，查个"order-api 的错误"要翻十万行。字段标准化（service/level/trace_id）是排障效率的分水岭。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">不做热温冷分层，全存 SSD</div><div class="pd">10TB/日全热存储，年账单百万级。7 天前的日志查询频率是 1/100，让它躺对象存储。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">敏感信息明文入库</div><div class="pd">手机号、身份证、密码出现在日志里直接进 ES，被检索出来就是合规事故（个保法）。入库前正则脱敏 + 定期全量扫描旧数据。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Kafka 分区倾斜</div><div class="pd">按服务名分区，某个大服务的日志量是其他的 100 倍，单分区打满而其他分区空闲。分区键加盐（service + hash(user_id)%N）或单独 topic。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">ES 高基数字段聚合</div><div class="pd">对 user_id/trace_id 做 terms 聚合，global ordinals 内存爆炸，节点被 Killed。高基数字段只做精确点查，不做聚合。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">告警规则太敏感，告警疲劳</div><div class="pd">一天 200 条告警，值班开免打扰，真正的 P0 被淹没。规则上线前必须过"触发了谁、做什么"评审，配套聚合/静默/分级。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 日志平台在 agent 和存储之间加 Kafka 的核心原因是？</div>
+      <button class="opt">Kafka 比 ES 更便宜</button>
+      <button class="opt">削峰解耦：日志流量有剧烈峰值而存储消费能力平滑，且故障时可重放</button>
+      <button class="opt">Kafka 自带检索能力</button>
+      <div class="ans">正确答案：<b>削峰 + 可重放</b>。峰值 100 万行/s 直写 ES（消费 40 万/s）会雪崩；Kafka 缓冲后匀速消费。额外红利：处理逻辑改错、存储故障后可以从任意 offset 重新消费原始日志。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 日增 10TB 日志，同数据量下存储成本最低的方案通常是？</div>
+      <button class="opt">Elasticsearch，因为索引最完善</button>
+      <button class="opt">三副本 MySQL 分库分表</button>
+      <button class="opt">Loki（标签索引 + 对象存储压缩）</button>
+      <div class="ans">正确答案：<b>Loki</b>。只索引标签、日志体压缩 5~10x 进对象存储，膨胀率约 0.2，通常是 ES（膨胀 1.8）的 1/5~1/10 成本。代价是关键词检索要扫描压缩块，慢于 ES。排障选 ES/Loki、分析选 ClickHouse、归档进对象存储，是主流组合。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于采集 agent（Filebeat）的多行合并，正确的是？</div>
+      <button class="opt">必须配 multiline，把 Java 堆栈等多行日志合并为一条，否则异常在检索里碎成几十行</button>
+      <button class="opt">不需要，解析引擎会自动识别堆栈</button>
+      <button class="opt">只在 Fluentd 里需要，Filebeat 没这个问题</button>
+      <div class="ans">正确答案：<b>必须配 multiline</b>。agent 按行读取文件，不合并的话一次异常堆栈被切成几十条独立记录，解析层拿不到上下文，检索时完全没法看。这是 Java 服务接入日志平台的第一个必改项。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. ES 查询"最近 1 小时 order-api 服务含 timeout 的日志"，正确的查询构造是？</div>
+      <button class="opt">先 must match timeout 全文检索，再 filter 服务名</button>
+      <button class="opt">filter 放时间范围 + 服务名（不打分可缓存），must 全文检索放最后</button>
+      <button class="opt">from+size 深分页拉全量再本地过滤</button>
+      <div class="ans">正确答案：<b>filter 前置</b>。filter 上下文不打分、可缓存，先用时间 + 标签把候选集从 10 亿缩到百万级，全文检索只在候选集上跑。顺序反了等于全量扫描。深分页（from 10000+）性能断崖，要用 search_after。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 日志平台的"热温冷"分层，热数据一般保留多久？</div>
+      <button class="opt">3 年，满足审计要求</button>
+      <button class="opt">1 小时，查完就归档</button>
+      <button class="opt">7 天全量检索，30 天降速检索，1 年归档对象存储</button>
+      <div class="ans">正确答案：<b>7 天热 + 30 天温 + 1 年冷</b>。日志访问规律极其鲜明：昨天的日志查 100 次，上月查 1 次，去年只为合规。让数据躺在配得上访问频率的介质上，是成本优化的核心手段。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于日志脱敏，正确的是？</div>
+      <button class="opt">入库前用正则把手机号/身份证等替换为掩码，旧数据定期全量扫描补脱敏</button>
+      <button class="opt">不需要，ES 有权限控制，看不到就是安全的</button>
+      <button class="opt">脱敏会让日志没法排障，应该明文存储</button>
+      <div class="ans">正确答案：<b>入库前脱敏 + 旧数据补扫</b>。日志里的手机号/身份证明文进 ES，任何有读权限的人都能检索出来，是个保法合规红线。权限控制防不住"有权限的人滥用"，脱敏是第一道防线。排障只需要掩码前后的部分字符，不影响定位。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>核心配置速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>filebeat.inputs[].parsers.container</code><span class="desc">K8s 容器日志自动解析（CRI 格式）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>multiline.pattern: '^\s' + match: after</code><span class="desc">Java 堆栈多行合并，必配</span><button class="copy">复制</button></div>
+    <div class="crow"><code>queue.mem.events: 4096</code><span class="desc">内存队列 + 背压，防日志暴涨拖垮机器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kafka compression.type=lz4</code><span class="desc">CPU 友好压缩，省 2/3 缓冲磁盘</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ILM: hot 7d / warm 30d / cold 365d</code><span class="desc">生命周期策略，rollover 50GB 切索引</span><button class="copy">复制</button></div>
+    <div class="crow"><code>{cluster="prod"} |= "timeout"</code><span class="desc">Loki LogQL：标签前缀 + 行过滤</span><button class="copy">复制</button></div>
+  </div>
+  <h3>容量估算速查表（算例数字）</h3>
+  <table>
+    <tr><th style="width:220px">指标</th><th>本篇算例值</th></tr>
+    <tr><td>原始日志量</td><td>1000 台 × 120KB/s ≈ 10.4TB/日</td></tr>
+    <tr><td>处理后入库量</td><td>丢弃/采样后 ≈ 4.2TB/日（留存 40%）</td></tr>
+    <tr><td>峰值写入</td><td>100 万行/s（Kafka 缓冲）</td></tr>
+    <tr><td>Kafka 缓冲磁盘</td><td>3 天 ≈ 38TB，3 副本 114TB</td></tr>
+    <tr><td>ES 热层（7 天）</td><td>≈ 53TB（膨胀 1.8x）</td></tr>
+    <tr><td>冷层（1 年）</td><td>≈ 281TB 对象存储</td></tr>
+    <tr><td>膨胀率对比</td><td>ES 1.8x / Loki 0.2x / CH 0.15x</td></tr>
+  </table>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Filebeat</b></td><td>Go 写的轻量采集 agent，内存 20~50MB，K8s 默认之选</td></tr>
+    <tr><td><b>Fluentd</b></td><td>插件极丰富的采集器（500+），内存较高，适合复杂处理</td></tr>
+    <tr><td><b>Vector</b></td><td>Rust 写的高性能采集+处理引擎，单机 30 万事件/s</td></tr>
+    <tr><td><b>multiline</b></td><td>多行合并配置，把 Java 堆栈拼回一条日志</td></tr>
+    <tr><td><b>背压</b></td><td>下游拥塞时采集端自动降速，防止拖垮业务机器</td></tr>
+    <tr><td><b>Grok</b></td><td>正则别名库，把非结构化文本解析成字段</td></tr>
+    <tr><td><b>ECS</b></td><td>Elastic Common Schema，日志字段命名规范</td></tr>
+    <tr><td><b>脱敏</b></td><td>入库前把手机号/身份证等替换为掩码，合规红线</td></tr>
+    <tr><td><b>倒排索引</b></td><td>token → 文档列表，ES 全文检索快的原因</td></tr>
+    <tr><td><b>跳数索引</b></td><td>列式存储按块预统计，ClickHouse 的剪枝优化</td></tr>
+    <tr><td><b>高基数</b></td><td>字段唯一值极多（user_id），聚合会 OOM，禁 terms 聚合</td></tr>
+    <tr><td><b>ILM</b></td><td>ES 索引生命周期：hot/warm/cold/delete 自动流转</td></tr>
+    <tr><td><b>rollover</b></td><td>索引按大小/时间切分（如 50GB/天），避免单索引过大</td></tr>
+    <tr><td><b>searchable snapshot</b></td><td>ES 冷层可检索快照，直接查对象存储（商业功能）</td></tr>
+    <tr><td><b>LogQL</b></td><td>Loki 查询语言，标签选择器是性能命门</td></tr>
+    <tr><td><b>filter vs must</b></td><td>ES 布尔查询：filter 不打分可缓存，must 打分，前者前置</td></tr>
+    <tr><td><b>search_after</b></td><td>深分页替代 from+size，性能不随深度衰减</td></tr>
+    <tr><td><b>配额</b></td><td>每团队每日写入上限，超限先采样降级再拒绝</td></tr>
+    <tr><td><b>告警疲劳</b></td><td>告警太多导致值班免打扰，真事故被淹没</td></tr>
+    <tr><td><b>可重放</b></td><td>Kafka 保留原始日志，处理出错可重新消费</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 Docker 起 Filebeat + Kafka + Loki，跑通"容器日志 → 解析 → 存储 → Grafana 查询"全链路；② 给一个 Java 应用配 multiline 和 JSON 日志，对比排障体验；③ 给自己集群算一遍容量账（原始量、膨胀、Kafka 缓冲、冷归档成本）；④ 写一条 ILM 策略和一条告警规则，过一遍"触发了谁、做什么"评审。<br><br>
+    <b>之后值得单独学：</b>Elasticsearch 集群调优（分片/mapping/GC）、OpenTelemetry 日志规范、以及日志与链路追踪/指标的联动（Observability 三支柱）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透日志平台设计 · 上线前务必检查：agent 限流、多行合并、脱敏、分层策略</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（存储选型）和模块 8（容量账）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边算账：日日志量、ES 膨胀、冷归档成本。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边算账：估算你自己集群的日日志量、ES 存储成本、3 年后归档量。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

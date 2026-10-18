@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透虚拟化原理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透虚拟化原理</h1>
+    <p class="sub">虚拟化不是"软件模拟一台电脑"，而是<b>用硬件和内核配合，让每个 Guest 以为自己独占一台机器</b>。理解这句话，就能解释为什么 VM 启动要几十秒、为什么 IO 有 10 倍差距、为什么容器不是虚拟化。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种虚拟化路线</span>
+      <span class="chip">VM Exit 约 <b>1~3μs</b></span>
+      <span class="chip"><b>10</b> 个选型坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">不需要真装 KVM，能跑 lscpu 和 systemd-detect-virt 就行</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先确认你在哪一层</h2></div>
+  <p class="lead">很多性能问题，第一步是搞清楚"我现在跑在裸机、虚拟机还是容器里"。</p>
+  <pre><span class="c"># 1. 我在虚拟机里吗？</span>
+systemd-detect-virt
+<span class="c"># kvm / vmware / microsoft / none（none 表示裸机）</span>
+
+<span class="c"># 2. 虚拟化平台和型号</span>
+sudo dmidecode -s system-product-name
+<span class="c"># KVM / VMware Virtual Platform / VirtualBox</span>
+
+<span class="c"># 3. CPU 是否支持硬件虚拟化（想在宿主机上开 KVM 才需要）</span>
+grep -E -o 'vmx|svm' /proc/cpuinfo | sort -u
+<span class="c"># vmx = Intel VT-x，svm = AMD-V。有输出说明支持</span>
+sudo kvm-ok          <span class="c"># 需要 cpu-checker 包</span>
+
+<span class="c"># 4. 是不是容器（容器里通常没有 virt 标识，但 cgroup 名字会暴露）</span>
+cat /proc/1/cgroup | head -3
+<span class="c"># 0::/docker/3f2a... 或 /kubepods/... 说明在容器里</span>
+
+<span class="c"># 5. 看 NUMA 拓扑（选型时决定绑核策略）</span>
+lscpu | grep -E 'Socket|Core|Thread|NUMA'
+numactl -H | head -12</pre>
+  <div class="callout warn">
+    <b>一个常见的误判：</b><span class="k">systemd-detect-virt</span> 返回 <span class="k">none</span> 不代表一定在裸机——某些精简的虚拟化环境（尤其是嵌套虚拟化或某些 ARM 平台）没有暴露 DMI 信息。反过来，<span class="k">kvm</span> 也不一定说明你在云上，可能只是本地开发机。要交叉验证 <span class="k">/sys/class/dmi/id/product_name</span>、<span class="k">/proc/cpuinfo</span> 的 hypervisor 标志、以及磁盘设备名（<span class="k">/dev/vda</span> 通常是 virtio）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>虚拟化的三条路线</h2></div>
+  <p class="lead">核心矛盾只有一个：<b>Guest 内核以为自己在 Ring 0，可以执行特权指令，但它其实不在 Ring 0</b>。三种方案就是三种"骗术"。</p>
+
+  <table>
+    <tr><th style="width:130px">方式</th><th style="width:230px">怎么骗</th><th style="width:150px">Guest 要不要改</th><th>代表</th></tr>
+    <tr><td><b>全虚拟化</b><br>（二进制翻译）</td><td>Hypervisor 扫描 Guest 的代码，把特权指令<b>动态替换</b>成对 Hypervisor 的调用</td><td>不用改，装原版系统即可</td><td>早期 VMware、VirtualBox（部分场景）、QEMU TCG</td></tr>
+    <tr><td><b>半虚拟化</b><br>（paravirt）</td><td>不骗了，直接约定一套 <b>hypercall</b> 接口，Guest 主动调用</td><td><b>要改内核</b>（或装驱动）</td><td>Xen PV、virtio 驱动、KVM 的 PV 特性</td></tr>
+    <tr><td><b>硬件辅助</b></td><td>CPU 新增一套"根模式/非根模式"，Guest 直接跑在硬件上，只有敏感操作才陷入</td><td>不用改</td><td>Intel VT-x、AMD-V、ARM EL2</td></tr>
+  </table>
+
+  <h3>为什么早期 x86 不能虚拟化</h3>
+  <p>1974 年 Popek 和 Goldberg 提出一个架构要能虚拟化，必须满足"<b>敏感指令集是特权指令集的子集</b>"。x86 违反了这条：有一批指令<b>既敏感又不是特权</b>——它们能读到或影响全局状态，但在 Ring 3 下执行<b>不会触发异常</b>，只是安静地返回一个错误的值。</p>
+  <table>
+    <tr><th style="width:170px">指令</th><th>问题</th></tr>
+    <tr><td class="f">popf</td><td>试图改中断标志位，Ring 3 下不报错，只是静默失败。Guest 以为自己关了中断，其实没关</td></tr>
+    <tr><td class="f">sgdt / sidt</td><td>能读到真实的 GDT/IDT 地址，暴露 Hypervisor 的存在</td></tr>
+    <tr><td class="f">smsw</td><td>读到真实的机器状态字</td></tr>
+    <tr><td class="f">lar / lsl</td><td>段限长检查，结果与虚拟环境不一致</td></tr>
+  </table>
+  <p>这些指令在 Ring 3 不陷入，Hypervisor 就没机会介入。VMware 的解法是<b>二进制翻译</b>：运行时扫描代码块，遇到这些指令就替换掉。代价是每次执行都要翻译/查缓存，早期实测开销 <b>5~20 倍</b>，而且代码缓存管理极其复杂。</p>
+
+  <h3>硬件辅助：VT-x 与 AMD-V</h3>
+  <p>2005 年前后 Intel VT-x 和 AMD-V 出现，思路是<b>在 Ring 0 之外再加一层</b>：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>两种模式：</b>root 模式（Hypervisor 跑这里）和 non-root 模式（Guest 跑这里）。Guest 内核仍然跑在自己的 Ring 0，但它处在 non-root 里，<b>是一个"假的 Ring 0"</b>。</div></div>
+    <div class="step"><div class="txt"><b>VMCS：</b>每 vCPU 一块内存（Virtual Machine Control Structure），保存 Guest 的寄存器状态、以及<b>哪些操作要触发 VM Exit</b> 的配置位图。</div></div>
+    <div class="step"><div class="txt"><b>VM Exit：</b>Guest 执行了被配置为"拦截"的指令（如读写 CR3、执行 hlt、访问特定 IO 端口），CPU 自动保存 Guest 状态、切到 root 模式、跳到 Hypervisor 的处理入口。</div></div>
+    <div class="step"><div class="txt"><b>VM Entry：</b>Hypervisor 处理完，执行 <span class="k">VMLAUNCH</span> / <span class="k">VMRESUME</span> 回到 Guest，CPU 恢复 Guest 状态。</div></div>
+  </div>
+  <p>ARM64 上对应的是 EL2（Hypervisor 异常级别），概念完全一致：Guest 内核在 EL1，Hypervisor 在 EL2，敏感操作触发异常到 EL2。</p>
+  <div class="callout">
+    <b>嵌套虚拟化（nested）为什么慢：</b>L1 Hypervisor 本身跑在 L0 的 non-root 里，当 L2 Guest 触发 VM Exit 时，要先退出到 L1，L1 再决定是否需要退出到 L0。<b>一次操作可能变成两三次 Exit</b>，延迟翻倍。这就是"在云主机里再开 VM"体验差的原因。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>CPU 虚拟化：VM Exit 的代价</h2></div>
+  <p class="lead">硬件辅助不是免费的。每一次 VM Exit 都是一次"上下文切换 + 世界切换"，比系统调用贵得多。</p>
+
+  <table>
+    <tr><th style="width:230px">操作</th><th style="width:150px">典型耗时</th><th>说明</th></tr>
+    <tr><td>函数调用</td><td>1~2 ns</td><td>基线</td></tr>
+    <tr><td>系统调用</td><td>50~500 ns</td><td>用户态 → 内核态</td></tr>
+    <tr><td><b>VM Exit + Entry</b></td><td><b>1~3 μs</b></td><td>保存/恢复全部 vCPU 状态、切换世界。较新的 CPU 可到 0.5~1μs</td></tr>
+    <tr><td>进程上下文切换</td><td>2~5 μs</td><td>同量级，但 VM Exit 更不可控</td></tr>
+    <tr><td>一次网络收发包（虚拟化路径）</td><td>5~20 μs</td><td>可能包含多次 Exit</td></tr>
+  </table>
+  <p>关键在于<b>次数</b>。一个 Guest 每秒触发 10 万次 VM Exit，光切换就是 0.1~0.3 秒的 CPU 时间——这还没算 Hypervisor 里处理逻辑的开销。</p>
+
+  <h3>哪些操作会触发 Exit</h3>
+  <table>
+    <tr><th style="width:210px">类别</th><th>例子</th><th style="width:200px">优化手段</th></tr>
+    <tr><td>特权指令</td><td>读写 CR3（切页表）、lgdt、invlpg</td><td>VPID/ASID 让 TLB 不冲刷；PCID</td></tr>
+    <tr><td>IO 端口访问</td><td><span class="k">in</span> / <span class="k">out</span> 指令</td><td>改用 MMIO 或 virtio；减少设备模拟</td></tr>
+    <tr><td>MMIO 访问</td><td>读写设备寄存器</td><td>内核同页合并（KSM）、减少 MMIO 次数</td></tr>
+    <tr><td>中断注入</td><td>Hypervisor 给 Guest 送中断</td><td>APICv / posted interrupt，硬件直接投递</td></tr>
+    <tr><td>halt / 停机</td><td>Guest 空闲时执行 hlt</td><td>这是<b>好事</b>，让出物理 CPU</td></tr>
+    <tr><td>MSR 读写</td><td>读写模型特定寄存器</td><td>MSR bitmap 放行常用项</td></tr>
+  </table>
+
+  <h3>三个关键优化</h3>
+  <h4>1. VPID / ASID：别每次都冲 TLB</h4>
+  <p>没有 VPID 时，每次 VM Entry/Exit 都要冲刷整个 TLB，因为 CPU 分不清哪些页表项属于哪个 Guest。VPID（Virtual Processor ID）给每个 vCPU 一个标签，TLB 项带上标签，切换时不用冲。这一项能把 Exit 密集场景的性能提升 <b>10%~30%</b>。</p>
+
+  <h4>2. 大页：减少页表层级和 TLB 压力</h4>
+  <p>2MB 大页让一个 TLB 项覆盖 512 倍的内存，TLB 命中率显著提升。KVM 上给 Guest 配 <span class="k">hugepages</span> 通常能带来 <b>5%~15%</b> 的性能提升，内存密集应用更多。</p>
+
+  <h4>3. CPU 绑核与隔离</h4>
+  <pre><span class="c"># 宿主机上把物理核留给某个 VM 独占，避免调度抖动</span>
+<span class="c"># 1. 内核启动参数隔离 CPU（需要重启）</span>
+<span class="c"># isolcpus=4-11 nohz_full=4-11 rcu_nocbs=4-11</span>
+
+<span class="c"># 2. 把 vCPU 线程绑到隔离的物理核</span>
+<span class="c"># 先找到 vCPU 线程</span>
+ps -eLo pid,tid,psr,comm | grep -E 'CPU [0-9]+/KVM'
+<span class="c">#  9812  9813   3 CPU 0/KVM</span>
+<span class="c">#  9814  9815   5 CPU 1/KVM</span>
+taskset -cp 4 9813
+taskset -cp 5 9815
+
+<span class="c"># 3. 验证：看 vCPU 线程是否稳定在指定核</span>
+watch -n1 'ps -eLo psr,comm | grep KVM'</pre>
+  <div class="callout warn">
+    <b>"vCPU 数量"不等于"物理核数量"。</b>给 VM 配 8 个 vCPU，如果宿主机只有 4 个物理核（8 线程），那么这 8 个 vCPU 是在 8 个超线程上分时复用。一旦所有 vCPU 同时忙，就会出现 <b>vCPU 等待物理 CPU</b>，Guest 里表现为 <span class="k">%steal</span> 升高。这是云主机"看起来配置很高但很卡"的头号原因。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>内存虚拟化：影子页表与 EPT</h2></div>
+  <p class="lead">内存虚拟化比 CPU 更麻烦，因为 Guest 的页表里存的是"Guest 物理地址"，而硬件 MMU 只认"宿主物理地址"。</p>
+
+  <h3>三层地址</h3>
+  <table>
+    <tr><th style="width:190px">地址类型</th><th style="width:110px">缩写</th><th>含义</th></tr>
+    <tr><td>虚拟地址</td><td>VA</td><td>Guest 里进程看到的地址</td></tr>
+    <tr><td>Guest 物理地址</td><td>GPA</td><td>Guest 以为的"物理地址"</td></tr>
+    <tr><td>宿主物理地址</td><td>HPA</td><td>真正的内存条地址</td></tr>
+  </table>
+  <p>Guest 的页表做的是 <b>VA → GPA</b> 的映射。硬件 MMU 需要 <b>VA → HPA</b>。中间少了一环。</p>
+
+  <h3>方案一：影子页表（shadow page table）</h3>
+  <p>Hypervisor 为每个 Guest 进程维护一份"影子页表"，里面直接是 VA → HPA。Guest 改自己的页表时，Hypervisor 要拦截（把 Guest 页表设为只读，写入触发缺页），然后同步更新影子页表。</p>
+  <table>
+    <tr><th style="width:150px">优点</th><th style="width:150px">缺点</th></tr>
+    <tr><td>Guest 侧 TLB 命中就是一次地址翻译，性能好</td><td><b>每次 Guest 改页表都要 Exit</b>，进程切换、mmap、缺页都会触发同步</td></tr>
+    <tr><td>不需要硬件支持</td><td>影子页表本身占内存；实现复杂，容易出 bug</td></tr>
+  </table>
+  <p>实测影子页表的开销在内存密集型负载下可达 <b>30%~50%</b>，进程创建/切换频繁时更糟。</p>
+
+  <h3>方案二：EPT / NPT（硬件二级页表）</h3>
+  <p>Intel 叫 <b>EPT</b>（Extended Page Table），AMD 叫 <b>NPT</b>（Nested Page Table），ARM 叫 stage-2 translation。思路是让硬件做<b>两次翻译</b>：</p>
+  <div class="steps">
+    <div class="step"><div class="txt">Guest 的 CR3 指向 Guest 页表，硬件先按它把 VA 翻成 GPA（这一步和裸机一样，由 Guest 内核控制）。</div></div>
+    <div class="step"><div class="txt">硬件再查 <b>EPT</b>（由 Hypervisor 维护），把 GPA 翻成 HPA。</div></div>
+    <div class="step"><div class="txt">两次翻译的结果可以缓存进 TLB，后续访问一次命中，<b>不需要 Exit</b>。</div></div>
+    <div class="step"><div class="txt">如果 EPT 里没有这个映射，触发 <b>EPT Violation</b>，退出到 Hypervisor，由它决定是分配内存还是报错。</div></div>
+  </div>
+  <p>这就是为什么 EPT 让虚拟化性能接近裸机：<b>正常的地址翻译完全在硬件里完成，Guest 改页表也不再需要 Exit</b>。</p>
+
+  <h3>代价：TLB 压力翻倍</h3>
+  <p>两次翻译意味着一次 VA→HPA 的映射要占<b>更多 TLB 项</b>（或者需要更长的查找）。这带来两个直接后果：</p>
+  <ul>
+    <li><b>TLB miss 变多。</b>同样大小的 TLB，能覆盖的内存范围变小。内存密集型应用（数据库、JVM 堆）受影响最大。</li>
+    <li><b>页表遍历变长。</b>4 级 Guest 页表 + 4 级 EPT = 最坏 20 次内存访问才能完成一次翻译（实际有缓存，但 miss 时确实很贵）。</li>
+  </ul>
+  <pre><span class="c"># 看 EPT 的命中情况和缺页次数（KVM 宿主）</span>
+sudo perf kvm stat live
+<span class="c"># 关注 EPT_VIOLATION / EPT_MISCONFIG 事件</span>
+
+<span class="c"># 看 Guest 里的 TLB 相关性能计数器</span>
+perf stat -e dTLB-load-misses,dTLB-store-misses -a sleep 5
+
+<span class="c"># 缓解手段：大页</span>
+<span class="c"># Guest 内启用 2MB 大页（透明大页或显式 hugetlbfs）</span>
+cat /sys/kernel/mm/transparent_hugepage/enabled
+<span class="c"># [always] madvise never</span>
+
+<span class="c"># 宿主机侧给 VM 分配 hugepages</span>
+cat /proc/meminfo | grep -i huge</pre>
+  <div class="callout ok">
+    <b>一句话对比：</b>影子页表是<b>用软件换硬件</b>（省硬件支持，费 Exit）；EPT 是<b>用硬件换软件</b>（省 Exit，费 TLB）。现代 CPU 都有 EPT，影子页表基本只剩历史意义，但它的思路（拦截写页表）在嵌套虚拟化和某些安全场景里还在用。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>IO 虚拟化：差距最大的地方</h2></div>
+  <p class="lead">CPU 和内存虚拟化的开销通常在 5% 以内，IO 可以差 10 倍以上。选型时最该关注的就是这一层。</p>
+
+  <h3>四种方案，四代技术</h3>
+  <table>
+    <tr><th style="width:150px">方案</th><th style="width:230px">原理</th><th style="width:120px">性能（相对裸机）</th><th>典型场景</th></tr>
+    <tr><td><b>全模拟</b><br>emulated</td><td>QEMU 用软件模拟一块真实网卡（如 e1000），Guest 的每次寄存器读写都要 Exit 到 QEMU 处理</td><td><b>10%~30%</b></td><td>兼容性优先、老系统、调试</td></tr>
+    <tr><td><b>virtio</b><br>半虚拟化</td><td>Guest 装 virtio 驱动，和宿主约定共享内存环（vring），批量提交描述符，减少 Exit</td><td><b>50%~80%</b></td><td><b>绝大多数云主机的默认选择</b></td></tr>
+    <tr><td><b>vhost / vhost-user</b></td><td>把 virtio 的后端从 QEMU 用户态进程挪到内核（vhost-net）或独立进程（DPDK），减少一次上下文切换</td><td><b>70%~90%</b></td><td>高吞吐网络、NFV</td></tr>
+    <tr><td><b>SR-IOV / 直通</b></td><td>网卡硬件虚拟出多个 VF（Virtual Function），每个 VF 直接分配给一个 VM，DMA 直达</td><td><b>90%~98%</b></td><td>高性能计算、数据库、低延迟交易</td></tr>
+  </table>
+
+  <h3>virtio 为什么快</h3>
+  <p>核心是<b>把"一次操作一次 Exit"改成"一批操作一次 Exit"</b>。以发送为例：</p>
+  <div class="steps">
+    <div class="step"><div class="txt">Guest 驱动把"要发的缓冲区地址和长度"写进 <b>vring</b>（一块 Guest 和宿主共享的物理内存），这是一个描述符数组。</div></div>
+    <div class="step"><div class="txt">Guest 更新 <b>avail ring</b> 的索引，然后写一个 MMIO 寄存器（或触发一个通知）告诉宿主"有新请求"。</div></div>
+    <div class="step"><div class="txt">宿主侧的 vhost 从 vring 里批量取出描述符，直接组包发出，<b>一次处理几十个请求</b>。</div></div>
+    <div class="step"><div class="txt">发完后宿主更新 <b>used ring</b>，必要时发一个中断给 Guest。Guest 也可以选择轮询（<span class="k">virtio_poll</span>）避免中断开销。</div></div>
+  </div>
+  <p>对比全模拟：e1000 每发一个包，Guest 要读写好几个 MMIO 寄存器，每个都是一次 VM Exit。virtio 把几十个包压缩成一两次通知。</p>
+
+  <h3>SR-IOV：把硬件切开</h3>
+  <p>SR-IOV 让一块物理网卡在硬件层虚拟出多个 <b>VF</b>（Virtual Function），每个 VF 有自己的 PCI 配置空间、自己的队列和中断。通过 <b>IOMMU</b>（Intel VT-d / AMD-Vi）做 DMA 重映射，保证 VF 只能访问分配给它的内存。</p>
+  <pre><span class="c"># 宿主机上看网卡是否支持 SR-IOV</span>
+lspci -vv -s 0000:3b:00.0 | grep -i 'Single Root'
+<span class="c"># Capabilities: [160] Single Root I/O Virtualization (SR-IOV)</span>
+
+<span class="c"># 开启 VF（不同驱动路径不同，以 Intel ixgbe 为例）</span>
+echo 8 &gt; /sys/class/net/eth0/device/sriov_numvfs
+lspci | grep 'Virtual Function'
+
+<span class="c"># 把 VF 直通给 VM（libvirt 配置片段）</span>
+<span class="c">&lt;interface type='hostdev' managed='yes'&gt;</span>
+<span class="c">  &lt;source&gt;&lt;address type='pci' domain='0' bus='0x3b' slot='0x10' function='0x1'/&gt;&lt;/source&gt;</span>
+<span class="c">&lt;/interface&gt;</span>
+
+<span class="c"># 验证：Guest 里应该看到独立的网卡，且 driver 是真实驱动（如 ixgbevf）</span>
+ethtool -i eth0</pre>
+  <div class="callout danger">
+    <b>SR-IOV 的三个代价：</b>① <b>不能热迁移</b>——VF 绑定了物理位置，迁移就得先解绑再重新绑定，会有秒级中断；② <b>宿主看不到流量</b>，安全组、抓包、QoS 都要在交换机或 VF 侧做；③ <b>VF 数量有限</b>，一块卡通常 32~128 个，且要和宿主机自己用的队列抢。<br>
+    所以云厂商的"高性能网络"通常是<b>可切换的</b>：普通模式走 virtio（能迁移、能限流），高性能模式走 SR-IOV（快但不能迁移）。
+  </div>
+
+  <h3>存储 IO 的对应关系</h3>
+  <table>
+    <tr><th style="width:170px">方案</th><th>路径</th><th style="width:140px">IOPS 量级</th></tr>
+    <tr><td>全模拟 IDE/SATA</td><td>Guest → Exit → QEMU → 宿主文件 → 真实磁盘</td><td>几百</td></tr>
+    <tr><td>virtio-blk</td><td>Guest → vring → vhost → 宿主块层</td><td>几万</td></tr>
+    <tr><td>virtio-scsi</td><td>同上，但支持更多设备和 SCSI 语义</td><td>几万</td></tr>
+    <tr><td>NVMe 直通</td><td>Guest 直接驱动物理 NVMe 盘</td><td>几十万</td></tr>
+    <tr><td>本地 NVMe（裸机）</td><td>无虚拟化层</td><td>几十万到百万</td></tr>
+  </table>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>容器不是虚拟化</h2></div>
+  <p class="lead">这是最容易被说错的一句话。容器和 VM 解决的是不同的问题，只是用起来像。</p>
+
+  <table>
+    <tr><th style="width:170px">维度</th><th style="width:280px">虚拟机</th><th>容器</th></tr>
+    <tr><td><b>隔离的是什么</b></td><td>一整套硬件（CPU、内存、磁盘、网卡）</td><td><b>视图</b>：命名空间 + cgroup 限制</td></tr>
+    <tr><td><b>有没有自己的内核</b></td><td><b>有</b>，每个 VM 跑一个完整内核</td><td><b>没有</b>，共享宿主机内核</td></tr>
+    <tr><td><b>系统调用路径</b></td><td>Guest 内核 → VM Exit → 宿主内核</td><td><b>直接进宿主内核</b>，没有中间层</td></tr>
+    <tr><td><b>启动时间</b></td><td>秒到分钟（要引导内核、初始化设备）</td><td>毫秒到秒（就是 fork + exec）</td></tr>
+    <tr><td><b>内存开销</b></td><td>每台至少几百 MB（内核 + 页表 + 设备模型）</td><td>几 MB 到几十 MB</td></tr>
+    <tr><td><b>隔离强度</b></td><td><b>强</b>，硬件级边界</td><td>弱，共享内核，一个内核漏洞可能穿透</td></tr>
+    <tr><td><b>能否跑不同内核</b></td><td><b>能</b>，Windows / 老版本 Linux 都行</td><td>不能，必须和宿主内核兼容</td></tr>
+    <tr><td><b>密度</b></td><td>单机几十台</td><td>单机几百到几千个</td></tr>
+  </table>
+
+  <h3>容器"看起来像虚拟机"的原因</h3>
+  <p>因为容器做了一件很巧的事：<b>给它一个独立的根文件系统</b>。你在容器里看到 <span class="k">/etc/os-release</span> 写着 Ubuntu，那只是镜像里带的文件，和内核版本毫无关系。所以：</p>
+  <pre><span class="c"># 容器里看"系统版本"</span>
+cat /etc/os-release
+<span class="c"># PRETTY_NAME="Ubuntu 24.04 LTS"   ← 这只是镜像里的一个文本文件</span>
+
+<span class="c"># 但内核是宿主机的</span>
+uname -r
+<span class="c"># 6.8.0-45-generic   ← 宿主机内核，不是 Ubuntu 24.04 自带的</span>
+
+<span class="c"># 证明共享内核：容器里看到的模块列表就是宿主的</span>
+ls /lib/modules/
+<span class="c"># 通常为空或只有宿主版本，因为容器不该加载模块</span></pre>
+  <div class="callout warn">
+    <b>一个直接推论：容器里不能"重启内核"、不能加载内核模块、不能改全局 sysctl。</b>很多人在容器里装 Docker、装 VPN、装需要 <span class="k">/dev/net/tun</span> 的软件，然后发现各种权限错误——因为它们本质上是在要求"操作宿主机内核"。这不是配置问题，是模型不允许。
+  </div>
+
+  <h3>那 Kata / gVisor / Firecracker 算什么</h3>
+  <table>
+    <tr><th style="width:150px">方案</th><th>做法</th><th style="width:150px">本质</th></tr>
+    <tr><td><b>Kata Containers</b></td><td>每个容器跑在一个轻量 VM 里，接口还是容器运行时</td><td><b>是 VM</b>，只是用起来像容器</td></tr>
+    <tr><td><b>gVisor</b></td><td>用 Go 实现一个用户态内核（Sentry），拦截应用的系统调用自己处理</td><td>用户态内核，不是 VM 也不是普通容器</td></tr>
+    <tr><td><b>Firecracker</b></td><td>极简 VMM，只保留 virtio-net/block 和最小设备模型，启动 &lt;125ms</td><td><b>微虚拟机</b>，AWS Lambda 的底座</td></tr>
+    <tr><td><b>普通 runc</b></td><td>namespace + cgroup + chroot</td><td>真容器</td></tr>
+  </table>
+  <p>这些方案的共同目标是<b>在"容器级轻量"和"VM 级隔离"之间找平衡点</b>。多租户 SaaS 跑不可信代码时，值得付出这部分开销。</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>性能对比：数字说话</h2></div>
+  <p class="lead">下面都是数量级，具体数字随硬件、内核版本、负载类型变化，但比例关系是稳定的。</p>
+
+  <table>
+    <tr><th style="width:190px">指标</th><th style="width:150px">裸机</th><th style="width:150px">VM（virtio）</th><th>容器</th></tr>
+    <tr><td>启动到可服务</td><td>30~60 s</td><td>10~60 s</td><td><b>50 ms~2 s</b></td></tr>
+    <tr><td>单核 CPU 计算</td><td>100%</td><td>95%~99%</td><td>≈100%（有 cgroup 限额时按限额）</td></tr>
+    <tr><td>内存带宽</td><td>100%</td><td>85%~95%</td><td>≈100%</td></tr>
+    <tr><td>网络吞吐（virtio）</td><td>100%</td><td>50%~80%</td><td>≈95%</td></tr>
+    <tr><td>网络吞吐（SR-IOV）</td><td>100%</td><td>90%~98%</td><td>—</td></tr>
+    <tr><td>网络 P99 延迟</td><td>基线</td><td>+20~100 μs</td><td>+5~20 μs</td></tr>
+    <tr><td>磁盘 4K 随机写 IOPS</td><td>100%</td><td>40%~80%</td><td>90%~98%</td></tr>
+    <tr><td>单实例内存开销</td><td>0</td><td><b>300 MB~2 GB</b></td><td>5~50 MB</td></tr>
+    <tr><td>单机密度（64G/32核）</td><td>1</td><td>20~50</td><td>200~2000</td></tr>
+  </table>
+
+  <h3>为什么 VM 的启动慢</h3>
+  <p>不是"虚拟化本身慢"，而是<b>要模拟一次完整的开机</b>：固件（SeaBIOS/UEFI）→ 引导加载器 → 内核解压 → 设备探测 → init 系统 → 启动服务。这套流程在裸机上多久，在 VM 里也差不多，还要加上设备模拟的开销。</p>
+  <p>所以"快速启动"的 VM 方案（Firecracker、Cloud Hypervisor）都在做减法：<b>去掉 BIOS、精简设备模型、直接用内核引导协议</b>，把启动压到 100ms 级。代价是牺牲了兼容性（不能装 Windows、不能随便加设备）。</p>
+
+  <h3>为什么容器的 IO 几乎无损</h3>
+  <p>因为容器的 IO 路径和宿主机进程<b>完全一样</b>：应用 → 系统调用 → 宿主内核 → 块层 → 驱动。唯一多出来的是 overlayfs 的路径解析（如果用的是 overlay 根文件系统），以及 cgroup 的 IO 限速（如果配了 <span class="k">io.max</span>）。</p>
+  <pre><span class="c"># 容器里测 IO，和宿主机测出来的差异通常 &lt;5%（无 IO 限速时）</span>
+fio --name=randwrite --ioengine=libaio --iodepth=32 --rw=randwrite \
+    --bs=4k --size=1G --numjobs=4 --runtime=30 --group_reporting
+
+<span class="c"># 如果容器配了 IO 限速，会看到明显下降</span>
+cat /sys/fs/cgroup/&lt;cgroup&gt;/io.max
+<span class="c"># 8:0 rbps=10485760 wbps=10485760 riops=1000 wiops=1000</span></pre>
+  <div class="callout">
+    <b>一个反直觉的结论：</b>容器的"轻量"不是因为技术更先进，而是因为<b>它什么都不做</b>——不模拟硬件、不引导内核、不隔离页表。它的快是用隔离强度换来的。需要强隔离时，还是得回到 VM 或微虚拟机。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>云主机选型：三个必须懂的陷阱</h2></div>
+  <p class="lead">云上的"8 核 16G"和物理机的"8 核 16G"不是一回事。区别写在计费模型里。</p>
+
+  <h3>陷阱一：共享型 vs 独享型</h3>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:230px">CPU 分配方式</th><th>适用</th></tr>
+    <tr><td><b>共享型</b></td><td>vCPU 是<b>超卖</b>的，多个 VM 分时复用同一批物理核。通常超卖 2~8 倍</td><td>低负载、开发测试、个人站点</td></tr>
+    <tr><td><b>独享型</b></td><td>vCPU 绑定到固定的物理线程，不超卖</td><td>生产数据库、高并发服务、延迟敏感</td></tr>
+    <tr><td><b>裸金属</b></td><td>整台物理机给你，没有 Hypervisor 层</td><td>极致性能、特殊硬件、合规</td></tr>
+  </table>
+  <p>共享型最典型的表现是 <span class="k">%steal</span> 高——你的 vCPU 想跑，但物理核被别的 VM 占着。这个值在 <span class="k">top</span> 里显示为 <span class="k">st</span>，在 <span class="k">mpstat</span> 里是 <span class="k">%steal</span>。</p>
+  <pre><span class="c"># 判断是否被"邻居"影响</span>
+mpstat -P ALL 1 10
+<span class="c"># %steal 持续 &gt; 5% 就说明物理 CPU 不够分；&gt; 20% 基本没法跑延迟敏感业务</span>
+
+<span class="c"># 看 CPU 的真实型号和频率（共享型常被限制在较低频率）</span>
+lscpu | grep -E 'Model name|MHz|CPU\(s\)'
+cat /proc/cpuinfo | grep 'cpu MHz' | head -4
+
+<span class="c"># 看是否被限频（cgroup cpu.max 或 cpufreq）</span>
+cat /sys/fs/cgroup/cpu.max
+<span class="c"># 200000 100000  → 每 100ms 只能用 200ms 的 CPU 时间（= 2 核）</span></pre>
+
+  <h3>陷阱二：突发性能实例的 CPU 积分</h3>
+  <p>这类实例（各家的叫法不同，常见后缀 t5/t6 或"突发型"）的卖法是：<b>基准性能很低，但可以短时间冲到 100%</b>。冲的额度来自"CPU 积分"。</p>
+  <table>
+    <tr><th style="width:200px">机制</th><th>说明</th></tr>
+    <tr><td>基准性能</td><td>通常只有 10%~15% 的单核性能。比如 2 核实例的基准可能只有 0.2 核</td></tr>
+    <tr><td>积分获取</td><td>空闲时按基准性能的余量累积，通常每分钟 1~2 分</td></tr>
+    <tr><td>积分消耗</td><td>跑满 100% 时按超出部分消耗，1 vCPU 跑满 1 分钟约消耗 60 分</td></tr>
+    <tr><td>积分耗尽</td><td><b>强制降频到基准性能</b>，不是关机，是变慢——通常慢 5~10 倍</td></tr>
+    <tr><td>无上限模式</td><td>可以关掉限制，但超出部分按量计费，账单可能翻几倍</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>这是云上最隐蔽的性能陷阱。</b>压测时一切正常（积分充足），上线后跑了几小时突然变慢，CPU 使用率看起来还是 100%，但 QPS 掉到 1/5。因为 <b>CPU 时间没变，但有效算力被限制了</b>。<br>
+    判断方法：看实例的 <span class="k">CPU 积分余额</span>（云监控里有这个指标），或者观察"CPU 使用率 100% 但吞吐周期性下降"的模式。突发型实例只适合<b>长期低负载、偶发峰值</b>的场景，比如个人博客、测试环境、定时任务。
+  </div>
+
+  <h3>陷阱三：云盘的 IOPS 和吞吐是两回事</h3>
+  <p>云盘通常按容量分档，每档有<b>三个独立上限</b>：IOPS、吞吐（MB/s）、容量。三者任一打满都会成为瓶颈，而且小文件看 IOPS、大文件看吞吐。</p>
+  <table>
+    <tr><th style="width:170px">负载类型</th><th style="width:130px">瓶颈</th><th>例子</th></tr>
+    <tr><td>数据库（8K 随机读写）</td><td><b>IOPS</b></td><td>MySQL OLTP、Redis AOF</td></tr>
+    <tr><td>日志顺序写（1M 大块）</td><td><b>吞吐</b></td><td>Kafka、日志采集</td></tr>
+    <tr><td>混合负载</td><td>两者都可能</td><td>需要分别压测</td></tr>
+  </table>
+  <pre><span class="c"># 分别测 IOPS 和吞吐</span>
+<span class="c"># 4K 随机读，看 IOPS</span>
+fio --name=iops --ioengine=libaio --iodepth=64 --rw=randread --bs=4k \
+    --size=4G --runtime=30 --group_reporting
+
+<span class="c"># 1M 顺序读，看带宽</span>
+fio --name=bw --ioengine=libaio --iodepth=32 --rw=read --bs=1M \
+    --size=4G --runtime=30 --group_reporting
+
+<span class="c"># 注意：fio 的 --size 要大于云盘缓存，否则测的是缓存不是盘</span>
+<span class="c"># 建议 --size 至少是内存的 2 倍，或用 --direct=1 绕过页缓存</span></pre>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>什么时候必须用 VM</h2></div>
+  <p class="lead">容器能解决 80% 的问题，剩下 20% 是容器在模型上做不到的。</p>
+
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>需要不同内核</div><div class="cd">老应用依赖 3.10 内核的某个行为，宿主机是 6.x；或者要跑 FreeBSD。容器共享内核，做不到。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>强隔离 / 多租户</div><div class="cd">跑不可信代码（用户上传的函数、CI 任务）。容器共享内核，一个内核漏洞就是全部沦陷。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>Windows / 异构系统</div><div class="cd">Windows 容器需要 Windows 宿主，Linux 上跑 Windows 只能靠 VM。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>内核级调试</div><div class="cd">要改内核、装模块、用 kprobe/ftrace 深度调试。容器里没有权限，也不该有。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>整机迁移 / 快照</div><div class="cd">VM 可以整机快照、热迁移、克隆。容器只能快照文件系统，进程状态带不走。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>合规与边界</div><div class="cd">等保、金融合规常要求"物理隔离"或"独立内核"，容器很难论证满足。</div></div>
+  </div>
+
+  <h3>决策流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一步：能不能共享内核？</b>如果应用只依赖标准系统调用、不需要改内核参数、不需要加载模块 → 容器可行。</div></div>
+    <div class="step"><div class="txt"><b>第二步：隔离要求有多高？</b>跑自己的代码 → 容器够用。跑别人的代码 → 至少 Kata/gVisor，最好 VM。</div></div>
+    <div class="step"><div class="txt"><b>第三步：性能瓶颈在哪？</b>CPU 密集 → 容器和 VM 差别不大。网络/磁盘 IO 密集 → 优先容器，或 VM + SR-IOV。</div></div>
+    <div class="step"><div class="txt"><b>第四步：运维复杂度能不能接受？</b>容器需要镜像、编排、网络方案；VM 需要镜像模板、补丁、监控。团队能力决定最终选择。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>实践中的常见组合：</b>用 VM 做<b>隔离边界</b>（每个租户一台或一组 VM），用容器做<b>部署单元</b>（VM 内部跑 K8s 或 Docker Compose）。这样既有硬件级隔离，又有容器的部署效率。绝大多数云厂商的托管 K8s 就是这么做的——<b>节点是 VM，Pod 是容器</b>。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个选型与运维坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把容器当虚拟机用</div><div class="pd">在容器里装 systemd、改内核参数、加载模块、跑 dockerd。这些操作要么失败，要么影响宿主机。容器是"一个进程"，不是"一台机器"。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">给 VM 配的 vCPU 超过物理核数</div><div class="pd">8 个 vCPU 挤在 4 个物理核上，全部忙时互相抢，%steal 飙升。vCPU 总数不应超过物理线程数，延迟敏感场景还应留 1~2 核给宿主。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">买了突发型实例跑生产</div><div class="pd">积分耗尽后 CPU 降到基准的 10%~15%，表现为"CPU 100% 但 QPS 掉到 1/5"。突发型只适合长期低负载 + 偶发峰值。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">只看云盘的容量，不看 IOPS 档位</div><div class="pd">500GB 的高档盘和 5TB 的低档盘，IOPS 可能差 10 倍。数据库选盘要先算"每秒多少次 8K 随机写"，再对照档位。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 fio 测云盘但不加 direct=1</div><div class="pd">测的是页缓存和云盘缓存，数字好看但不真实。必须 <span class="k">--direct=1</span>，且 <span class="k">--size</span> 大于内存，否则测不出真实 IOPS。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">开了 SR-IOV 才发现不能热迁移</div><div class="pd">VF 绑定物理位置，迁移要解绑重绑，有秒级中断。需要迁移能力的业务应该用 virtio，或者接受"高性能 = 不可迁移"。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">在 VM 里再开 VM（嵌套虚拟化）</div><div class="pd">一次操作可能触发两三层 VM Exit，性能下降 30%~60%，而且很多云厂商默认不开放 nested。CI 里跑模拟器要提前确认。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">以为容器能限制所有资源</div><div class="pd">cgroup 能限 CPU、内存、IO、PID 数，但限不了内核态共享资源（如 conntrack 表、ARP 表、文件句柄总数）。一个容器打满 conntrack，全机网络都受影响。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">忽略 %steal 这个指标</div><div class="pd">Guest 里看到的 CPU 使用率不包含"想跑但没排上"的时间。%steal 高说明宿主超卖严重，此时优化应用毫无意义，应该换实例规格。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用容器做安全边界</div><div class="pd">容器共享内核，逃逸漏洞（如 dirty pipe、overlayfs 提权）影响所有容器。多租户跑不可信代码，至少要用 Kata/gVisor 或独立 VM。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 早期 x86 难以虚拟化的根本原因是？</div>
+      <button class="opt">CPU 主频太低</button>
+      <button class="opt">存在一批"敏感但非特权"的指令，在 Ring 3 执行不触发异常，Hypervisor 无法拦截</button>
+      <button class="opt">没有硬件支持内存分页</button>
+      <div class="ans">正确答案：<b>敏感非特权指令</b>。比如 popf、sgdt 在 Ring 3 下静默失败而不报错，Guest 以为自己改了状态，实际没有。VMware 只能用二进制翻译把这些指令替换掉，开销 5~20 倍。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一次 VM Exit + Entry 的典型耗时是？</div>
+      <button class="opt">50~100 纳秒</button>
+      <button class="opt">10~20 毫秒</button>
+      <button class="opt">1~3 微秒</button>
+      <div class="ans">正确答案：<b>1~3 微秒</b>。比系统调用（50~500ns）贵一个数量级。所以虚拟化优化的核心是<b>减少 Exit 次数</b>，而不是让单次 Exit 更快。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. EPT/NPT 相比影子页表，最大的优势是？</div>
+      <button class="opt">Guest 修改页表不再需要 VM Exit，地址翻译由硬件完成</button>
+      <button class="opt">完全不需要 TLB</button>
+      <button class="opt">内存占用更小</button>
+      <div class="ans">正确答案：<b>免 Exit</b>。影子页表要在 Guest 每次改页表时拦截同步；EPT 让硬件做两次翻译，Guest 改自己的页表随便改。代价是 TLB 压力变大，一次映射占更多项。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. virtio 比全模拟网卡快，核心原因是？</div>
+      <button class="opt">virtio 用了更快的物理网卡</button>
+      <button class="opt">通过共享内存的 vring 批量提交请求，把"每包多次 Exit"变成"一批一两次通知"</button>
+      <button class="opt">virtio 绕过了 TCP/IP 协议栈</button>
+      <div class="ans">正确答案：<b>批量 + 共享内存</b>。全模拟的 e1000 每个包要读写多个 MMIO 寄存器，每次都是 Exit；virtio 把几十个描述符放进 vring，一次通知处理完。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 容器和虚拟机的本质区别是？</div>
+      <button class="opt">容器用 Go 写的，虚拟机用 C 写的</button>
+      <button class="opt">容器启动更快，所以是更先进的虚拟化</button>
+      <button class="opt">容器共享宿主内核，只隔离视图；虚拟机有独立内核，靠硬件边界隔离</button>
+      <div class="ans">正确答案：<b>共享内核 vs 独立内核</b>。容器是 namespace + cgroup 包装的普通进程，系统调用直接进宿主内核；VM 有完整的 Guest 内核，中间隔着 Hypervisor。这决定了隔离强度和兼容性。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 突发性能实例的 CPU 积分耗尽后会发生什么？</div>
+      <button class="opt">CPU 被限制到基准性能（通常 10%~15%），不是关机而是变慢</button>
+      <button class="opt">实例自动关机</button>
+      <button class="opt">自动升级到独享型</button>
+      <div class="ans">正确答案：<b>降频到基准</b>。CPU 使用率仍显示 100%，但有效算力只剩一小部分，QPS 掉到几分之一。判断要看云监控里的"积分余额"指标，或观察周期性的吞吐塌陷。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>环境判断</h3>
+  <div class="cmds">
+    <div class="crow"><code>systemd-detect-virt</code><span class="desc">判断裸机 / VM / 容器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sudo dmidecode -s system-product-name</code><span class="desc">看虚拟化平台型号</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -E -o 'vmx|svm' /proc/cpuinfo | sort -u</code><span class="desc">CPU 是否支持硬件虚拟化</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lscpu | grep -E 'Socket|Core|Thread|NUMA'</code><span class="desc">看物理拓扑，规划绑核</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/1/cgroup</code><span class="desc">从 cgroup 路径判断是否在容器里</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -i eth0</code><span class="desc">看网卡驱动，virtio_net / ixgbevf 可判断虚拟化方式</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lspci | grep -i 'virtual function'</code><span class="desc">确认是否分到了 SR-IOV VF</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>性能观测</h3>
+  <div class="cmds">
+    <div class="crow"><code>mpstat -P ALL 1 10</code><span class="desc">重点看 %steal，判断是否被邻居抢 CPU</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sudo perf kvm stat live</code><span class="desc">看 VM Exit 的原因分布（需在宿主）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e dTLB-load-misses -a sleep 5</code><span class="desc">TLB 缺失，评估 EPT 开销</span><button class="copy">复制</button></div>
+    <div class="crow"><code>fio --direct=1 --rw=randread --bs=4k --iodepth=64</code><span class="desc">测真实 IOPS（绕过缓存）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>fio --direct=1 --rw=read --bs=1M --iodepth=32</code><span class="desc">测顺序吞吐</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/fs/cgroup/cpu.max</code><span class="desc">看容器/VM 的 CPU 配额</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/kernel/mm/transparent_hugepage/enabled</code><span class="desc">透明大页是否开启</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -eLo pid,tid,psr,comm | grep KVM</code><span class="desc">找 vCPU 线程，配合 taskset 绑核</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Hypervisor / VMM</b></td><td>虚拟机监控器，负责创建、调度、隔离 VM 的那层软件</td></tr>
+    <tr><td><b>Guest / Host</b></td><td>虚拟机里的系统 / 跑 Hypervisor 的物理机</td></tr>
+    <tr><td><b>全虚拟化</b></td><td>Guest 不用改，靠二进制翻译或硬件辅助骗过它</td></tr>
+    <tr><td><b>半虚拟化</b></td><td>Guest 改内核/装驱动，主动调用 hypercall，性能更好</td></tr>
+    <tr><td><b>hypercall</b></td><td>Guest 调用 Hypervisor 的接口，类似系统调用</td></tr>
+    <tr><td><b>VT-x / AMD-V</b></td><td>Intel / AMD 的硬件虚拟化扩展，提供 root / non-root 两种模式</td></tr>
+    <tr><td><b>VMCS</b></td><td>每 vCPU 一块的控制结构，保存 Guest 状态和拦截位图</td></tr>
+    <tr><td><b>VM Exit / Entry</b></td><td>Guest 与 Hypervisor 之间的世界切换，一次 1~3μs</td></tr>
+    <tr><td><b>影子页表</b></td><td>Hypervisor 维护的 VA→HPA 页表，Guest 改页表要拦截同步</td></tr>
+    <tr><td><b>EPT / NPT</b></td><td>硬件二级页表，做 GPA→HPA 翻译，免去改页表的 Exit</td></tr>
+    <tr><td><b>EPT Violation</b></td><td>EPT 里没有映射时触发，退出到 Hypervisor 处理</td></tr>
+    <tr><td><b>VPID / ASID</b></td><td>给 TLB 项打 vCPU 标签，切换时不用冲刷整个 TLB</td></tr>
+    <tr><td><b>virtio</b></td><td>半虚拟化 IO 标准，用共享内存 vring 批量传请求</td></tr>
+    <tr><td><b>vhost</b></td><td>把 virtio 后端从 QEMU 用户态挪到内核，减少上下文切换</td></tr>
+    <tr><td><b>SR-IOV</b></td><td>网卡硬件虚拟出多个 VF，直通给 VM，接近原生性能</td></tr>
+    <tr><td><b>IOMMU / VT-d</b></td><td>做 DMA 重映射，保证直通设备只能访问分配给它的内存</td></tr>
+    <tr><td><b>嵌套虚拟化</b></td><td>在 VM 里再开 VM，一次操作可能触发多层 Exit</td></tr>
+    <tr><td><b>%steal</b></td><td>vCPU 想跑但物理 CPU 被占用而等待的时间比例</td></tr>
+    <tr><td><b>CPU 积分</b></td><td>突发型实例的算力额度，耗尽后降频到基准性能</td></tr>
+    <tr><td><b>微虚拟机</b></td><td>极简 VMM（如 Firecracker），启动 &lt;125ms，兼顾隔离与轻量</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 <span class="k">systemd-detect-virt</span> 和 <span class="k">ethtool -i</span> 判断你手头机器用的是哪种虚拟化；② 在一台 VM 里跑 <span class="k">mpstat</span> 观察 %steal，压测时看它是否升高；③ 用 <span class="k">fio --direct=1</span> 分别测 4K 随机和 1M 顺序，对比 IOPS 与带宽哪个先到顶；④ 如果条件允许，在宿主机上用 <span class="k">perf kvm stat live</span> 看 Exit 原因分布；⑤ 起一个容器，在容器内执行 <span class="k">uname -r</span> 和 <span class="k">cat /etc/os-release</span>，亲眼确认"系统版本是假的、内核是真的"。<br><br>
+    <b>接下来该读：</b>《容器内核机制》（namespace 与 cgroup 怎么拼出一台"假机器"）、《内存管理》（页表、TLB、大页的底层细节）、《性能分析》（perf 与火焰图）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透虚拟化原理 · 选型先问三件事：隔离要多强、IO 有多重、能不能改内核</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（IO 虚拟化）和模块 5（容器不是虚拟化）最值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边确认自己在哪一层。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='不需要真装 KVM，能跑 lscpu 和 systemd-detect-virt 就行';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

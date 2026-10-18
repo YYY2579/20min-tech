@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透日志分析</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 工程基础</span>
+    <h1>二十分钟学透日志分析</h1>
+    <p class="sub">日志的价值不在"打得多"，而在<b>出事时能回答三个问题</b>：什么时候开始的、影响了谁、为什么。这篇讲清四类日志的分工、结构化字段怎么设计、量怎么控，以及 awk + sort + uniq 那套真正管用的分析套路。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 类日志来源</span>
+      <span class="chip"><b>6</b> 级日志级别</span>
+      <span class="chip"><b>10</b> 个日志坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议造一份假日志跟着敲：本文开头的 Python 脚本可以直接跑</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先造一批能练手的日志</h2></div>
+  <p class="lead">分析日志这件事，光看是学不会的。下面这段脚本会生成 5 万行 nginx 风格的访问日志，分布刻意做得不均匀：某个接口的错误率明显偏高，还有一批耗时异常的请求。后面的命令都拿它练。</p>
+  <pre><span class="c"># gen_log.py —— 生成 5 万行 combined 格式的访问日志</span>
+import random, datetime
+
+random.seed(7)
+paths = [<span class="y">"/api/orders"</span>, <span class="y">"/api/users"</span>, <span class="y">"/api/pay"</span>, <span class="y">"/api/search"</span>, <span class="y">"/health"</span>]
+weights = [30, 25, 10, 30, 5]
+start = datetime.datetime(2026, 10, 17, 14, 0, 0)
+lines = []
+
+for i in range(50000):
+    ts = start + datetime.timedelta(seconds=i // 12)      <span class="c"># 约 12 QPS</span>
+    path = random.choices(paths, weights)[0]
+    <span class="c"># /api/pay 的错误率刻意做成 12%，其余 0.5%</span>
+    bad = random.random() &lt; (0.12 if path == <span class="y">"/api/pay"</span> else 0.005)
+    status = random.choice([500, 502, 504]) if bad else 200
+    <span class="c"># 1% 的请求是慢请求（1.5~8 秒）</span>
+    rt = round(random.uniform(1.5, 8.0), 3) if random.random() &lt; 0.01 else round(random.uniform(0.003, 0.09), 3)
+    t = ts.strftime(<span class="y">"%d/%b/%Y:%H:%M:%S +0800"</span>)
+    lines.append(f<span class="y">'10.0.{random.randint(0,3)}.{random.randint(1,254)} - - [{t}] "GET {path} HTTP/1.1" {status} {random.randint(200,9000)} "-" "curl/8.4.0" {rt}'</span>)
+
+open(<span class="y">"access.log"</span>, <span class="y">"w"</span>).write(<span class="y">"\n"</span>.join(lines))
+print(len(lines), <span class="y">"lines"</span>)</pre>
+  <pre><span class="c"># 跑起来，然后看一眼长什么样</span>
+python gen_log.py
+head -3 access.log
+wc -l access.log
+
+<span class="c"># 典型一行（注意字段位置，后面 awk 全靠它）</span>
+<span class="c"># 1:IP  4:时间  6:方法  7:路径  9:状态码  10:字节数  12:UA  13:耗时(秒)</span>
+10.0.1.23 - - [17/Oct/2026:14:00:00 +0800] "GET /api/pay HTTP/1.1" 500 3120 "-" "curl/8.4.0" 0.041</pre>
+  <div class="callout warn">
+    <b>注意最后一列 <span class="k">$request_time</span> 不是 nginx 默认格式自带的。</b>它需要在 <span class="k">log_format</span> 里显式加上，否则日志里根本没有耗时字段——这是排查慢请求时最常见的"我日志里怎么没这个信息"。<b>日志格式要在上线前设计好，事后补是补不回历史数据的。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>日志的四个层次：谁产生、谁消费</h2></div>
+  <p class="lead">很多人把"日志"当成一个整体，结果把审计日志和调试日志混在一个文件里，既查不动也不敢删。先按<b>产生者和消费者</b>分开。</p>
+  <table>
+    <tr><th style="width:100px">类型</th><th style="width:140px">谁产生</th><th style="width:200px">记录什么</th><th>谁消费</th></tr>
+    <tr><td><b>应用日志</b></td><td>业务代码、框架、SDK</td><td>请求处理过程、业务事件、异常堆栈、外部调用结果</td><td>开发、值班工程师。用于定位 bug</td></tr>
+    <tr><td><b>访问日志</b></td><td>Nginx、网关、负载均衡、CDN</td><td>每个请求一行：来源 IP、路径、状态码、字节数、耗时、UA</td><td>运维、安全、容量规划、计费。用于看流量与错误率</td></tr>
+    <tr><td><b>系统日志</b></td><td>内核、systemd、syslog、容器运行时</td><td>启动关机、OOM Killer、磁盘满、网卡异常、服务重启</td><td>运维、SRE。用于判断"是不是机器/平台的问题"</td></tr>
+    <tr><td><b>审计日志</b></td><td>应用、数据库、云平台、堡垒机</td><td><b>谁</b>在<b>什么时间</b>从<b>哪里</b>对<b>什么资源</b>做了<b>什么操作</b>，结果如何</td><td>安全、合规、事后追责。用于回答"这是谁干的"</td></tr>
+  </table>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:220px">典型位置</th><th>关键约束</th></tr>
+    <tr><td>应用日志</td><td class="f">stdout → 容器运行时 → 采集器</td><td>必须带 trace_id；生产默认 INFO 级</td></tr>
+    <tr><td>访问日志</td><td class="f">/var/log/nginx/access.log</td><td>量大，必须轮转；<b>要记录耗时和 upstream 耗时</b></td></tr>
+    <tr><td>系统日志</td><td class="f">journalctl / /var/log/messages</td><td>受 <span class="k">rate-limit</span> 限制，短时间大量日志会被丢弃</td></tr>
+    <tr><td>审计日志</td><td class="f">独立存储，通常 WORM（一次写入多次读取）</td><td><b>不可修改、不可采样、不可随意删除</b>，保留期由合规决定</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最危险的一种混用：把审计日志当普通应用日志打。</b>一旦它进了会被采样、会被轮转删除、会被 DEBUG 级别过滤的通道，等出事需要举证时，你会发现"这条记录恰好没采到"。<b>审计日志必须走独立通道、独立索引、独立保留策略，且写入失败要让业务失败（fail-closed），不能静默吞掉。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>结构化日志：为什么必须是 JSON</h2></div>
+  <p class="lead">先看一条"人看着挺清楚"的日志，和它在机器眼里的样子。</p>
+  <pre><span class="c"># 反例：拼接字符串</span>
+2026-10-17 14:23:01 INFO user 123 login success from 1.2.3.4 cost 35ms
+
+<span class="c"># 机器要解析它，得写正则。然后遇到这些情况就崩了：</span>
+<span class="c"># - 用户名里带空格："user john smith login success"</span>
+<span class="c"># - 消息里带引号或换行</span>
+<span class="c"># - 以后想加一个字段，所有正则全部失效</span>
+
+<span class="c"># 正例：一行一个 JSON 对象</span>
+{<span class="b">"ts"</span>:<span class="y">"2026-10-17T14:23:01.035Z"</span>,<span class="b">"level"</span>:<span class="y">"INFO"</span>,<span class="b">"service"</span>:<span class="y">"user-api"</span>,<span class="b">"msg"</span>:<span class="y">"login_success"</span>,
+ <span class="b">"trace_id"</span>:<span class="y">"4bf92f3577b34da6a3ce929d0e0e4736"</span>,<span class="b">"user_id"</span>:123,<span class="b">"client_ip"</span>:<span class="y">"1.2.3.4"</span>,<span class="b">"duration_ms"</span>:35}</pre>
+  <p>JSON 的四个实际好处：<b>字段可寻址</b>（<span class="k">jq '.duration_ms'</span> 直接取值，不用正则）、<b>可加字段不破坏兼容</b>、<b>类型正确</b>（数字是数字，能比较大小）、<b>嵌套结构能表达上下文</b>（错误对象、上游响应）。</p>
+
+  <h4>字段设计：一套够用的最小集合</h4>
+  <table>
+    <tr><th style="width:150px">字段</th><th style="width:110px">类型</th><th>说明与坑</th></tr>
+    <tr><td class="f">ts</td><td>字符串</td><td><b>ISO 8601 + UTC + 毫秒</b>，如 <span class="k">2026-10-17T14:23:01.035Z</span>。全链路统一 UTC，展示时再转本地时区</td></tr>
+    <tr><td class="f">level</td><td>字符串</td><td>固定枚举，全大写：<span class="k">DEBUG/INFO/WARN/ERROR/FATAL</span>。<b>不要出现 "warning"、"Err" 这种变体</b></td></tr>
+    <tr><td class="f">msg</td><td>字符串</td><td><b>稳定的短标识</b>，不是给人读的长句。如 <span class="k">"payment_callback_verify_failed"</span>，便于聚合统计</td></tr>
+    <tr><td class="f">service</td><td>字符串</td><td>服务名，与部署单元一致。多实例再加 <span class="k">instance</span> / <span class="k">pod</span></td></tr>
+    <tr><td class="f">env / version</td><td>字符串</td><td>环境（prod/staging）与版本号。<b>没有 version，你无法判断"新版本上线后才出现"</b></td></tr>
+    <tr><td class="f">trace_id</td><td>字符串</td><td>全链路追踪 ID，32 位十六进制（W3C Trace Context 规范）。<b>没有它，跨服务排查只能靠猜时间</b></td></tr>
+    <tr><td class="f">span_id</td><td>字符串</td><td>当前操作 ID，16 位十六进制。用于区分同一次请求里的不同步骤</td></tr>
+    <tr><td class="f">request_id</td><td>字符串</td><td>入口生成的请求 ID，用于没有接入链路追踪时兜底关联</td></tr>
+    <tr><td class="f">duration_ms</td><td><b>数字</b></td><td>耗时，单位毫秒，纯数字。<b>不要写 "1.2s" 或 "35ms" 这种带单位的字符串</b>，否则没法做数值比较</td></tr>
+    <tr><td class="f">status / error</td><td>数字 / 对象</td><td>HTTP 状态码用数字；错误用对象承载 <span class="k">type</span>、<span class="k">message</span>、<span class="k">stack</span>，别全塞进 msg</td></tr>
+    <tr><td class="f">user_id / tenant_id</td><td>数字或字符串</td><td>业务定位的关键维度。<b>但注意：不要把它们做成日志系统的索引标签</b>，高基数会拖垮存储</td></tr>
+  </table>
+  <pre><span class="c"># 一条完整的错误日志：上下文足够，不用再问"当时发生了什么"</span>
+{
+  <span class="b">"ts"</span>: <span class="y">"2026-10-17T14:23:01.035Z"</span>,
+  <span class="b">"level"</span>: <span class="y">"ERROR"</span>,
+  <span class="b">"service"</span>: <span class="y">"order-api"</span>,
+  <span class="b">"version"</span>: <span class="y">"1.4.2"</span>,
+  <span class="b">"env"</span>: <span class="y">"prod"</span>,
+  <span class="b">"msg"</span>: <span class="y">"upstream_timeout"</span>,
+  <span class="b">"trace_id"</span>: <span class="y">"4bf92f3577b34da6a3ce929d0e0e4736"</span>,
+  <span class="b">"span_id"</span>: <span class="y">"00f067aa0ba902b7"</span>,
+  <span class="b">"http"</span>: {<span class="b">"method"</span>: <span class="y">"POST"</span>, <span class="b">"path"</span>: <span class="y">"/api/orders"</span>, <span class="b">"status"</span>: 504},
+  <span class="b">"duration_ms"</span>: 3002,
+  <span class="b">"upstream"</span>: {<span class="b">"name"</span>: <span class="y">"inventory"</span>, <span class="b">"host"</span>: <span class="y">"inv-3:8080"</span>, <span class="b">"timeout_ms"</span>: 3000},
+  <span class="b">"error"</span>: {<span class="b">"type"</span>: <span class="y">"TimeoutError"</span>, <span class="b">"message"</span>: <span class="y">"read timeout after 3000ms"</span>},
+  <span class="b">"retry"</span>: {<span class="b">"attempt"</span>: 3, <span class="b">"max"</span>: 3}
+}</pre>
+  <div class="callout warn">
+    <b>三个容易忽略的细节：</b><br>
+    ① <b>一条日志必须是一行。</b>采集器按行读，多行堆栈会被拆成 N 条互不相关的记录。把 stack 放进 JSON 字段里（换行转义为 <span class="k">\n</span>），而不是直接换行输出。<br>
+    ② <b>字段名要统一。</b>同一个含义在不同服务里叫 <span class="k">traceId</span>、<span class="k">trace_id</span>、<span class="k">tid</span>，跨服务查询就是灾难。团队应该有一份字段字典。<br>
+    ③ <b>msg 要稳定。</b>如果 msg 里拼了用户 ID 和订单号，那每条都是"唯一消息"，聚合统计完全失效——这些应该放字段。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>日志级别：判断标准与"ERROR 通胀"</h2></div>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:230px">判断标准</th><th>典型例子</th></tr>
+    <tr><td><b>FATAL</b></td><td>进程无法继续，必须退出</td><td>配置加载失败、端口被占用、数据库连接池初始化失败</td></tr>
+    <tr><td><b>ERROR</b></td><td><b>影响用户、需要人介入</b>，或请求最终失败</td><td>下游超时导致下单失败、支付回调验签失败、未捕获异常</td></tr>
+    <tr><td><b>WARN</b></td><td>异常但<b>已自愈或已降级</b>，不影响最终结果</td><td>重试第 2 次成功、缓存未命中回源、连接池使用率 85%</td></tr>
+    <tr><td><b>INFO</b></td><td>关键状态变化，<b>正常运行时也需要留痕</b></td><td>服务启动、配置热加载、发布版本变更、订单状态流转</td></tr>
+    <tr><td><b>DEBUG</b></td><td>排查细节，生产默认关闭</td><td>SQL 与参数、上游原始响应、分支走向</td></tr>
+    <tr><td><b>TRACE</b></td><td>比 DEBUG 更细，逐步骤</td><td>序列化耗时、锁等待、逐条循环处理</td></tr>
+  </table>
+  <p><b>一句话判据：这条日志出现时，有没有用户的请求因此失败？</b>有 → ERROR；没有但需要人看一眼 → WARN；只是记录正常事实 → INFO。</p>
+
+  <h4>把 ERROR 当 INFO 用，会精确地毁掉告警</h4>
+  <p>假设一个服务 1000 QPS，每个请求打一条 INFO，每条 500 字节：</p>
+  <pre><span class="c"># 算一下量级</span>
+1000 QPS × 86400 秒 = 86,400,000 条/天
+86,400,000 × 500 B  ≈ 43 GB/天（未压缩）
+
+<span class="c"># 如果这些日志里 5% 是 ERROR（因为"任何异常都打 ERROR"）</span>
+86,400,000 × 5% = 4,320,000 条 ERROR/天
+
+<span class="c"># 结果：告警规则 "ERROR 数 &gt; 100/分钟" 永远在响</span>
+<span class="c"># 值班的人第一周还会看，第二周开始直接静音 —— 告警正式失效</span></pre>
+  <table>
+    <tr><th style="width:190px">反模式</th><th>后果</th></tr>
+    <tr><td>捕获异常后打 ERROR 又继续返回成功</td><td>ERROR 数量与实际故障脱钩，告警阈值无法设定</td></tr>
+    <tr><td>每个请求都打一条 "request received" ERROR</td><td>ERROR 率恒定为 100%，等于没有级别</td></tr>
+    <tr><td>把业务校验失败（如密码错误）打成 ERROR</td><td>正常的用户行为被算成系统故障</td></tr>
+    <tr><td>吞掉异常只打一行 WARN，不带上堆栈</td><td>真出事时无法定位，只能复现</td></tr>
+    <tr><td>生产开 DEBUG 忘了关</td><td>日志量涨 10~50 倍，磁盘和采集链路一起崩</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>可用的经验阈值：</b>健康系统的 ERROR 日志应低于请求量的 <b>0.1%</b>，且 ERROR 条数与"失败请求数"量级相当。如果你发现 ERROR 数远大于失败请求数，说明级别用错了；如果远小于，说明有异常被吞掉了。<b>这个比值本身就是一个值得监控的指标。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>日志量控制：采样、异步、限流、脱敏</h2></div>
+  <p class="lead">日志是要花钱的，而且写日志本身会抢业务的时间。控制量不是"少打点"，而是<b>把有限的额度花在有用的地方</b>。</p>
+  <table>
+    <tr><th style="width:130px">手段</th><th style="width:200px">怎么做</th><th>边界与代价</th></tr>
+    <tr><td><b>头部采样</b></td><td>请求进来时按比例决定"这个请求要不要记日志"，如 1/100</td><td>简单、省资源。<b>但会丢掉被采样请求里的所有错误</b>，故障时可能一条 ERROR 都没有</td></tr>
+    <tr><td><b>尾部采样</b></td><td>先把整条链路的数据收齐，再决定留不留：<b>有错误的 100% 留，正常的按 1% 留</b></td><td>需要缓冲，实现复杂，但这是生产环境最推荐的策略</td></tr>
+    <tr><td><b>按 key 哈希采样</b></td><td>用 trace_id 或 user_id 做哈希取模，保证同一请求的所有日志同进同出</td><td>避免"只有半条链路"，是采样的必要前提</td></tr>
+    <tr><td><b>异步写入</b></td><td>业务线程只入队，后台线程批量刷盘/发送</td><td><b>队列必须有界。</b>无界队列在故障时会吃光内存</td></tr>
+    <tr><td><b>限流</b></td><td>每服务每秒最多 N 条，超出丢弃并计数</td><td>丢弃策略要分级：<b>先丢 DEBUG，再丢 INFO，ERROR 尽量不丢</b></td></tr>
+    <tr><td><b>去重聚合</b></td><td>相同"指纹"（msg + 关键字段）在 N 秒内只打一条，附带 <span class="k">repeated: 137</span></td><td>适合高频重复错误，如连接被拒、限流触发</td></tr>
+  </table>
+
+  <h4>两个必须改掉的写法</h4>
+  <pre><span class="c"># ✗ 反例一：在循环里打日志</span>
+for order in orders:                 <span class="c"># orders 有 10000 条</span>
+    log.info(f<span class="y">"processing {order.id}"</span>)   <span class="c"># 10000 条日志，99% 没人看</span>
+    process(order)
+
+<span class="c"># ✓ 正例：聚合后打一条，保留统计和少量样本</span>
+ok, fail, samples = 0, 0, []
+for order in orders:
+    try:
+        process(order); ok += 1
+    except Exception as e:
+        fail += 1
+        if len(samples) &lt; 3: samples.append(order.id)
+log.info(<span class="y">"batch_processed"</span>, total=len(orders), ok=ok, fail=fail, sample_ids=samples)
+
+<span class="c"># ✗ 反例二：把整个大对象序列化进日志</span>
+log.info(<span class="y">"response"</span>, body=resp.text)     <span class="c"># 可能 2MB，还带用户隐私</span>
+
+<span class="c"># ✓ 正例：只打标识 + 摘要，需要细节时靠 trace_id 去链路系统取</span>
+log.info(<span class="y">"response_received"</span>, status=resp.status_code,
+         bytes=len(resp.content), sha256=hashlib.sha256(resp.content).hexdigest()[:12])</pre>
+
+  <h4>脱敏要在序列化层做，不能靠自觉</h4>
+  <table>
+    <tr><th style="width:150px">字段</th><th style="width:170px">处理方式</th><th>例子</th></tr>
+    <tr><td>手机号</td><td>中间四位掩码</td><td class="f">138****5678</td></tr>
+    <tr><td>身份证</td><td>只留前 6 后 4</td><td class="f">110101********1234</td></tr>
+    <tr><td>银行卡</td><td>只留后 4 位</td><td class="f">**** **** **** 1234</td></tr>
+    <tr><td>密码 / token / Cookie</td><td><b>整字段删除</b>，不是掩码</td><td class="f">[REDACTED]</td></tr>
+    <tr><td>请求体</td><td>白名单字段才记录</td><td>只留 <span class="k">order_id</span>、<span class="k">amount</span></td></tr>
+  </table>
+  <div class="callout danger">
+    <b>还有一个安全细节常被忽略：日志注入（log injection）。</b>如果用户可控的输入被原样写进日志，攻击者可以塞入换行符伪造日志条目，或塞入 ANSI 转义序列污染终端。<b>做法是：结构化输出（JSON 序列化会自动转义换行），并在展示层禁用 ANSI 解析。</b>另外，日志内容若被渲染到 HTML 页面，必须转义，否则就是存储型 XSS。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>分析套路：四个动作定位任何故障</h2></div>
+  <p class="lead">排查不是"翻日志找线索"，而是<b>按固定顺序缩小范围</b>。这四步能覆盖绝大多数线上问题。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>按时间聚合，找"什么时候开始"。</b>把日志按分钟或 5 分钟分桶计数，画出曲线。拐点就是起点，起点附近一定有一次变更（发布、配置、流量、依赖故障）。<b>没有拐点的持续异常，通常是容量或长期存在的 bug。</b></div></div>
+    <div class="step"><div class="txt"><b>按维度分组，找"影响了谁"。</b>按状态码、路径、上游服务、实例、机房、用户分群统计。如果只有某个实例异常 → 机器/网络问题；只有某个接口 → 代码问题；所有接口都异常 → 依赖或基础设施问题。<b>这一步决定你去看哪本日志。</b></div></div>
+    <div class="step"><div class="txt"><b>找离群值，看"最坏情况"。</b>平均值会骗人。看 P95 / P99，看 Top N 慢请求，看错误集中在哪几个 trace_id。一次故障往往只由少数请求触发，抓住它们比看总量有用得多。</div></div>
+    <div class="step"><div class="txt"><b>时间线还原，回答"为什么"。</b>拿一个失败的 trace_id，把它在所有服务里的日志按时间排序，看每一步的输入输出和耗时。<b>故障的根因往往在第一个"看起来正常但变慢"的环节</b>，而不是最后报错的那个。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:210px">现象</th><th style="width:230px">第一步查什么</th><th>常见结论</th></tr>
+    <tr><td>错误率突增，QPS 正常</td><td>按状态码和上游分组</td><td>某个依赖挂了，或某次发布引入 bug</td></tr>
+    <tr><td>错误率正常，延迟上涨</td><td>P99 慢请求的 trace</td><td>慢查询、锁等待、连接池耗尽、GC</td></tr>
+    <tr><td>只有部分实例异常</td><td>按实例 IP / pod 分组</td><td>单机故障、配置漂移、磁盘满</td></tr>
+    <tr><td>QPS 掉零，日志也停了</td><td>系统日志 + 容器事件</td><td>进程崩溃、被 OOM Killer 杀、健康检查失败</td></tr>
+    <tr><td>特定用户报错，别人正常</td><td>按 user_id 过滤</td><td>数据问题、灰度未覆盖、权限配置</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>先分清"全站"还是"局部"，能省一半时间。</b>错误率上涨时，第一件事不是 grep 错误消息，而是看<b>是不是所有实例都在涨</b>。全站同时出问题，基本可以排除单机原因，直接去看最近一次变更和共享依赖；只有一台机器出问题，去看系统日志和磁盘。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>常用组合：awk + sort + uniq 的实战</h2></div>
+  <p class="lead">这套命令的价值在于<b>不需要任何平台，SSH 上去就能用</b>。它们的共同模式是：<b>取字段 → 过滤 → 排序 → 计数 → 取前 N</b>。</p>
+
+  <h4>1. 状态码分布</h4>
+  <pre><span class="c"># 第 9 列是状态码。统计每个状态码出现多少次，按次数倒序</span>
+awk <span class="y">'{print $9}'</span> access.log | sort | uniq -c | sort -rn
+
+<span class="c"># 只看 5xx</span>
+awk <span class="y">'$9 &gt;= 500 {print $9}'</span> access.log | sort | uniq -c | sort -rn
+
+<span class="c"># 算 5xx 占比（一条命令出结果）</span>
+awk <span class="y">'{t++; if($9&gt;=500) e++} END{printf "total=%d err=%d rate=%.2f%%\n", t, e, e*100/t}'</span> access.log</pre>
+
+  <h4>2. Top URL 与 Top IP</h4>
+  <pre><span class="c"># 第 7 列是路径（含查询串）。取前 10</span>
+awk <span class="y">'{print $7}'</span> access.log | sort | uniq -c | sort -rn | head -10
+
+<span class="c"># 去掉查询串再统计（把 ? 之后截掉）</span>
+awk <span class="y">'{split($7,a,"?"); print a[1]}'</span> access.log | sort | uniq -c | sort -rn | head -10
+
+<span class="c"># 来源 IP 前 10，通常是攻击或爬虫的第一眼</span>
+awk <span class="y">'{print $1}'</span> access.log | sort | uniq -c | sort -rn | head -10</pre>
+
+  <h4>3. 按分钟看请求量（找拐点）</h4>
+  <pre><span class="c"># 时间字段是 [17/Oct/2026:14:23:01，第 4 列，取前 17 个字符就是"到分钟"</span>
+awk <span class="y">'{print substr($4,2,17)}'</span> access.log | sort | uniq -c
+
+<span class="c"># 只看 14:20 到 14:30 这个窗口</span>
+awk <span class="y">'$4 ~ /17\/Oct\/2026:14:2[0-9]/'</span> access.log | wc -l
+
+<span class="c"># 每分钟的 5xx 数量 —— 故障曲线就是这么画出来的</span>
+awk <span class="y">'$9&gt;=500 {print substr($4,2,17)}'</span> access.log | sort | uniq -c</pre>
+
+  <h4>4. 提取慢请求</h4>
+  <pre><span class="c"># 第 13 列是耗时（秒）。取大于 1 秒的，按耗时倒序取前 20</span>
+awk <span class="y">'$13 &gt; 1 {print $13, $7, $9}'</span> access.log | sort -rn | head -20
+
+<span class="c"># 按接口统计慢请求数量</span>
+awk <span class="y">'$13 &gt; 1 {print $7}'</span> access.log | sort | uniq -c | sort -rn
+
+<span class="c"># 算 P95 耗时（把耗时排序后取第 95% 位置的值）</span>
+awk <span class="y">'{print $13}'</span> access.log | sort -n | awk <span class="y">'{a[NR]=$1} END{print a[int(NR*0.95)]}'</span></pre>
+
+  <h4>5. 错误消息聚类（把"看起来都不同"的错误合并）</h4>
+  <pre><span class="c"># 原始错误里带订单号、时间、IP，每条都不同，无法统计</span>
+<span class="c"># 做法：把数字和十六进制串替换成占位符，再统计</span>
+grep <span class="y">'"level":"ERROR"'</span> app.log \
+  | sed -E <span class="y">'s/[0-9a-f]{8,}/&lt;HEX&gt;/g; s/[0-9]+/&lt;N&gt;/g'</span> \
+  | sort | uniq -c | sort -rn | head -20
+
+<span class="c"># 这一步能把 50 万条错误收敛成十几类，直接看出"主要矛盾"</span></pre>
+
+  <h4>6. 用 jq 分析结构化日志</h4>
+  <pre><span class="c"># 按 level 统计</span>
+jq -r <span class="y">'.level'</span> app.log | sort | uniq -c | sort -rn
+
+<span class="c"># 筛出慢请求，输出成 TSV 便于二次处理</span>
+jq -r <span class="y">'select(.duration_ms &gt; 1000) | [.ts, .http.path, .duration_ms] | @tsv'</span> app.log | head -20
+
+<span class="c"># 按接口算平均耗时（先分组求和与计数，再相除）</span>
+jq -s <span class="y">'group_by(.http.path) | map({path: .[0].http.path, n: length, avg: (map(.duration_ms) | add / length)}) | sort_by(-.avg) | .[:10]'</span> app.log
+
+<span class="c"># 拿一个 trace_id，把它在所有服务日志里的完整时间线拉出来</span>
+jq -r <span class="y">'select(.trace_id == "4bf92f3577b34da6a3ce929d0e0e4736") | [.ts, .service, .msg, .duration_ms] | @tsv'</span> *.log | sort</pre>
+
+  <h4>7. 系统日志与容器日志</h4>
+  <pre><span class="c"># journald：看某个服务最近 30 分钟，优先级 warning 及以上</span>
+journalctl -u order-api --since <span class="y">"30 min ago"</span> -p warning --no-pager
+
+<span class="c"># 看 OOM Killer 有没有杀过进程（内存问题的第一现场）</span>
+journalctl -k --since <span class="y">"2026-10-17 00:00"</span> | grep -i <span class="y">"out of memory"</span>
+
+<span class="c"># 容器日志：带时间戳，取最近 100 行</span>
+docker logs --since 30m --tail 100 -t order-api
+
+<span class="c"># Kubernetes：看上一个崩溃实例的日志（重启排查必用）</span>
+kubectl logs order-api-7d9f --previous</pre>
+  <div class="callout ok">
+    <b>把高频组合记成一句话：</b>"<b>取列 → 过滤 → 排序 → 计数 → 取头部</b>"。<span class="k">awk</span> 负责取列和过滤，<span class="k">sort | uniq -c</span> 负责计数，<span class="k">sort -rn | head</span> 负责排头部。任何"哪一类最多"的问题，都是这四步的变形。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>日志与指标的分工：谁发现问题，谁定位原因</h2></div>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:230px">指标（Metrics）</th><th>日志（Logs）</th></tr>
+    <tr><td><b>回答什么</b></td><td>有没有问题？多大范围？多久了？</td><td><b>为什么</b>出问题？具体是哪个请求、哪个参数</td></tr>
+    <tr><td><b>数据形态</b></td><td>按时间聚合的数值（计数器、直方图、仪表盘）</td><td>离散的事件明细，每条带完整上下文</td></tr>
+    <tr><td><b>基数</b></td><td><b>必须低基数</b>。标签组合控制在几十到几千</td><td>天然高基数，可以有 user_id、trace_id</td></tr>
+    <tr><td><b>成本</b></td><td>低。一个时间序列每天几 KB</td><td>高。一条 500 字节，乘上亿次</td></tr>
+    <tr><td><b>保留</b></td><td>可以留 1~2 年，用于容量趋势</td><td>通常 7~30 天，长期靠冷存</td></tr>
+    <tr><td><b>适合告警</b></td><td><b>是。</b>稳定、便宜、可算比率和分位数</td><td>否（除少数业务关键事件）。日志告警易抖动、解析脆弱</td></tr>
+  </table>
+  <p>所以正确的分工是：<b>告警建在指标上，定位靠日志，两者用 trace_id 串起来。</b></p>
+  <pre><span class="c"># 一个完整的排查动线</span>
+1. 指标告警：order-api 的 5xx 比率 5 分钟内从 0.02% 涨到 4.1%
+2. 看板下钻：按 instance 分组，发现只有 order-api-3 异常 → 排除全局依赖
+3. 指标样本上的 exemplar 带着一个 trace_id：4bf92f35...
+4. 用 trace_id 查日志：发现该实例连不上 inventory 的 10.2.3.4:8080
+5. 查系统日志：该节点 14:22 有一条 "conntrack table full"
+6. 结论：不是代码问题，是连接跟踪表打满 → 调参 + 扩容
+
+<span class="c"># 关键：第 3 步的 exemplar。没有它，你只能靠时间戳猜是哪条日志</span>
+<span class="c"># Prometheus 的 histogram 支持 exemplar，OpenTelemetry 默认打通这三者</span></pre>
+  <div class="callout">
+    <b>一个反直觉的结论：日志量越大，排查越慢。</b>因为信噪比下降了。真正好用的日志系统，是<b>INFO 很少但每条都有用，ERROR 全部带 trace_id 和上下文，DEBUG 需要时能临时打开</b>。追求"把所有东西都记下来"的团队，最后往往在故障时找不到那一行。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>成本与保留：日志是要花钱的</h2></div>
+  <p class="lead">日志系统的成本不只是磁盘。<b>索引和查询往往比存储更贵</b>——同样 1TB 数据，放在对象存储里很便宜，放进全文索引集群里可能贵一个数量级。</p>
+  <table>
+    <tr><th style="width:110px">层级</th><th style="width:170px">介质</th><th style="width:110px">保留</th><th>查询体验</th></tr>
+    <tr><td><b>热</b></td><td>SSD + 索引集群（ES / Loki / ClickHouse）</td><td>7~14 天</td><td>秒级，支持全文检索与聚合。<b>只放最近、最可能要查的</b></td></tr>
+    <tr><td><b>温</b></td><td>大容量磁盘，压缩存储，索引精简</td><td>30~90 天</td><td>分钟级，适合按 trace_id 精确查</td></tr>
+    <tr><td><b>冷</b></td><td>对象存储（S3 / OSS），压缩归档</td><td>180 天~数年</td><td>小时级，需要先恢复或走离线任务</td></tr>
+  </table>
+  <table>
+    <tr><th style="width:190px">成本项</th><th>说明</th><th>优化手段</th></tr>
+    <tr><td>存储</td><td>原始体积 × 副本数</td><td>压缩（文本通常 8~12 倍）、列式存储、只存必要字段</td></tr>
+    <tr><td><b>索引</b></td><td>倒排索引体积常与原始数据相当甚至更大</td><td><b>只索引查询会用到的字段</b>；高基数字段（user_id、trace_id）不做标签</td></tr>
+    <tr><td>写入吞吐</td><td>峰值 QPS × 单条大小</td><td>客户端批量发送、压缩传输、采样</td></tr>
+    <tr><td>查询计算</td><td>大范围聚合最贵</td><td>预聚合、限制时间范围、避免 <span class="k">SELECT *</span></td></tr>
+    <tr><td>跨区传输</td><td>日志跨地域汇聚</td><td>本地采集本地存储，只把汇总指标传回中心</td></tr>
+  </table>
+
+  <h4>保留期怎么定</h4>
+  <p>取下面两个约束里<b>更长</b>的那个：</p>
+  <ul>
+    <li><b>业务需要回看多久。</b>大多数故障在 7 天内被发现，偶发问题可能一个月后才复盘。所以热存 7 天、温存 30 天是常见起点。</li>
+    <li><b>合规要求。</b>例如网络安全相关法规要求<b>网络日志留存不少于六个月</b>，金融、医疗行业另有更细的规定。<b>审计日志的保留期必须按合规来，不能按成本来。</b></li>
+  </ul>
+  <pre><span class="c"># 一个务实的策略（按级别差异化，而不是一刀切）</span>
+ERROR / FATAL   → 全量保留，热 30 天，冷 1 年
+WARN            → 全量保留，热 14 天，冷 90 天
+INFO            → 采样 10%，热 7 天，冷 30 天
+DEBUG / TRACE   → 生产默认关闭，按需开启，最长 2 小时自动回滚
+审计日志        → 独立通道，全量，不可篡改，保留 ≥ 6 个月（按合规）
+
+<span class="c"># 磁盘保护：logrotate 的最小可用配置</span>
+/var/log/app/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}</pre>
+  <div class="callout danger">
+    <b>两个真实的翻车场景：</b><br>
+    ① <b>日志打满磁盘导致服务全挂。</b>根分区被日志写满后，数据库写不进去、进程起不来。必须配轮转 + 磁盘使用率告警（80% 预警，90% 严重）。<br>
+    ② <b>把高基数字段做成索引标签。</b>在 Loki 里给 <span class="k">user_id</span> 或 <span class="k">trace_id</span> 建标签，会生成天文数字的流（stream），索引直接爆掉。<b>Loki 的标签只放 service、env、level 这类低基数字段，其余靠全文检索。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个日志坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">日志里打印了密码、token、身份证</div><div class="pd">日志系统往往权限更宽、保留更久、还会被同步到第三方平台。脱敏要做在序列化层，靠 code review 拦不住。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">异常堆栈多行输出，被采集器拆成 N 条</div><div class="pd">采集器按行读取，堆栈的每一行都会变成独立记录，还丢了级别和 trace_id。把 stack 放进 JSON 字段，换行转义为 \n。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">时间戳用本地时区，跨时区排查差 8 小时</div><div class="pd">存储统一用 UTC + ISO 8601，展示时再转本地时区。混用本地时间会让"日志和指标对不上"这种问题查一整天。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用字符串拼接而不是结构化字段</div><div class="pd">一旦格式变了，所有正则和告警规则全部失效。结构化输出是让日志可被程序消费的前提。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">ERROR 泛滥，告警彻底失效</div><div class="pd">每个请求都打 ERROR，错误率恒定 100%，值班的人只能静音。ERROR 的判据是"用户请求是否因此失败"。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">在循环里逐条打日志</div><div class="pd">一万次循环打一万条，99% 没人看，还把磁盘和采集链路打满。聚合成一条，带总数、失败数和少量样本。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">生产开 DEBUG 忘了关</div><div class="pd">日志量涨 10~50 倍，可能直接把服务拖垮。动态调级别必须带自动过期，比如 30 分钟后强制回到 INFO。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">只打结果不打上下文</div><div class="pd">"调用失败"这四个字没有任何信息量。至少要带：调谁、参数摘要、耗时、trace_id、错误类型。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">日志文件不轮转，打满根分区</div><div class="pd">磁盘满之后数据库写不进、进程起不来，故障范围远超日志本身。轮转 + 使用率告警是底线配置。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把高基数字段做成索引标签</div><div class="pd">user_id、request_id、trace_id 做标签会导致流数量爆炸，索引成本和写入放大失控。高基数字段只做全文检索，不做标签。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 下面哪个字段设计是明显错误的？</div>
+      <button class="opt">"duration_ms": 35</button>
+      <button class="opt">"duration": "35ms"</button>
+      <button class="opt">"ts": "2026-10-17T14:23:01.035Z"</button>
+      <div class="ans">正确答案：<b>"duration": "35ms"</b>。带单位的字符串无法做数值比较和聚合，P95、慢请求筛选全部失效。耗时必须是纯数字，单位写在字段名里。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一个 1000 QPS 的服务，每请求打一条 500 字节的 INFO 日志，一天产生多少数据？</div>
+      <button class="opt">约 4.3 GB</button>
+      <button class="opt">约 430 MB</button>
+      <button class="opt">约 43 GB</button>
+      <div class="ans">正确答案：<b>约 43 GB</b>。1000 × 86400 = 8640 万条，乘以 500 字节约 43 GB（未压缩）。这就是为什么"顺手打个 INFO"在生产环境是很贵的习惯。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 抓到一个失败请求的 trace_id 后，正确的下一步是？</div>
+      <button class="opt">用它把所有服务里这个请求的日志按时间排序，还原完整链路</button>
+      <button class="opt">直接在日志里搜 "error" 关键字</button>
+      <button class="opt">重启服务看能不能恢复</button>
+      <div class="ans">正确答案：<b>按 trace_id 还原时间线</b>。根因往往在第一个"看起来正常但变慢"的环节，而不是最后报错的那个服务。关键字搜索会捞出大量无关记录。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 为什么告警应该建在指标上而不是日志上？</div>
+      <button class="opt">因为日志不能做聚合</button>
+      <button class="opt">因为指标低基数、稳定、便宜，而日志告警解析脆弱、易抖动、成本高</button>
+      <button class="opt">因为日志系统不支持告警功能</button>
+      <div class="ans">正确答案：<b>指标更稳定更便宜</b>。日志格式一变，基于正则的告警就失效；日志量大时，告警查询本身就会拖垮系统。例外是少数业务关键事件（如支付回调验签失败）。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 在 Loki 里把 user_id 建成标签，会发生什么？</div>
+      <button class="opt">查询变快，因为可以精确定位用户</button>
+      <button class="opt">没有影响，标签越多越好</button>
+      <button class="opt">流数量爆炸，索引和写入成本失控</button>
+      <div class="ans">正确答案：<b>流数量爆炸</b>。标签的每个组合都会生成独立的流，user_id 这种高基数字段会产生天文数字的流。高基数字段应做全文检索，标签只放 service、env、level 这类低基数字段。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 尾部采样（tail sampling）相比头部采样，最大的优势是？</div>
+      <button class="opt">可以先收集完整链路再决定，保证错误请求 100% 被保留</button>
+      <button class="opt">实现更简单，资源消耗更小</button>
+      <button class="opt">不需要 trace_id 也能工作</button>
+      <div class="ans">正确答案：<b>能保留所有错误请求</b>。头部采样在请求开始时就要决定去留，可能把出错的请求也采样掉；尾部采样先缓冲，按结果决定，但实现复杂、需要额外内存。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>排查命令速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>awk '{print $9}' access.log | sort | uniq -c | sort -rn</code><span class="desc">状态码分布</span><button class="copy">复制</button></div>
+    <div class="crow"><code>awk '{print $7}' access.log | sort | uniq -c | sort -rn | head</code><span class="desc">Top URL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>awk '{print $1}' access.log | sort | uniq -c | sort -rn | head</code><span class="desc">Top 来源 IP</span><button class="copy">复制</button></div>
+    <div class="crow"><code>awk '{print substr($4,2,17)}' access.log | uniq -c</code><span class="desc">按分钟统计请求量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>awk '$13 &gt; 1' access.log | sort -rn | head -20</code><span class="desc">提取耗时超过 1 秒的请求</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jq -r '.level' app.log | sort | uniq -c</code><span class="desc">JSON 日志按级别统计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jq -r 'select(.duration_ms &gt; 1000) | [.ts,.http.path] | @tsv' app.log</code><span class="desc">筛慢请求并转 TSV</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jq -r 'select(.trace_id=="...") | [.ts,.service,.msg] | @tsv' *.log | sort</code><span class="desc">按 trace_id 还原时间线</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -u svc --since "30 min ago" -p warning</code><span class="desc">看服务最近告警级日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -k | grep -i "out of memory"</code><span class="desc">查 OOM Killer 记录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker logs --since 30m --tail 100 -t svc</code><span class="desc">带时间戳看容器日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs pod --previous</code><span class="desc">看崩溃前的上一个实例日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -c '"level":"ERROR"' app.log</code><span class="desc">统计错误条数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tail -f app.log | jq -c 'select(.level=="ERROR")'</code><span class="desc">实时只看错误</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>字段命名速查</h3>
+  <pre><span class="c"># 推荐的字段字典（团队统一，别各写各的）</span>
+ts            ISO8601 UTC 毫秒      2026-10-17T14:23:01.035Z
+level         DEBUG/INFO/WARN/ERROR/FATAL
+msg           稳定的短标识（可聚合）
+service       服务名
+env           prod / staging / dev
+version       语义化版本
+trace_id      32 位十六进制
+span_id       16 位十六进制
+request_id    入口请求 ID
+duration_ms   数字，毫秒
+http.method   GET / POST
+http.path     /api/orders
+http.status   200 / 500
+error.type    异常类名
+error.message 异常消息
+error.stack   堆栈（转义为单行）</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>结构化日志</b></td><td>以固定字段（通常是 JSON）输出、可被程序直接解析的日志</td></tr>
+    <tr><td><b>trace_id</b></td><td>一次请求在全链路的唯一标识，用于把多个服务的日志串起来</td></tr>
+    <tr><td><b>span_id</b></td><td>链路中单个操作的标识，一个 trace 包含多个 span</td></tr>
+    <tr><td><b>W3C Trace Context</b></td><td>跨服务传递链路信息的标准，通过 traceparent 请求头传播</td></tr>
+    <tr><td><b>头部采样</b></td><td>请求开始时按比例决定是否记录，简单但可能丢掉错误</td></tr>
+    <tr><td><b>尾部采样</b></td><td>收齐整条链路后再决定去留，可保证错误全留</td></tr>
+    <tr><td><b>日志轮转</b></td><td>按大小或时间切分日志文件并删除旧文件，防止打满磁盘</td></tr>
+    <tr><td><b>日志注入</b></td><td>攻击者通过可控输入插入换行或转义字符，伪造日志条目</td></tr>
+    <tr><td><b>脱敏</b></td><td>对敏感字段做掩码或删除，避免隐私数据进入日志系统</td></tr>
+    <tr><td><b>基数（cardinality）</b></td><td>某个字段不同取值的数量。user_id 基数极高，level 极低</td></tr>
+    <tr><td><b>exemplar</b></td><td>指标样本上附带的 trace_id，用于从指标直接跳到具体请求</td></tr>
+    <tr><td><b>RED 方法</b></td><td>Rate、Errors、Duration 三个指标，面向请求型服务</td></tr>
+    <tr><td><b>USE 方法</b></td><td>Utilization、Saturation、Errors，面向资源</td></tr>
+    <tr><td><b>审计日志</b></td><td>记录"谁在何时对什么做了什么"的不可篡改日志，用于合规与追责</td></tr>
+    <tr><td><b>WORM</b></td><td>一次写入多次读取，写入后不可修改的存储特性</td></tr>
+    <tr><td><b>冷热分离</b></td><td>近期数据放高性能存储，历史数据压缩归档到廉价介质</td></tr>
+    <tr><td><b>Loki</b></td><td>只索引标签、不索引全文的日志系统，成本低，查询靠标签 + 过滤</td></tr>
+    <tr><td><b>ILM</b></td><td>索引生命周期管理，按时间自动在热/温/冷/删除之间迁移</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用开头生成的 access.log 完成这五件事 —— ① 找出 5xx 占比最高的接口；② 画出每分钟请求量，找到流量拐点；③ 取出耗时最长的 20 个请求，看它们集中在哪个路径；④ 把错误消息里的数字替换成占位符，聚类出前三类错误；⑤ 自己写一个 JSON 格式的应用日志，只保留 8 个字段，然后用 jq 按 trace_id 还原一次请求。<br><br>
+    <b>之后值得单独学：</b>OpenTelemetry 的日志/指标/链路三合一接入、Loki 的 LogQL 与标签设计、ClickHouse 做日志分析的建表与分区策略、以及采样策略在成本和质量之间的定量权衡。
+  </div>
+</section>
+
+</main>
+
+<footer>20分钟速学 · 工程基础 · 日志的价值不在数量，在于出事时能不能回答"为什么"</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 6（awk 组合）和模块 7（日志与指标分工）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里敲 awk。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议造一份假日志跟着敲：本文开头的 Python 脚本可以直接跑';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

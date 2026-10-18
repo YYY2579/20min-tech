@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透事件驱动架构</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 第 3 期 · 高密度版</span>
+    <h1>二十分钟学透事件驱动架构</h1>
+    <p class="sub">事件驱动的难点不在“发消息”，在<b>最终一致性</b>：怎么保证消息不丢不重、顺序不乱、系统不乱循环。这篇把 outbox、Saga、对账、幂等等硬机制讲透。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">事件三形态 + Saga</span>
+      <span class="chip">outbox 完整实现</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一套 Kafka + 数据库（docker-compose 即可），边看边把 outbox 表建出来。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先分清三个词：事件、消息、命令</h2></div>
+  <p class="lead">这三个词在中文里被混用，但它们的方向、语义、耦合度完全不同。分不清就会设计出错的契约。</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:180px">语义</th><th style="width:150px">时态</th><th>耦合特征</th></tr>
+    <tr><td><b>命令 Command</b></td><td>“请做某事”。可能被拒绝</td><td>将来时</td><td>点对点，<b>发送方知道谁该做</b>，期待结果/失败</td></tr>
+    <tr><td><b>事件 Event</b></td><td>“某事已发生”。不可更改的事实</td><td>过去时</td><td>广播，<b>发送方不关心谁消费</b>，无返回</td></tr>
+    <tr><td><b>消息 Message</b></td><td>传输载体统称。上面两种的报文都是消息</td><td>—</td><td>技术概念，含 headers/payload</td></tr>
+  </table>
+  <pre><span class="c">// 命令：期望被执行，允许失败</span>
+PlaceOrderCommand { orderId, items, address }        <span class="c">// 发给订单服务</span>
+ChargePaymentCommand { orderId, amount }             <span class="c">// 发给支付服务，可被拒绝（余额不足）</span>
+
+<span class="c">// 事件：已经发生的事实，不可撤销，只能补偿</span>
+OrderCreated { orderId, items, total, occurredAt }   <span class="c">// 订单已创建（广播给库存/营销/搜索）</span>
+PaymentSucceeded { orderId, paidAmount }             <span class="c">// 支付已成功（广播）</span>
+
+<span class="c">// 反例：把命令当事件发 —— OrderCreationRequested，收方不知道要不要执行，</span>
+<span class="c">// 出了事互相甩锅（"我以为你拒绝了"）。命名规范：事件一律过去式</span></pre>
+  <div class="callout ok">
+    <b>设计自检：</b>① 你的消息名是过去式吗？不是 → 你在发命令，请确认接收方和失败处理。② 发送方需要知道消费者是谁吗？需要 → 这不是事件驱动，是 RPC，别披着事件的外衣。③ 消费者能否安全地重复处理同一条消息？不能 → 你还没做幂等（模块 5 见）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>事件模式三形态</h2></div>
+  <h4>1. 事件通知（Event Notification）</h4>
+  <p>事件只带 ID 和最少信息，消费者按需回查。耦合最低，但消费者要知道去哪拉数据：</p>
+  <pre><span class="c">// 订单服务只发通知，不带明细</span>
+OrderCreated { orderId: 42, occurredAt: "2026-10-17T10:00:00Z" }
+
+<span class="c">// 库存服务收到后，自己回查订单详情</span>
+<span class="b">public void</span> on(OrderCreated e) {
+    OrderDetail detail = orderClient.getDetail(e.orderId());   <span class="c">// 回查</span>
+    inventoryService.reserve(detail.getSkuIds());
+}
+<span class="c">// 优点：订单服务改字段不影响消费者；消费者按需取数</span>
+<span class="c">// 缺点：消费者依赖订单服务的查询接口（时点耦合）；回查量大时打挂上游</span></pre>
+  <h4>2. 事件携带状态传输（Event-Carried State Transfer）</h4>
+  <p>事件自带消费者需要的全量数据，消费者无需回查，还能建自己的本地副本：</p>
+  <pre><span class="c">// 事件带上消费者要的一切</span>
+OrderCreated {
+    orderId: 42,
+    userId: 1001,
+    items: [ { skuId: 88, qty: 2, price: 99.00 } ],
+    total: 198.00,
+    address: { province: "广东", city: "深圳", detail: "..." },
+    occurredAt: "2026-10-17T10:00:00Z"
+}
+
+<span class="c">// 库存服务直接把 items 落自己的库，零回查</span>
+<span class="c">// 甚至可以在本地维护一份"订单只读副本"，查询完全不碰订单服务</span>
+<span class="c">// 优点：自治性强、消费者可用性不受上游影响；缺点是事件会变大、字段变更要兼容</span></pre>
+  <h4>3. 事件溯源（Event Sourcing）</h4>
+  <p>不存当前状态，只存事件流，状态由重放得到。详细机制见本期《领域驱动设计实战》模块 5。事件驱动语境下它的位置是：<b>事件流即数据源</b>，是前两种模式的极端形式。</p>
+  <table>
+    <tr><th style="width:180px">形态</th><th style="width:130px">事件大小</th><th style="width:150px">耦合方向</th><th>适用</th></tr>
+    <tr><td>事件通知</td><td>小（几个字段）</td><td>消费者→生产者查询接口</td><td>上游模型稳定、查询便宜</td></tr>
+    <tr><td>携带状态传输</td><td>大（全量字段）</td><td>生产者→消费者数据契约</td><td>消费者要自治、要本地副本</td></tr>
+    <tr><td>事件溯源</td><td>流（按顺序全部）</td><td>无（自己就是源）</td><td>审计/金融台账，配 CQRS</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>选型经验：</b>80% 的集成事件用<b>携带状态传输</b>——消费者自治、不回查、上游挂了消费者照常工作。事件通知只适合“变更很少但消费者很多”的通知场景（如缓存失效广播）。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>EventBus / EventBridge：事件路由层</h2></div>
+  <p class="lead">事件驱动需要一层“<b>事件从哪来、到哪去、规则是什么</b>”的基础设施。进程内叫 EventBus，云上叫 EventBridge/EventRouter。</p>
+  <h4>进程内 EventBus</h4>
+  <pre><span class="c">// 轻量进程内总线：类型即 topic，同步分发 + 异常隔离</span>
+<span class="b">public class</span> EventBus {
+    <span class="b">private final</span> Map&lt;Class&lt;?&gt;, List&lt;Consumer&lt;Object&gt;&gt;&gt; handlers = <span class="b">new</span> ConcurrentHashMap&lt;&gt;();
+
+    <span class="b">public</span> &lt;T&gt; <span class="b">void</span> subscribe(Class&lt;T&gt; type, Consumer&lt;T&gt; handler) {
+        handlers.computeIfAbsent(type, k -&gt; <span class="b">new</span> CopyOnWriteArrayList&lt;&gt;()).add(h -&gt; handler.accept(type.cast(h)));
+    }
+
+    <span class="b">public void</span> publish(Object event) {
+        List&lt;Consumer&lt;Object&gt;&gt; hs = handlers.get(event.getClass());
+        <span class="b">if</span> (hs == <span class="b">null</span>) <span class="b">return</span>;
+        <span class="b">for</span> (Consumer&lt;Object&gt; h : hs) {
+            <span class="b">try</span> { h.accept(event); }
+            <span class="b">catch</span> (Exception e) {
+                log.error(<span class="y">"事件处理失败: {}"</span>, event, e);   <span class="c">// 单个 handler 失败不影响其他</span>
+                metrics.counter(<span class="y">"eventbus.error"</span>).increment();
+            }
+        }
+    }
+}
+<span class="c">// 本质是观察者模式框架化。同步执行，只适合同进程、非关键下游</span></pre>
+  <h4>云上事件路由器（以 AWS EventBridge 为范本）</h4>
+  <table>
+    <tr><th style="width:170px">概念</th><th>作用</th></tr>
+    <tr><td><b>Event Bus</b></td><td>事件管道，分 default / partner / custom bus</td></tr>
+    <tr><td><b>Rule</b></td><td>事件路由规则：按 source/detail-type 匹配，投递到 targets</td></tr>
+    <tr><td><b>Target</b></td><td>Lambda / SQS / SNS / Step Functions / 另一个 bus</td></tr>
+    <tr><td><b>Schema Registry</b></td><td>事件 schema 登记与发现，防契约腐化</td></tr>
+    <tr><td><b>Archive/Replay</b></td><td>事件归档与重放，修 bug 后重放事件流恢复状态</td></tr>
+  </table>
+  <pre><span class="c"># EventBridge 规则示例（Terraform 风格表达）</span>
+resource "aws_cloudwatch_event_rule" "order_events" {
+  name           = "order-events-to-sqs"
+  event_bus_name = "default"
+  event_pattern  = jsonencode({
+    source        = ["com.shop.order"]
+    detail-type   = ["OrderCreated", "OrderPaid", "OrderCancelled"]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "to_inventory" {
+  rule = aws_cloudwatch_event_rule.order_events.name
+  arn  = aws_sqs_queue.inventory_queue.arn
+  <span class="c"># 死信队列 + 重试策略</span>
+  dead_letter_config {
+    arn = aws_sqs_queue.dlq.arn
+  }
+  retry_policy {
+    maximum_retry_attempts = 3
+    maximum_event_age_seconds = 300
+  }
+}</pre>
+  <div class="callout">
+    <b>自建 vs 托管怎么选：</b>自建 Kafka/RocketMQ 需要运维副本、rebalance、消息堆积治理；EventBridge/SNS/SQS（云）、RocketMQ（云厂商托管）省运维但绑定厂商、单 topic 吞吐和单价受限。<b>规则：&lt; 10 万 TPS、无强顺序要求 → 托管；高吞吐或强顺序 → 自建 Kafka 分区模型。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>最终一致性与补偿事务 Saga</h2></div>
+  <p class="lead">跨服务的事务没有两阶段提交的优雅解法（2PC 性能差、锁太久），工程答案是 <b>Saga：一串本地事务 + 失败时的补偿</b>。</p>
+  <h4>两种编排方式</h4>
+  <table>
+    <tr><th style="width:140px">方式</th><th style="width:240px">机制</th><th>优缺点</th></tr>
+    <tr><td><b>编排 Choreography</b></td><td>无中心，服务监听彼此事件，链式反应</td><td>简单松耦合；但流程看不见，加一环要改多方，容易循环</td></tr>
+    <tr><td><b>协同 Orchestration</b></td><td>中央 orchestrator 按状态机发命令、监听结果</td><td>流程集中可见、可观测；中心组件是单点（做成无状态+持久化状态机）</td></tr>
+  </table>
+  <pre><span class="c">// Saga 状态机示例：下单流程，任一步失败走补偿</span>
+<span class="c">//</span>
+<span class="c">//  [创建订单] --OrderCreated--> [扣库存] --StockReserved--> [扣款] --Paid--> 完成</span>
+<span class="c">//      |                            |                          |</span>
+<span class="c">//      v 失败                       v 失败                     v 失败</span>
+<span class="c">//  (无需补偿)                   [释放库存]                 [释放库存 + 退款]</span>
+
+<span class="c">// 协同式：状态机 + 命令 + 补偿，全部持久化</span>
+<span class="b">public class</span> PlaceOrderSaga {
+    <span class="b">public void</span> start(CreateOrderCmd cmd) {
+        sagaState = <span class="b">new</span> SagaState(START);        <span class="c">// 状态先落库</span>
+        send(<span class="b">new</span> CreateOrderCommand(cmd));        <span class="c">// ① 发命令，不是直接调</span>
+    }
+
+    <span class="b">public void</span> on(OrderCreated e) {
+        sagaState.advance(ORDER_CREATED);
+        send(<span class="b">new</span> ReserveStockCommand(e.orderId(), e.items()));  <span class="c">// ②</span>
+    }
+
+    <span class="b">public void</span> on(StockReserved e) {
+        sagaState.advance(STOCK_RESERVED);
+        send(<span class="b">new</span> ChargePaymentCommand(e.orderId(), e.total())); <span class="c">// ③</span>
+    }
+
+    <span class="b">public void</span> on(PaymentFailed e) {           <span class="c">// ③ 失败 → 补偿链</span>
+        send(<span class="b">new</span> ReleaseStockCommand(e.orderId()));    <span class="c">// 撤销 ②</span>
+        send(<span class="b">new</span> CancelOrderCommand(e.orderId()));     <span class="c">// 撤销 ①</span>
+    }
+}
+<span class="c">// 关键：状态 + 已执行步骤持久化，进程崩溃重启后能接着补偿，不能"补偿到一半丢了"</span></pre>
+  <h4>Saga 的三个铁律</h4>
+  <ul>
+    <li><b>补偿 ≠ 回滚。</b>回滚是“当没发生”，补偿是“做相反的事”（退款、释放库存），补偿本身也可能失败，要能重试且幂等。</li>
+    <li><b>隔离性缺失是固有代价。</b>Saga 执行中，其他事务可能读到中间状态（库存已扣、订单未创建）。要么接受可读，要么用语义锁（如订单先置“处理中”）。</li>
+    <li><b>每一步都要幂等 + 可重试 + 有超时。</b>命令发出后没收到响应，分不清“对方没收到”还是“响应丢了”——靠幂等重试，靠超时查询兜底。</li>
+  </ul>
+  <div class="callout danger">
+    <b>没有补偿机制的 Saga 不是 Saga，是分布式事故。</b>经典案例：支付成功但订单创建失败，没有 CancelOrder 补偿，用户钱扣了订单不存在，客服手工修了三年。<b>每个正向步骤设计时就要同时写出逆向步骤。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Outbox：消息必达的正确姿势</h2></div>
+  <p class="lead">“业务事务提交了，但消息没发出去”是事件驱动第一号事故。outbox（发件箱）模式用<b>同一个本地事务</b>解决：</p>
+  <pre><span class="c">// 错误示范：事务提交后才发消息 —— 两个失败窗口</span>
+<span class="b">@Transactional</span>
+<span class="b">public void</span> placeOrder(CreateOrderCmd cmd) {
+    orderRepo.save(Order.create(cmd));
+}
+kafka.send(<span class="y">"order-created"</span>, event);   <span class="c">// ✗ ① 事务回滚了消息照样发</span>
+                                        <span class="c">// ✗ ② 这里抛异常，订单建了消息没发</span></pre>
+  <h4>正确姿势：outbox 表 + 中继（relay）</h4>
+  <pre><span class="c">-- 1. 建 outbox 表（和业务表在同一个数据库）</span>
+<span class="b">CREATE TABLE</span> outbox (
+    id            <span class="b">BIGINT</span> AUTO_INCREMENT <span class="b">PRIMARY KEY</span>,
+    aggregate_id  <span class="b">VARCHAR</span>(64)  <span class="b">NOT NULL</span>,     <span class="c">-- 聚合 ID，保证同聚合有序</span>
+    event_type    <span class="b">VARCHAR</span>(128) <span class="b">NOT NULL</span>,
+    payload       JSON         <span class="b">NOT NULL</span>,
+    created_at    TIMESTAMP    <span class="b">DEFAULT</span> CURRENT_TIMESTAMP,
+    <span class="b">INDEX</span> idx_pending (created_at, id)         <span class="c">-- 中继扫描用</span>
+) ENGINE=InnoDB;</pre>
+  <pre><span class="c">// 2. 业务写入和事件入 outbox —— 同一个本地事务，原子性由数据库保证</span>
+<span class="b">@Transactional</span>
+<span class="b">public void</span> placeOrder(CreateOrderCmd cmd) {
+    Order order = Order.create(cmd);
+    orderRepo.save(order);                          <span class="c">// 业务表</span>
+    outboxRepo.save(<span class="b">new</span> OutboxRow(
+        order.getId().value(),                      <span class="c">-- aggregate_id</span>
+        <span class="y">"OrderCreated"</span>, order.toCreatedEventJson()  <span class="c">-- outbox 表</span>
+    ));
+}
+<span class="c">// 要么都成功，要么都回滚。从此不存在"订单建了消息没发"</span></pre>
+  <pre><span class="c">// 3. 中继进程：扫 outbox → 发 MQ → 标记已发（或删行）</span>
+<span class="b">@Scheduled</span>(fixedDelay = 1000)
+<span class="b">public void</span> relay() {
+    List&lt;OutboxRow&gt; pending = outboxRepo.findPending(500);   <span class="c">-- 批量 500 条</span>
+    <span class="b">for</span> (OutboxRow row : pending) {
+        <span class="b">try</span> {
+            <span class="c">// 发送时带 eventId = outbox.id，消费者做幂等键</span>
+            mqClient.send(row.getEventType(), row.getPayload(), row.getId());
+            outboxRepo.markDone(row.getId());       <span class="c">-- 或 DELETE（表会膨胀）</span>
+        } <span class="b">catch</span> (Exception e) {
+            metrics.counter(<span class="y">"outbox.relay.fail"</span>).increment();
+            <span class="c">// 不删行，下一轮重试；连续失败超阈值告警</span>
+            <span class="b">break</span>;                                  <span class="c">-- 保序：失败即停</span>
+        }
+    }
+}</pre>
+  <h4>工程细节清单</h4>
+  <table>
+    <tr><th style="width:200px">细节</th><th>做法</th></tr>
+    <tr><td>中继与业务同库不同部署</td><td>中继可多实例，用 <span class="k">SELECT ... FOR UPDATE SKIP LOCKED</span> 或按 id 取模分片，避免重复发</td></tr>
+    <tr><td>outbox 表膨胀</td><td>已发送行定时归档/删除（每天一次 DELETE 限批），或改用 Debezium 直接读 binlog</td></tr>
+    <tr><td>顺序保证</td><td>按 aggregate_id 分区到同一 partition；中继单线程扫或同聚合串行发</td></tr>
+    <tr><td>发成功但 markDone 前崩溃</td><td>重发 → 消费者靠 eventId 幂等去重。这就是为什么幂等是强制项</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>不想写中继？用 CDC。</b>Debezium/Canal 订阅业务库 binlog，把 INSERT into outbox 自动转成 MQ 消息，业务零侵入。代价是多一套 Debezium 集群要运维。<b>日均事件 &lt; 100 万，自写中继更划算；&gt; 1000 万或懒得维护，上 Debezium。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>最终一致性工程套件：对账、幂等、乱序</h2></div>
+  <h4>幂等：一切重试的地基</h4>
+  <pre><span class="c">// 消费者侧幂等三件套：唯一键 + 状态机 + 业务判重</span>
+<span class="c">// ① 唯一键：事件 ID 建唯一索引，重复插入直接失败</span>
+<span class="b">CREATE TABLE</span> processed_event (
+    event_id    <span class="b">VARCHAR</span>(64) <span class="b">PRIMARY KEY</span>,     <span class="c">-- = outbox.id 或 MQ messageId</span>
+    event_type  <span class="b">VARCHAR</span>(64) <span class="b">NOT NULL</span>,
+    processed_at TIMESTAMP <span class="b">DEFAULT</span> CURRENT_TIMESTAMP
+);
+
+<span class="b">@Transactional</span>
+<span class="b">public void</span> handlePaymentSucceeded(PaymentSucceeded e) {
+    <span class="c">// 先尝试登记事件 ID，重复事件在这里被拦下</span>
+    <span class="b">try</span> {
+        processedEventRepo.insert(e.eventId());      <span class="c">-- 唯一键冲突 = 已处理过</span>
+    } <span class="b">catch</span> (DuplicateKeyException ex) {
+        log.info(<span class="y">"重复事件，忽略: {}"</span>, e.eventId());
+        <span class="b">return</span>;
+    }
+    orderService.markPaid(e.orderId());              <span class="c">-- 同一事务里做业务</span>
+}
+
+<span class="c">// ② 状态机守卫：只允许合法迁移，天然幂等</span>
+<span class="b">if</span> (order.getStatus() == OrderStatus.PAID) <span class="b">return</span>;   <span class="c">-- 已支付，重复通知无害</span>
+
+<span class="c">// ③ 业务判重：唯一业务单号（如支付流水号）</span>
+<span class="c">-- payment_record 表：biz_no 唯一索引，重复回调插入失败即幂等</span></pre>
+  <h4>对账：最终一致的安全网</h4>
+  <table>
+    <tr><th style="width:150px">层级</th><th style="width:250px">对账内容</th><th>频率</th></tr>
+    <tr><td>实时对账</td><td>关键链路双方状态比对（订单状态 vs 支付状态）</td><td>每次消费时</td></tr>
+    <tr><td>小时级对账</td><td>扫描 N 小时前未完结的 Saga/卡住的中间态</td><td>每小时</td></tr>
+    <tr><td>日终对账</td><td>全量流水双边核对（我方 vs 渠道方），出差异报表</td><td>每天</td></tr>
+  </table>
+  <pre><span class="c">-- 经典对账 SQL：找出"订单已创建但 10 分钟没动静"的卡单</span>
+<span class="b">SELECT</span> o.id, o.status, o.created_at
+<span class="b">FROM</span> orders o
+<span class="b">LEFT JOIN</span> payment_record p <span class="b">ON</span> p.order_id = o.id
+<span class="b">WHERE</span> o.status = <span class="y">'CREATED'</span>
+  <span class="b">AND</span> o.created_at &lt; NOW() - INTERVAL 10 MINUTE
+  <span class="b">AND</span> p.id <span class="b">IS NULL</span>;
+<span class="c">-- 结果进告警或自动补偿队列：查支付渠道实际状态 → 推进或取消</span></pre>
+  <h4>乱序处理：不要假设消息按序到达</h4>
+  <ul>
+    <li><b>版本号/时间戳丢弃旧值：</b><span class="k">if (event.version &lt;= currentVersion) return;</span> 状态机只认前进，不认回退</li>
+    <li><b>局部顺序：</b>Kafka 单 partition 有序。把同一实体的所有事件发同一 key（如 orderId），消费者按 key 单线程/同队列处理</li>
+    <li><b>乱序容忍设计：</b>消费“库存已扣”前先确保“订单已创建”，否则挂起等齐（或回查补偿）</li>
+    <li><b>不要试图全局排序：</b>跨 topic、跨服务的全局顺序不存在。把顺序要求收敛到单实体</li>
+  </ul>
+  <div class="callout warn">
+    <b>顺序性只能局部保证。</b>Kafka 的 partition 有序是“单分区单消费者”的有序，一旦并发消费或分区重分配，顺序即破。<b>设计原则：假设任何消息可能乱序、重复、延迟数小时，系统仍能收敛到正确状态。</b>做不到这一点，就不是最终一致，是最终不一致。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>领域事件与集成事件</h2></div>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:240px">领域事件</th><th>集成事件</th></tr>
+    <tr><td><b>范围</b></td><td>限界上下文内部，进程内</td><td>跨上下文/跨服务，经 MQ</td></tr>
+    <tr><td><b>目的</b></td><td>解耦聚合间的副作用（扣库存、发短信）</td><td>对外发布契约，别的上下文依赖它</td></tr>
+    <tr><td><b>演进</b></td><td>随意改，重构友好</td><td><b>版本化契约</b>。加字段可以，删字段/改语义 = 破坏性变更</td></tr>
+    <tr><td><b>投递</b></td><td>EventBus 同步或线程池异步</td><td>MQ 持久化 + 重试 + DLQ</td></tr>
+    <tr><td><b>示例</b></td><td class="f">OrderPaid（进程内）</td><td class="f">shop.order.paid.v1（契约）</td></tr>
+  </table>
+  <pre><span class="c">// 事件契约演进的兼容规则</span>
+<span class="c">// ✅ 可以：新增可选字段（老消费者忽略，新消费者用默认值）</span>
+{
+  <span class="y">"orderId"</span>: 42,
+  <span class="y">"paidAmount"</span>: 198.00,
+  <span class="y">"paidAt"</span>: <span class="y">"2026-10-17T10:00:00Z"</span>,
+  <span class="y">"channel"</span>: <span class="y">"WECHAT"</span>        <span class="c">// v2 新增，老消费者安全</span>
+}
+
+<span class="c">// ❌ 不行：改字段类型/语义、删字段、改事件名</span>
+<span class="c">// "paidAmount": "198.00"  字符串→数字，老消费者解析崩</span>
+<span class="c">// "amount" 改名，老消费者直接 null</span>
+
+<span class="c">// 正确姿势：破坏性变更发新事件名 shop.order.paid.v2，两版并行跑一个迁移周期</span>
+<span class="c">// Schema Registry（Confluent/Apicurio）在 CI 里做兼容性检查，不兼容直接卡发布</span></pre>
+  <div class="callout danger">
+    <b>事件契约是 API，且比 REST API 更难改。</b>REST 至少你知道谁在调；事件广播出去你不知道有几个消费者，改坏一个就是线上事故。<b>每个事件 topic 必须有 owner、有文档、有兼容性测试。</b>没有 Schema Registry 至少也要在代码库里集中定义事件类并评审。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>消息顺序性与重试治理</h2></div>
+  <h4>顺序保证的层级</h4>
+  <table>
+    <tr><th style="width:170px">机制</th><th style="width:220px">保证范围</th><th>代价</th></tr>
+    <tr><td>Kafka 单 partition</td><td>同 key 消息有序</td><td>key 倾斜时单分区热点；分区数只增不减</td></tr>
+    <tr><td>RocketMQ MessageQueueSelector</td><td>同业务 key 进同一队列</td><td>队列级串行，吞吐受限</td></tr>
+    <tr><td>全局序列号（如 MySQL 自增 ID 发号）</td><td>全局可比的顺序基准</td><td>发号器单点/性能瓶颈</td></tr>
+    <tr><td>版本向量 + 丢弃旧值</td><td>不保证到达有序，保证结果有序</td><td>需要事件带单调版本号</td></tr>
+  </table>
+  <pre><span class="c">// 版本号模式：乱序到达，结果不错乱</span>
+<span class="b">public void</span> apply(OrderStatusChanged e) {
+    <span class="b">synchronized</span> (orderLock) {
+        <span class="b">if</span> (e.version() &lt;= order.getStatusVersion()) {
+            <span class="c">// 旧版本事件晚到：丢弃（幂等 + 保序合一）</span>
+            metrics.counter(<span class="y">"event.stale.dropped"</span>).increment();
+            <span class="b">return</span>;
+        }
+        order.setStatus(e.newStatus());
+        order.setStatusVersion(e.version());
+    }
+}
+<span class="c">// 生产者：每次状态变更 version = ++current，事件带 version</span>
+<span class="c">// 消费者：版本小的直接丢。乱序的"已发货(3)"不会覆盖"已完成(4)"</span></pre>
+  <h4>重试与死信的三级防线</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一级：消费者本地重试。</b>失败立即重试 3 次，间隔 100ms/500ms/2s 指数退避。只治瞬时故障（网络抖动、锁冲突）。</div></div>
+    <div class="step"><div class="txt"><b>第二级：重试队列。</b>本地重试耗尽，消息进 retry-topic（如 RocketMQ 的 %RETRY%），延迟 30s/1min/5min 逐级放大。<b>绝不在原队列无限重试</b>——会阻塞后面所有消息（队头阻塞）。</div></div>
+    <div class="step"><div class="txt"><b>第三级：死信队列 DLQ。</b>重试 N 次仍失败（通常是代码 bug 或毒消息），进 DLQ 并告警，人工/定时任务介入。<b>DLQ 必须有监控：堆积 = 有人在丢消息。</b></div></div>
+  </div>
+  <pre><span class="c"># RocketMQ 消费重试语义（不同 MQ 行为不同，用前查文档）</span>
+<span class="c"># 普通消息：失败进 %RETRY%topic，默认重试 16 次，间隔逐级拉长（10s→30s→...→2h）</span>
+<span class="c"># 超过次数进 %DLQ%topic，不再自动消费，需人工处理</span>
+<span class="c"># 顺序消息：消费失败会挂起当前队列（suspendCurrentQueueTime），重试成功才继续</span>
+<span class="c"># 事务消息：半消息 + 回查，用于"本地事务与发消息原子"（outbox 的替代路线）</span></pre>
+  <div class="callout warn">
+    <b>不同 MQ 的语义差异巨大：</b>RocketMQ 失败自动进重试 topic；Kafka 消费者要自己实现重试 topic；RabbitMQ 的死信交换机（DLX）是另一套机制。<b>照着 RocketMQ 经验写 Kafka 重试，大概率写出队头阻塞。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个典型坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">事务提交后才发消息</div><div class="pd">两个失败窗口：事务回滚消息已发（幽灵事件）、消息发失败订单已建（丢事件）。用 outbox 同事务写库，或 RocketMQ 事务消息。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">消费者不幂等</div><div class="pd">at-least-once 投递 + 重试 = 必然重复。重复扣款、重复发货都这么来的。唯一键 + 状态机 + 业务单号三重判重是标配。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">事件无限膨胀</div><div class="pd">图省事把整个聚合序列化进事件，1KB 变 500KB，还带上历史字段只增不减。事件只带消费者要的字段，定期清理下线字段。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">无限重试不设上限</div><div class="pd">毒消息（解析失败、NPE）卡住重试队列，看起来在忙其实零进展。必须重试计数 + DLQ + 告警。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">循环事件</div><div class="pd">A 发事件触发 B，B 处理又发事件触发 A，系统自激振荡，监控上一片“繁忙”。规则：事件链深度 &gt; 3 必须报警，环路上加链路 ID 去重。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">假设消息按序到达</div><div class="pd">重试、多分区、并发消费都会乱序。“先删后建”乱成“先建后删”= 数据丢失。用版本号丢弃旧事件，把顺序要求收敛到单实体。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">调试断点打不进</div><div class="pd">发布方看不到消费者，问题靠翻日志。必须：全链路 trace ID 贯穿（生产者注入，消费者透传）、事件台账可查（谁在何时消费成功/失败）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">同步监听当 RPC 用</div><div class="pd">在 @EventListener 里调外部 HTTP，消费者超时拖垮发布方事务。监听器只做本地快操作，跨进程一律异步。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">事件契约随意改</div><div class="pd">上游删字段/改类型，下游消费全线 NPE，且你根本不知道有几个下游。Schema Registry 兼容性检查 + 事件 owner 制。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">outbox 表只增不删</div><div class="pd">跑三个月表几个亿，中继扫描越来越慢。已发送行定时归档删除，或直接上 Debezium 读 binlog 不建表。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. “OrderCreated”和“PlaceOrderCommand”的本质区别是？</div>
+      <button class="opt">没有区别，只是命名习惯不同</button>
+      <button class="opt">前者是已发生的事实（可广播、不可拒），后者是请求（点对点、可被拒绝）</button>
+      <button class="opt">前者只能异步，后者只能同步</button>
+      <div class="ans">正确答案：<b>事实 vs 请求</b>。事件是过去式、不可撤销、广播给不关心的接收方；命令是将来时、期待执行结果、点对点。混用会导致失败时责任不清——“我以为你拒绝了”这类甩锅。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 要保证“订单入库”和“订单事件发出”要么都成功要么都失败，最稳妥的方案是？</div>
+      <button class="opt">先发消息，消息成功后再写订单库</button>
+      <button class="opt">先写订单库，事务提交后再发消息</button>
+      <button class="opt">同一事务里写订单表 + outbox 表，由中继异步发消息</button>
+      <div class="ans">正确答案：<b>outbox 同事务</b>。业务表和 outbox 表在同一个数据库事务里，原子性由本地事务保证；之后中继扫 outbox 发 MQ，失败了靠重试和消费者幂等兜底。其他两种方案都存在“一半成功”的窗口。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 消费者收到重复的 PaymentSucceeded 事件，正确的处理是？</div>
+      <button class="opt">用 eventId 唯一键判重，已处理过就直接返回</button>
+      <button class="opt">相信 MQ 不会重复，直接执行业务</button>
+      <button class="opt">抛异常让消息重试，直到 MQ 不再重发</button>
+      <div class="ans">正确答案：<b>唯一键判重</b>。at-least-once 语义下重复是必然的（重试、重平衡、宕机重连都会造成）。“相信不重复”是赌博；抛异常只会制造无限重试。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 一条消息因代码 bug 每次消费都失败，最合理的链路行为是？</div>
+      <button class="opt">原地无限重试，保证最终一定成功</button>
+      <button class="opt">本地重试几次 → 进重试队列逐级延迟 → 仍失败进 DLQ 并告警</button>
+      <button class="opt">直接丢弃，避免阻塞队列</button>
+      <div class="ans">正确答案：<b>分级重试 + DLQ + 告警</b>。原地无限重试会造成队头阻塞，后面全堵死；直接丢弃是丢数据。DLQ 让毒消息被隔离且可见，修完 bug 还能重放。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于消息顺序，哪个说法是对的？</div>
+      <button class="opt">MQ 保证全局严格有序，可以放心依赖</button>
+      <button class="opt">只要单线程消费就不会乱序</button>
+      <button class="opt">只有单分区/单队列级别有序，且必须按业务 key 路由才能保证单实体有序</button>
+      <div class="ans">正确答案：<b>局部有序</b>。Kafka 单 partition 有序、RocketMQ 单队列有序，但跨分区、重平衡、重试后都会乱序。工程解法是：同一实体的事件发同一 key，并用版本号丢弃迟到的旧事件，不依赖到达顺序。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. Saga 事务里“扣款成功但通知库存失败”，正确的补偿动作是？</div>
+      <button class="opt">发起退款（反向业务），退款成功后取消订单，且补偿操作本身要幂等</button>
+      <button class="opt">回滚数据库事务，当扣款没发生过</button>
+      <button class="opt">什么都不做，等对账发现再说</button>
+      <div class="ans">正确答案：<b>反向补偿 + 幂等</b>。分布式事务没有回滚，只有补偿；且补偿也可能失败/重复，必须可重试幂等。分布式下也做不到“当没发生”——可能已经有其他服务读到了中间状态。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>事件驱动设计检查清单</h3>
+  <div class="cmds">
+    <div class="crow"><code>消息命名过去式</code><span class="desc">OrderPaid 不是 DoPay。检查每个事件是否“已发生的事实”</span><button class="copy">复制</button></div>
+    <div class="crow"><code>outbox 同事务</code><span class="desc">业务表 + outbox 表一个本地事务，中继异步投递</span><button class="copy">复制</button></div>
+    <div class="crow"><code>eventId 幂等键</code><span class="desc">消费者建 processed_event 表，重复事件唯一键拦截</span><button class="copy">复制</button></div>
+    <div class="crow"><code>重试三级防线</code><span class="desc">本地重试 → 重试队列（逐级延迟）→ DLQ 告警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>版本号丢弃旧值</code><span class="desc">事件带单调 version，小的迟到直接丢，乱序结果不错乱</span><button class="copy">复制</button></div>
+    <div class="crow"><code>同 key 同分区</code><span class="desc">orderId 作 Kafka key，保证单实体事件有序</span><button class="copy">复制</button></div>
+    <div class="crow"><code>三级对账</code><span class="desc">实时比对 + 小时级扫卡单 + 日终全量双边核对</span><button class="copy">复制</button></div>
+    <div class="crow"><code>契约版本化</code><span class="desc">只加不删不改，破坏性变更发新事件名，Schema Registry 卡 CI</span><button class="copy">复制</button></div>
+    <div class="crow"><code>traceId 透传</code><span class="desc">生产者注入、消费者透传、全链路可查消费台账</span><button class="copy">复制</button></div>
+    <div class="crow"><code>链路深度告警</code><span class="desc">事件链 &gt; 3 层、Saga &gt; 5 步、fan-out &gt; 5 都该重新设计</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>模式选型速查</h3>
+  <table>
+    <tr><th style="width:220px">需求</th><th>选型</th></tr>
+    <tr><td>同进程解耦、非关键通知</td><td>进程内 EventBus / Spring @EventListener（同步或 @Async）</td></tr>
+    <tr><td>跨服务状态传播</td><td>携带状态传输事件 + MQ + outbox</td></tr>
+    <tr><td>跨服务多步流程</td><td>Saga（流程 &gt; 3 步、要可见性 → 协同式）</td></tr>
+    <tr><td>读性能瓶颈（列表页慢）</td><td>CQRS：事件物化 ES 读模型</td></tr>
+    <tr><td>审计即生命（金融台账）</td><td>事件溯源 + CQRS</td></tr>
+    <tr><td>云上快速起步</td><td>EventBridge/SNS+SQS，托管 DLQ 和重试</td></tr>
+    <tr><td>高吞吐 + 强顺序</td><td>Kafka 分区模型，自管重试 topic</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>命令 Command</b></td><td>“请做某事”的请求，将来时，可被拒绝，点对点</td></tr>
+    <tr><td><b>事件 Event</b></td><td>“某事已发生”的事实，过去时，不可撤销，广播</td></tr>
+    <tr><td><b>消息 Message</b></td><td>传输载体的统称，命令和事件都是消息</td></tr>
+    <tr><td><b>事件通知</b></td><td>事件只带 ID，消费者回查详情的轻量模式</td></tr>
+    <tr><td><b>事件携带状态传输</b></td><td>事件自带全量数据，消费者零回查、可建本地副本</td></tr>
+    <tr><td><b>事件溯源</b></td><td>只存事件流不存状态，当前状态由重放得到</td></tr>
+    <tr><td><b>EventBus</b></td><td>进程内的事件总线，观察者模式的框架化</td></tr>
+    <tr><td><b>最终一致性</b></td><td>不保证瞬时一致，保证系统收敛到一致状态</td></tr>
+    <tr><td><b>Saga</b></td><td>一串本地事务 + 失败补偿的长事务替代方案</td></tr>
+    <tr><td><b>补偿事务</b></td><td>执行反向业务操作（退款/释放库存）抵消已完成的步骤</td></tr>
+    <tr><td><b>编排/协同</b></td><td>Saga 的两种形态：事件链自然推进 vs 中心状态机指挥</td></tr>
+    <tr><td><b>Outbox 发件箱</b></td><td>业务同事务写事件表，中继异步投递，保证不丢不幻</td></tr>
+    <tr><td><b>中继 Relay</b></td><td>扫描 outbox 表发 MQ 的后台进程</td></tr>
+    <tr><td><b>CDC</b></td><td>变更数据捕获，读 binlog 捕获库变更（Debezium/Canal）</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作执行多次结果与一次相同，重试的地基</td></tr>
+    <tr><td><b>对账</b></td><td>定期比对双方状态，发现并修复最终一致中的偏差</td></tr>
+    <tr><td><b>死信队列 DLQ</b></td><td>多次重试仍失败的消息的隔离区，需告警和人工处理</td></tr>
+    <tr><td><b>队头阻塞</b></td><td>队列第一个消息卡住导致后续全部延迟的现象</td></tr>
+    <tr><td><b>领域事件</b></td><td>限界上下文内部的业务事实，进程内传播</td></tr>
+    <tr><td><b>集成事件</b></td><td>跨服务的事件契约，需版本化和兼容性管理</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 给现有系统加 outbox 表和中继，把最关键的“订单创建”事件化；② 消费侧加 processed_event 幂等表，然后手动重放同一条消息验证幂等；③ 造一条毒消息，观察它从本地重试 → 重试队列 → DLQ 的完整路径；④ 写一个小时级对账任务，扫出卡在中间态的 Saga。<br><br>
+    <b>之后值得单独学：</b>Kafka 精确一次（transactional producer + read_committed）、Debezium 运维、事件风暴工作坊、以及 RocketMQ 事务消息与 outbox 的取舍。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透事件驱动 · 不丢（outbox）、不重（幂等）、不乱（版本号）、不循环（深度告警）</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（outbox）和模块 5（幂等/对账/乱序）是事故高发区，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边把 outbox 表建出来。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一套 Kafka + 数据库（docker-compose 即可），边看边把 outbox 表建出来。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透并发模型</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟学透并发模型</h1>
+    <p class="sub">并发 bug 的共同特点是<b>测试环境永远复现不了</b>。这篇不背概念，讲清原子性/可见性/有序性各自怎么被破坏、锁的代价在哪、无锁为什么不等于快，以及竞态到底怎么查。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 模块</span>
+      <span class="chip"><b>死锁</b>四条件</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议装好 Go 或 JDK：Go 自带 race detector，跑 -race 就能看到真实的竞态报告</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>准备一个能跑出竞态的环境</h2></div>
+  <p class="lead">并发问题没法靠"读代码"验证，必须跑。最省事的组合是 Go（工具链自带竞态检测器）加一份 C++ 的 TSan 示例，两种语言的报告格式不同，但原理一样。</p>
+  <pre><span class="c"># Go：一条命令就能复现数据竞争</span>
+go version
+mkdir -p /tmp/race &amp;&amp; cd /tmp/race
+go mod init race
+
+<span class="c"># main.go 里写一个不加锁的计数器，然后：</span>
+go run -race main.go
+<span class="c"># 输出会包含：WARNING: DATA RACE</span>
+<span class="c"># 以及两个 goroutine 的完整调用栈和内存地址</span>
+
+<span class="c"># C/C++：ThreadSanitizer（GCC 和 Clang 都支持）</span>
+gcc -fsanitize=thread -g -O1 race.c -o race -lpthread
+./race
+
+<span class="c"># Java：看线程栈与死锁</span>
+jps -l
+jstack &lt;PID&gt; | grep -A 30 "Found one Java-level deadlock"</pre>
+  <table>
+    <tr><th style="width:150px">工具</th><th>能回答什么</th></tr>
+    <tr><td class="f">go run -race</td><td>哪两处访问构成数据竞争、各自的调用栈</td></tr>
+    <tr><td class="f">-fsanitize=thread</td><td>C/C++ 的同类检测，原理相同（基于 happens-before）</td></tr>
+    <tr><td class="f">jstack</td><td>Java 线程栈，能直接报出死锁环</td></tr>
+    <tr><td class="f">gdb + thread apply all bt</td><td>任意进程所有线程的栈，看谁在等锁</td></tr>
+    <tr><td class="f">perf sched</td><td>调度延迟、上下文切换次数，判断是不是锁竞争导致</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>race detector 不是万能的。</b>它只能发现<b>本次运行中实际发生过</b>的竞争。没跑到的分支、没撞上的时序，一律不报。所以"开了 -race 没问题"只能说明这次没撞上，不能证明代码正确。要把它放进 CI，配合高并发压测反复跑。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>三个根本问题：原子性、可见性、有序性</h2></div>
+  <p class="lead">所有并发 bug 都能归到这三类。分清是哪一类，才知道该用什么手段修 —— 加锁解决全部三个，原子变量只解决单个变量的三个，屏障只解决顺序。</p>
+  <h4>原子性：操作被拆开了</h4>
+  <pre><span class="c">// 看起来是一行，实际是三步：读 → 加 → 写</span>
+counter++
+
+<span class="c">// 汇编层面（x86-64）大致是：</span>
+<span class="c">//   mov  eax, [counter]    ; 读</span>
+<span class="c">//   add  eax, 1            ; 加</span>
+<span class="c">//   mov  [counter], eax    ; 写</span>
+
+<span class="c">// 两个线程交错执行，就会丢更新：</span>
+<span class="c">// T1 读 0 → T2 读 0 → T1 写 1 → T2 写 1 → 结果是 1，不是 2</span></pre>
+  <p><b>真实事故：</b>库存扣减、账户余额、优惠券领取计数。表现是"高并发下少扣了""发放数量对不上"，压测时必现，但 QPS 低的时候完全正常。修法有三种：加锁、用原子变量（<span class="k">atomic.AddInt64</span> / <span class="k">fetch_add</span>）、或者把操作下沉到数据库用一条 SQL 完成（<span class="k">UPDATE ... SET n = n - 1 WHERE n &gt; 0</span>）。</p>
+  <h4>可见性：一个线程改了，另一个看不见</h4>
+  <pre><span class="c">// 典型的"永不退出"循环</span>
+var stop bool
+
+func worker() {
+    for !stop {        // 编译器可能把 stop 读到寄存器里，只读一次
+        doSomething()
+    }
+}
+
+func main() {
+    go worker()
+    time.Sleep(time.Second)
+    stop = true        // 另一个 goroutine 永远看不到这个修改
+}</pre>
+  <p>原因是现代 CPU 有多级缓存和 store buffer：写操作先进本核的缓冲区，什么时候对其他核可见没有保证。加上编译器优化，读循环可能被提升成"只读一次内存"。<b>修法：用原子变量或加锁</b>（Go 里 <span class="k">sync/atomic</span>，Java 里 <span class="k">volatile</span>，C++ 里 <span class="k">std::atomic</span>）。</p>
+  <h4>有序性：指令被重排了</h4>
+  <pre><span class="c">// 初始化与发布之间的顺序，可能被编译器或 CPU 调换</span>
+var config *Config
+var ready bool
+
+func init() {
+    config = loadConfig()   // ① 写数据
+    ready = true            // ② 置标志
+}
+
+func use() {
+    if ready {              // ③ 看到标志
+        config.Get("k")     // ④ 但 config 可能还是 nil
+    }
+}</pre>
+  <p>① 和 ② 之间没有依赖，编译器和 CPU 都可以调换顺序；③ 和 ④ 之间也一样。结果就是"标志已经置位，数据却还没准备好"，空指针崩溃。<b>修法：用 release/acquire 语义把两步绑成一个原子发布</b>（Go 的 <span class="k">atomic.Store</span> + <span class="k">atomic.Load</span>、Java 的 <span class="k">volatile</span> 写读、C++ 的 <span class="k">memory_order_release/acquire</span>）。</p>
+  <table>
+    <tr><th style="width:110px">问题</th><th style="width:200px">本质</th><th>典型症状</th><th>修法</th></tr>
+    <tr><td><b>原子性</b></td><td>复合操作被中断</td><td>计数少、余额错、重复发放</td><td>锁 / 原子指令 / 数据库原子更新</td></tr>
+    <tr><td><b>可见性</b></td><td>写的结果没传到其他核</td><td>循环不退出、状态读到旧值</td><td>原子变量 / 锁 / 内存屏障</td></tr>
+    <tr><td><b>有序性</b></td><td>指令顺序被改变</td><td>初始化未完成就被使用、空指针</td><td>release/acquire 配对</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>一个必须建立的直觉：单核上正确的代码，多核上不一定正确。</b>单核的线程切换发生在指令边界，天然保证原子性；多核是<b>真并行</b>，两个核同时读写同一块内存，缓存一致性协议只保证"最终一致"，不保证"看起来像顺序执行"。这就是为什么这类 bug 只在多核服务器上出现，在开发者的单核虚拟机里跑一万次都正常。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>锁的代价与选择</h2></div>
+  <p class="lead">锁不是"慢"，<b>竞争才是慢</b>。无竞争时一次 mutex 加解锁在几十纳秒量级；一旦有竞争，线程要进内核挂起、等唤醒、再切换回来，成本跳到微秒级，差了两个数量级。</p>
+  <table>
+    <tr><th style="width:120px">类型</th><th style="width:190px">行为</th><th style="width:130px">无竞争开销</th><th>适用与边界</th></tr>
+    <tr><td><b>互斥锁</b></td><td>拿不到就阻塞，让出 CPU，由内核挂起</td><td>~10~30 ns（用户态快路径）</td><td>临界区较长、可能阻塞。默认选择</td></tr>
+    <tr><td><b>自旋锁</b></td><td>拿不到就循环重试，<b>不让出 CPU</b></td><td>~5~20 ns</td><td>临界区极短（几十条指令）、且持锁线程不会被调度走。内核里常用，用户态慎用</td></tr>
+    <tr><td><b>读写锁</b></td><td>读共享、写独占</td><td>读锁比互斥锁略贵</td><td>读远多于写、且读临界区不短。<b>写少时可能写饥饿</b></td></tr>
+    <tr><td><b>乐观锁</b></td><td>先改，提交时用 CAS 或版本号校验，失败重试</td><td>一次 CAS</td><td>冲突率低。冲突高时重试成本爆炸</td></tr>
+    <tr><td><b>无锁 / 无等待</b></td><td>用原子指令保证进度</td><td>一次原子指令 + 内存屏障</td><td>特定数据结构（队列、栈）。实现难度高，见模块 3</td></tr>
+  </table>
+  <h4>自旋锁为什么不能滥用</h4>
+  <p>自旋的前提是"锁马上就会释放"。如果持锁线程被操作系统抢占（时间片用完、发生缺页），自旋的核就白烧 CPU，而且可能一烧就是几毫秒。更糟的是多核机器上所有等待者一起烧，把真正持锁的线程挤得更慢。</p>
+  <p>所以自旋锁的适用条件很苛刻：<b>临界区只有几条指令、持锁期间不调用任何可能阻塞的函数、不会被抢占</b>。这也是为什么内核里的自旋锁要配合关抢占使用，而用户态程序基本不该手写自旋锁。</p>
+  <h4>读写锁的陷阱</h4>
+  <p>读写锁看起来很美，实际有两个问题：</p>
+  <ul>
+    <li><b>写饥饿。</b>读者源源不断时，写者永远等不到"没有读者"的时刻。glibc 的 <span class="k">pthread_rwlock</span> 默认偏向读者。要避免就得用"写者优先"的实现，但那又会饿死读者。</li>
+    <li><b>读锁并不便宜。</b>每次加读锁都要改共享的计数器，<b>多个核同时改同一缓存行会导致缓存行来回弹跳</b>（cache line bouncing），读多的时候这个开销可能超过临界区本身。读极短时，普通互斥锁反而更快。</li>
+  </ul>
+  <div class="callout ok">
+    <b>选择的实用顺序：</b>① 能不用共享状态就不用（消息传递、线程本地存储、分片）；② 必须共享就用最普通的互斥锁，把临界区缩到最小；③ 临界区里<b>绝对不能做 IO、不能调用外部服务、不能 sleep</b>；④ 只有在 profiling 证明锁竞争是瓶颈时，才考虑读写锁、分片锁或原子操作。<b>先正确，再快。</b>
+  </div>
+  <pre><span class="c">// 分片锁：把一把大锁拆成 N 把，按 key 哈希到不同的锁</span>
+<span class="c">// 适合 map 这类天然可分区的结构，能把竞争降低 N 倍</span>
+type ShardedMap struct {
+    shards [64]struct {
+        mu sync.Mutex
+        m  map[string]int
+    }
+}
+
+func (s *ShardedMap) Get(k string) int {
+    idx := fnv32(k) % 64          // 同一个 key 永远落同一个分片
+    sh := &amp;s.shards[idx]
+    sh.mu.Lock()
+    defer sh.mu.Unlock()
+    return sh.m[k]
+}</pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>CAS 与无锁编程</h2></div>
+  <p class="lead">CAS（Compare-And-Swap，比较并交换）是一条<b>硬件指令</b>，不是软件算法。x86 上是 <span class="k">lock cmpxchg</span>，ARM 上是 <span class="k">LDXR/STXR</span> 组成的 LL/SC 序列。它的语义是：<b>如果内存当前值等于期望值，就写入新值并返回成功；否则不做任何修改并返回失败。整个过程原子。</b></p>
+  <pre><span class="c">// CAS 的伪代码语义</span>
+bool cas(void *addr, T expected, T desired) {
+<span class="c">    // 以下三步由硬件保证不可分割</span>
+    if (*addr == expected) { *addr = desired; return true; }
+    return false;
+}
+
+<span class="c">// 用 CAS 实现原子自增</span>
+for (;;) {
+    T old = load(addr);
+    if (cas(addr, old, old + 1)) break;   // 失败就重读重试
+}</pre>
+  <h4>ABA 问题</h4>
+  <p>CAS 只比较<b>值</b>，不比较"这个值有没有被改过"。经典场景是无锁栈：</p>
+  <div class="steps">
+    <div class="step"><div class="txt">线程 1 读栈顶 <span class="k">A</span>，准备执行 <span class="k">CAS(top, A, A-&gt;next)</span>，此时被挂起。</div></div>
+    <div class="step"><div class="txt">线程 2 弹出 <span class="k">A</span>、弹出 <span class="k">B</span>，然后把 <span class="k">A</span> 重新压回栈。此时栈顶又是 <span class="k">A</span>，但 <span class="k">A-&gt;next</span> 已经指向了别处（原来是 B，现在可能是 C 或空）。</div></div>
+    <div class="step"><div class="txt">线程 1 恢复执行，CAS 成功（因为栈顶确实是 A），把 <span class="k">top</span> 设成它<b>之前读到的旧 next</b> —— 而那个节点可能已经被释放了。</div></div>
+    <div class="step"><div class="txt">结果：栈结构损坏，或者访问已释放内存。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:190px">解法</th><th>做法</th><th>代价</th></tr>
+    <tr><td><b>带版本号的 CAS</b></td><td>把 <span class="k">{指针, 计数器}</span> 打包成一个 128 位值一起 CAS，每次修改计数加 1，ABA 就不可能成立</td><td>x86 需要 <span class="k">cmpxchg16b</span>，某些平台不支持；Java 用 <span class="k">AtomicStampedReference</span></td></tr>
+    <tr><td><b>延迟回收</b></td><td>节点弹出后不立即释放，等确认没有线程持有旧引用再回收（hazard pointer、epoch、RCU）</td><td>内存占用上升，实现复杂</td></tr>
+    <tr><td><b>不自己实现</b></td><td>用语言或库提供的并发容器</td><td>几乎没有，<b>推荐</b></td></tr>
+  </table>
+  <h4>为什么无锁不等于更快</h4>
+  <table>
+    <tr><th style="width:200px">成本</th><th>说明</th></tr>
+    <tr><td><b>缓存行争用</b></td><td>所有线程 CAS 同一个变量，这个缓存行在核间来回迁移，每次失败重试都要重新读。竞争越激烈，有效吞吐越低</td></tr>
+    <tr><td><b>内存屏障</b></td><td><span class="k">lock</span> 前缀指令会串行化 store buffer，本身就有几十个周期的固定开销</td></tr>
+    <tr><td><b>重试风暴</b></td><td>N 个线程抢一个 CAS，理论上有 N-1 个要重试，高竞争下 CPU 全花在失败重试上</td></tr>
+    <tr><td><b>实现复杂度</b></td><td>内存回收、ABA、伪共享，每一项都能写出线上事故</td></tr>
+  </table>
+  <p>实测结论很反直觉：<b>低竞争时无锁略快于 mutex，中等竞争时两者接近，高竞争时 mutex（会让出 CPU）通常反而更好</b>，因为排队比空转更节省资源。这就是为什么成熟的运行时（Go 的 <span class="k">sync.Mutex</span>、Java 的 <span class="k">ReentrantLock</span>）都做成"先自旋几次，再阻塞"的混合策略。</p>
+  <div class="callout warn">
+    <b>无锁的真正优势不是性能，是进度保证：</b>持锁线程被杀死或挂起时，锁会永远不释放；无锁算法里任何一个线程卡住，其他线程仍能继续（lock-free），甚至每个线程都能在有限步内完成（wait-free）。这个性质在实时系统、信号处理、内核中断上下文里是刚需，在普通业务代码里基本用不上。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>内存模型与 happens-before</h2></div>
+  <p class="lead">内存模型是语言给程序员的<b>契约</b>：它规定了"一个线程的写，在什么条件下对另一个线程可见"。有了它，你不需要知道 CPU 到底怎么重排，只按规则推理即可。</p>
+  <h4>happens-before 的五条来源</h4>
+  <table>
+    <tr><th style="width:210px">规则</th><th>含义</th></tr>
+    <tr><td><b>程序顺序</b></td><td>同一线程内，前面的语句 happens-before 后面的语句</td></tr>
+    <tr><td><b>监视器锁</b></td><td>对同一把锁的 unlock happens-before 后续的 lock</td></tr>
+    <tr><td><b>volatile / 原子变量</b></td><td>对同一变量的写 happens-before 后续的读</td></tr>
+    <tr><td><b>线程启动与终止</b></td><td><span class="k">Thread.start()</span> 之前的操作对子线程可见；子线程的所有操作对 <span class="k">join()</span> 之后可见</td></tr>
+    <tr><td><b>传递性</b></td><td>A hb B，B hb C，则 A hb C。<b>这条是把零散的同步点连成链的关键</b></td></tr>
+  </table>
+  <p><b>只要建立了 happens-before，前一个线程的所有写（不只是被同步的那个变量）都对后一个线程可见。</b>这是最容易忽略的一点：不是"volatile 变量本身可见"，而是"volatile 写之前的所有写，都对读到这个 volatile 值的线程可见"。</p>
+  <h4>volatile 到底保证什么</h4>
+  <table>
+    <tr><th style="width:150px">保证</th><th>说明</th></tr>
+    <tr><td>可见性</td><td>写立即对其他线程可见，读总是读到最新值</td></tr>
+    <tr><td>有序性</td><td>禁止 volatile 读写与其他内存操作之间的特定重排（写前不重排、读后不重排）</td></tr>
+    <tr><td><b>不保证原子性</b></td><td><span class="k">volatile int n; n++</span> 依然是读-改-写三步，依然会丢更新</td></tr>
+  </table>
+  <p>C++ 里没有 <span class="k">volatile</span> 的并发语义（它只用于 MMIO 和信号处理），要用 <span class="k">std::atomic</span>。默认的 <span class="k">memory_order_seq_cst</span> 最强也最贵；<span class="k">acquire/release</span> 只约束必要的顺序，性能更好；<span class="k">relaxed</span> 只保证原子性，不保证任何顺序。</p>
+  <h4>双重检查锁为什么曾经是错的</h4>
+  <pre><span class="c">// 曾经广泛流传、实际有 bug 的写法（Java 5 之前）</span>
+public class Singleton {
+    private static Singleton instance;      // 少了 volatile
+    public static Singleton get() {
+        if (instance == null) {             // 第一次检查，无锁
+            synchronized (Singleton.class) {
+                if (instance == null) {     // 第二次检查，持锁
+                    instance = new Singleton();
+                }
+            }
+        }
+        return instance;
+    }
+}</pre>
+  <p><b>问题在 <span class="k">new Singleton()</span> 不是原子操作</b>，它分三步：① 分配内存；② 调用构造函数初始化；③ 把引用赋给 <span class="k">instance</span>。②和③之间没有依赖，<b>可能被重排成 ①③②</b>。</p>
+  <p>此时线程 A 执行到 ③ 后被切走，<span class="k">instance</span> 已经非空但对象还没初始化。线程 B 进入 <span class="k">get()</span>，第一次检查发现非空，直接返回一个<b>半成品对象</b>，后续访问字段就是 0 或 null。</p>
+  <p><b>修法：给 <span class="k">instance</span> 加 <span class="k">volatile</span></b>。Java 5 之后的内存模型明确规定 volatile 写不能与之前的写重排，②③ 的顺序被固定，问题消失。C++ 里对应的是 <span class="k">std::atomic</span> + release/acquire，或者更简单 —— <b>用函数内静态变量</b>，C++11 保证它的初始化是线程安全的。</p>
+  <div class="callout ok">
+    <b>更好的做法是根本不要手写单例。</b>依赖注入容器、函数内静态变量、或者启动时显式初始化，都比双重检查锁清晰。DCL 的价值主要在于它是一个绝佳的教学案例：<b>它证明了"看起来加了锁"和"正确"之间还差一个内存模型</b>。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>死锁：四个条件与破解</h2></div>
+  <p class="lead">死锁不是"锁用多了"，而是<b>四个条件同时成立</b>。破坏任意一个，死锁就不可能发生。这也是所有预防手段的出发点。</p>
+  <table>
+    <tr><th style="width:120px">必要条件</th><th>含义</th><th>怎么破坏</th></tr>
+    <tr><td><b>互斥</b></td><td>资源一次只能被一个线程持有</td><td>很难破坏（共享读场景可用读写锁、不可变数据、无锁结构）</td></tr>
+    <tr><td><b>占有并等待</b></td><td>持有 A 的同时去申请 B</td><td><b>一次性申请所有资源</b>；或者申请 B 失败时释放 A 再重试</td></tr>
+    <tr><td><b>非抢占</b></td><td>别人持有的锁不能强行夺走</td><td>用带超时的 <span class="k">tryLock</span>，超时后释放自己持有的锁并回退</td></tr>
+    <tr><td><b>循环等待</b></td><td>存在 A 等 B、B 等 A 的环</td><td><b>全局规定加锁顺序</b>（按地址、按 ID 排序），最实用</td></tr>
+  </table>
+  <pre><span class="c">// 死锁的标准形态：两个线程以相反顺序加锁</span>
+func transfer(from, to *Account, amount int) {
+    from.mu.Lock()          // 线程 1：锁 A，等 B
+    defer from.mu.Unlock()  // 线程 2：锁 B，等 A
+    to.mu.Lock()
+    defer to.mu.Unlock()
+    from.balance -= amount
+    to.balance += amount
+}
+
+<span class="c">// 修法一：按唯一 ID 排序，保证所有人用同一个顺序</span>
+func transfer(from, to *Account, amount int) {
+    first, second := from, to
+    if first.id &gt; second.id {
+        first, second = second, first
+    }
+    first.mu.Lock()
+    defer first.mu.Unlock()
+    second.mu.Lock()
+    defer second.mu.Unlock()
+<span class="c">    // 注意：这里要按原始的 from/to 做业务，不能用 first/second</span>
+}
+
+<span class="c">// 修法二：带超时，失败就放弃并回退（适合无法排序的场景）</span>
+if !from.mu.TryLock() { return ErrBusy }
+defer from.mu.Unlock()
+if !to.mu.TryLockTimeout(50 * time.Millisecond) {
+    return ErrBusy          // defer 会释放 from，不会持有并等待
+}</pre>
+  <div class="callout warn">
+    <b>死锁不一定发生在两把显式的锁上。</b>这些都会构成"持有并等待"：<br>
+    ① 持锁时调用了一个会回调你的函数（回调里又去拿同一把锁 → 重入死锁，非可重入锁直接卡死）；<br>
+    ② 持锁时做网络请求，对端超时重试又打到你的另一个线程，那个线程在等同一把锁；<br>
+    ③ 线程池里任务 A 提交任务 B 并 <span class="k">wait</span> 它的结果，而池子里所有线程都在做同样的事 —— 这叫<b>线程饥饿死锁</b>，把有界线程池和嵌套任务放在一起就会出现。
+  </div>
+  <h4>活锁与饥饿</h4>
+  <table>
+    <tr><th style="width:100px">现象</th><th>特征</th><th>例子</th></tr>
+    <tr><td><b>死锁</b></td><td>所有线程都阻塞，CPU 占用为 0</td><td>交叉加锁</td></tr>
+    <tr><td><b>活锁</b></td><td>线程都在跑，但谁也推进不了，CPU 占用很高</td><td>两个线程都用"冲突就重试 + 相同退避时间"，反复撞车</td></tr>
+    <tr><td><b>饥饿</b></td><td>某些线程长期拿不到资源</td><td>读写锁偏向读者，写线程永远排不上；低优先级线程被高优先级抢占</td></tr>
+  </table>
+  <p>活锁的解法是<b>随机化退避</b>（加抖动），破坏"总是同时重试"的对称性。饥饿的解法是<b>公平锁</b>（按等待顺序排队），代价是吞吐下降。</p>
+  <h4>怎么检测</h4>
+  <div class="cmds">
+    <div class="crow"><code>jstack &lt;PID&gt; | grep -A 20 "deadlock"</code><span class="desc">JVM 会直接算出死锁环并打印</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gdb -p &lt;PID&gt; -ex "thread apply all bt" -ex detach</code><span class="desc">看所有线程栈，找都在 futex/pthread_mutex_lock 的线程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/&lt;PID&gt;/task/*/stack</code><span class="desc">内核态栈，看是否卡在文件锁或内核锁上</span><button class="copy">复制</button></div>
+    <div class="crow"><code>go tool pprof http://localhost:6060/debug/pprof/goroutine</code><span class="desc">Go 的 goroutine dump，能看到 semacquire 的等待链</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf top -p &lt;PID&gt;</code><span class="desc">活锁时 CPU 高但无进展，看热点在哪个自旋函数</span><button class="copy">复制</button></div>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>协程模型</h2></div>
+  <p class="lead">协程不是"更轻的线程"，它是<b>用户态调度的执行流</b>。核心区别在于：线程由内核调度，切换要进内核；协程由运行时调度，切换只在用户态保存/恢复寄存器。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>有栈协程（stackful）</th><th>无栈协程（stackless）</th></tr>
+    <tr><td>代表</td><td>Go 的 goroutine、Lua 的 coroutine、Java 的虚拟线程</td><td>C++20 coroutine、Rust async、Kotlin suspend、JS async/await</td></tr>
+    <tr><td>栈</td><td>每个协程有自己的栈（Go 初始 2KB，按需增长）</td><td><b>共用线程栈</b>，状态存在编译器生成的状态机对象里</td></tr>
+    <tr><td>切换点</td><td>任意位置，函数内部也能挂起</td><td>只能在 <span class="k">await</span>/<span class="k">yield</span> 处挂起</td></tr>
+    <tr><td>内存</td><td>每个协程几 KB 起</td><td>一个状态机对象，通常几百字节</td></tr>
+    <tr><td>传染性</td><td>无，普通函数直接调用</td><td><b>有</b>：调用链上每一层都要标 <span class="k">async</span>（函数着色问题）</td></tr>
+    <tr><td>切换成本</td><td>保存/恢复寄存器 + 栈指针，几十纳秒</td><td>一次函数返回 + 状态机跳转，更接近普通调用</td></tr>
+  </table>
+  <h4>用户态调度省掉了什么</h4>
+  <table>
+    <tr><th style="width:200px">操作</th><th style="width:150px">典型耗时</th><th>说明</th></tr>
+    <tr><td>线程上下文切换</td><td>1~5 µs</td><td>陷入内核、保存完整寄存器与 FPU 状态、切换页表（可能刷 TLB）、调度决策</td></tr>
+    <tr><td>协程切换</td><td>20~200 ns</td><td>纯用户态，保存少量寄存器，不换页表，不刷 TLB</td></tr>
+    <tr><td>创建线程</td><td>10~50 µs</td><td>分配内核栈（默认 8MB 虚拟内存）、注册调度实体</td></tr>
+    <tr><td>创建 goroutine</td><td>~1 µs 以内</td><td>分配 2KB 栈，放进运行队列</td></tr>
+  </table>
+  <p>差距在<b>数量级</b>上。所以一台机器开几千个线程就吃力（每个 8MB 虚拟栈 + 内核调度开销），但可以开几十万个 goroutine。</p>
+  <h4>M:N 调度</h4>
+  <p>Go 的运行时把 M 个 goroutine 复用到 N 个 OS 线程上，核心结构是 GMP：</p>
+  <table>
+    <tr><th style="width:100px">角色</th><th>含义</th></tr>
+    <tr><td><b>G</b></td><td>goroutine，包含栈、指令指针、状态</td></tr>
+    <tr><td><b>M</b></td><td>machine，真正的 OS 线程，执行 G 的载体</td></tr>
+    <tr><td><b>P</b></td><td>processor，逻辑处理器，持有本地运行队列。<b>P 的数量默认等于 GOMAXPROCS（CPU 核数）</b>，M 必须绑定一个 P 才能执行 G</td></tr>
+  </table>
+  <p>这套设计的关键在于：<b>P 的数量限制了真正并行的数量</b>，而 M 可以远多于 P（某个 M 因系统调用阻塞时，P 会被交给另一个 M）。所以 <span class="k">GOMAXPROCS</span> 设得比核数大不会提升 CPU 密集型任务的吞吐，只会增加调度开销。</p>
+  <h4>为什么协程不适合 CPU 密集任务</h4>
+  <ul>
+    <li><b>并行度不会增加。</b>协程是并发（concurrency）不是并行（parallelism）。真正的并行受限于核数，开十万个协程做计算，还是只有 N 个核在跑，反而多了调度开销。</li>
+    <li><b>抢占不自由。</b>Go 在 1.14 之前只在函数调用处检查抢占标志，一个没有函数调用的死循环会<b>永久占住 P</b>，让同 P 上的其他 goroutine 饿死。1.14 之后用信号实现异步抢占，但仍有开销。</li>
+    <li><b>栈增长有成本。</b>有栈协程栈不够时要扩容并<b>搬移整个栈</b>（Go 的栈是可移动的，指针会被调整），深递归场景开销明显。</li>
+    <li><b>阻塞系统调用会拖住线程。</b>协程里做同步 IO（尤其 cgo 调用），运行时会新开一个 OS 线程顶上，线程数暴涨，失去协程的意义。</li>
+  </ul>
+  <div class="callout ok">
+    <b>一句话选择：</b>IO 密集、大量并发连接 → 协程（Go / 虚拟线程 / async）；CPU 密集 → 固定大小的线程池，数量等于核数；两者混合 → 分离成两个池，别让计算任务堵住 IO 任务的调度器。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Actor 与消息传递</h2></div>
+  <p class="lead">共享内存和消息传递是两种哲学：前者<b>用同步原语保护同一块数据</b>，后者<b>让数据只属于一个执行体，通过发消息来协作</b>。前者快但容易错，后者不容易错但有传递成本。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>共享内存</th><th>消息传递</th></tr>
+    <tr><td>数据归属</td><td>多个线程访问同一块内存</td><td>每份数据有唯一所有者</td></tr>
+    <tr><td>同步手段</td><td>锁、原子变量、条件变量</td><td>发送/接收消息，天然串行化</td></tr>
+    <tr><td>典型 bug</td><td>竞态、死锁、可见性</td><td>消息丢失、邮箱堆积、顺序错乱</td></tr>
+    <tr><td>性能</td><td>快（直接读写内存）</td><td>有拷贝或入队开销</td></tr>
+    <tr><td>可扩展性</td><td>跨进程/跨机几乎不可行</td><td>天然支持分布式（位置透明）</td></tr>
+  </table>
+  <h4>Actor 模型的三条规则</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>每个 Actor 有唯一地址和邮箱。</b>外部只能往邮箱发消息，不能直接读它的内部状态。</div></div>
+    <div class="step"><div class="txt"><b>消息串行处理。</b>一个 Actor 同一时刻只处理一条消息，所以<b>内部状态不需要加锁</b> —— 这是它消灭数据竞争的根源。</div></div>
+    <div class="step"><div class="txt"><b>处理消息时可以创建新 Actor、发消息给别的 Actor、改变自己的状态。</b>但不能共享可变状态。</div></div>
+  </div>
+  <pre><span class="c">// Actor 风格的计数器（伪代码）</span>
+type Counter struct {
+    count int          // 只被本 actor 的 mailbox 处理循环访问，无需加锁
+    inbox chan Msg
+}
+
+func (c *Counter) run() {
+    for msg := range c.inbox {      // 串行处理，天然互斥
+        switch m := msg.(type) {
+        case Inc:
+            c.count += m.N
+            m.Reply &lt;- c.count
+        case Get:
+            m.Reply &lt;- c.count
+        }
+    }
+}
+
+<span class="c">// 外部只能发消息，拿到的是一个 channel，不是 count 本身</span>
+func (c *Counter) Inc(n int) int {
+    reply := make(chan int, 1)
+    c.inbox &lt;- Inc{N: n, Reply: reply}
+    return &lt;-reply
+}</pre>
+  <h4>代价是什么</h4>
+  <table>
+    <tr><th style="width:200px">代价</th><th>说明</th></tr>
+    <tr><td><b>邮箱无界 → 内存爆炸</b></td><td>生产快、消费慢时消息堆积。<b>必须有背压（backpressure）</b>：有界队列 + 阻塞发送，或丢弃 + 降级</td></tr>
+    <tr><td><b>消息拷贝</b></td><td>大对象传递要么深拷贝（CPU 与 GC 压力），要么用不可变数据共享（要求纪律）</td></tr>
+    <tr><td><b>没有全局一致性</b></td><td>跨 Actor 的操作不是原子的。转账要么用 saga/补偿，要么把两个账户合并进一个 Actor（会限制并行度）</td></tr>
+    <tr><td><b>调试困难</b></td><td>调用栈不再是"谁调了谁"，而是消息流。需要分布式追踪才能还原因果</td></tr>
+    <tr><td><b>死信与顺序</b></td><td>消息可能丢、可能乱序、可能重复投递，业务要自己处理幂等</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>Go 的 channel 不是 Actor。</b>channel 是<b>一等公民的数据结构</b>，可以在任意 goroutine 之间传递；Actor 是<b>执行体的封装</b>，消息必须发给某个 Actor 的邮箱。CSP（Communicating Sequential Processes，Go 采用的模型）强调"通过 channel 同步"，Actor 强调"通过邮箱解耦"。两者都能避免共享可变状态，但 Actor 天然带地址、可跨机，CSP 的 channel 是进程内的。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>并发 bug 的排查</h2></div>
+  <p class="lead">竞态难复现的根本原因是<b>时间窗口极窄</b>：两条指令之间可能只隔几个 CPU 周期，要恰好在这个窗口内发生线程切换或另一核写入。所以它的出现概率可能是百万分之一，但生产环境每秒百万请求，一天就撞上好几次。</p>
+  <h4>为什么难复现</h4>
+  <table>
+    <tr><th style="width:220px">因素</th><th>说明</th></tr>
+    <tr><td>窗口极窄</td><td>两条指令之间只有几纳秒，绝大多数时候不会撞上</td></tr>
+    <tr><td>依赖硬件</td><td>需要多核、特定的缓存状态、特定的内存序，单核开发机永远不复现</td></tr>
+    <tr><td>依赖负载</td><td>低并发时线程不交错，高并发才暴露。<b>压测是必要手段</b></td></tr>
+    <tr><td>观察即改变</td><td>加日志、挂调试器都会改变时序，bug 消失（典型的 Heisenbug）</td></tr>
+    <tr><td>编译器与优化级别</td><td>-O0 下顺序恰好正确，-O2 重排后出错</td></tr>
+  </table>
+  <h4>race detector 的原理</h4>
+  <p>主流实现是 <b>ThreadSanitizer</b>（Go 的 <span class="k">-race</span> 就是它）。做法是给每个内存位置维护<b>向量时钟</b>（vector clock，记录每个线程最后访问它的逻辑时间），每次读写都检查：</p>
+  <ul>
+    <li>两次访问同一地址；</li>
+    <li>至少有一次是写；</li>
+    <li>两者之间<b>没有 happens-before 关系</b>（不通过锁、原子变量、channel 建立顺序）。</li>
+  </ul>
+  <p>三条同时满足，就报数据竞争。</p>
+  <table>
+    <tr><th style="width:170px">指标</th><th>典型值</th></tr>
+    <tr><td>CPU 开销</td><td>5~15 倍</td></tr>
+    <tr><td>内存开销</td><td>5~10 倍（影子内存记录访问历史）</td></tr>
+    <tr><td>漏报</td><td><b>有</b>。没执行到的路径不检测</td></tr>
+    <tr><td>误报</td><td>极少（它只报真正缺少 happens-before 的访问）</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最常见的错误用法：在测试环境跑一次 -race，没报错就上线。</b>正确的做法是：<b>把它放进 CI，每次提交都跑；并且用高并发压测驱动，让代码路径尽量都被执行到。</b>覆盖率不够的 race 检测，等于没检测。
+  </div>
+  <h4>组合排查法</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先确认是不是并发问题。</b>单线程压测正常、多线程异常；或者降低并发就消失；或者加日志后消失 —— 三条中任一条成立，基本可以锁定。</div></div>
+    <div class="step"><div class="txt"><b>用 race detector 扫一遍。</b>能直接给出两处冲突访问的调用栈，这是成本最低的一步。</div></div>
+    <div class="step"><div class="txt"><b>放大窗口。</b>在可疑位置插入随机 <span class="k">sleep</span>、<span class="k">runtime.Gosched()</span>、或者人为增加循环次数，让交错更容易发生。<b>只用于复现，不要提交</b>。</div></div>
+    <div class="step"><div class="txt"><b>加压。</b>把并发数调到远高于生产（比如 10 倍），跑长稳测试。竞态的概率随并发上升而急剧上升。</div></div>
+    <div class="step"><div class="txt"><b>加带序号的结构化日志。</b>每条日志带线程 ID、时间戳、单调递增序号，事后还原交错顺序。<b>日志本身要无锁或低开销</b>，否则会掩盖问题。</div></div>
+    <div class="step"><div class="txt"><b>用确定性重放。</b><span class="k">rr</span> 这类工具能录下整个执行过程并重放，让 bug 100% 复现。代价是只支持特定平台，且录制开销大。</div></div>
+  </div>
+  <pre><span class="c"># Go：把 race 检测放进 CI，并用高并发驱动</span>
+go test -race -count=10 ./...
+GOMAXPROCS=8 go test -race -run TestConcurrent -count=100
+
+<span class="c"># 看 goroutine 数量和阻塞点</span>
+curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | head -30
+
+<span class="c"># C/C++：TSan + 压测</span>
+gcc -fsanitize=thread -g -O1 -pthread stress.c -o stress
+TSAN_OPTIONS="halt_on_error=0 history_size=7" ./stress
+
+<span class="c"># 看上下文切换是否异常（锁竞争激烈时每秒几万次）</span>
+pidstat -w -p &lt;PID&gt; 1
+perf stat -e context-switches,cpu-migrations -p &lt;PID&gt; sleep 5</pre>
+  <div class="callout ok">
+    <b>最后的防线是设计，不是排查。</b>把共享可变状态降到最少：能用不可变数据就不用可变，能用消息传递就不用共享内存，能用一个 goroutine 独占一份数据就不要加锁。竞态的数量与共享状态的数量是平方关系 —— <b>少一处共享，少十处 bug</b>。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个踩过才知道的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 volatile 当计数器</div><div class="pd">volatile 只保证可见性和有序性，不保证原子性。n++ 仍是读-改-写，多线程下照样丢更新。计数要用 atomic 或加锁。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">双重检查锁忘了 volatile</div><div class="pd">new 的三步可能被重排成"分配-赋值-初始化"，另一个线程会拿到半初始化对象。Java 里必须给 instance 加 volatile，C++ 用 atomic 或函数内静态变量。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">在锁里做 IO 或调用外部服务</div><div class="pd">临界区从纳秒级变成毫秒级，所有线程排队。锁内只做内存操作，IO 移到锁外，或者用"先在锁内取快照，锁外再处理"。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">不同代码路径用不同的加锁顺序</div><div class="pd">A 函数先锁 X 再锁 Y，B 函数先锁 Y 再锁 X，必然死锁。全局规定顺序（按 ID、按地址排序），并写进注释。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">手动 Lock 之后忘了 Unlock</div><div class="pd">中间 return 或 panic 就永久泄漏锁。Go 用 defer，Java 用 try/finally，C++ 用 RAII（lock_guard）。不要相信"我每一条路径都写了"。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为读写锁一定比互斥锁快</div><div class="pd">读锁也要改共享计数，多核下缓存行弹跳很贵；写少时还会写饥饿。读临界区极短时，普通 mutex 往往更快。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">认为无锁队列一定比 mutex 快</div><div class="pd">高竞争下所有线程 CAS 同一个缓存行，失败重试把 CPU 烧光；mutex 会让出 CPU 排队，反而更省资源。低竞争才有优势。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">在协程里做 CPU 密集计算或同步阻塞调用</div><div class="pd">协程不增加并行度，还会占住调度线程；阻塞系统调用（尤其 cgo）会让运行时不断新建 OS 线程。计算任务放独立线程池。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 sleep 代替同步</div><div class="pd">"等 100ms 对方应该写完了"在负载高时必然失效。用 channel、WaitGroup、条件变量、future 做真正的同步。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">只在本地跑一次 -race 就认为没问题</div><div class="pd">race detector 只报实际执行到的路径。要放进 CI、配合高并发压测、反复跑，覆盖率不够等于没测。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 两个线程各执行 100 万次 counter++，最终结果小于 200 万。这属于哪类问题？</div>
+      <button class="opt">可见性问题，一个线程看不到另一个的写</button>
+      <button class="opt">原子性问题，读-改-写三步被打断导致丢更新</button>
+      <button class="opt">有序性问题，指令被重排</button>
+      <div class="ans">正确答案：<b>原子性</b>。counter++ 是读、加、写三步，两个线程交错时会互相覆盖。修法是加锁或用原子自增。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 双重检查锁在 Java 5 之前为什么是错的？</div>
+      <button class="opt">synchronized 性能太差</button>
+      <button class="opt">静态变量不能被同步</button>
+      <button class="opt">new 的"分配-初始化-赋值"可能被重排，别的线程会拿到未初始化完成的对象</button>
+      <div class="ans">正确答案：<b>指令重排</b>。赋值可能先于构造完成，另一个线程看到非空引用就直接返回半成品。加 volatile 禁止这种重排即可修复。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 无锁栈的 ABA 问题，最直接的解法是？</div>
+      <button class="opt">把指针和版本号打包成一个整体做 CAS</button>
+      <button class="opt">加一把互斥锁</button>
+      <button class="opt">把 CAS 换成普通赋值</button>
+      <div class="ans">正确答案：<b>带版本号的 CAS</b>。值相同但版本不同就判定失败，ABA 无法成立。也可以用延迟回收（hazard pointer、epoch）避免节点被复用。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 要破坏死锁的"循环等待"条件，最实用的做法是？</div>
+      <button class="opt">给所有锁加超时</button>
+      <button class="opt">全局规定统一的加锁顺序，比如按资源 ID 排序后依次加锁</button>
+      <button class="opt">改用读写锁</button>
+      <div class="ans">正确答案：<b>统一加锁顺序</b>。所有人按同一顺序申请，就不可能形成环。加超时破坏的是"非抢占"条件，也是一条可行路径。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 为什么协程不适合 CPU 密集任务？</div>
+      <button class="opt">协程的栈太小，放不下计算数据</button>
+      <button class="opt">协程不能访问 CPU 寄存器</button>
+      <button class="opt">协程只提供并发不提供并行，真正的并行受核数限制，反而多出调度开销</button>
+      <div class="ans">正确答案：<b>不增加并行度</b>。开十万个协程做计算，还是只有 N 个核在跑。CPU 密集应该用固定大小的线程池，数量等于核数。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 race detector，哪个说法是对的？</div>
+      <button class="opt">它基于 happens-before 分析，只能发现本次运行实际发生的竞争，漏报是正常的</button>
+      <button class="opt">它能静态分析出所有可能的竞争，跑一次就够</button>
+      <button class="opt">它没有性能开销，可以常开在生产环境</button>
+      <div class="ans">正确答案：<b>只能发现实际发生的竞争</b>。它靠影子内存记录访问历史，没执行到的代码路径不检测，且有 5~15 倍 CPU 开销。要放进 CI 并配合高并发压测。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查工具</h3>
+  <div class="cmds">
+    <div class="crow"><code>go run -race main.go</code><span class="desc">Go 的竞态检测，输出冲突双方调用栈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>go test -race -count=10 ./...</code><span class="desc">CI 里反复跑，提高撞上概率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -fsanitize=thread -g -O1 x.c -pthread</code><span class="desc">C/C++ 的 TSan</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jstack &lt;PID&gt;</code><span class="desc">Java 线程栈，直接报死锁环</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jcmd &lt;PID&gt; Thread.print</code><span class="desc">同上，JDK 8+ 推荐用 jcmd</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gdb -p &lt;PID&gt; -ex "thread apply all bt"</code><span class="desc">看所有线程卡在哪</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl localhost:6060/debug/pprof/goroutine?debug=1</code><span class="desc">Go 的 goroutine dump</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -w -p &lt;PID&gt; 1</code><span class="desc">上下文切换次数，判断锁竞争强度</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf stat -e context-switches,cpu-migrations -p &lt;PID&gt;</code><span class="desc">切换与核间迁移统计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>perf sched latency</code><span class="desc">调度延迟，看线程等 CPU 等了多久</span><button class="copy">复制</button></div>
+    <div class="crow"><code>taskset -c 0,1 ./app</code><span class="desc">绑核复现，缩小变量范围</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GOMAXPROCS=1 ./app</code><span class="desc">单核运行，如果 bug 消失就高度怀疑竞态</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>内存序速查</h3>
+  <pre><span class="c">// C++11 的六种 memory_order，从强到弱</span>
+memory_order_seq_cst   <span class="c">// 全局单一总序，最安全也最贵（默认）</span>
+memory_order_acq_rel   <span class="c">// 读用 acquire，写用 release，用于读改写操作</span>
+memory_order_release   <span class="c">// 之前的读写不能重排到这条之后（发布数据）</span>
+memory_order_acquire   <span class="c">// 之后的读写不能重排到这条之前（获取数据）</span>
+memory_order_consume   <span class="c">// 依赖序，实践中基本没人用，多数编译器按 acquire 处理</span>
+memory_order_relaxed   <span class="c">// 只保证原子性，不保证任何顺序</span>
+
+<span class="c">// 典型的生产者-消费者发布模式</span>
+data = 42;                                    <span class="c">// 普通写</span>
+flag.store(true, std::memory_order_release);  <span class="c">// 发布：保证 data 先可见</span>
+
+<span class="c">// 消费者</span>
+while (!flag.load(std::memory_order_acquire)) {} <span class="c">// 获取：保证能看到 data</span>
+assert(data == 42);                              <span class="c">// 一定成立</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>原子性</b></td><td>操作不可被分割，要么全做要么全不做</td></tr>
+    <tr><td><b>可见性</b></td><td>一个线程的写能否被另一个线程及时看到</td></tr>
+    <tr><td><b>有序性</b></td><td>指令的实际执行顺序是否与代码顺序一致</td></tr>
+    <tr><td><b>happens-before</b></td><td>内存模型定义的部分有序关系，前者的写对后者可见</td></tr>
+    <tr><td><b>数据竞争</b></td><td>两个线程访问同一变量、至少一个写、且无同步</td></tr>
+    <tr><td><b>竞态条件</b></td><td>结果依赖执行时序，是比数据竞争更宽的概念</td></tr>
+    <tr><td><b>CAS</b></td><td>比较并交换，硬件提供的原子指令</td></tr>
+    <tr><td><b>ABA 问题</b></td><td>值从 A 变 B 又变回 A，CAS 无法察觉中间变化</td></tr>
+    <tr><td><b>自旋锁</b></td><td>拿不到锁就忙等，不让出 CPU</td></tr>
+    <tr><td><b>乐观锁</b></td><td>先修改再校验版本，冲突则重试</td></tr>
+    <tr><td><b>伪共享</b></td><td>两个变量在同一缓存行，不同核分别修改导致互相失效</td></tr>
+    <tr><td><b>内存屏障</b></td><td>限制指令重排、保证内存操作顺序的指令或编译原语</td></tr>
+    <tr><td><b>死锁</b></td><td>互相等待对方持有的资源，全部阻塞</td></tr>
+    <tr><td><b>活锁</b></td><td>都在运行但无法推进，通常因为对称的重试</td></tr>
+    <tr><td><b>饥饿</b></td><td>某些线程长期得不到资源</td></tr>
+    <tr><td><b>协程</b></td><td>用户态调度的执行流，切换不进内核</td></tr>
+    <tr><td><b>M:N 调度</b></td><td>M 个协程映射到 N 个 OS 线程上执行</td></tr>
+    <tr><td><b>Actor</b></td><td>以邮箱串行处理消息的执行体，内部状态不共享</td></tr>
+    <tr><td><b>CSP</b></td><td>通过 channel 通信的并发模型，Go 采用</td></tr>
+    <tr><td><b>背压</b></td><td>消费端处理不过来时让生产端降速的机制</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个不加锁的计数器，用 <span class="k">go run -race</span> 看报告，再用 atomic 修好；② 复现 DCL 的半初始化对象（可以用 sleep 放大窗口）；③ 写两个函数以相反顺序加锁，用 jstack 或 goroutine dump 观察死锁；④ 用 <span class="k">benchmark</span> 对比 mutex、atomic、分片锁在不同并发度下的吞吐，画出一条交叉的曲线；⑤ 把 race detector 加进 CI，跑一周，看它能抓出多少历史遗留问题。<br><br>
+    <b>之后值得单独学：</b>伪共享与缓存行填充、RCU 与 hazard pointer、Go 的调度器源码（findrunnable 与 work stealing）、Java 的 JMM 与 varhandle、以及分布式场景下从"锁"到"租约"的演进。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透并发模型 · 三个问题（原子/可见/有序）、四个条件（死锁）、一个原则（少共享）</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（三个根本问题）和模块 5（死锁四条件）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边用 -race 跑一段真正有竞态的代码。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议装好 Go 或 JDK：Go 自带 race detector，跑 -race 就能看到真实的竞态报告';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

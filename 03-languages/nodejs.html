@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Node.js 运行时</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 语言篇 · 高密度版</span>
+    <h1>二十分钟学透 Node.js 运行时</h1>
+    <p class="sub">会写 Express 不等于懂 Node。这篇直接讲运行时机制：<b>事件循环到底按什么顺序执行、libuv 线程池分担了什么、背压是什么信号、GC 什么时候卡住你</b>，以及线上最常见的十类 Node 事故。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>15+</b> 段可运行代码</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边跑：node -v 确认 18+，每个示例都亲手敲一遍看输出顺序</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能跑的环境</h2></div>
+  <pre><span class="c"># 确认版本（下面内容要求 Node 14+，unhandledRejection 行为是 15+，require(ESM) 要 22.12+）</span>
+node -v
+
+<span class="c"># 直接跑一个文件（REPL：裸敲 node）</span>
+node index.js
+
+<span class="c"># 模块系统二选一：.mjs 后缀，或 package.json 里声明</span>
+echo <span class="y">'{"type":"module"}'</span> &gt; package.json
+
+<span class="c"># 调试三件套</span>
+node --inspect index.js        <span class="c"># 等 Chrome DevTools 连 9229 端口</span>
+node --heapsnapshot-signal=SIGUSR2 index.js   <span class="c"># 收到信号自动打堆快照（内存泄漏排查用）</span>
+node --max-old-space-size=4096 index.js       <span class="c"># 抬高 V8 堆上限到 4GB</span>
+
+<span class="c"># 观察事件循环延迟</span>
+node -e <span class="y">"setInterval(() =&gt; console.log(perf_hooks.eventLoopUtilization()), 1000)"</span></pre>
+  <div class="callout warn">
+    <b>先建立一个总认知：Node 的"单线程"指的是你的 JS 代码跑在单线程上。</b>I/O、文件系统、DNS、加密这些活由 libuv 丢给操作系统（epoll/kqueue/IOCP）或它自己的<b>线程池</b>去做，完成后再以回调的形式排回主线程。所以：<b>任何一段同步 JS 代码（含一个大 JSON.parse）执行期间，整个进程的所有请求一起停摆</b>——这是后面所有坑的总根源。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>事件循环：六个阶段与执行顺序</h2></div>
+  <p class="lead">事件循环不是"一个队列 FIFO"，而是<b>分阶段的循环</b>。每个阶段有自己的回调队列，一轮循环里按固定顺序进入。</p>
+  <table>
+    <tr><th style="width:150px">阶段</th><th style="width:240px">执行什么</th><th>要点</th></tr>
+    <tr><td><b>timers</b></td><td>到期的 setTimeout / setInterval 回调</td><td>只执行"到点"的；poll 阶段会计算本轮该阻塞多久来等 timer</td></tr>
+    <tr><td><b>pending callbacks</b></td><td>上一轮遗留的系统回调</td><td>典型如 TCP 连接被拒（ECONNREFUSED）的错误回调</td></tr>
+    <tr><td><b>idle / prepare</b></td><td>内部使用</td><td>不用关心</td></tr>
+    <tr><td><b>poll</b></td><td>执行 I/O 回调（网络、文件）</td><td>没有可执行回调时会<b>阻塞等待</b>，时长参考 timers 里最近的到期时间</td></tr>
+    <tr><td><b>check</b></td><td>setImmediate 回调</td><td>poll 之后立刻跑，专门设计给"当前 I/O 后尽快执行"</td></tr>
+    <tr><td><b>close</b></td><td>close 事件回调</td><td>socket.on('close') 等</td></tr>
+  </table>
+  <p>两个"循环外"的优先队列：<b>process.nextTick 队列</b>和 <b>微任务（Promise）队列</b>。每执行完一个宏任务（一个阶段的一批回调、一次 IO 回调），都会<b>先把 nextTick 队列掏空，再掏空微任务队列</b>，然后才回到事件循环。nextTick 优先级高于 Promise。</p>
+  <pre><span class="c">// 例 1：nextTick vs Promise vs setTimeout（顺序完全确定）</span>
+setTimeout(() =&gt; console.log(<span class="y">'A: setTimeout'</span>), 0);
+Promise.resolve().then(() =&gt; console.log(<span class="y">'B: promise.then'</span>));
+process.nextTick(() =&gt; console.log(<span class="y">'C: nextTick'</span>));
+console.log(<span class="y">'D: 同步代码'</span>);
+
+<span class="g">// 输出顺序：D → C → B → A</span>
+<span class="c">// 同步代码最先；当前操作结束后，nextTick 队列先于微任务队列；</span>
+<span class="c">// setTimeout 的回调要等事件循环真正跑到 timers 阶段才执行。</span></pre>
+  <pre><span class="c">// 例 2：I/O 回调内部，setImmediate 一定先于 setTimeout(0)（Node 文档级结论）</span>
+const fs = require(<span class="y">'node:fs'</span>);
+
+setTimeout(() =&gt; console.log(<span class="y">'E: setTimeout(0)'</span>), 0);
+setImmediate(() =&gt; console.log(<span class="y">'F: setImmediate'</span>));
+
+fs.readFile(__filename, () =&gt; {
+  console.log(<span class="y">'G: readFile 回调'</span>);
+  setTimeout(() =&gt; console.log(<span class="y">'H: IO 里的 setTimeout'</span>), 0);
+  setImmediate(() =&gt; console.log(<span class="y">'I: IO 里的 setImmediate'</span>));
+});
+
+<span class="g">// 确定的顺序：G → I → H</span>
+<span class="c">// G 执行完后，nextTick/微任务队列先清空；然后事件循环从 poll 进入 check 阶段，</span>
+<span class="c">// I 立即执行；H 要等下一轮循环的 timers 阶段。</span>
+<span class="r">// 注意：顶层 E 和 F 的顺序是不确定的！取决于主模块执行到事件循环是否超过 1ms。</span>
+<span class="c">// 超过 1 秒级别的延迟请用 setTimeout(fn, ms)，不要用 setImmediate 冒充"立即"。</span></pre>
+  <div class="callout">
+    <b>一句话记住优先级：</b>当前同步代码 → nextTick 队列 → 微任务（Promise）队列 → 事件循环（timers → pending → poll → check → close，一轮一轮转）。<br>
+    <b>Node 11+ 的一个变化：</b>timers 和 poll 阶段在每轮循环开始时会做一次"对齐"，所以 setTimeout(0) 的实际触发时间在 1ms 上下浮动，<b>不要把 setTimeout(fn, 0) 当精确计时用</b>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>单线程与 libuv 线程池</h2></div>
+  <p>主线程只有一条，但异步能力分两条路：<b>网络 I/O 走操作系统的多路复用</b>（Linux epoll、macOS kqueue、Windows IOCP），<b>另一批操作 libuv 用线程池模拟异步</b>。</p>
+  <table>
+    <tr><th style="width:220px">操作</th><th style="width:140px">实现方式</th><th>说明</th></tr>
+    <tr><td>TCP/HTTP/UDP 网络请求</td><td>epoll/kqueue/IOCP</td><td>事件循环本体，<b>真·单线程</b>，无线程开销</td></tr>
+    <tr><td>fs 文件读写（异步版）</td><td><b>libuv 线程池</b></td><td>默认 4 个线程，用 UV_THREADPOOL_SIZE 调</td></tr>
+    <tr><td>dns.lookup / dns.resolve</td><td>线程池 / getaddrinfo</td><td>dns.lookup 走线程池，dns.resolve 走网络</td></tr>
+    <tr><td>crypto 异步 API<br>（pbkdf2、scrypt、randomBytes）</td><td><b>libuv 线程池</b></td><td>同理；同步版（pbkdf2Sync）则直接占死主线程</td></tr>
+    <tr><td>zlib 压缩/解压</td><td><b>libuv 线程池</b></td><td>大文件 gzip 别忘了它占线程池名额</td></tr>
+    <tr><td>你的 JS 同步代码</td><td>主线程</td><td><b>这里发生的一切，全网请求一起等</b></td></tr>
+  </table>
+  <pre><span class="c">// 线程池大小默认 4 —— 并发跑 10 个大文件 gzip，实际只有 4 个在并行</span>
+UV_THREADPOOL_SIZE=8 node server.js     <span class="c">// 启动前设置，进程内读不到（要早于 require libuv）</span>
+
+<span class="c">// 验证：4 个线程池任务并发 vs 8 个的耗时差</span>
+const zlib = require(<span class="y">'node:zlib'</span>), fs = require(<span class="y">'node:fs'</span>);
+const big = Buffer.alloc(64 * 1024 * 1024, <span class="y">'x'</span>);      <span class="c">// 64MB</span>
+console.time(<span class="y">'gzip'</span>);
+Promise.all(Array.from({length: 8}, () =&gt; zlib.gzip(big)))
+  .then(() =&gt; console.timeEnd(<span class="y">'gzip'</span>));   <span class="c">// UV_THREADPOOL_SIZE=4 时约是 =8 的两倍耗时</span></pre>
+  <div class="callout warn">
+    <b>"异步"不等于"不占线程"。</b>fs.readFile 异步版把活丢给线程池，主线程确实解放了——但线程池只有默认 4 个位置。一窝蜂的 fs 异步操作会在线程池里排队，表现就是"回调迟迟不来"。CPU 密集任务更糟：它连线程池都去不了，<b>只能占主线程</b>，唯一解是 worker_threads 或独立进程。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>异步陷阱：回调、Promise、async/await</h2></div>
+  <pre><span class="c">// ===== 1. 回调地狱：嵌套三层，错误处理要写三遍 =====</span>
+getUser(id, (err, u) =&gt; {
+  <span class="r">if (err) return handle(err);</span>
+  getOrders(u, (err, os) =&gt; {
+    <span class="r">if (err) return handle(err);</span>
+    getItems(os, (err, is) =&gt; { <span class="c">/* 越嵌越深，return 都容易漏 */</span> });
+  });
+});
+<span class="c">// 现代写法：async/await + Promise，错误用一个 try/catch 收</span>
+try {
+  const u = await getUser(id);
+  const os = await getOrders(u);
+  const is = await getItems(os);
+} catch (err) { handle(err); }
+
+<span class="c">// ===== 2. forEach(async ...) 是错的：不等、不串行、不接错 =====</span>
+urls.forEach(<span class="r">async</span> (u) =&gt; {
+  const r = await fetch(u);     <span class="c">// forEach 不等这个 await</span>
+  await save(r);                <span class="c">// 所有请求被同时发出，save 可能乱序</span>
+});                             <span class="c">// save 抛错 → unhandledRejection → Node 15+ 杀进程</span>
+
+<span class="c">// ✓ 串行（保序、限量）：</span>
+for (const u of urls) { await save(await fetch(u)); }
+
+<span class="c">// ✓ 并发（一个失败整体 reject，慎用）：</span>
+const rs = await Promise.all(urls.map(fetch));
+
+<span class="c">// ✓ 并发且容错（单个失败不影响其他，推荐批量场景）：</span>
+const rs = await Promise.allSettled(urls.map(fetch));
+const ok = rs.filter(r =&gt; r.status === <span class="y">'fulfilled'</span>).map(r =&gt; r.value);
+const bad = rs.filter(r =&gt; r.status === <span class="y">'rejected'</span>).map(r =&gt; r.reason);
+
+<span class="c">// ===== 3. floating promise：没人接的 Promise =====</span>
+async function risky() { <span class="r">throw new Error('boom');</span> }
+risky();                        <span class="c">// 没有 await、没有 .catch()</span>
+
+<span class="c">// Node 15 起，unhandledRejection 的默认行为 = 抛出异常、进程退出（code 1）</span>
+process.on(<span class="y">'unhandledRejection'</span>, (reason) =&gt; {
+  console.error(<span class="y">'未接住的拒绝：'</span>, reason);
+  process.exit(1);              <span class="c">// 上报后主动退，交给 PM2/systemd 拉起来</span>
+});</pre>
+  <div class="callout danger">
+    <b>await 写在错误的位置 = 性能白给。</b>把三个互不依赖的请求用 await 串起来，总耗时是三者之和；用 Promise.all 是取最大值。经验法则：<b>循环里的 await 基本都该改成 Promise.all + 并发上限</b>（p-limit 之类），除非顺序本身就是业务约束。
+  </div>
+  <pre><span class="c">// try/catch 的位置：包住 await，不要包住函数定义</span>
+async function load() {
+  <span class="r">try</span> {
+    const cfg = await readConfig();
+    return cfg;
+  } <span class="r">catch</span> (e) {
+    <span class="c">// finally 里别再 await：会吞掉/延迟原始异常</span>
+    return defaultConfig();
+  }
+}
+
+<span class="c">// .catch() 与 await 混用时，注意链式：then().catch() 捕获的是整条链</span>
+fetch(url).then(r =&gt; r.json()).catch(err =&gt; fallback());</pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>流与背压</h2></div>
+  <p class="lead">流（Stream）解决两件事：<b>不把整个文件/响应读进内存</b>，以及用<b>背压</b>防止生产者把消费者冲爆。</p>
+  <table>
+    <tr><th style="width:150px">类型</th><th>例子</th></tr>
+    <tr><td><b>Readable</b></td><td>fs.createReadStream、http req、process.stdin</td></tr>
+    <tr><td><b>Writable</b></td><td>fs.createWriteStream、http res</td></tr>
+    <tr><td><b>Duplex</b></td><td>TCP socket（可读可写）</td></tr>
+    <tr><td><b>Transform</b></td><td>zlib.createGzip()、crypto Cipher：读写之间的加工厂</td></tr>
+  </table>
+  <pre><span class="c">// 背压的机理：write() 返回 false = 内部缓冲超过 highWaterMark</span>
+const readable = fs.createReadStream(<span class="y">'access.log'</span>);   <span class="c">// 默认每次读 64KB</span>
+const writable = fs.createWriteStream(<span class="y">'out.log'</span>);    <span class="c">// 默认缓冲 16KB</span>
+
+readable.on(<span class="y">'data'</span>, (chunk) =&gt; {
+  const ok = writable.write(chunk);      <span class="c">// 缓冲没超 → true；超了 → false</span>
+  <span class="r">if (!ok) {</span>                            <span class="c">// false 是背压信号：消费者忙不过来</span>
+    readable.pause();                    <span class="c">// ① 暂停读端，停止生产</span>
+    writable.once(<span class="y">'drain'</span>, () =&gt; readable.resume());  <span class="c">// ② 缓冲排空后恢复</span>
+  }
+});
+
+<span class="c">// Transform：把日志转成大写再写出去</span>
+const { Transform } = require(<span class="y">'node:stream'</span>);
+const upper = new Transform({
+  transform(chunk, encoding, cb) {
+    this.push(chunk.toString().toUpperCase());   <span class="c">// 推进可读侧</span>
+    cb();                                        <span class="c">// 必须调用 cb()，否则整个流卡死</span>
+  },
+});
+
+<span class="c">// pipeline：自动背压 + 错误传播 + 句柄清理（pipe 做不到后两件）</span>
+const { pipeline } = require(<span class="y">'node:stream'</span>);
+pipeline(
+  fs.createReadStream(<span class="y">'access.log'</span>),
+  upper,
+  fs.createWriteStream(<span class="y">'out.log'</span>),
+  (err) =&gt; { <span class="r">if (err)</span> console.error(<span class="y">'管线失败'</span>, err); <span class="r">else</span> console.log(<span class="y">'完成'</span>); }
+);
+
+<span class="c">// 异步迭代：for await 逐块消费，天然背压</span>
+for await (const chunk of fs.createReadStream(<span class="y">'big.log'</span>)) {
+  <span class="c">// 每块默认 64KB，内存恒定</span>
+}</pre>
+  <div class="callout warn">
+    <b>highWaterMark 不是硬上限，是"开始背压"的水位线。</b>对象模式（objectMode）默认是 <b>16 个对象</b>，字节模式 Readable 默认 64KB、Writable 默认 16KB。生产者比消费者快时，缓冲仍可能涨到远超它——所以 <span class="k">write() 返回 false 时的 pause/resume 不是可选优化，是必需逻辑</span>。<span class="k">stream.pipe()</span> 会自动处理背压，<b>但它不传播错误</b>：目标流出错时源流还在傻傻地读，文件句柄泄漏就是这么来的。用 <span class="k">pipeline()</span> 或 <span class="k">pipeline()` 的 stream/promises 版本替代 pipe。
+  </div>
+  <pre><span class="c">// 常见性能组合：读大文件 → 按行切割 → 逐行处理 → 批量写库</span>
+const readline = require(<span class="y">'node:readline'</span>);
+const rl = readline.createInterface({ input: fs.createReadStream(<span class="y">'big.log'</span>) });
+let batch = [];
+rl.on(<span class="y">'line'</span>, (line) =&gt; {
+  batch.push(parse(line));
+  if (batch.length &gt;= 1000) { flushToDb(batch); batch = []; }   <span class="c">// 批量写，别逐行 insert</span>
+});</pre>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>集群模式：cluster 与 PM2</h2></div>
+  <p>单进程 Node 只用得满一个 CPU 核，且一个未捕获异常就整体退出。<b>cluster 用多进程共享端口</b>把这两个问题一起解决。</p>
+  <pre><span class="c">// cluster.js —— 每个 CPU 一个 worker，挂了自动补</span>
+const cluster = require(<span class="y">'node:cluster'</span>);
+const os = require(<span class="y">'node:os'</span>);
+
+<span class="r">if (cluster.isPrimary) {</span>
+  const n = os.cpus().length;
+  console.log(<span class="y">`主进程 ${process.pid} 启动 ${n} 个 worker`</span>);
+  for (let i = 0; i &lt; n; i++) cluster.fork();
+
+  cluster.on(<span class="y">'exit'</span>, (worker, code) =&gt; {
+    <span class="c">// 平滑退出（reload）时 code 为 0 不补；异常崩溃才补</span>
+    <span class="r">if (code !== 0)</span> {
+      console.warn(<span class="y">`worker ${worker.process.pid} 崩溃(code ${code})，1s 后重启`</span>);
+      setTimeout(() =&gt; cluster.fork(), 1000);     <span class="c">// 加延时，防疯狂崩溃重启打满 CPU</span>
+    }
+  });
+<span class="r">} else {</span>
+  require(<span class="y">'./server'</span>);   <span class="c">// 每个 worker 跑同一个 HTTP server，监听同一个端口</span>
+}</pre>
+  <table>
+    <tr><th style="width:220px">机制</th><th>说明</th></tr>
+    <tr><td><b>端口共享</b></td><td>只有主进程真正 listen，worker 通过 IPC 把连接"接"过来处理</td></tr>
+    <tr><td><b>分发策略</b></td><td>非 Windows 默认轮询（RR）；<b>Windows 上由操作系统分发</b>（SCHED_NONE）</td></tr>
+    <tr><td><b>隔离性</b></td><td>worker 间<b>不共享内存</b>，一个 worker 崩溃不影响其他；Session 等共享状态必须外置（Redis）</td></tr>
+    <tr><td><b>Sticky Session</b></td><td>WebSocket / Socket.io / 长轮询必须把同一客户端固定到同一 worker，否则握手后断连。用 Nginx <span class="k">ip_hash</span> 或 cluster sticky 模块</td></tr>
+  </table>
+  <pre><span class="c"># PM2：生产事实标准的进程管理器</span>
+pm2 start server.js -i max        <span class="c"># 集群模式，worker 数 = CPU 核数</span>
+pm2 start server.js -i 2 --name api   <span class="c"># 固定 2 个 worker，命名进程</span>
+pm2 reload api                    <span class="c"># 零停机重启：先起新的，再下旧的（restart 是直接杀）</span>
+pm2 logs api --lines 100          <span class="c"># 看日志</span>
+pm2 monit                         <span class="c"># 实时 CPU/内存面板</span>
+
+<span class="c">// ecosystem.config.js —— 声明式配置，替代一长串命令行参数</span>
+module.exports = {
+  apps: [{
+    name: <span class="y">'api'</span>,
+    script: <span class="y">'./server.js'</span>,
+    instances: <span class="y">'max'</span>,
+    exec_mode: <span class="y">'cluster'</span>,
+    max_memory_restart: <span class="y">'500M'</span>,     <span class="c">// 内存超限自动重启，兜住泄漏</span>
+    env: { NODE_ENV: <span class="y">'production'</span> },
+  }],
+};
+
+<span class="c">// 部署更新三步：pm2 reload（零停机）→ 健康检查 → 出问题 pm2 stop 回滚</span></pre>
+  <div class="callout ok">
+    <b>CPU 密集型任务怎么办？</b>cluster 是多进程，启动开销大（每个 worker 独立 V8 实例，几十 MB 起）；如果只是偶尔算个哈希、压个图，用 <b>worker_threads</b>（线程级，共享内存可选，启动几毫秒）更合适。<b>高频、重度的计算才上独立微服务</b>（Go/Rust），Node 的舒适区是高并发 I/O。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>内存管理与 V8 GC</h2></div>
+  <p>V8 把堆分成两代：<b>新生代</b>（小、死得快的对象）和 <b>老生代</b>（活得久的对象）。GC 策略因此不同。</p>
+  <table>
+    <tr><th style="width:150px">区域</th><th style="width:170px">算法</th><th>特性</th></tr>
+    <tr><td><b>新生代</b></td><td>Scavenge（半空间复制）</td><td>频率高、单次快（亚毫秒级）。活过两轮 GC 晋升到老生代</td></tr>
+    <tr><td><b>老生代</b></td><td>Mark-Sweep + Compact</td><td>整堆标记 + 清理，<b>堆越大停顿越久</b>（几十到数百毫秒），期间主线程全停</td></tr>
+    <tr><td><b>堆外内存</b></td><td>不计入 V8 堆</td><td><b>Buffer / ArrayBuffer</b> 走这里，受操作系统约束，heapUsed 看不到它们</td></tr>
+  </table>
+  <pre><span class="c">// 看内存：rss 才是进程真实占用，heapUsed 只是 V8 堆已用</span>
+setInterval(() =&gt; {
+  const m = process.memoryUsage();
+  console.log({
+    rssMB:        (m.rss / 1048576).toFixed(1),        <span class="c">// 进程常驻物理内存（含堆外）</span>
+    heapUsedMB:   (m.heapUsed / 1048576).toFixed(1),   <span class="c">// V8 堆已用</span>
+    externalMB:   (m.external / 1048576).toFixed(1),   <span class="c">// 堆外（Buffer 等）</span>
+    arrayBuffersMB: (m.arrayBuffers / 1048576).toFixed(1),
+  });
+}, 5000);
+
+<span class="c">// 堆上限：64 位默认约 2GB 起（视机器内存可到 ~4GB），超了直接 OOM 崩溃</span>
+node --max-old-space-size=4096 server.js
+
+<span class="c">// 内存泄漏排查标准流程：</span>
+<span class="c">// 1. node --heapsnapshot-signal=SIGUSR2 server.js，业务高峰期和低峰期各 kill -USR2 一次</span>
+<span class="c">// 2. Chrome DevTools → Memory → 载入两个快照 → Comparison 视图</span>
+<span class="c">// 3. 看 Retained Size 异常大的对象和它的"保留树"，顺藤摸到引用它的模块级变量</span></pre>
+  <h4>Node 里最常见的四种泄漏写法</h4>
+  <ul>
+    <li><b>无上限的模块级缓存</b>：<span class="k">const cache = new Map()</span> 只进不出，内存单调涨。用 lru-cache 或加 TTL 清理</li>
+    <li><b>EventEmitter 监听器只加不减</b>：每个请求都 <span class="k">emitter.on('x')</span>，超过 <span class="k">events.maxListeners</span>（默认 10）就告警，更糟的是监听器闭包抓住了请求级大对象</li>
+    <li><b>setInterval 不清</b>：回调里引用了请求上下文，整个对象树被定时器钉死</li>
+    <li><b>被 Buffer 骗过的监控</b>：只盯 heapUsed，结果 Buffer 堆外分配把机器内存吃光——<b>监控必须看 rss</b></li>
+  </ul>
+  <div class="callout warn">
+    <b>GC 停顿是延迟毛刺的常见来源。</b>老生代堆涨到 1GB+ 时，一次 Mark-Compact 可能停几百毫秒，对 P99 延迟敏感的服务就是故障。缓解手段：控制堆大小（小堆 = 短停顿）、复用对象池、减少长生命周期大对象、以及把大块内存操作拆到 worker_threads。<b>Node 14+ 可用 --max-semi-space-size 调新生代</b>，大新生代减少对象晋升、降低老生代压力。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>CommonJS vs ESM</h2></div>
+  <table>
+    <tr><th style="width:170px">维度</th><th style="width:250px">CommonJS（CJS）</th><th>ESM</th></tr>
+    <tr><td><b>文件标识</b></td><td>.js + package.json 无 "type"</td><td>.mjs，或 package.json "type": "module"</td></tr>
+    <tr><td><b>导入导出</b></td><td class="f">require() / module.exports</td><td class="f">import / export</td></tr>
+    <tr><td><b>加载时机</b></td><td><b>同步</b>，运行时求值</td><td>静态分析 + 异步加载，<b>顶层就能 await</b></td></tr>
+    <tr><td><b>路径必须带扩展</b></td><td>require('./a') 补全 .js</td><td>import './a.js' <b>必须写全</b>，不补全</td></tr>
+    <tr><td><b>__dirname / __filename</b></td><td>内置</td><td><b>没有</b>，要用 import.meta.url 自己拼</td></tr>
+    <tr><td><b>导出绑定</b></td><td>值的拷贝（exports.x = 1 后改不影响引用方）</td><td>活的只读绑定，源模块改了引用方看得到</td></tr>
+    <tr><td><b>Tree Shaking</b></td><td>基本不可能</td><td>静态结构，打包器可摇树</td></tr>
+    <tr><td><b>互相调用</b></td><td>CJS 可以 <span class="k">require()</span> ESM（Node 22.12+/23+）</td><td>ESM 可以 <span class="k">import</span> CJS（默认导入 = module.exports）</td></tr>
+  </table>
+  <pre><span class="c">// CJS</span>
+const { readFile } = require(<span class="y">'node:fs'</span>);
+module.exports = { readFile };
+console.log(__dirname);            <span class="c">// 当前目录</span>
+
+<span class="c">// ESM 等价写法</span>
+import { readFile } from <span class="y">'node:fs'</span>;
+export { readFile };
+import { fileURLToPath } from <span class="y">'node:url'</span>;
+import { dirname } from <span class="y">'node:path'</span>;
+const __dirname = dirname(fileURLToPath(import.meta.url));   <span class="c">// 唯一标准姿势</span>
+
+<span class="c">// ESM 顶层 await：模块加载时就能跑异步初始化</span>
+const cfg = await loadConfig();      <span class="c">// CJS 里不可能这么写</span>
+
+<span class="c">// ESM 引入 CJS：默认导入是 module.exports 本体</span>
+import express from <span class="y">'express'</span>;          <span class="c">// 常见包仍是 CJS，这么写没问题</span>
+
+<span class="c">// CJS 引入 ESM：低版本 Node 直接抛 ERR_REQUIRE_ESM</span>
+<span class="r">// const { x } = require('./pure-esm.mjs');   // ✗ Node &lt; 22.12 报错</span>
+const { x } = await import(<span class="y">'./pure-esm.mjs'</span>);  <span class="c">// ✓ 动态 import 全版本通用</span></pre>
+  <div class="callout danger">
+    <b>双包陷阱（dual package hazard）：</b>一个包同时提供 CJS 和 ESM 入口（package.json 的 <span class="k">exports</span> 字段按 <span class="k">require</span>/<span class="k">import</span> 条件分流）时，CJS 和 ESM 拿到的是<b>两个不同模块实例</b>——状态不共享，<span class="k">instanceof</span> 都可能判 False。症状是"同一个类在两个文件里行为不一样"。排查：确认引用方和被引用方用的是同一套模块系统。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>常见性能坑：阻塞、大 JSON、假异步</h2></div>
+  <table>
+    <tr><th style="width:260px">操作</th><th style="width:150px">量级参考</th><th>解法</th></tr>
+    <tr><td>fs.readFileSync 读 1GB 文件</td><td>秒级停摆</td><td>createReadStream 流式读</td></tr>
+    <tr><td>JSON.parse 10MB 字符串</td><td>约 100~300ms</td><td>worker_threads / 流式解析（stream-json）</td></tr>
+    <tr><td>JSON.parse 100MB 字符串</td><td>约 1~3 秒，<b>全站卡死</b></td><td>同上；或从源头避免（别传大 JSON）</td></tr>
+    <tr><td>crypto.pbkdf2Sync 一次</td><td>几十~几百 ms</td><td>用异步 pbkdf2 / scrypt</td></tr>
+    <tr><td>深层递归 / 大 RegExp 回溯</td><td>不定，可能爆栈</td><td>改迭代；RegExp 加超时或换非回溯引擎</td></tr>
+    <tr><td>巨型 for 循环（千万次级）</td><td>整段占死主线程</td><td>分片 + setImmediate 让出；或 worker</td></tr>
+  </table>
+  <pre><span class="c">// 大 JSON.parse：峰值内存 = 原字符串 + 解析后对象（常为 2~3 倍）</span>
+const raw = await readFile(<span class="y">'data.json'</span>, <span class="y">'utf8'</span>);   <span class="c">// 100MB 字符串</span>
+const obj = JSON.parse(raw);                    <span class="c">// 又一份 100MB+ 的对象树</span>
+
+<span class="c">// ✓ 方案一：丢进 worker_threads，主线程零感知</span>
+const { Worker } = require(<span class="y">'node:worker_threads'</span>);
+const w = new Worker(<span class="y">'./parse-worker.js'</span>, { workerData: raw });
+w.on(<span class="y">'message'</span>, (obj) =&gt; use(obj));      <span class="c">// 解析在主线程外完成</span>
+
+<span class="c">// ✓ 方案二：流式逐条解析，内存恒定（JSON Lines / NDJSON）</span>
+const { parser } = require(<span class="y">'stream-json'</span>);
+fs.createReadStream(<span class="y">'data.ndjson'</span>)
+  .pipe(split2())                              <span class="c">// 一行一条 JSON</span>
+  .on(<span class="y">'data'</span>, (line) =&gt; handle(JSON.parse(line)));
+
+<span class="c">// 长循环让出事件循环：每 1000 条让一次，请求不再集体卡死</span>
+let i = 0;
+function work() {
+  const end = Math.min(i + 1000, total);
+  for (; i &lt; end; i++) heavyTask(i);
+  if (i &lt; total) setImmediate(work);      <span class="c">// 本轮结束再排下一片</span>
+}
+work();</pre>
+  <div class="callout danger">
+    <b>最隐蔽的"假异步"：</b>用 <span class="k">async</span> 包一个全是同步计算的函数，它确实返回 Promise，但计算过程照样占死主线程——<b>async 关键字不产生任何并行</b>。判断标准只有一个：<b>看这段代码里有没有真正的 I/O 等待点</b>。没有，就该拆去 worker_threads。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">避坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">主线程跑大 JSON.parse / 同步 fs</div><div class="pd">100MB JSON.parse 能让整个进程停 1~3 秒，期间所有请求一起超时。大对象解析进 worker_threads，文件读用流。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">urls.forEach(async fn)</div><div class="pd">forEach 不等 await：请求全部并发发出、写库乱序、异常变成 unhandledRejection。要串行用 for...of，要并发用 Promise.all/allSettled。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">floating promise 没人 catch</div><div class="pd">Node 15+ 起未处理的 Promise 拒绝默认直接杀进程。入口处装 process.on('unhandledRejection') 兜底并主动退出，交给 PM2 拉起。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">nextTick / Promise 里递归</div><div class="pd">nextTick 队列和微任务队列永远排不空，事件循环根本没机会跑，timer 和 I/O 全部饿死。递归逻辑必须让出到下一轮（setImmediate）。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 stream.pipe 串管线然后不管错误</div><div class="pd">pipe 不传播错误：下游挂了上游还在读，句柄泄漏、内存堆积。用 pipeline()，它在任何一段失败时销毁整条链。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">无视 write() 返回的 false</div><div class="pd">消费端处理不过来时写缓冲无限膨胀，内存缓慢涨到 OOM。false 出现要 pause 读端、drain 后 resume。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">cluster 多进程没做 sticky session</div><div class="pd">WebSocket/Socket.io 握手连到 worker A，后续帧被分到 worker B，连接秒断。Nginx ip_hash 或 sticky 模块固定同一客户端。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">模块级 Map 当缓存，无上限无清理</div><div class="pd">典型内存泄漏：只进不出，heapUsed 单调上涨直到 OOM。加 LRU 上限或 TTL，必要时 max_memory_restart 兜底。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">setInterval 里跑可能重叠的 async 任务</div><div class="pd">上一次还没跑完下一次又触发，任务排队叠加。改用递归 setTimeout，或加"运行中"标志跳过本轮。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">CJS/ESM 混用踩坑</div><div class="pd">ESM 里写 require/__dirname 直接 ReferenceError；CJS require() ESM 在 Node 22.12 之前抛 ERR_REQUIRE_ESM。新项目统一 ESM，旧包用动态 import() 过渡。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 下面代码的输出顺序是？<br>setTimeout(() =&gt; console.log('A'), 0); Promise.resolve().then(() =&gt; console.log('B')); process.nextTick(() =&gt; console.log('C')); console.log('D');</div>
+      <button class="opt">A → B → C → D</button>
+      <button class="opt">D → A → B → C</button>
+      <button class="opt">D → C → B → A</button>
+      <div class="ans">正确答案：<b>D → C → B → A</b>。同步代码最先；当前操作结束后先掏空 <b>nextTick 队列（C）</b>，再掏空微任务队列（B）；setTimeout 的回款要等事件循环跑到 timers 阶段（A）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. async function boom() { throw new Error('x'); } 然后直接 boom() 不 await 不 catch。Node 18 的默认行为是？</div>
+      <button class="opt">什么都不发生，Promise 静默失败</button>
+      <button class="opt">触发 unhandledRejection，默认抛出异常使进程退出</button>
+      <button class="opt">只在控制台打一条 warning，进程继续</button>
+      <div class="ans">正确答案：<b>默认抛出异常、进程退出</b>。Node 15 起 unhandledRejection 的默认行为从 warning 改为 throw。生产应显式注册 process.on('unhandledRejection') 做日志上报，然后主动退出让 PM2 拉起。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. writable.write(chunk) 返回 false，意味着什么？</div>
+      <button class="opt">写失败了，数据丢了，应该重试</button>
+      <button class="opt">内部缓冲超过 highWaterMark，消费端忙不过来——背压信号，应暂停读端等 drain</button>
+      <button class="opt">流已关闭，不能再写</button>
+      <div class="ans">正确答案：<b>背压信号</b>。false 不代表失败（数据已进缓冲），代表"再写就要涨内存了"。正确做法是暂停可读端，监听一次 drain 后再 resume。pipeline/pipe 会自动处理这件事，手写 data 事件时必须自己做。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 下列哪组操作走的是 libuv 线程池（默认 4 线程）？</div>
+      <button class="opt">HTTP 请求响应、TCP 连接</button>
+      <button class="opt">JSON.parse、数组排序</button>
+      <button class="opt">fs 文件读写、dns.lookup、crypto.pbkdf2、zlib 压缩</button>
+      <div class="ans">正确答案：<b>fs / dns.lookup / crypto / zlib</b>。网络 I/O 走 epoll/kqueue/IOCP（事件循环本体），而文件系统、DNS 查询、加密、压缩由 libuv 线程池模拟异步，容量受 UV_THREADPOOL_SIZE 限制。同步 JS（JSON.parse 等）只在主线程，谁都不分流。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. cluster 模式部署 Socket.io 服务，客户端频繁断线重连，最可能的原因和修法？</div>
+      <button class="opt">worker 内存不足，调大 max-old-space-size</button>
+      <button class="opt">握手和后续帧被分到不同 worker，需要 sticky session（Nginx ip_hash 或 sticky 模块）</button>
+      <button class="opt">端口被占用，应该每个 worker 监听不同端口</button>
+      <div class="ans">正确答案：<b>需要 sticky session</b>。主进程按轮询把连接分给不同 worker，而 WebSocket 是有状态的长连接，握手后必须留在同一 worker。另外 worker 间不共享内存，Socket.io 的适配器也要指到 Redis。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 一个 CommonJS 文件里 require() 一个纯 ESM 包，会发生什么？</div>
+      <button class="opt">正常工作，require 会自动处理 ESM</button>
+      <button class="opt">静默返回 undefined</button>
+      <button class="opt">Node 22.12/23+ 之前抛 ERR_REQUIRE_ESM；全版本通用解法是动态 import()</button>
+      <div class="ans">正确答案：<b>ERR_REQUIRE_ESM（22.12+/23+ 之前）</b>。CJS 是同步加载，ESM 支持顶层异步，所以历史上不能 require()。低版本用 const m = await import('./x.mjs') 动态导入；双向互通时还要注意双包陷阱（CJS 和 ESM 是两个模块实例，状态不共享）。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令与代码模式</h3>
+  <div class="cmds">
+    <div class="crow"><code>node --inspect server.js</code><span class="desc">开启调试，Chrome DevTools 连 9229 端口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>node --heapsnapshot-signal=SIGUSR2</code><span class="desc">收到信号自动打堆快照，排查内存泄漏</span><button class="copy">复制</button></div>
+    <div class="crow"><code>UV_THREADPOOL_SIZE=8 node server.js</code><span class="desc">调大 libuv 线程池（默认 4），利好 fs/zlib/crypto 并发</span><button class="copy">复制</button></div>
+    <div class="crow"><code>process.memoryUsage()</code><span class="desc">看 rss / heapUsed / external / arrayBuffers，监控盯 rss</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Promise.allSettled(urls.map(fetch))</code><span class="desc">并发且单个失败不拖垮整体</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pipeline(a, b, c, cb)</code><span class="desc">流管线：自动背压 + 错误传播，替代 pipe</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cluster.isPrimary / cluster.fork()</code><span class="desc">多进程共享端口，一核一 worker</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pm2 start app.js -i max</code><span class="desc">集群模式启动，worker 数 = CPU 核数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pm2 reload app</code><span class="desc">零停机重启（先起新再下旧）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>max_memory_restart: '500M'</code><span class="desc">PM2 内存超限自动重启，兜住内存泄漏</span><button class="copy">复制</button></div>
+    <div class="crow"><code>new Worker('./w.js')</code><span class="desc">worker_threads 跑 CPU 密集任务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>for await (const c of stream)</code><span class="desc">异步迭代流，天然背压</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>事件循环</b></td><td>分六阶段循环执行回调的调度器：timers → poll → check → close</td></tr>
+    <tr><td><b>libuv</b></td><td>Node 的异步 I/O 库，封装 epoll/kqueue/IOCP 和线程池</td></tr>
+    <tr><td><b>线程池</b></td><td>libuv 用默认 4 个线程模拟 fs/crypto/zlib/dns.lookup 的异步</td></tr>
+    <tr><td><b>process.nextTick</b></td><td>当前操作结束后最先执行的队列，优先级高于 Promise 微任务</td></tr>
+    <tr><td><b>微任务队列</b></td><td>Promise.then/catch/finally 的回调，每个宏任务后清空</td></tr>
+    <tr><td><b>setImmediate</b></td><td>在 poll 之后的 check 阶段执行；I/O 回调里一定早于 setTimeout(0)</td></tr>
+    <tr><td><b>背压 backpressure</b></td><td>消费端处理不过来时，通过 write() 返回 false 反向抑制生产端</td></tr>
+    <tr><td><b>highWaterMark</b></td><td>缓冲水位线：超过就开始背压，不是硬上限</td></tr>
+    <tr><td><b>Transform 流</b></td><td>读写之间的加工厂，输入输出可不同（如 gzip、大写转换）</td></tr>
+    <tr><td><b>pipeline</b></td><td>流组合工具：自动背压 + 错误传播 + 资源清理</td></tr>
+    <tr><td><b>cluster</b></td><td>多进程共享同一端口：主进程分发，worker 干活，崩溃自动补</td></tr>
+    <tr><td><b>sticky session</b></td><td>把同一客户端固定到同一 worker，WebSocket 集群的必需品</td></tr>
+    <tr><td><b>worker_threads</b></td><td>线程级并行，适合 CPU 密集任务，可共享内存</td></tr>
+    <tr><td><b>Scavenge</b></td><td>新生代 GC：半空间复制，频繁但快</td></tr>
+    <tr><td><b>Mark-Sweep-Compact</b></td><td>老生代 GC：标记-清除-整理，堆越大停顿越久</td></tr>
+    <tr><td><b>堆外内存</b></td><td>Buffer/ArrayBuffer 不走 V8 堆，只体现在 rss 和 external 里</td></tr>
+    <tr><td><b>unhandledRejection</b></td><td>没人接的 Promise 拒绝，Node 15+ 默认直接杀进程</td></tr>
+    <tr><td><b>floating promise</b></td><td>没被 await 也没 catch 的 Promise 调用</td></tr>
+    <tr><td><b>CommonJS</b></td><td>require/module.exports 同步模块规范，Node 传统格式</td></tr>
+    <tr><td><b>ESM</b></td><td>import/export 标准模块，静态分析、支持顶层 await</td></tr>
+    <tr><td><b>双包陷阱</b></td><td>CJS 和 ESM 入口实例不同、状态不共享的经典坑</td></tr>
+    <tr><td><b>OOM</b></td><td>超出内存上限（堆或 rss）导致进程崩溃</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>把这几件事亲手做一遍 —— ① 抄下模块 1 的两段顺序示例，实际运行对照输出；② 写一个 50MB 的文件流转换（读 → gzip → 写）用 pipeline 跑通；③ 起一个 cluster 服务，kill 掉一个 worker 看自动重启；④ 用 --heapsnapshot-signal=SIGUSR2 打两次快照，在 DevTools 里做 Comparison；⑤ 故意写一个 floating promise，观察 Node 18 的退出行为，再补上 unhandledRejection 处理。<br><br>
+    <b>之后值得单独学：</b>worker_threads 的 SharedArrayBuffer 与 Atomics、Node 内置测试运行器（node:test）、诊断工具链（clinic doctor/flame、0x）、以及 HTTP/2 与 keep-alive 连接池调优。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Node.js 运行时 · 上线前务必检查：unhandledRejection 兜底、rss 监控、sticky session</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（执行顺序）和模块 8（性能坑）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边把示例敲进 node 里跑。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边跑：node -v 确认 18+，每个示例都亲手敲一遍看输出顺序';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

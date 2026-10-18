@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Istio 与服务治理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 28 期 · 高密度版</span>
+    <h1>二十分钟学透 Istio 与服务治理</h1>
+    <p class="sub">Istio 是 Service Mesh 的主流实现，把<b>流量管理、mTLS、可观测性</b>从应用代码里搬到 Sidecar 代理。这篇讲机制：控制面/数据面怎么协作、VirtualService/DestinationRule 怎么写、规则优先级怎么排、Sidecar 开销怎么压。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>2</b> 个核心 CRD</span>
+      <span class="chip"><b>4</b> 种故障注入</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议对着一个 K8s 集群看：每个 Pod 里有没有 istio-proxy 容器</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>Service Mesh 解决什么问题</h2></div>
+  <p class="lead">微服务一多，每个服务都要自己实现：熔断、重试、超时、灰度、mTLS、链路追踪。用 SDK 的问题是<b>多语言要写五遍、版本升级绑业务发布</b>。Service Mesh 的思路：把这些能力下沉到<b>每个 Pod 里的 Sidecar 代理</b>，业务无感知。</p>
+  <table>
+    <tr><th style="width:150px">能力</th><th style="width:230px">SDK 方案的问题</th><th>Service Mesh 方案</th></tr>
+    <tr><td><b>熔断/重试/超时</b></td><td>每语言一套库，配置分散在代码里</td><td>DestinationRule 统一配置，运维可改</td></tr>
+    <tr><td><b>灰度发布</b></td><td>应用自己解析流量权重</td><td>VirtualService 按权重路由，控制面秒级生效</td></tr>
+    <tr><td><b>mTLS</b></td><td>证书管理埋进业务代码</td><td>Sidecar 自动双向认证，证书自动轮转</td></tr>
+    <tr><td><b>可观测性</b></td><td>各服务埋点口径不一</td><td>Envoy 统一产出指标/日志/trace</td></tr>
+    <tr><td><b>故障演练</b></td><td>改代码发版才能注入故障</td><td>VirtualService 声明式注入延迟/中止</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>Mesh 不是银弹：</b>它引入 Sidecar 资源开销（每 Pod 多一个容器）、新增一层故障点、排障链路变长（要会看 Envoy 配置）。<b>10 个服务以内、流量简单的团队，Ingress + SDK 往往更划算。</b>上 Mesh 的典型触发点：服务数 50+、多语言、合规要求全链路 mTLS。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Istio 架构：控制面 + 数据面</h2></div>
+  <h3>两个平面</h3>
+  <table>
+    <tr><th style="width:120px">平面</th><th style="width:260px">组成</th><th>职责</th></tr>
+    <tr><td><b>数据面</b></td><td>每个 Pod 里的 <b>Envoy</b> Sidecar（istio-proxy 容器）</td><td>实际转发所有进出 Pod 的流量，执行路由、mTLS、遥测</td></tr>
+    <tr><td><b>控制面</b></td><td><b>istiod</b> 一个 Deployment（1.5+ 合并了 Pilot/Citadel/Galley）</td><td>服务发现、下发配置（xDS）、签发证书、校验 CRD</td></tr>
+  </table>
+  <h3>xDS：控制面与数据面的协议</h3>
+  <p>istiod 通过 <b>xDS 系列 API</b> 把配置推给每个 Envoy。Envoy 不需要重启，收到新配置热加载：</p>
+  <table>
+    <tr><th style="width:120px">协议</th><th style="width:260px">下发内容</th><th>对应 Istio CRD</th></tr>
+    <tr><td class="f">CDS</td><td>Cluster：有哪些上游服务、怎么连</td><td>ServiceEntry、DestinationRule</td></tr>
+    <tr><td class="f">RDS</td><td>Route：请求怎么路由、按什么权重</td><td>VirtualService</td></tr>
+    <tr><td class="f">EDS</td><td>Endpoint：上游的具体 Pod IP 列表</td><td>自动来自服务发现</td></tr>
+    <tr><td class="f">LDS</td><td>Listener：监听哪些端口、走哪条链</td><td>Gateway、Sidecar</td></tr>
+    <tr><td class="f">SDS</td><td>Secret：mTLS 证书与私钥</td><td>自动签发轮转</td></tr>
+  </table>
+  <h3>注入与安装</h3>
+  <pre><span class="c"># 安装（istioctl 方式，生产推荐）</span>
+istioctl install --set profile=demo -y        <span class="c"># demo = 全功能含 Kiali/Jaeger</span>
+istioctl install --set profile=default -y     <span class="c"># default = 生产最小集</span>
+
+<span class="c"># 命名空间级自动注入（打标签，之后新建 Pod 自动带 sidecar）</span>
+kubectl label namespace default istio-injection=enabled
+
+<span class="c"># 验证注入：Pod 里应该有 2 个容器（app + istio-proxy）</span>
+kubectl get pod webapp-xxx -o jsonpath='{.spec.containers[*].name}'
+<span class="c"># webapp istio-proxy</span>
+
+<span class="c"># 已有 Pod 要重启才会注入；排查用</span>
+istioctl analyze -n default                 <span class="c"># 静态检查常见配置错误，装完先跑它</span></pre>
+  <div class="callout">
+    <b>流量走向（重点）：</b>Pod 内所有进出流量被 iptables 规则劫持到 Envoy 的 15001 端口。<b>应用容器以为自己在直连对方服务，实际是 app → 本地 Envoy → 对端 Envoy → 对端 app。</b>所以 Kubelet 健康检查、应用探针也会被劫持 —— 这是模块 8 坑 3 的根源。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>流量管理：VirtualService 与 DestinationRule</h2></div>
+  <p class="lead">这两个 CRD 是所有流量治理的地基：<b>VirtualService 决定"请求去哪"，DestinationRule 决定"到了之后怎么处理这个子集的连接"。</b></p>
+  <h3>VirtualService 核心能力</h3>
+  <pre><span class="c"># vs.yaml —— 金丝雀 + 按 header 灰度 + 超时重试，一个例子全覆盖</span>
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: webapp
+spec:
+  hosts:
+    - webapp                <span class="c"># K8s Service 短名（同命名空间解析）</span>
+  gateways:
+    - mesh                  <span class="c"># mesh = 仅集群内；配合 gateway 名 = 入口流量</span>
+  http:
+    - match:                <span class="c"># ① 带内部灰度头的请求 → 全部去 canary</span>
+        - headers:
+            x-canary:
+              exact: "true"
+      route:
+        - destination:
+            host: webapp
+            subset: canary
+    - route:                <span class="c"># ② 其余流量 90/10 金丝雀</span>
+        - destination:
+            host: webapp
+            subset: stable
+          weight: 90
+        - destination:
+            host: webapp
+            subset: canary
+          weight: 10
+      timeout: 5s            <span class="c"># ③ 超时</span>
+      retries:
+        attempts: 3          <span class="c"># ④ 重试次数</span>
+        perTryTimeout: 2s
+        retryOn: 5xx,reset,connect-failure</pre>
+  <h3>DestinationRule：定义 subset 与连接策略</h3>
+  <pre><span class="c"># dr.yaml —— 用 label 划分版本，并配置熔断（outlierDetection）</span>
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: webapp
+spec:
+  host: webapp
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100      <span class="c"># 熔断：单 Pod 最大连接数</span>
+      http:
+        h2UpgradePolicy: DEFAULT
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 5     <span class="c"># 连续 5 次 5xx → 摘除实例</span>
+      interval: 10s              <span class="c"># 扫描间隔</span>
+      baseEjectionTime: 30s      <span class="c"># 摘除时长，之后按比例恢复</span>
+      maxEjectionPercent: 50     <span class="c"># 最多摘 50%，防全摘导致雪崩</span>
+  subsets:
+    - name: stable              <span class="c"># subset 名 = VS 里 destination.subset</span>
+      labels:
+        version: v1
+    - name: canary
+      labels:
+        version: v2</pre>
+  <h3>故障注入（ chaos 演练不用改代码）</h3>
+  <pre><span class="c"># fault.yaml —— 给 10% 的请求注入 500ms 延迟 + 5% 请求直接中止</span>
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: webapp-fault
+spec:
+  hosts: [webapp]
+  http:
+    - fault:
+        delay:
+          percentage:
+            value: 10
+          fixedDelay: 500ms
+        abort:
+          percentage:
+            value: 5
+          httpStatus: 503
+      route:
+        - destination:
+            host: webapp
+            subset: stable</pre>
+  <div class="callout ok">
+    <b>路由匹配优先级（Istio 官方规则）：</b>header/uri 匹配 &gt; 精确（exact）&gt; 前缀（prefix）&gt; 正则（regex）&gt; 端口。<b>多个规则按"最精确者优先"，同精度按创建顺序。</b>所以"灰度头规则放最前面"只是习惯，真正保证顺序的是匹配精度。排查路由不生效：<span class="k">istioctl x describe pod webapp-xxx</span> 看合并后的实际路由。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>安全：自动 mTLS 与授权策略</h2></div>
+  <h3>PeerAuthentication：mTLS 三种模式</h3>
+  <pre><span class="c"># pa.yaml —— 命名空间级强制 mTLS</span>
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: default
+spec:
+  mtls:
+    mode: STRICT          <span class="c"># STRICT = 只接受 TLS；PERMISSIVE = 明文/TLS 都收</span></pre>
+  <table>
+    <tr><th style="width:130px">模式</th><th style="width:260px">行为</th><th>适用场景</th></tr>
+    <tr><td class="f">STRICT</td><td>只接受 mTLS 连接，明文直接拒绝</td><td>生产环境终态</td></tr>
+    <tr><td class="f">PERMISSIVE</td><td>明文和 mTLS 都接受</td><td>迁移期默认值，兼容未注入 Pod 的调用方</td></tr>
+    <tr><td class="f">DISABLE</td><td>完全关闭 mTLS</td><td>调试，生产禁用</td></tr>
+  </table>
+  <div class="callout">
+    <b>证书自动管理：</b>istiod 内置 CA，给每个 Sidecar 自动签发 SPIFFE 证书（默认 24 小时有效期，自动轮转），证书身份形如 <span class="k">spiffe://cluster.local/ns/default/sa/webapp</span> —— <b>服务账号（ServiceAccount）就是身份</b>，授权策略可以直接按 SA 写。
+  </div>
+  <h3>AuthorizationPolicy：四层模型</h3>
+  <pre><span class="c"># ap.yaml —— 只允许 billing 服务调用 payment 的 POST /charge</span>
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: payment-allow-billing
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: payment          <span class="c"># 作用在哪些 Pod 上（不写 = 整个命名空间）</span>
+  action: ALLOW             <span class="c"># ALLOW / DENY / AUDIT / CUSTOM</span>
+  rules:
+    - from:
+        - source:
+            namespaces: ["billing-ns"]      <span class="c"># 来源命名空间</span>
+      to:
+        - operation:
+            methods: ["POST"]               <span class="c"># HTTP 方法</span>
+            paths: ["/charge"]              <span class="c"># 精确路径</span>
+      when:
+        - key: request.headers[x-version]   <span class="c"># 自定义条件</span>
+          values: ["v2"]</pre>
+  <table>
+    <tr><th style="width:120px">字段</th><th>匹配维度</th></tr>
+    <tr><td class="f">from.source</td><td>principal（SA 身份）、namespaces、ipBlocks、remoteIp</td></tr>
+    <tr><td class="f">to.operation</td><td>methods、paths、ports、hosts</td></tr>
+    <tr><td class="f">when</td><td>header、JWT claim、SNI 等任意键值</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>AuthorizationPolicy 的"拒绝一切"陷阱：</b>一旦给某 Pod 配了<b>任何一条 ALLOW 策略</b>，该 Pod 立即变为<b>默认拒绝</b>（白名单模式），没被显式允许的流量全部 403。迁移期标准姿势：先 AUDIT（只记日志不拦截）观察 24 小时，确认没误伤再切 ALLOW。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>可观测性：Kiali、访问日志、追踪</h2></div>
+  <p class="lead">Istio 的最大卖点之一：<b>不改一行代码，自动获得三个平面的可观测性。</b>全部由 Envoy 旁路产出。</p>
+  <h3>Telemetry API：统一开关（Istio 1.10+ 替代 MeshConfig 里的散落配置）</h3>
+  <pre><span class="c"># telemetry.yaml —— 全网格默认开访问日志，tracing 采样 10%</span>
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-default
+  namespace: istio-system
+spec:
+  accessLogging:
+    - providers:
+        - name: envoy        <span class="c"># 输出到 stdout，由采集器（OTel/Fluent Bit）收</span>
+  tracing:
+    - providers:
+        - name: jaeger       <span class="c"># 需先部署 tracing provider（Jaeger/Zipkin/OTel）</span>
+      randomSamplingPercentage: 10.0
+      customTags:
+        environment:
+          literal:
+            value: "prod"</pre>
+  <h3>三个平面的数据从哪来</h3>
+  <table>
+    <tr><th style="width:130px">平面</th><th style="width:260px">内容</th><th>查看方式</th></tr>
+    <tr><td><b>指标</b></td><td>Envoy 自动上报 istio_requests_total、istio_request_duration_milliseconds（按目标服务/版本分维度）</td><td>Prometheus + Grafana，或 Kiali 图表页</td></tr>
+    <tr><td><b>访问日志</b></td><td>每个请求一行：来源/目标、状态码、耗时、trace_id</td><td>kubectl logs pod -c istio-proxy</td></tr>
+    <tr><td><b>分布式追踪</b></td><td>自动透传 trace 上下文（b3 / W3C traceparent）</td><td>Jaeger / Kiali 追踪页</td></tr>
+  </table>
+  <pre><span class="c"># Kiali：mesh 的可视化中枢（流量拓扑、配置校验、trace 入口）</span>
+istioctl dashboard kiali
+
+<span class="c"># 看某个 Pod 的 Envoy 实际配置（排障核心命令）</span>
+istioctl x describe pod webapp-7d9f-abcde
+<span class="c"># 会打印：该 Pod 同步了哪些 VS/DR/SE、Listener 路由表、</span>
+<span class="c"># 每个 upstream 的 endpoints、mTLS 状态</span>
+
+<span class="c"># 看控制面与某 proxy 的同步状态（排查配置没生效）</span>
+istioctl proxy-status
+
+<span class="c"># 直接 dump Envoy 的 listeners/routes/clusters</span>
+istioctl proxy-config listeners webapp-7d9f-abcde
+istioctl proxy-config routes webapp-7d9f-abcde --name 9080 -o json</pre>
+  <div class="callout warn">
+    <b>访问日志默认是关闭的，且开了很贵：</b>一个 QPS 1000 的服务每天产生 8000 万行日志。建议：<b>默认关、按需开（只给核心服务或排障期）、采样输出</b>。全网格开访问日志前先估算存储成本。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>Gateway：入口流量治理</h2></div>
+  <p class="lead">集群外流量进 mesh 的唯一正规入口是 <b>Gateway</b>（跑在 istio-ingressgateway Pod 里的 Envoy）。常见错误是直接用 Ingress Controller，绕过了 mesh 的 mTLS 和可观测性。</p>
+  <pre><span class="c"># gateway.yaml —— 对外暴露 443，配 TLS 证书</span>
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: webapp-gw
+spec:
+  selector:
+    istio: ingressgateway     <span class="c"># 选定 ingressgateway Pod（按标签）</span>
+  servers:
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+        tls:
+          mode: SIMPLE
+          credentialName: webapp-tls   <span class="c"># 引用 K8s Secret 里的证书</span>
+      hosts:
+        - "webapp.example.com"    <span class="c"># 精确域名，别用 *</span></pre>
+  <pre><span class="c"># vs-ingress.yaml —— 把 Gateway 收到的流量路由进集群</span>
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: webapp-public
+spec:
+  hosts:
+    - "webapp.example.com"       <span class="c"># 必须和 Gateway 里的 host 一致</span>
+  gateways:
+    - webapp-gw                  <span class="c"># 绑定上面的 Gateway（少了这行 = 只走 mesh 内）</span>
+    - mesh
+  http:
+    - route:
+        - destination:
+            host: webapp.default.svc.cluster.local
+            port:
+              number: 80
+            subset: stable</pre>
+  <h3>东西向 vs 南北向</h3>
+  <table>
+    <tr><th style="width:110px">方向</th><th style="width:230px">路径</th><th>配置</th></tr>
+    <tr><td><b>南北向</b></td><td>外部 → Gateway(ingressgateway) → 服务</td><td>Gateway + VirtualService 绑定</td></tr>
+    <tr><td><b>东西向</b></td><td>服务 A → 服务 B（全 mTLS）</td><td>VirtualService 只写 hosts，gateways 用 mesh</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>新手最常犯：VirtualService 里写了 hosts 但 gateways 只写了 mesh</b>，结果外网访问不通 —— Gateway 那条路根本没绑定。反过来，给 Gateway 配了证书但没建对应 Secret，ingressgateway 直接报错不 ready。排障第一招：<span class="k">kubectl logs -n istio-system deploy/istio-ingressgateway</span>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Sidecar 开销与优化</h2></div>
+  <p class="lead">Sidecar 不是免费的：<b>每个 Pod 多一个容器，吃 CPU/内存，增加约 1~3ms 延迟，启动还比业务容器慢。</b>优化核心是两件事：砍它接收的配置、砍它转发流量。</p>
+  <h3>默认开销（istio-proxy 容器默认 limit）</h3>
+  <table>
+    <tr><th style="width:130px">指标</th><th style="width:190px">默认值</th><th>高流量服务建议</th></tr>
+    <tr><td>内存 request</td><td>200Mi</td><td>512Mi~1Gi（路由规则多时）</td></tr>
+    <tr><td>CPU request</td><td>100m</td><td>500m~1 核（QPS 上 3000 后）</td></tr>
+    <tr><td>延迟增量</td><td>P99 +2ms 左右</td><td>可测不可忽视，对延迟敏感服务提前评估</td></tr>
+    <tr><td>启动耗时</td><td>1~3 秒（先于业务 ready）</td><td>配合 holdApplicationUntilProxyStarts</td></tr>
+    <tr><td>连接开销</td><td>每 Pod 多 2 条 mTLS 连接（入/出）</td><td>高扇出服务关注 envoy_server_live 指标</td></tr>
+  </table>
+  <h3>优化三板斧</h3>
+  <pre><span class="c"># 第一斧：Sidecar CRD —— 告诉 Envoy "你只需要关心这些上游"</span>
+<span class="c"># 默认 Envoy 会接收全网格所有服务的 endpoints，500 服务时内存爆炸</span>
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  name: webapp-sidecar
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: webapp
+  egress:
+    - hosts:
+        - "default/*"          <span class="c"># 只接收本命名空间服务发现</span>
+        - "istio-system/*"     <span class="c"># 控制面必须留</span>
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY       <span class="c"># 只放行集群内已知服务，外部流量默认拒绝</span></pre>
+  <pre><span class="c"># 第二斧：全局安装参数收窄监听范围</span>
+istioctl install --set profile=default \
+  --set global.proxy.excludeOutboundPorts="443,3306" \   <span class="c"># 这些端口流量不劫持</span>
+  --set global.proxy.excludeInboundPorts="9090"            <span class="c"># 入向不劫持（管理端口）</span>
+
+<span class="c"># 单 Pod 级别覆盖（annotation 形式）</span>
+metadata:
+  annotations:
+    proxy.istio.io/config: |
+      excludeOutboundPorts: "443"</pre>
+  <pre><span class="c"># 第三斧：资源与启动顺序</span>
+<span class="c"># istioctl install 时调大 proxy 资源</span>
+istioctl install --set profile=default \
+  --set global.proxy.resources.requests.cpu=200m \
+  --set global.proxy.resources.requests.memory=256Mi
+
+<span class="c"># Pod 级：业务容器等 proxy ready 后再起（避免启动期请求 503）</span>
+metadata:
+  annotations:
+    proxy.istio.io/config: |
+      holdApplicationUntilProxyStarts: true</pre>
+  <div class="callout ok">
+    <b>效果预期：</b>一个 200 服务的集群，默认配置下每个 Envoy 缓存全部 endpoints，单 proxy 内存 300Mi+；加了 Sidecar CRD 收敛后通常能降到 <b>80~120Mi，整体 Pod 内存降 30%~50%</b>。<b>大规模 mesh 的第一优化项永远是 Sidecar CRD，不是加机器。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>升级与版本兼容</h2></div>
+  <h3>兼容性铁律</h3>
+  <ul>
+    <li><b>控制面（istiod）版本 ≥ 数据面（proxy）版本</b>：新 istiod 兼容旧 proxy（N-1 个 minor 版本），反过来不行</li>
+    <li>Istio 官方支持<b>最近 3 个 K8s minor 版本</b>，升级 K8s 前先查 Istio 支持矩阵</li>
+    <li>CRD API 版本：v1alpha3 已废弃，新配置一律用 <b>networking.istio.io/v1beta1</b> 和 <b>security.istio.io/v1beta1</b></li>
+  </ul>
+  <h3>金丝雀升级（生产标准姿势）</h3>
+  <pre><span class="c"># 不停服升级：新旧两套 istiod 并存，逐命名空间重启 workload 切流量</span>
+
+<span class="c"># 1. 装新版本为 canary（revision 标签隔离）</span>
+istioctl install --set profile=default --revision=1-24 -y
+
+<span class="c"># 2. 给测试命名空间打新版本标签，观察一个业务周期</span>
+kubectl label namespace canary-ns istio.io/rev=1-24 --overwrite
+
+<span class="c"># 3. 确认无误，滚动切换生产命名空间（重启 workload 让 Pod 注入新 proxy）</span>
+kubectl label namespace default istio.io/rev=1-24 --overwrite
+kubectl rollout restart deployment -n default
+
+<span class="c"># 4. 全部切完后卸载旧版本</span>
+istioctl uninstall --revision=1-23 -y
+
+<span class="c"># 升级前后必跑：</span>
+istioctl analyze --all-namespaces          <span class="c"># 升级前</span>
+istioctl proxy-status                       <span class="c"># 升级后，看每个 proxy 同步是否 STALE</span></pre>
+  <div class="callout danger">
+    <b>升级事故 top1：istiod 和 proxy 跨大版本。</b>典型症状是 Pod 日志刷 <span class="k">xds.lds: response rejected</span>、服务间歇 503。原则：<b>proxy 永远跟在 istiod 后面升</b>，或者用 revision 金丝雀，绝不一次性全集群替换。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">VirtualService 规则"没生效"或顺序错乱</div><div class="pd">规则按匹配精度优先（exact &gt; prefix &gt; regex），不是 YAML 书写顺序。想强制顺序就提升匹配精度，并用 istioctl x describe pod 看合并后的实际路由。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">hosts 写错导致 503 NR</div><div class="pd">VS 的 host 必须是 K8s Service 名（同 ns 可短名）或完整 FQDN（webapp.default.svc.cluster.local），写成 Pod 名、IP、错命名空间都解析不到 upstream。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">Kubelet 探针被 Sidecar 劫持，Pod 反复重启</div><div class="pd">探针流量也被 iptables 送进 Envoy，代理未就绪时探针失败。解法：探针端口重写为 http（由 sidecar 代转），或加 holdApplicationUntilProxyStarts 注解。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">Gateway 配了但 VirtualService 没绑定 gateways 字段</div><div class="pd">外部流量根本进不来。VS 必须显式列出 gateway 名；hosts 还要和 Gateway 里的 host 完全一致。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">配了一条 ALLOW 授权策略，服务突然全 403</div><div class="pd">AuthorizationPolicy 是白名单模型：一旦有 ALLOW，其余全部拒绝。迁移期先用 action: AUDIT 观察日志，确认放行清单完整后再切 ALLOW。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">mTLS 直接上 STRICT，老服务全断</div><div class="pd">未注入 Pod 的明文调用方被拒。正确节奏：PERMISSIVE 迁移 → 全注入 → 确认 istio_requests_total 里无明文 → 切 STRICT。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Envoy 内存涨到 500Mi+，Pod 被 OOMKill</div><div class="pd">Envoy 默认接收全网格 endpoints。加 Sidecar CRD 收敛 egress hosts，大规模 mesh 能降 30%~50% 内存。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">升级后 Pod 日志刷 xds.lds response rejected</div><div class="pd">istiod 与 proxy 跨大版本不兼容。用 revision 金丝雀升级，保证控制面版本领先数据面，最多跨一个 minor。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">开了全网格访问日志，一个月存储费翻三倍</div><div class="pd">QPS 1000 的服务一天 8000 万行日志。默认关闭，按服务按需开，或用 Telemetry 的 filter 只记错误请求。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">DestinationRule 的 subset 名和 VirtualService 引用不一致</div><div class="pd">症状：流量 100% 落到默认版本，金丝雀不生效。subset 名对不上时 Envoy 找不到 cluster 直接报错。istioctl analyze 能提前发现这类问题。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. Istio 数据面与控制面之间用什么协议同步配置？</div>
+      <button class="opt">Kubernetes Watch API，Envoy 直接 watch CRD</button>
+      <button class="opt">xDS（LDS/RDS/CDS/EDS/SDS），istiod 主动推送给 Envoy</button>
+      <button class="opt">Envoy 定时轮询 istiod 的 HTTP 接口</button>
+      <div class="ans">正确答案：<b>xDS</b>。istiod 把 VirtualService/DestinationRule 等 CRD 转换成 Envoy 的 listener/route/cluster/endpoint/secret 配置主动推送，Envoy 热加载不重启。CRD watch 只是 istiod 获取用户意图的第一步。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 同一个 host 上有两条 VirtualService 规则：一条匹配 URI 前缀 /api，一条匹配路径精确 /api/charge。请求 GET /api/charge 走哪条？</div>
+      <button class="opt">写在 YAML 里更靠前的那条</button>
+      <button class="opt">随机一条，由 Envoy 负载均衡决定</button>
+      <button class="opt">精确匹配 /api/charge 那条，因为 Istio 按匹配精度优先</button>
+      <div class="ans">正确答案：<b>精确匹配优先</b>。Istio 规则优先级：header/uri 精确 &gt; 前缀 &gt; 正则 &gt; 端口，同精度才按创建顺序。所以"调整 YAML 书写顺序"经常不生效，要改的是匹配精度。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 想给某服务加白名单访问控制，直接创建一条 ALLOW 的 AuthorizationPolicy 会发生什么？</div>
+      <button class="opt">该服务立即变为默认拒绝，只有显式允许的流量能通过</button>
+      <button class="opt">只拦截规则里 DENY 的流量，其他照常</button>
+      <button class="opt">什么都不会发生，ALLOW 只是文档</button>
+      <div class="ans">正确答案：<b>立即默认拒绝（白名单模型）</b>。只要存在任何 ALLOW 策略，未匹配的流量全部 403。安全做法：先 action: AUDIT 观察日志，补全放行清单后再切 ALLOW。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 200 个服务的集群，Envoy Sidecar 内存占用过大，最有效的优化是？</div>
+      <button class="opt">给每个 Pod 加更多内存 limit</button>
+      <button class="opt">用 Sidecar CRD 收敛 egress hosts，让 Envoy 只关心实际上游</button>
+      <button class="opt">关闭 mTLS 节省证书开销</button>
+      <div class="ans">正确答案：<b>Sidecar CRD 收敛</b>。默认 Envoy 接收全网格所有服务的 endpoints，配置量与服务数成正比。用 workloadSelector + egress hosts 收窄后内存通常降 30%~50%。加 limit 只是延后 OOM。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 外部域名要接入 Istio 并复用 mesh 的 mTLS 与遥测，正确做法是？</div>
+      <button class="opt">继续用原有 Ingress Controller，Istio 自动会接管它</button>
+      <button class="opt">给业务 Pod 直接配 hostPort 暴露</button>
+      <button class="opt">配 Gateway（443 + TLS 证书）+ VirtualService 绑定该 gateway</button>
+      <div class="ans">正确答案：<b>Gateway + VirtualService 绑定</b>。南北向流量必须走 istio-ingressgateway，VS 的 gateways 字段要显式写上 Gateway 名，hosts 与 Gateway 一致。Ingress Controller 方案绕过了 mesh，没有 mTLS 和统一遥测。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 Istio 升级，说法正确的是？</div>
+      <button class="opt">istiod 版本必须 ≥ proxy 版本，推荐 revision 金丝雀升级</button>
+      <button class="opt">proxy 版本必须领先 istiod，否则配置不同步</button>
+      <button class="opt">Istio 版本和 K8s 版本一一绑定，升级一个必须升另一个</button>
+      <div class="ans">正确答案：<b>istiod 领先 proxy</b>（最多跨一个 minor）。revision 金丝雀让新旧 istiod 并存，逐命名空间切换，出问题秒级切回。Istio 只支持最近 3 个 K8s minor 版本，但不是一一绑定。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>istioctl install --set profile=default</code><span class="desc">生产最小化安装（demo  profile 含 Kiali/Jaeger）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl label ns default istio-injection=enabled</code><span class="desc">命名空间级自动注入</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl analyze -n default</code><span class="desc">静态检查配置错误，装完先跑</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl x describe pod webapp-xxx</code><span class="desc">看 Pod 实际生效的路由/集群/mTLS（排障核心）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl proxy-status</code><span class="desc">看所有 proxy 与 istiod 的同步状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl dashboard kiali</code><span class="desc">打开流量拓扑可视化</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl proxy-config routes pod -o json</code><span class="desc">dump Envoy 路由表原文</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs pod -c istio-proxy</code><span class="desc">看 Sidecar 日志（xds 报错都在这）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>核心 CRD 速查</h3>
+  <table>
+    <tr><th style="width:190px">CRD</th><th>管什么</th></tr>
+    <tr><td class="f">VirtualService</td><td>路由：权重、匹配、超时、重试、故障注入</td></tr>
+    <tr><td class="f">DestinationRule</td><td>子集（subset）、连接池、熔断 outlierDetection</td></tr>
+    <tr><td class="f">Gateway</td><td>入口：ingressgateway 的端口/TLS/host</td></tr>
+    <tr><td class="f">PeerAuthentication</td><td>mTLS 模式：STRICT / PERMISSIVE / DISABLE</td></tr>
+    <tr><td class="f">AuthorizationPolicy</td><td>访问控制：ALLOW / DENY / AUDIT 白名单</td></tr>
+    <tr><td class="f">Telemetry</td><td>访问日志、tracing 采样、指标维度</td></tr>
+    <tr><td class="f">Sidecar</td><td>收敛 Envoy 接收的 egress/ingress 范围</td></tr>
+    <tr><td class="f">ServiceEntry</td><td>把 mesh 外服务注册进来（外部 API）</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Service Mesh</b></td><td>用 Sidecar 代理接管服务间通信的基础设施层</td></tr>
+    <tr><td><b>Sidecar</b></td><td>与业务容器同 Pod 的 Envoy 代理容器（istio-proxy）</td></tr>
+    <tr><td><b>istiod</b></td><td>Istio 控制面，合并了 Pilot/Citadel/Galley，下发配置与证书</td></tr>
+    <tr><td><b>Envoy</b></td><td>Istio 使用的数据面代理，高性能 L7 代理</td></tr>
+    <tr><td><b>xDS</b></td><td>Envoy 动态配置协议族：LDS/RDS/CDS/EDS/SDS</td></tr>
+    <tr><td><b>VirtualService</b></td><td>定义请求如何路由到目标服务，含权重/重试/超时/故障注入</td></tr>
+    <tr><td><b>DestinationRule</b></td><td>定义目标服务的子集与连接策略（连接池、熔断）</td></tr>
+    <tr><td><b>subset</b></td><td>DestinationRule 里按 label 划分的服务版本分组</td></tr>
+    <tr><td><b>outlierDetection</b></td><td>熔断：连续错误实例被临时摘出负载均衡池</td></tr>
+    <tr><td><b>mTLS</b></td><td>双向 TLS：客户端和服务端互相验证证书</td></tr>
+    <tr><td><b>PeerAuthentication</b></td><td>控制 mTLS 模式的 CRD（STRICT/PERMISSIVE）</td></tr>
+    <tr><td><b>SPIFFE 身份</b></td><td>spiffe://cluster.local/ns/&lt;ns&gt;/sa/&lt;sa&gt;，Istio 中服务账号即身份</td></tr>
+    <tr><td><b>AuthorizationPolicy</b></td><td>L4-L7 授权，白名单模型，一条 ALLOW 即默认拒绝</td></tr>
+    <tr><td><b>Gateway</b></td><td>南北向流量入口，跑在 istio-ingressgateway 的 Envoy</td></tr>
+    <tr><td><b>Telemetry API</b></td><td>统一配置访问日志、指标、追踪的 CRD</td></tr>
+    <tr><td><b>holdApplicationUntilProxyStarts</b></td><td>让业务容器等 Sidecar ready 再启动的注解</td></tr>
+    <tr><td><b>revision 升级</b></td><td>新旧 istiod 并存的滚动升级方式（canary upgrade）</td></tr>
+    <tr><td><b>REGISTRY_ONLY</b></td><td>Sidecar 出向策略：只放行集群内已注册服务</td></tr>
+    <tr><td><b>Kiali</b></td><td>Istio 生态的可视化控制台：拓扑、配置校验、追踪</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>在一个 K8s 集群完成这五件事 —— ① istioctl install demo profile，给命名空间打注入标签，确认 Pod 变成 2 容器；② 部署两个版本（v1/v2 label）的示例服务，用 DestinationRule 划 subset + VirtualService 做 90/10 金丝雀，在 Kiali 里看流量比例；③ 给服务配 STRICT mTLS 和一条 AUDIT 授权策略，观察日志后切 ALLOW；④ 写 Sidecar CRD 收敛 egress，对比收敛前后 istio-proxy 内存；⑤ 注入 503 故障，验证重试与熔断行为。<br><br>
+    <b>之后值得单独学：</b>EnvoyFilter 的风险与替代方案、多集群 Mesh（east-west gateway）、 Ambient Mode（无 Sidecar 的新架构）、以及 Mesh 与网络策略（NetworkPolicy）的叠加使用。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Istio 与服务治理 · 记住：先 analyze 再上线，Sidecar 要收敛，升级用 revision</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（VS/DR）和模块 8（坑清单）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 对照 K8s 集群里的 istio-proxy 容器看。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议对着一个 K8s 集群看：每个 Pod 里有没有 istio-proxy 容器';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

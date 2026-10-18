@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透语言运行时与 VM</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 编程语言</span>
+    <h1>二十分钟学透语言运行时与 VM</h1>
+    <p class="sub">你写的每一行代码，最终都由一个运行时兑现。这篇把 <b>JVM、V8、CPython、Go</b> 四个主流运行时的执行模型、编译策略、GC 机制摊开对比，数字尽量给真实量级，选型直接看决策树。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 大运行时横向对比</span>
+      <span class="chip"><b>3</b> 种跨语言调用</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议本机四个都装上：java -version、node -v、python3 -V、go version，边看边跑 --print-flags 类命令。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先建立坐标系</h2></div>
+  <p class="lead">运行时的核心决策只有三个：<b>代码怎么变成机器码</b>（解释 / JIT / AOT）、<b>内存谁回收、何时暂停</b>（GC / 引用计数 / 手动）、<b>并发怎么调度</b>（OS 线程 / 协程 / 单线程事件循环）。后面所有差异都是这三个选择的下游。</p>
+  <pre><span class="c"># 确认本机四个运行时的版本</span>
+java -version          <span class="c"># JDK 17 / 21 LTS 最常见</span>
+node -v                <span class="c"># V8 版本：node -p process.versions.v8</span>
+python3 -V             <span class="c"># 3.11+ 有特化解释器；3.13 有实验性 JIT 与无 GIL 版本</span>
+go version             <span class="c"># 1.22+ 修了循环变量捕获；1.21+ 有 PGO</span></pre>
+  <div class="callout warn">
+    <b>两个提醒：</b>① 下文所有数字是<b>典型量级</b>，会随版本、硬件、堆大小变化，用做对比和排障参考，不是精确基准；② 本文讲的是运行时机制，<b>不涉及某个语言的具体语法</b>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>JVM：内存区域、类加载、JIT 与 GC</h2></div>
+  <h3>运行时数据区（JDK 8 及以后）</h3>
+  <table>
+    <tr><th style="width:150px">区域</th><th style="width:220px">存什么</th><th>关键点</th></tr>
+    <tr><td><b>堆 Heap</b></td><td>对象实例和数组。<b>GC 的主战场</b></td><td>分代：Eden : Survivor(S0/S1) : Old 默认 <b>8 : 1 : 1</b>（-XX:NewRatio=2）。默认上限约为物理内存的 <b>1/4</b>，容器里务必用 -XX:MaxRAMPercentage 管住</td></tr>
+    <tr><td><b>Metaspace</b></td><td>类元数据（替代 JDK7 的 PermGen）</td><td><b>占用宿主机本地内存</b>，默认无上限，必须配 -XX:MaxMetaspaceSize 防止吃光内存</td></tr>
+    <tr><td><b>虚拟机栈</b></td><td>栈帧：局部变量表、操作数栈、返回地址</td><td>默认 -Xss 512K~1M（平台相关）。<b>递归过深抛 StackOverflowError</b></td></tr>
+    <tr><td><b>本地方法栈</b></td><td>native 方法栈帧</td><td>JNI 调用链在这里</td></tr>
+    <tr><td><b>PC 寄存器</b></td><td>当前线程执行的字节码行号</td><td>每个线程私有</td></tr>
+    <tr><td><b>CodeCache</b></td><td>JIT 编译后的机器码</td><td>满时停止编译（flushed），-XX:ReservedCodeCacheSize</td></tr>
+    <tr><td><b>直接内存</b></td><td>NIO ByteBuffer 的堆外内存</td><td>不受堆大小限制，靠 -XX:MaxDirectMemorySize 控制；GC 只能间接回收</td></tr>
+  </table>
+  <h3>类加载：五步与双亲委派</h3>
+  <div class="steps">
+    <div class="txt"><b>加载</b>：字节流 → Class 对象（不限于 class 文件，也可以从网络、加密文件生成）</div>
+    <div class="txt"><b>验证</b>：文件格式、元数据、字节码、符号引用校验，<b>防止恶意字节码</b></div>
+    <div class="txt"><b>准备</b>：为静态变量分配内存并赋零值（不是代码里的初始值，final 常量除外）</div>
+    <div class="txt"><b>解析</b>：符号引用 → 直接引用</div>
+    <div class="txt"><b>初始化</b>：执行 &lt;clinit&gt;()，真正运行静态赋值和静态块。<b>类的初始化是线程安全的，且只做一次</b></div>
+  </div>
+  <p>三类加载器构成<b>双亲委派</b>链：Bootstrap（C++ 实现，加载 rt 包核心类）→ Platform（JDK 9+ 合并了 Extension）→ Application（classpath）。一个类加载请求先委派父级，父级找不到才自己加载。<b>同一份 class 被不同加载器加载 = 两个不同的类</b>——Tomcat 的 webapp 隔离、热部署都靠打破委派实现（JDK 9+ 由 Thread.getContextClassLoader 配合）。</p>
+  <h3>JIT：C1 与 C2</h3>
+  <table>
+    <tr><th style="width:120px">编译器</th><th style="width:180px">定位</th><th>说明</th></tr>
+    <tr><td><b>C1</b></td><td>快速编译（tier 1-3）</td><td>编译快、优化少，尽快让热点方法脱离解释执行</td></tr>
+    <tr><td><b>C2</b></td><td>极致优化（tier 4）</td><td>编译慢但优化激进，<b>峰值吞吐的主要来源</b></td></tr>
+    <tr><td><b>分层编译</b></td><td>两者混用（默认）</td><td>方法先解释 → C1 → 够热再 C2；<b>OSR（栈上替换）</b>让循环热点也能被替换</td></tr>
+  </table>
+  <p>C2 的招牌优化：<b>方法内联</b>（消除调用开销，是其他优化的基础）、<b>逃逸分析</b>（对象不逃逸就栈分配/标量替换，省掉堆分配和 GC 压力）、<b>锁消除</b>（逃逸分析发现无竞争则去掉同步）。<b>代价是去优化（deopt）</b>：假设"这个调用点只有一种类型"被后续代码打破，就退回解释或重新编译——写多态混乱的热点代码等于反复触发 deopt。</p>
+  <h3>GC：分代假说与收集器谱系</h3>
+  <p>分代建立在两个假说上：<b>绝大多数对象朝生夕死</b>（弱分代假说 → 新生代用复制算法）、<b>熬过越多次 GC 的对象越难死</b>（强分代假说 → 老年代用标记-清除/整理）。</p>
+  <table>
+    <tr><th style="width:200px">收集器</th><th style="width:150px">暂停特性</th><th>说明</th></tr>
+    <tr><td><b>Serial / Serial Old</b></td><td>STW，年轻/老年代都用</td><td>单线程，客户端模式；简单场景几十毫秒级</td></tr>
+    <tr><td><b>Parallel Scavenge</b></td><td>STW</td><td>吞吐优先，JDK 8 服务端默认组合</td></tr>
+    <tr><td><b>CMS</b></td><td>并发标记，停顿较短</td><td>标记-清除，<b>有内存碎片</b>；JDK 14 已移除，别用了</td></tr>
+    <tr><td><b>G1</b></td><td>目标可设，<b>默认 -XX:MaxGCPauseMillis=200</b></td><td><b>JDK 9+ 默认。</b>堆切 region，混合回收；单 region 超过 50% 即 humongous 大对象，分配慢且难回收</td></tr>
+    <tr><td><b>ZGC</b></td><td><b>目标 &lt;10ms，实测通常亚毫秒</b></td><td>着色指针 + 读屏障，支持 TB 级堆，JDK 15 起生产可用</td></tr>
+    <tr><td><b>Shenandoah</b></td><td>与 ZGC 同级</td><td>Brooks 转发指针，Red Hat 主导，OpenJDK 可用</td></tr>
+  </table>
+  <pre><span class="c"># JDK 21 + 16G 容器内存的生产组合</span>
+java -XX:+UseZGC \
+     -XX:MaxRAMPercentage=75 \
+     -XX:InitialRAMPercentage=50 \
+     -XX:MaxMetaspaceSize=512m \
+     -Xlog:gc*:file=gc.log:time,uptime,level,tags:filecount=5,filesize=100m \
+     -jar app.jar</pre>
+  <div class="callout danger">
+    <b>容器里的 JVM 是最经典的坑：</b>JDK 8 的 JVM <b>看不到 cgroup 限制</b>，-Xmx 不设时按宿主机内存算，容器 limit 2G 它敢开到 8G，直接被 OOM Killer 杀掉。JDK 10+ 支持 UseContainerSupport，但正确姿势仍是显式配 <span class="k">-XX:MaxRAMPercentage</span>，并给系统和直接内存留 25%。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>V8：隐藏类、内联缓存与分代 GC</h2></div>
+  <h3>隐藏类（Hidden Class / Map）</h3>
+  <p>V8 在运行时给每个对象关联一个<b>隐藏类</b>，描述它的属性布局。属性访问走的是"固定偏移"，像 C++ struct 一样快——前提是<b>对象结构稳定</b>。</p>
+  <pre><span class="c">// 反模式：动态增删属性，每次加属性都引发隐藏类转换链跳变</span>
+<span class="r">const</span> o = {};
+o.a = 1;            <span class="c">// 隐藏类 C0 → C1</span>
+o.b = 2;            <span class="c">// C1 → C2</span>
+<span class="r">delete</span> o.a;        <span class="c">// ✗ 直接退化成字典模式（慢一个量级）</span>
+
+<span class="c">// 正模式：构造函数里一次性初始化所有字段，保持结构一致</span>
+<span class="g">class</span> Point {
+  <span class="g">constructor</span>(x, y) { this.x = x; this.y = y; }   <span class="c">// 所有实例同一条转换链</span>
+}
+<span class="c">// 推论：热路径上的对象，字段顺序和数量要一致；别用对象当"可扩展字典"</span></pre>
+  <h3>内联缓存（IC）</h3>
+  <table>
+    <tr><th style="width:170px">状态</th><th>含义</th><th>性能</th></tr>
+    <tr><td><b>Monomorphic</b></td><td>调用点只见过的 1 种隐藏类</td><td><b>最快</b>：一次类型检查 + 直接偏移访问</td></tr>
+    <tr><td><b>Polymorphic</b></td><td>2~4 种隐藏类</td><td>线性比几次，仍可接受</td></tr>
+    <tr><td><b>Megamorphic</b></td><td>5 种以上或不可知</td><td><b>最慢</b>：走全局 megamorphic stub cache，哈希查找</td></tr>
+  </table>
+  <p>数组同理：元素种类（element kind）从 <span class="k">PACKED_SMI</span> → <span class="k">PACKED_DOUBLE</span> → <span class="k">PACKED</span> 一路退化，<b>开洞（holey）后再想紧凑回去，V8 不会帮你做</b>。<span class="k">const a = [1,2,3]; a[100]=4;</span> 这类写法会让整条热路径退化。</p>
+  <h3>四级执行管线</h3>
+  <table>
+    <tr><th style="width:200px">层</th><th>角色</th></tr>
+    <tr><td><b>Ignition</b></td><td>解释器，直接执行字节码。<b>启动快靠它</b></td></tr>
+    <tr><td><b>Sparkplug</b></td><td>基线编译器（V8 9.1+），字节码快速转机器码</td></tr>
+    <tr><td><b>Maglev</b></td><td>中层优化编译器（Chrome 117+），介于基线和 TurboFan</td></tr>
+    <tr><td><b>TurboFan</b></td><td>顶层优化编译器，图-based 优化。<b>假设被打破时去优化（deopt）</b></td></tr>
+  </table>
+  <h3>GC</h3>
+  <p>新生代用 <b>Semi-space 复制</b>（Scavenger）：对象先分配在 from 空间，活对象复制到 to，两个 semi-space 交换；熬过两次 GC 晋升老年代。老年代用<b>标记-清除-整理</b>，配合<b>并发标记</b>（增量标记 + 写屏障）减少停顿。<b>大对象直接进老年代（大对象空间）</b>，超过限制（默认单对象 &gt; 256KB 量级，依版本）直接分配失败。<b>Node 进程默认堆上限约 2GB（64 位）</b>，超了先 OOM 而不是慢慢涨——调 <span class="k">--max-old-space-size</span> 或从根本上少建对象。</p>
+  <pre><span class="c"># Node 排查三件套</span>
+node --max-old-space-size=4096 app.js   <span class="c"># 放宽老生代上限</span>
+node --trace-gc app.js                  <span class="c"># 打印每次 GC 的类型与耗时</span>
+node --trace-deopt app.js               <span class="c"># 打印去优化点，找热点代码的类型不稳定</span>
+<span class="c"># 或者直接生成堆快照离线分析：node --heapsnapshot-near-heap-limit=3 app.js</span></pre>
+  <div class="callout warn">
+    <b>V8 的性能是"惯"出来的，不是"配"出来的：</b>同样的算法，结构稳定的对象 + 类型单一的数组 + 少分配临时对象，可以差出 5~10 倍。<b>遇到 JS 热点慢，先看 --trace-deopt 和隐藏类转换，再怀疑算法。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>CPython：GIL、引用计数与分代 GC</h2></div>
+  <h3>GIL：全局解释器锁</h3>
+  <p><b>GIL 保证同一时刻只有一个线程在执行字节码。</b>原因有二：CPython 的内存管理（引用计数）不是线程安全的，加一把大锁比细粒度锁简单得多；历史路径依赖延续至今。</p>
+  <table>
+    <tr><th style="width:180px">场景</th><th>多线程有效吗</th></tr>
+    <tr><td><b>IO 密集</b>（网络、磁盘）</td><td><b>有效</b>：IO 操作会释放 GIL，线程可并行等待</td></tr>
+    <tr><td><b>CPU 密集</b>（计算、编解码）</td><td><b>无效</b>：线程抢不到执行权，甚至更慢。用多进程（multiprocessing）</td></tr>
+  </table>
+  <p>线程切换间隔由 <span class="k">sys.getswitchinterval()</span> 控制，<b>默认 5ms</b>。间隔调大减少切换开销，调大响应延迟；反之亦然，一般不用动。<b>3.13 引入了无 GIL 的自由线程构建（PEP 703，实验性）</b>，这是 CPython 三十年来最大的一次并发模型松动，但生态扩展需要重新编译适配，短期生产仍按"有 GIL"设计。</p>
+  <h3>引用计数 + 分代 GC</h3>
+  <pre><span class="c"># 引用计数：对象头里的 ob_refcnt，归零立即释放</span>
+<span class="b">import</span> sys
+a = [1, 2, 3]
+sys.getrefcount(a)      <span class="c"># 当前引用数（含 getrefcount 自己那次）</span>
+
+<span class="c"># 致命盲区：循环引用，双方引用计数永远到不了 0</span>
+<span class="r">class</span> Node:
+    <span class="b">def</span> __init__(self):
+        self.parent = <span class="b">None</span>
+        self.child  = <span class="b">None</span>
+
+a = Node(); b = Node()
+a.child = b; b.parent = a    <span class="c"># 互相引用，引用计数清不掉 → 必须靠分代 GC</span>
+
+<span class="c"># 分代 GC：默认三代，阈值 700 / 10 / 10</span>
+<span class="b">import</span> gc
+gc.get_threshold()      <span class="c"># (700, 10, 10)：gen0 分配 700 次触发一次，逐级晋升</span>
+gc.collect()            <span class="c"># 手动全量回收，返回不可达对象数</span>
+gc.freeze()             <span class="c"># fork 前冻结现有对象，避免 copy-on-write 失效</span></pre>
+  <div class="callout warn">
+    <p><b>分代 GC 是 STW 的：</b>回收期间所有线程挂起。平时 gen0 很快（微秒~毫秒级），但<b>大堆 + 大量长生命周期对象</b>时一次 gen2 全量回收可能到<b>几十甚至上百毫秒</b>。服务进程内存只涨不降，先怀疑循环引用或缓存无上限，用 <span class="k">gc.set_debug(gc.DEBUG_SAVEALL)</span> 或 objgraph 定位。</p>
+    <p>另一个常见坑：<b>引用计数让"大对象延迟释放"变得隐蔽</b>——del 一个对象只是减计数，任何角落的引用（闭包、异常 traceback、缓存）都会让它继续占内存。<span class="k">tracemalloc</span> + <span class="k">objgraph.show_backrefs()</span> 是排查内存泄漏的标准组合。</p>
+  </div>
+  <h3>解释器性能的拐点</h3>
+  <p>3.11 引入<b>特化自适应解释器</b>（PEP 659）：热点字节码在运行时被替换为针对实际类型的特化指令，典型负载比 3.10 快 <b>10%~60%</b>，且<b>不需要 JIT</b>——把"预热"逻辑做进了解释器。3.12/3.13 继续改进并加入实验性 JIT（PEP 744）。但 CPython 的天花板仍在：<b>纯计算密集型场景通常比 C 慢 10~50 倍</b>，重计算下沉到 C 扩展 / NumPy / Cython 是标准姿势。</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Go：GMP 调度与三色标记 GC</h2></div>
+  <h3>GMP 调度模型</h3>
+  <table>
+    <tr><th style="width:60px">角色</th><th style="width:260px">含义</th><th>关键点</th></tr>
+    <tr><td><b>G</b></td><td>goroutine（用户态协程）</td><td>初始栈仅 <b>2KB</b>，按需扩容，64 位上限 <b>1GB</b>。创建成本几百纳秒，单进程跑几十万个很常见</td></tr>
+    <tr><td><b>M</b></td><td>OS 线程（machine）</td><td>由 runtime 管理，数量默认受 10000 上限约束</td></tr>
+    <tr><td><b>P</b></td><td>逻辑处理器（processor）</td><td><b>数量 = GOMAXPROCS，默认等于 CPU 逻辑核数</b>。每个 P 带一个本地运行队列（默认 256）</td></tr>
+  </table>
+  <p>调度逻辑：新建的 G 优先进当前 P 的本地队列，P 从本地队列取 G 交给 M 执行；本地空了去全局队列偷、去其他 P <b>work-stealing</b>；网络 IO 交给 <b>netpoller</b> 统一管理，goroutine 阻塞 IO 不占 OS 线程；M 因系统调用阻塞超过约 20μs，P 会被剥离交给其他 M（handoff）。<b>1.14 起支持基于信号的异步抢占</b>，死循环 goroutine 无法再饿死调度器。</p>
+  <h3>三色标记 GC</h3>
+  <div class="steps">
+    <div class="txt"><b>标记开始</b>：开启写屏障，STW 第一段（极短，微秒级）</div>
+    <div class="txt"><b>并发标记</b>：GC 协程与用户 goroutine 同时跑，把可达对象从白推到灰再推到黑；<b>写屏障记录"黑对象引用了白对象"</b>防止漏标</div>
+    <div class="txt"><b>标记终止</b>：STW 第二段（同样极短），重新扫描少量残余</div>
+    <div class="txt"><b>并发清除</b>：不遍历对象本身，按 span 元数据回收，与用户代码并行</div>
+  </div>
+  <p>Go 用<b>混合写屏障</b>（Dijkstra 插入屏障 + Yuasa 删除屏障，1.14 起）兼顾两者。暂停时间<b>实测通常在 1ms 以下</b>，堆到几百 GB 也能维持亚毫秒级——这是它适合延迟敏感服务的核心原因。代价是 <b>GC 占用 CPU 目标 25%</b>（GOGC=100 表示"堆涨到存活量的 2 倍就触发下一次"），内存换 CPU。</p>
+  <pre><span class="c"># Go 排查命令</span>
+GODEBUG=gctrace=1 ./app          <span class="c"># 每次 GC 的 STW、并发标记、辅助 GC 耗时全打印</span>
+GOMAXPROCS=4 ./app                <span class="c"># 限制逻辑处理器数（默认 = 逻辑核数）</span>
+GOGC=50 ./app                     <span class="c"># 更激进 GC，省内存；=off 完全关闭（危险）</span>
+go tool pprof http://localhost:6060/debug/pprof/heap   <span class="c"># 堆剖析（需 net/http/pprof）</span></pre>
+  <div class="callout warn">
+    <b>Go 的 GC 快，不等于你可以随便分配：</b>写屏障、辅助标记（assist）、GC 占用的 25% CPU 都是真实成本。<b>高 QPS 服务里减少临时对象仍然是第一优化手段</b>——GODEBUG=gctrace=1 看 GC 频率，sync.Pool 复用热点对象，别让 GC 周期变成固定背景负载。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>四大运行时横向对比</h2></div>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:200px">JVM（Java/Kotlin）</th><th style="width:200px">V8（Node/Deno）</th><th>CPython</th></tr>
+    <tr><td><b>冷启动量级</b></td><td>裸 JVM ~100ms；空 Spring Boot 应用 <b>1.5~2.5s</b>，全家桶 5~10s</td><td><b>30~80ms</b>（解析+编译启动脚本）</td><td><b>20~50ms</b>；引入重库（NumPy）再 +100~300ms</td></tr>
+    <tr><td><b>峰值吞吐</b></td><td><b>极高</b>：C2 优化后计算密集可接近 C/C++</td><td><b>高</b>：TurboFan 后接近 C++ 水平（同算法）</td><td><b>低</b>：解释执行，比 C 慢 10~50 倍</td></tr>
+    <tr><td><b>内存占用</b></td><td><b>高</b>：堆默认物理内存 1/4，空 Web 应用 150~250MB</td><td><b>中</b>：空进程 30~60MB，堆上限默认 ~2GB</td><td><b>低</b>：解释器基线 10~15MB</td></tr>
+    <tr><td><b>编译技术</b></td><td>C1/C2 分层 JIT + OSR + 去优化</td><td>Ignition → Sparkplug → Maglev → TurboFan</td><td>解释器（3.11 起特化自适应）；3.13 实验性 JIT</td></tr>
+    <tr><td><b>GC 暂停</b></td><td>G1 目标 ~200ms；<b>ZGC/Shenandoah &lt;10ms（实测亚毫秒）</b>；老年代 Full GC 可达秒级</td><td>Scavenger 毫秒级；老年代 Full GC 大堆下数十~数百毫秒</td><td>引用计数即时回收；分代 GC STW，大堆可到几十~上百毫秒</td></tr>
+    <tr><td><b>并发模型</b></td><td>OS 线程（1:1），虚拟线程 21 预览</td><td>单线程事件循环为主；worker_threads 多实例并行</td><td>OS 线程受 GIL 限制，CPU 密集靠多进程</td></tr>
+    <tr><td><b>典型阵地</b></td><td>企业后端、大数据（Kafka/Spark/ES）、Android</td><td>Web 服务、SSR/BFF、工具链、边缘计算</td><td>脚本、胶水、数据科学、AI 训练周边</td></tr>
+  </table>
+  <p>再加上 Go 这一列：<b>冷启动 1~10ms</b>（静态二进制，无 VM 初始化）、<b>吞吐高</b>（AOT 编译，约为 C 的 70~90%）、<b>内存低到中</b>（空服务 20~100MB）、<b>无 JIT</b>、<b>GC 暂停 &lt;1ms</b>、并发靠 goroutine + M:N 调度。</p>
+  <div class="callout danger">
+    <b>对比的三种错误姿势：</b>① <b>用冷启动数据比吞吐</b>——JVM 是"起得慢、跑得久"的类型，服务跑几天后 C2 代码是全场最快的；② <b>用空进程比内存</b>——JVM 的内存随负载和堆配置伸缩，要拿<b>稳态 + 峰值</b>比；③ <b>拿默认参数比 GC 暂停</b>——G1 不调参、ZGC 不换，等于让选手穿拖鞋赛跑。任何基准测试先对齐参数和工作负载。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>跨语言调用：JNI、FFI 与 cgo</h2></div>
+  <h3>JNI：Java 调原生代码</h3>
+  <pre><span class="c">// Java 侧声明 native 方法</span>
+<span class="b">public class</span> NativeDemo {
+    <span class="b">static</span> { System.loadLibrary(<span class="y">"demo"</span>); }        <span class="c">// 加载 libdemo.so</span>
+    <span class="b">public native int</span> add(<span class="b">int</span> a, <span class="b">int</span> b);
+}
+
+<span class="c">// C 侧实现，命名规则：Java_类全路径_方法名</span>
+<span class="c">#include &lt;jni.h&gt;</span>
+JNIEXPORT jint JNICALL
+Java_NativeDemo_add(JNIEnv *env, jobject obj, jint a, jint b) {
+    <span class="b">return</span> a + b;
+}
+
+<span class="c"># 编译</span>
+gcc -shared -fPIC -I<span class="y">"$JAVA_HOME/include"</span> -I<span class="y">"$JAVA_HOME/include/linux"</span> demo.c -o libdemo.so</pre>
+  <p><b>性能要点：</b>每次跨越 JNI 边界都有成本（参数转换、引用表操作，通常在几十到上百纳秒级），且<b>JIT 无法优化边界两边的代码</b>。GetStringUTFChars / ReleaseStringUTFChars 这类成对操作必须配对，<b>漏 Release 就是内存泄漏</b>。对象引用分局部引用（自动管理但表有上限，大量循环里要 DeleteLocalRef）和全局引用（NewGlobalRef，需手动 DeleteGlobalRef）。现代替代：<b>JDK 22+ 的 Foreign Function &amp; Memory API（Panama 项目，JEP 454）</b>，纯 Java 调 C、无样板代码、且能和 JIT 更好地配合。</p>
+  <h3>FFI：通用概念与 CPython 实践</h3>
+  <p>FFI（Foreign Function Interface）指一门语言调用另一门语言编译出的 ABI。CPython 的三个选项：<b>ctypes</b>（标准库，零依赖，每次调用开销约微秒级，适合低频调用）、<b>CFFI</b>（API 模式预编译，CTA 级更快，适合热点）、<b>Cython</b>（把 Python 编译成 C 扩展，适合把热点函数整体下沉）。<b>共同铁律：调用方不拥有 C 侧分配的内存，free 的责任要划清</b>，否则泄漏或 double-free。</p>
+  <h3>cgo：Go 调 C</h3>
+  <pre><span class="c">// 紧挨 import "C" 的注释是 C 源码，编译期由 cgo 处理</span>
+<span class="b">package</span> main
+
+<span class="c">/*</span>
+<span class="c">#include &lt;stdlib.h&gt;</span>
+<span class="c">static int add(int a, int b) { return a + b; }</span>
+<span class="c">*/</span>
+<span class="b">import</span> <span class="y">"C"</span>
+<span class="b">import</span> <span class="y">"fmt"</span>
+
+<span class="b">func</span> main() {
+    r := C.add(C.int(1), C.int(2))   <span class="c">// 类型必须显式转换，没有隐式转换</span>
+    fmt.Println(r)
+}
+
+<span class="c"># 关闭 cgo：纯 Go 构建，静态链接、可交叉编译</span>
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o app .</pre>
+  <table>
+    <tr><th style="width:110px">方案</th><th style="width:180px">单次调用开销量级</th><th>主要代价</th></tr>
+    <tr><td><b>JNI</b></td><td>几十~上百 ns</td><td>样板代码、引用管理、JIT 屏障</td></tr>
+    <tr><td><b>ctypes</b></td><td>约 1μs</td><td>无编译期检查，热点循环别用</td></tr>
+    <tr><td><b>CFFI(API)</b></td><td>亚微秒</td><td>需要构建步骤</td></tr>
+    <tr><td><b>cgo</b></td><td>约 50~80ns</td><td><b>依赖 gcc、拖慢编译、默认禁交叉编译、C 内存不进 GC</b></td></tr>
+  </table>
+  <div class="callout danger">
+    <b>三条工程红线：</b>① <b>别在 FFI 边界上做高频小调用</b>——把数据批量化，一次传一批，而不是一次一个元素；② cgo 调用会阻塞 OS 线程（但 Go 运行时会做 handoff，不至于拖垮整个 P），<b>C 函数里执行久的任务要考虑线程预算</b>；③ <b>能不用 cgo 就不用</b>（CGO_ENABLED=0 带来的纯静态二进制，对容器分发和安全面都是巨大优势），Go 侧替代品优先：net、os/exec 都不行时的最后手段才是 cgo，或用 21+ 的 <span class="k">purego</span> / 系统调用。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>选 Runtime 的决策依据</h2></div>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>延迟敏感的微服务 / Serverless</div><div class="cd">选 <b>Go</b>。冷启动 1~10ms、GC &lt;1ms、内存占用低、静态二进制部署简单。函数计算场景冷启动排序：Go &lt; V8 &lt; CPython &lt; JVM。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>长跑的计算密集 / 企业后端</div><div class="cd">选 <b>JVM</b>。C2 峰值吞吐最高，生态（Kafka、Spark、ES、Hadoop）无可替代。接受启动慢、内存高，用 ZGC 治停顿。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>脚本 / 数据科学 / AI 周边</div><div class="cd">选 <b>CPython</b>。库生态是决定性因素；CPU 密集部分下沉 C 扩展/NumPy；并发用多进程绕开 GIL。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>Web 服务 / 前后端同构 / 边缘</div><div class="cd">选 <b>Node（V8）</b>。启动快、JSON 处理链最短、npm 生态最大；注意隐藏类稳定性与 --trace-deopt。</div></div>
+  </div>
+  <h3>决策树（按约束倒推）</h3>
+  <div class="steps">
+    <div class="txt"><b>第一步：有没有硬性延迟/内存指标？</b>有（P99 &lt; 10ms、实例 &lt; 128MB、Serverless 冷启动 &lt; 100ms）→ 基本只剩 Go 和 V8，JVM 出局</div>
+    <div class="txt"><b>第二步：负载是计算密集还是 IO 密集？</b>计算密集（编解码、压缩、矩阵）且长跑 → JVM/Go；IO 密集（网关、代理、CRUD）→ 全家桶都行，看生态</div>
+    <div class="txt"><b>第三步：团队和生态在哪？</b>大数据/企业中间件 → JVM；数据/ML → CPython；前端团队全栈 → Node。切换运行时是组织决策，不只是技术决策</div>
+    <div class="txt"><b>第四步：要不要复用某个语言的库？</b>要 → 选那个 runtime + FFI/gRPC，别为了"性能"重写轮子</div>
+    <div class="txt"><b>第五步：遗留系统怎么办？</b>优先 <b>进程间通信（HTTP/gRPC）而不是进程内 FFI</b>——服务边界清晰、故障隔离、可独立伸缩，FFI 只用于确实压不下来的热点</div>
+  </div>
+  <div class="callout ok">
+    <b>一句话总结：</b>JVM 用<b>启动时间和内存</b>换峰值吞吐；V8 用<b>单线程的简单</b>换开发效率和生态；CPython 用<b>执行速度</b>换生态和开发速度；Go 用<b>一点峰值吞吐</b>换部署简单和延迟确定性。<b>没有更好的运行时，只有更匹配约束的运行时。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">排雷</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">容器里 JVM 不设 MaxRAMPercentage</div><div class="pd">JVM 按宿主机内存算堆，容器 limit 2G 它敢开 8G，被 OOM Killer 直接杀死。显式配 -XX:MaxRAMPercentage=75，JDK 8 老应用更要补 UseContainerSupport。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">G1 堆里塞大对象</div><div class="pd">超过 region 一半即 humongous，分配慢、回收差、碎片多。大数组/大缓存改分片或堆外，别直接怼堆。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为"分代 GC 一定快"</div><div class="pd">老年代 Full GC（Serial/CMS/Parallel Old）在大堆下是<b>秒级 STW</b>。延迟敏感就上 ZGC，别停留在"GC 就是卡一下"的认知。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">V8 里动态增删对象属性</div><div class="pd">隐藏类转换链跳变，delete 直接退化字典模式，IC 变 megamorphic，热点接口慢一个量级。构造函数里一次初始化所有字段。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">JS 数组混类型、开洞</div><div class="pd">[1,2,3] 里塞字符串，或 a[10000]=x 开大洞，元素种类退化不可逆。热路径数组保持同类型紧凑，别用稀疏数组当 Map。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">CPython 用多线程做 CPU 密集计算</div><div class="pd">GIL 下多线程零加速甚至更慢。要么多进程（multiprocessing），要么把热点下沉 C 扩展/NumPy。IO 密集才用多线程。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Python 循环引用导致内存只涨不降</div><div class="pd">引用计数管不了互相引用。先 gc.collect() 验证，再用 objgraph/tracemalloc 定位持有者；缓存要有上限（functools.lru_cache 的 maxsize）。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">goroutine 泄漏</div><div class="pd">channel 阻塞没有退出路径，goroutine 只增不减，最后 OOM。每个 goroutine 都要有退出条件（ctx.Done() / channel close），用 runtime.NumGoroutine() 做监控。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">Go 1.22 前循环变量被闭包共享捕获</div><div class="pd">for 循环里 go func(){ use(i) }() 全是最后一个值。升级 1.22+（每次迭代新变量），或老版本手动 i := i。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">为省事开 cgo</div><div class="pd">引入 gcc 依赖、编译慢十倍、不能交叉编译、C 内存泄漏难查。默认 CGO_ENABLED=0；纯 Go 替代不了再上，调用要批量化。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. JDK 9 及以后，服务端默认的垃圾收集器是？</div>
+      <button class="opt">CMS</button>
+      <button class="opt">G1</button>
+      <button class="opt">ZGC</button>
+      <div class="ans">正确答案：<b>G1</b>。它按 region 划分堆、混合回收，默认目标停顿 200ms（-XX:MaxGCPauseMillis）。ZGC 是 JDK 15 起生产可用的低延迟选项，目标停顿 &lt;10ms（实测亚毫秒）。CMS 已在 JDK 14 移除。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. ZGC 的设计目标停顿时间是？</div>
+      <button class="opt">约 200ms，和 G1 一样</button>
+      <button class="opt">没有停顿，完全并发</button>
+      <button class="opt">小于 10ms，实测通常亚毫秒</button>
+      <div class="ans">正确答案：<b>&lt;10ms（实测通常亚毫秒）</b>。靠着色指针 + 读屏障实现，支持 TB 级堆。注意"目标 &lt;10ms"不等于"永远不卡"——大堆 + 极端负载下仍有波动，只是数量级远小于 G1。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. JS 热点函数突然变慢，--trace-deopt 显示频繁去优化，最可能的原因是？</div>
+      <button class="opt">传入对象的属性结构不一致，导致隐藏类跳变、IC 退化</button>
+      <button class="opt">CPU 被其他进程抢占</button>
+      <button class="opt">V8 的 GC 频率太高</button>
+      <div class="ans">正确答案：<b>对象结构不稳定</b>。同一调用点出现多种隐藏类，TurboFan 的类型假设反复失效，反复 deopt 重编译。修复：构造函数统一初始化字段、热路径对象结构一致、数组保持同类型紧凑。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于 CPython 的 GIL，哪个说法正确？</div>
+      <button class="opt">开了 GIL 后所有多线程场景都没有加速</button>
+      <button class="opt">同一时刻只有一个线程执行字节码，但 IO 操作会释放 GIL，所以 IO 密集仍可并行</button>
+      <button class="opt">GIL 只影响多进程，不影响多线程</button>
+      <div class="ans">正确答案：<b>字节码级互斥，但 IO 释放</b>。所以 IO 密集（网络/磁盘）多线程有效，CPU 密集无效——后者用多进程。3.13 起有实验性的无 GIL 构建（PEP 703），但生产短期仍按有 GIL 设计。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. Go 中 GOMAXPROCS 的默认值和含义是？</div>
+      <button class="opt">1，防止 goroutine 竞争</button>
+      <button class="opt">CPU 物理核数 × 2</button>
+      <button class="opt">CPU 逻辑核数，即同时执行 Go 代码的最大 P 数量</button>
+      <div class="ans">正确答案：<b>逻辑核数</b>。GOMAXPROCS 决定 P 的数量，P 是 M（OS 线程）运行 G（goroutine）的"许可"。默认等于 NumCPU。注意它不等于线程数——M 可以更多，只是同时只有 GOMAXPROCS 个线程在执行 Go 代码。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. Go 的一个 goroutine 初始栈大小是？</div>
+      <button class="opt">2KB，可按需增长，64 位下上限约 1GB</button>
+      <button class="opt">8MB，和 OS 线程栈一样大</button>
+      <button class="opt">512KB，固定不可变</button>
+      <div class="ans">正确答案：<b>2KB 起步、动态扩容、上限约 1GB</b>。这就是 goroutine 能开几十万个的原因——对比 OS 线程默认 8MB 栈。栈扩容是复制到更大空间，深递归会持续触发扩容，成为隐藏成本。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>JVM 排查命令与参数</h3>
+  <div class="cmds">
+    <div class="crow"><code>-XX:+UseZGC -XX:MaxRAMPercentage=75</code><span class="desc">容器低延迟生产组合</span><button class="copy">复制</button></div>
+    <div class="crow"><code>-Xlog:gc*:file=gc.log:time,uptime</code><span class="desc">JDK 9+ 统一 GC 日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jps -l / jstat -gcutil &lt;pid&gt; 1000</code><span class="desc">找进程；每秒看各区使用率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jstack -l &lt;pid&gt;</code><span class="desc">线程栈快照，查死锁</span><button class="copy">复制</button></div>
+    <div class="crow"><code>jmap -histo:live &lt;pid&gt; | head -30</code><span class="desc">活对象直方图，定位大对象</span><button class="copy">复制</button></div>
+    <div class="crow"><code>-XX:+PrintCompilation</code><span class="desc">打印 JIT 编译，看 C1/C2 升级</span><button class="copy">复制</button></div>
+  </div>
+  <h3>V8 / Node 排查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>node --trace-gc app.js</code><span class="desc">打印每次 GC 类型与耗时</span><button class="copy">复制</button></div>
+    <div class="crow"><code>node --trace-deopt app.js</code><span class="desc">打印去优化点，查热点类型不稳</span><button class="copy">复制</button></div>
+    <div class="crow"><code>node --max-old-space-size=4096 app.js</code><span class="desc">放宽老生代堆上限（MB）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>node --cpu-prof app.js</code><span class="desc">生成 .cpuprofile，Chrome DevTools 打开</span><button class="copy">复制</button></div>
+    <div class="crow"><code>node -p process.versions.v8</code><span class="desc">看 Node 内置的 V8 版本</span><button class="copy">复制</button></div>
+  </div>
+  <h3>CPython 排查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>sys.getswitchinterval()</code><span class="desc">GIL 线程切换间隔，默认 5ms</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gc.get_threshold() / gc.collect()</code><span class="desc">看阈值（700,10,10）/ 手动全量回收</span><button class="copy">复制</button></div>
+    <div class="crow"><code>python -X importtime -c "import numpy"</code><span class="desc">看每个模块导入耗时，治启动慢</span><button class="copy">复制</button></div>
+    <div class="crow"><code>py-spy top --pid &lt;pid&gt;</code><span class="desc">不侵入看线程在跑什么</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tracemalloc + objgraph.show_backrefs()</code><span class="desc">内存泄漏定位组合</span><button class="copy">复制</button></div>
+  </div>
+  <h3>Go 排查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>GODEBUG=gctrace=1 ./app</code><span class="desc">每次 GC 的 STW/并发标记/辅助耗时</span><button class="copy">复制</button></div>
+    <div class="crow"><code>runtime.NumGoroutine()</code><span class="desc">goroutine 数，做泄漏监控</span><button class="copy">复制</button></div>
+    <div class="crow"><code>go tool pprof http://host/debug/pprof/heap</code><span class="desc">堆剖析（需 net/http/pprof）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CGO_ENABLED=0 go build</code><span class="desc">纯 Go 静态构建、可交叉编译</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GOMAXPROCS=4 / GOGC=50</code><span class="desc">调并行度 / 更激进 GC 省内存</span><button class="copy">复制</button></div>
+  </div>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>字节码</b></td><td>介于源码和机器码之间的中间表示，由解释器或 JIT 执行</td></tr>
+    <tr><td><b>解释器</b></td><td>逐条读字节码并执行的引擎，启动快、峰值低</td></tr>
+    <tr><td><b>JIT</b></td><td>运行时把热点代码编译成机器码，用内存和编译时间换吞吐</td></tr>
+    <tr><td><b>AOT</b></td><td>运行前编译成二进制（Go/C），启动快、无运行时优化</td></tr>
+    <tr><td><b>分层编译</b></td><td>JVM 策略：解释 → C1 → C2，逐级加大优化力度</td></tr>
+    <tr><td><b>OSR 栈上替换</b></td><td>循环热点在方法执行中途被替换为编译后代码</td></tr>
+    <tr><td><b>去优化 deopt</b></td><td>编译期假设失效，退回解释执行并可能重编译</td></tr>
+    <tr><td><b>隐藏类</b></td><td>V8 给对象维护的结构描述，属性访问按固定偏移</td></tr>
+    <tr><td><b>内联缓存 IC</b></td><td>V8 在调用点缓存目标类型，monomorphic 最快</td></tr>
+    <tr><td><b>分代假说</b></td><td>弱：多数对象朝生夕死；强：熬过 GC 越多越难死</td></tr>
+    <tr><td><b>三色标记</b></td><td>GC 把对象分白/灰/黑，从灰出发遍历可达性</td></tr>
+    <tr><td><b>写屏障</b></td><td>引用赋值时触发的钩子，保证并发标记不漏标</td></tr>
+    <tr><td><b>STW</b></td><td>Stop-The-World，GC 期间暂停所有用户线程</td></tr>
+    <tr><td><b>GIL</b></td><td>CPython 全局解释器锁，字节码级互斥，IO 时释放</td></tr>
+    <tr><td><b>引用计数</b></td><td>对象被引用数归零即释放；管不了循环引用</td></tr>
+    <tr><td><b>GMP</b></td><td>Go 调度模型：G 协程、M 线程、P 逻辑处理器</td></tr>
+    <tr><td><b>work stealing</b></td><td>空闲 P 从其他队列偷 goroutine 执行，负载均衡</td></tr>
+    <tr><td><b>Metaspace</b></td><td>JDK 8+ 类元数据区，用本地内存，需设上限</td></tr>
+    <tr><td><b>FFI</b></td><td>跨语言调用对方 ABI 的通用机制（ctypes/cffi）</td></tr>
+    <tr><td><b>JNI</b></td><td>Java 调 C/C++ 的官方桥，JDK 22+ 可换 FFM API</td></tr>
+    <tr><td><b>cgo</b></td><td>Go 调 C 的机制，代价是 gcc 依赖和交叉编译受限</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个 Spring Boot 应用，分别用 G1 和 ZGC 跑相同压测，对比 GC 日志里的暂停分布；② Node 里写两版同样逻辑的对象（结构稳定 vs 动态加属性），用 --trace-deopt 对比；③ Python 写一个循环引用的缓存，观察 gc.collect() 前后内存；④ Go 写一个故意泄漏的 goroutine 程序，用 GODEBUG=gctrace=1 和 runtime.NumGoroutine 观察；⑤ 给自己团队的服务按第五模块的决策树走一遍，写下选型理由。<br><br>
+    <b>之后值得单独学：</b>JVM 虚拟线程（JDK 21）与结构化并发、V8 的 Maglev/Turbofan 优化细节、PEP 703 无 GIL Python 的迁移、Go 的 Green Tea GC 演进，以及 eBPF 对运行时观测的增强。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透语言运行时与 VM · 记住：没有更好的运行时，只有更匹配约束的运行时</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 5（横向对比）和模块 7（选型决策）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在本机的 java/node/python/go 里验证。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议本机四个都装上：java -version、node -v、python3 -V、go version，边看边跑 --print-flags 类命令。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

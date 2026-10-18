@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 容器与 K8s 安全</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 26 期 · 高密度版</span>
+    <h1>二十分钟学透 容器与 K8s 安全</h1>
+    <p class="sub">容器的默认假设是"方便"，不是"安全"。这篇按<b>镜像 / 运行时 / 集群 / 供应链</b>四层拆解，给你能直接抄的 securityContext、Pod Security Standards、RBAC、NetworkPolicy 和准入策略，以及逃逸的真实 CVE 链条。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 层安全体系</span>
+      <span class="chip"><b>3</b> 级 Pod 安全标准</span>
+      <span class="chip"><b>10</b> 个真实坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起个本地集群：kind create cluster 或 minikube start，配合 kubectl 边看边打</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先想清楚容器改变了什么</h2></div>
+  <p class="lead">容器把"一台服务器跑一个应用"变成了"一台服务器跑几十个共享内核的应用"。隔离边界从硬件级降到了<b>内核命名空间 + cgroup</b>级 —— 这就是所有容器安全问题的根源。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>虚拟机</th><th>容器</th></tr>
+    <tr><td><b>隔离边界</b></td><td>硬件虚拟化（Intel VT-x）</td><td>共享宿主机内核，靠 namespace/cgroup/seccomp 隔离</td></tr>
+    <tr><td><b>逃逸代价</b></td><td>需要 hypervisor 漏洞</td><td>内核漏洞 / 配置错误即可，成本低得多</td></tr>
+    <tr><td><b>攻击面</b></td><td>Guest OS 全套</td><td>单个应用 + 运行时（runc/containerd）+ 内核</td></tr>
+    <tr><td><b>爆炸半径</b></td><td>通常限于一台 VM</td><td>同节点所有 Pod + 宿主机 + 集群凭证</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>本文靶场纪律：</b>下面所有"逃逸演示"只用来说明机制，请在你自己机器上的 kind/minikube 里做。任何对共享集群的未授权测试都可能违反公司政策与法律。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>容器安全四层模型</h2></div>
+  <table>
+    <tr><th style="width:90px">层</th><th style="width:260px">核心风险</th><th>关键控制</th></tr>
+    <tr><td><b>镜像</b></td><td>基础镜像带高危 CVE、镜像以 root 跑、镜像里烘焙密钥、镜像来源不可信</td><td>最小化（distroless/alpine）、非 root、扫描（Trivy/Grype）、签名（cosign）、无密钥烘焙</td></tr>
+    <tr><td><b>运行时</b></td><td>特权容器、capabilities 过多、可写根文件系统、逃逸漏洞（runc/containerd CVE）</td><td>securityContext 硬化、seccomp/AppArmor、只读根文件系统、及时打补丁</td></tr>
+    <tr><td><b>集群</b></td><td>etcd 明文、API server 暴露、RBAC 过宽、扁平网络、Secret 无加密</td><td>RBAC 最小权限、etcd EncryptionConfiguration、私有 API server、NetworkPolicy、mTLS</td></tr>
+    <tr><td><b>供应链</b></td><td>被篡改的镜像、带毒的基础镜像、不受控的镜像来源、构建流水线投毒</td><td>镜像签名 + 验签准入、来源白名单（受信 registry）、CI/CD 加固、SBOM</td></tr>
+  </table>
+  <div class="callout">
+    <b>四层是串联的：</b>任何一层失守都会把风险传导给下一层 —— 镜像里的漏洞给了初始立足点，运行时的宽松配置给了逃逸机会，集群的宽 RBAC 把单 Pod 失守放大成集群失守，供应链没签名则连"失守的是哪个镜像"都查不清。<b>纵深防御的每一层都在缩小爆炸半径。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>镜像安全：最小化是主线</h2></div>
+  <h3>1. 基础镜像选型</h3>
+  <table>
+    <tr><th style="width:170px">方案</th><th style="width:180px">体积</th><th>取舍</th></tr>
+    <tr><td class="f">ubuntu:22.04</td><td>约 78MB</td><td>glibc 兼容性好，但 CVE 数量多，需要持续打补丁</td></tr>
+    <tr><td class="f">alpine:3.20</td><td>约 7.8MB</td><td>极小、CVE 少；<b>但 musl libc 与 glibc 有兼容差异</b>（DNS、部分二进制），Java/Node 生态要实测</td></tr>
+    <tr><td class="f">distroless</td><td>约 2~20MB</td><td><b>没有 shell、没有包管理器</b>，攻击者拿到 shell 也干不了大事；Go/静态二进制首选</td></tr>
+    <tr><td class="f">scratch</td><td>0</td><td>完全空镜像，只放静态二进制；连 ca-certificates 都要自己 COPY</td></tr>
+  </table>
+  <h3>2. 非 root 运行</h3>
+  <pre><span class="c"># ✗ 默认以 root 跑 —— 容器内 root 加上逃逸就是宿主机 root</span>
+FROM ubuntu:22.04
+COPY app /app
+ENTRYPOINT ["/app"]
+
+<span class="c"># ✓ 多阶段构建 + 静态编译 + distroless + 非 root 用户</span>
+FROM golang:1.22 AS build
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o /out/app ./cmd/server
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /out/app /app
+USER nonroot:nonroot
+EXPOSE 8080
+ENTRYPOINT ["/app"]</pre>
+  <div class="callout warn">
+    <b>非 root 的两个前置条件：</b>① 应用<b>不监听 1024 以下端口</b>（要监听 80 就用 8080 + 容器端口映射，或用 <span class="k">capabilities: add: ["NET_BIND_SERVICE"]</span> 精细授权）；② 数据目录提前 <span class="k">chown</span> 或挂 <span class="k">emptyDir</span> + <span class="k">fsGroup</span>。满足不了这两条，"非 root"会在半夜被运维改回 root。
+  </div>
+  <h3>3. 构建卫生</h3>
+  <ul>
+    <li><b>.dockerignore</b>：把 <span class="k">.git</span>、<span class="k">*.pem</span>、<span class="k">.env</span>、<span class="k">node_modules</span> 挡在构建上下文外 —— 防止密钥被打进镜像层</li>
+    <li><b>多阶段构建</b>：编译器、源码、依赖缓存留在 build stage，最终镜像只有产物</li>
+    <li><b>禁止镜像内存密钥</b>：任何进过镜像层的东西都能被 <span class="k">docker history</span> / <span class="k">docker save</span> 翻出来，密钥只能运行时注入（K8s Secret / Vault / KMS）</li>
+    <li><b>镜像标签用 digest</b>：<span class="k">image: registry/app:v1.2.3@sha256:abc...</span>，不用 <span class="k">latest</span> —— 保证运行的就是审计过的那个镜像</li>
+  </ul>
+  <h3>4. 扫描（CI 里跑，不是上线后补）</h3>
+  <pre><span class="c"># Trivy：扫 OS 包 + 语言依赖 + 密钥泄漏，高危直接失败</span>
+trivy image --exit-code 1 --severity HIGH,CRITICAL \
+  --ignore-unfixed registry.example.com/app:v1.2.3
+
+<span class="c"># 扫 IaC 和集群配置</span>
+trivy config ./k8s-manifests/
+trivy k8s --report summary cluster
+
+<span class="c"># 生成 SBOM（软件物料清单），出事时能回答"我用了哪些组件"</span>
+trivy image --format spdx-json --output sbom.json registry.example.com/app:v1.2.3
+
+<span class="c"># 密钥泄漏检测</span>
+trivy image --scanners secret --exit-code 1 registry.example.com/app:v1.2.3</pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Pod 安全：securityContext 全字段</h2></div>
+  <h3>Pod 级 securityContext</h3>
+  <table>
+    <tr><th style="width:220px">字段</th><th>作用</th></tr>
+    <tr><td class="f">runAsNonRoot: true</td><td><b>强制</b>容器不能以 root 启动（镜像指定了 USER 0 会直接启动失败）</td></tr>
+    <tr><td class="f">runAsUser: 10001</td><td>指定 UID。建议 ≥ 10000，避开常见系统 UID 段</td></tr>
+    <tr><td class="f">runAsGroup: 10001</td><td>指定 GID</td></tr>
+    <tr><td class="f">fsGroup: 10001</td><td>挂载卷的文件属组，解决非 root 写 PVC 的问题</td></tr>
+    <tr><td class="f">seccompProfile.type: RuntimeDefault</td><td>启用运行时默认系统调用过滤（PSS restricted 的硬性要求）</td></tr>
+  </table>
+  <h3>容器级 securityContext</h3>
+  <table>
+    <tr><th style="width:220px">字段</th><th>作用</th></tr>
+    <tr><td class="f">allowPrivilegeEscalation: false</td><td>禁止 setuid/setcap 提权（如 sudo、ping 提权链），<b>性价比最高的一行</b></td></tr>
+    <tr><td class="f">readOnlyRootFilesystem: true</td><td>根文件系统只读。落盘路径用 emptyDir/tmpfs 显式挂载</td></tr>
+    <tr><td class="f">capabilities.drop: ["ALL"]</td><td>丢掉全部 Linux capabilities；需要哪个加哪个（如 NET_BIND_SERVICE）</td></tr>
+    <tr><td class="f">privileged: true</td><td><b>灾难开关</b>：等价于宿主机 root，永远不要在生产用</td></tr>
+    <tr><td class="f">procMount: Default</td><td>防止容器把 /proc 重新挂成可写</td></tr>
+  </table>
+  <h3>seccomp 与 AppArmor</h3>
+  <ul>
+    <li><b>seccomp</b>：按系统调用号过滤。<span class="k">RuntimeDefault</span>  profile 由容器运行时提供，挡住大多数逃逸所需的危险调用。自定义 profile 放节点 <span class="k">/var/lib/kubelet/seccomp/profiles/</span>，用 <span class="k">seccompProfile.type: Localhost</span> 引用</li>
+    <li><b>AppArmor</b>：基于路径的强制访问控制，限制文件访问。K8s 里用注解加载：</li>
+  </ul>
+  <pre>metadata:
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/app: runtime/default</pre>
+  <h3>Pod Security Standards（PSS）：内置的三档基线</h3>
+  <table>
+    <tr><th style="width:120px">档位</th><th style="width:200px">定位</th><th>核心要求</th></tr>
+    <tr><td><b>privileged</b></td><td>不限制（基础设施组件用）</td><td>无限制</td></tr>
+    <tr><td><b>baseline</b></td><td>阻断已知提权手段</td><td>禁 privileged、禁 hostPID/hostIPC/hostNetwork、禁大部分 hostPath、禁危险 capabilities、禁 procMount</td></tr>
+    <tr><td><b>restricted</b></td><td><b>生产默认目标</b></td><td>baseline 全部 + runAsNonRoot + seccomp RuntimeDefault + drop ALL capabilities + allowPrivilegeEscalation: false</td></tr>
+  </table>
+  <pre><span class="c"># 在 namespace 上打标签启用（三种模式可叠加）</span>
+kubectl label ns production \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/warn=restricted
+
+<span class="c"># enforce = 违规 Pod 拒绝创建</span>
+<span class="c"># audit   = 放行但记录审计事件</span>
+<span class="c"># warn    = 放行但给 kubectl 警告</span>
+<span class="c"># 升级路径：先 audit/warn 跑一周看存量违规，再切 enforce</span></pre>
+  <div class="callout ok">
+    <b>落地顺序：</b>① 全集群所有 namespace 先打 <span class="k">audit=restricted, warn=restricted</span>，跑一周收集违规清单；② 按清单逐批修（改 securityContext、加 emptyDir 挂载、去掉特权）；③ 存量清零后切 <span class="k">enforce=restricted</span>，只给真正需要的系统 namespace（kube-system 等）留 baseline/privileged。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>K8s 集群安全</h2></div>
+  <h3>1. RBAC：最小权限，默认拒绝</h3>
+  <pre><span class="c"># ✗ 常见事故写法：给默认 SA 或整个团队绑了 edit/cluster-admin</span>
+kubectl create clusterrolebinding team-admin --clusterrole=edit --group=dev-team
+
+<span class="c"># ✓ 按 namespace 的最小 Role（get/list/watch，不绑 create/delete）</span>
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: production
+  name: pod-viewer
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]        <span class="c"># 只读，没有 exec —— exec 等于进容器</span>
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: production
+  name: pod-viewer-binding
+subjects:
+  - kind: User
+    name: alice@example.com
+roleRef:
+  kind: Role
+  name: pod-viewer
+  apiGroup: rbac.authorization.k8s.io</pre>
+  <ul>
+    <li><b>高危 verbs 要审批</b>：<span class="k">pods/exec</span>（进容器）、<span class="k">pods/attach</span>、<span class="k">secrets</span> 读、<span class="k">create pods</span>（可挂 hostPath 造特权 Pod）—— 这四类权限等于集群控制权</li>
+    <li><b>ServiceAccount 收紧</b>：默认 SA 不绑任何 Role；应用 SA 加 <span class="k">automountServiceAccountToken: false</span>，Pod 内就不该有 token 可偷</li>
+    <li><b>定期审计</b>：<span class="k">kubectl auth can-i --list --as=system:serviceaccount:ns:sa</span> 逐个查权限，清理历史遗留的宽绑定</li>
+  </ul>
+  <h3>2. etcd：加密 + 访问控制</h3>
+  <pre><span class="c"># etcd 是集群的唯一事实来源 —— Secret、证书、全在里面</span>
+<span class="c"># 访问控制：只允许 API server 节点访问 etcd（防火墙/安全组 2379/2380）</span>
+<span class="c"># 静态加密：API server 加 --encryption-provider-config</span>
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources:
+      - secrets                <span class="c"># 加密 Secret，也可加 configmaps</span>
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: &lt;BASE64_ENCODED_32_BYTE_KEY&gt;
+      - identity: {}           <span class="c"># identity 必须留最后，保证能读未加密旧数据</span></pre>
+  <div class="callout danger">
+    <b>没有 EncryptionConfiguration 时，etcd 里的 Secret 是明文的。</b>能读到 etcd 备份/磁盘的人等于拿到集群全部密钥。<b>更稳妥的是 KMS 方案</b>（Vault / 云 KMS provider），密钥不进节点磁盘，还支持轮换。
+  </div>
+  <h3>3. Secret：base64 不是加密</h3>
+  <pre><span class="c"># 这是编码，不是加密 —— 任何能进 Pod 的人都能解开</span>
+kubectl get secret db-creds -o jsonpath='{.data.password}' | base64 -d
+
+<span class="c"># 加固组合：</span>
+<span class="c"># 1) etcd 静态加密（上面）</span>
+<span class="c"># 2) RBAC 限制 secrets 的 get/list</span>
+<span class="c"># 3) 外部密钥管理：External Secrets Operator / Vault Agent 注入</span>
+<span class="c">#    —— Secret 不落 K8s，Pod 启动时从 Vault 拉，支持动态凭据和自动轮换</span>
+<span class="c"># 4) 应用侧：不要把 Secret 打进日志、错误页、环境变量（env 会出现在 describe 输出里）</span></pre>
+  <h3>4. API server 与网络</h3>
+  <table>
+    <tr><th style="width:200px">控制</th><th>做法</th></tr>
+    <tr><td><b>API server 不暴露公网</b></td><td>内网地址 + 办公网/VPN 白名单；<span class="k">--anonymous-auth=false</span> 禁匿名</td></tr>
+    <tr><td><b>NetworkPolicy</b></td><td>默认拒绝 + 按需放行（见下方 YAML）。<b>没开 NP 的集群是扁平网络：一个 Pod 被攻破，所有服务可直连</b></td></tr>
+    <tr><td><b>控制平面加固</b></td><td>kube-bench（CIS Benchmark）跑分；etcd/API server 通信走 TLS； admission webhook 开启</td></tr>
+    <tr><td><b>节点加固</b></td><td>SSH 禁用密码登录、最小化节点软件、自动安全更新、CIS 基线</td></tr>
+  </table>
+  <pre><span class="c"># NetworkPolicy：默认拒绝一切，再逐条放行</span>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: production
+spec:
+  podSelector: {}          <span class="c"># 选中 namespace 全部 Pod</span>
+  policyTypes: ["Ingress", "Egress"]   <span class="c"># 进出都默认拒</span>
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-api
+  namespace: production
+spec:
+  podSelector:
+    matchLabels: {app: api}          <span class="c"># 目标：api Pod</span>
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: frontend}   <span class="c"># 只允许同 namespace 的 frontend 进</span>
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}  <span class="c"># 允许监控 namespace</span>
+      ports:
+        - protocol: TCP
+          port: 8080</pre>
+  <div class="callout warn">
+    <b>NetworkPolicy 的前提：CNI 插件支持。</b>flannel 不支持，Calico/Cilium/Weave 支持。很多集群"配了 NP 不生效"，八成是 CNI 的锅。验证方式：<span class="k">kubectl run test --rm -it --image=busybox -- wget -qO- --timeout=2 http://api-svc:8080</span>，默认拒绝下应该超时。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>逃逸风险与防范</h2></div>
+  <h3>三条最常见的"人造逃逸通道"</h3>
+  <table>
+    <tr><th style="width:200px">配置</th><th>后果</th><th>正确做法</th></tr>
+    <tr><td class="f">privileged: true</td><td>容器进程≈宿主机 root：可挂载宿主块设备、改内核参数、访问所有设备</td><td>删掉。确有特权需求用白名单 capabilities 逐项授</td></tr>
+    <tr><td class="f">挂载 /var/run/docker.sock</td><td>通过 Docker API 创建挂载宿主机 / 的容器 = 宿主机沦陷；等价于给 root</td><td>永远不挂。要用容器能力改用 rootless 构建（Kaniko/BuildKit）或无守护进程方案</td></tr>
+    <tr><td class="f">hostPID / hostNetwork / hostIPC</td><td>看到宿主机全部进程/网络/共享内存；hostPID 下可操作宿主机进程、读宿主 /proc 里的密钥</td><td>默认 false；监控/网络组件确有需求时单独 Pod 开，单独 namespace + NP 隔离</td></tr>
+  </table>
+  <h3>内核态逃逸：真实 CVE 时间线</h3>
+  <table>
+    <tr><th style="width:140px">CVE</th><th style="width:150px">组件</th><th>机制</th></tr>
+    <tr><td class="f">CVE-2019-5736</td><td>runc</td><td>恶意镜像让容器内进程在 exec 时覆盖宿主 runc 二进制，下次容器启动执行恶意代码。<b>影响 runc 1.0-rc6 之前版本</b></td></tr>
+    <tr><td class="f">CVE-2020-15257</td><td>containerd</td><td>宿主机抽象 unix socket 未隔离，容器内可访问 hostNetwork 上的 containerd socket 而绕过权限</td></tr>
+    <tr><td class="f">CVE-2022-0492</td><td>Linux cgroup v1</td><td>容器内可写 cgroup release_agent，让内核在 cgroup 释放时执行宿主机上的任意程序</td></tr>
+    <tr><td class="f">CVE-2024-21626</td><td>runc（Leaky Vessels）</td><td>process.cwd 文件描述符泄漏到容器内，配合可写工作目录实现逃逸</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>这些 CVE 的共同前提：</b>攻击者已经能在容器内执行代码。所以防逃逸的本质是<b>分层假设失守</b>：第一层（镜像最小化 + 非 root + 只读根fs）让他进不来；第二层（seccomp + capabilities 限制 + 不挂宿主 socket）让他动不了宿主；第三层（及时升级 runc/containerd/内核）把已知门焊死。<b>任何一层单独都不够。</b>
+  </div>
+  <h3>纵深防御配置（容器级）</h3>
+  <pre><span class="c"># 防逃逸的四件套（任缺一件，爆炸半径就从 Pod 扩大到宿主机）</span>
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  allowPrivilegeEscalation: false      <span class="c"># 断了 setuid 提权</span>
+  readOnlyRootFilesystem: true         <span class="c"># 断了落盘写 payload</span>
+  capabilities:
+    drop: ["ALL"]                      <span class="c"># 断了 CAP_SYS_ADMIN 等危险权能</span>
+  seccompProfile:
+    type: RuntimeDefault               <span class="c"># 断了危险系统调用（如 keyctl、unshare）</span>
+volumes:                                <span class="c"># 无 hostPath / 无 docker.sock</span>
+  - name: tmp
+    emptyDir: {}                       <span class="c"># 要写只能写这里，容器销毁即消失</span></pre>
+  <h3>逃逸后能干什么（为什么不能只防"进容器"）</h3>
+  <ul>
+    <li>Pod 里的 ServiceAccount token（默认挂载在 <span class="k">/var/run/secrets/kubernetes.io/serviceaccount/</span>）→ 调 API server → 按 SA 权限偷 Secret、建 Pod</li>
+    <li>节点上的 kubelet 凭证、云实例元数据 → 拿临时云凭证 → 横向移动到控制平面</li>
+    <li>同节点其他 Pod 的本地共享目录（emptyDir 不跨 Pod，但 hostPath 会）</li>
+  </ul>
+  <div class="callout">
+    <b>自检命令：</b>进自己的 Pod 跑一遍 <span class="k">cat /var/run/secrets/kubernetes.io/serviceaccount/token | head -c 20</span>。有输出就说明 <span class="k">automountServiceAccountToken</span> 没关 —— 这个 token 在容器里躺平，等着被偷。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>供应链：签名与准入</h2></div>
+  <h3>镜像签名（cosign + Sigstore）</h3>
+  <pre><span class="c"># 1. 生成密钥对（私钥进 CI 保密系统，公钥进集群）</span>
+cosign generate-key-pair
+
+<span class="c"># 2. CI 构建后签名（私钥由 CI 的 KMS/保密变量提供）</span>
+cosign sign --key cosign.key registry.example.com/app:v1.2.3
+
+<span class="c"># 3. 发布方提供 attestation（构建来源证明）</span>
+cosign attest --key cosign.key --type slsaprovenance registry.example.com/app:v1.2.3
+
+<span class="c"># 4. 集群侧验签（准入控制器自动完成，下面 Kyverno 示例）</span>
+cosign verify --key cosign.pub registry.example.com/app:v1.2.3</pre>
+  <h3>准入控制器：把"只能跑受信镜像"变成强制</h3>
+  <p>两类主流方案：<b>Kyverno</b>（纯 YAML 策略，上手快）和 <b>OPA Gatekeeper</b>（用 Rego 语言，表达力强）。下面用 Kyverno 演示最常见的三条策略。</p>
+  <pre><span class="c"># 策略一：只允许受信 registry 的镜像，且必须带 digest</span>
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Enforce        <span class="c"># Enforce=拒绝，Audit=只记录</span>
+  background: true
+  rules:
+    - name: validate-registries
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      validate:
+        message: "镜像必须来自 registry.example.com 且带 sha256 digest"
+        pattern:
+          spec:
+            containers:
+              - image: "registry.example.com/*@sha256:*"
+
+<span class="c"># 策略二：强制镜像签名（cosign）</span>
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signature
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: check-signature
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      verifyImages:
+        - imageReferences:
+            - "registry.example.com/*"
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      &lt;你的 cosign.pub 内容&gt;
+                      -----END PUBLIC KEY-----</pre>
+  <pre><span class="c"># 策略三：Pod 必须符合 restricted 基线（等价于 PSS enforce 的策略化版本）</span>
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-security-context
+spec:
+  validationFailureAction: Enforce
+  rules:
+    - name: check-hardening
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+      validate:
+        message: "必须 runAsNonRoot、drop ALL caps、只读根文件系统"
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop: ["ALL"]</pre>
+  <h3>供应链全景</h3>
+  <table>
+    <tr><th style="width:150px">环节</th><th>控制</th></tr>
+    <tr><td><b>构建</b></td><td>CI 环境最小权限、构建缓存隔离、SBOM 生成（syft/spdx）</td></tr>
+    <tr><td><b>仓库</b></td><td>Harbor / 受管 registry；拉取前扫漏洞；不可信镜像禁入；镜像不可变 tag</td></tr>
+    <tr><td><b>分发</b></td><td>TLS 拉取；签名 + attestation；镜像来源白名单</td></tr>
+    <tr><td><b>准入</b></td><td>Kyverno/Gatekeeper 验签 + 基线校验 + registry 白名单，三件事一次拦</td></tr>
+    <tr><td><b>运行时</b></td><td>Falco 行为监控（异常 exec、敏感文件读）；镜像与运行态比对</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>SolarWinds 事件的教训：</b>供应链攻击（如投毒公共镜像、劫持 CI）防的是"你信任的镜像被换掉"。没有签名和 attestation，出事时你无法回答"这个镜像是哪次构建产物、代码是什么版本"—— 响应时间以周计。签名 + SBOM 把这个时间压到小时。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>真实 YAML：一个 hardened Pod 与自查</h2></div>
+  <h3>可直接抄的生产 Pod 模板</h3>
+  <pre>apiVersion: v1
+kind: Pod
+metadata:
+  name: secure-demo
+  namespace: production
+  labels: {app: secure-demo}
+spec:
+  serviceAccountName: app-sa
+  automountServiceAccountToken: false      <span class="c"># 容器内无 token 可偷</span>
+  securityContext:                          <span class="c"># Pod 级</span>
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: app
+      image: registry.example.com/app:v1.2.3@sha256:64ec2a3f...   <span class="c"># digest 锁定</span>
+      ports:
+        - containerPort: 8080               <span class="c"># 非特权端口</span>
+      securityContext:                      <span class="c"># 容器级</span>
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+      resources:                            <span class="c"># 上限防单 Pod 吃光节点</span>
+        requests: {cpu: 100m, memory: 128Mi}
+        limits: {cpu: 500m, memory: 256Mi}
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+  volumes:
+    - name: tmp
+      emptyDir: {}                          <span class="c"># 唯一可写路径</span></pre>
+  <h3>配套：最小权限 SA + 默认拒绝网络</h3>
+  <pre>apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-sa
+  namespace: production
+automountServiceAccountToken: false         <span class="c"># SA 本身也不挂</span>
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: secure-demo-netpol
+  namespace: production
+spec:
+  podSelector:
+    matchLabels: {app: secure-demo}
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: ingress-nginx}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: postgres}
+      ports: [{protocol: TCP, port: 5432}]
+    - to:                                   <span class="c"># DNS 必须放</span>
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports: [{protocol: UDP, port: 53}]</pre>
+  <h3>集群自查命令表</h3>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get pods -A -o json | jq '.items[] | select(any(.spec.containers[]; .securityContext.privileged == true)) | .metadata.name'</code><span class="desc">找出所有特权 Pod</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pods -A -o json | jq '.items[] | select(any(.spec.containers[]; .securityContext.runAsNonRoot != true)) | .metadata.namespace + "/" + .metadata.name'</code><span class="desc">找出未强制非 root 的 Pod</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pods -A -o json | jq '.items[] | select(.spec.volumes[]? | .hostPath) | .metadata.name'</code><span class="desc">找出挂 hostPath 的 Pod</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl auth can-i --list --as=system:serviceaccount:production:app-sa</code><span class="desc">查某个 SA 的真实权限清单</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get networkpolicies -A</code><span class="desc">确认 NetworkPolicy 覆盖（空 = 扁平网络）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kube-bench run --targets master,node</code><span class="desc">CIS Kubernetes Benchmark 基线扫描</span><button class="copy">复制</button></div>
+    <div class="crow"><code>trivy k8s --report summary --severity CRITICAL cluster</code><span class="desc">全集群漏洞汇总</span><button class="copy">复制</button></div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个真实坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">镜像默认以 root 跑，没设 runAsNonRoot</div><div class="pd">Dockerfile 不写 USER 就是 root；容器 root + 逃逸漏洞 = 宿主机 root。加 USER nonroot + securityContext.runAsNonRoot 双保险。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">privileged: true 一把梭</div><div class="pd">为了"装个调试工具""改个 sysctl"就给特权 Pod。特权容器 = 宿主机 root。需要的能力用 capabilities 逐项授，调试用一次性 Pod。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">挂载 /var/run/docker.sock</div><div class="pd">"让容器里能跑 docker"是最经典的沦陷配置：通过 Docker API 创建挂载宿主机 / 的容器直接拿下节点。改用 Kaniko/BuildKit rootless 或无守护进程构建。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">hostPID / hostNetwork / hostIPC 图省事</div><div class="pd">hostPID 下能读宿主 /proc 里的所有进程环境和命令行参数（包括密钥）、操作宿主进程。只有网络/监控类组件单独开，并放独立 namespace + NP。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">以为 Secret 的 base64 是加密</div><div class="pd">kubectl get secret -o jsonpath 一把 base64 -d 就还原。etcd 必须开 EncryptionConfiguration，敏感场景用 Vault/External Secrets，密钥别进环境变量和日志。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">etcd 没加密、端口全网可达</div><div class="pd">etcd 明文存全部 Secret + 证书；2379/2380 若对集群外开放，拿到 etcd 等于拿到集群。访问控制 + 静态加密 + etcd 证书轮换，三件事都要做。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">RBAC 图省事绑 cluster-admin / edit</div><div class="pd">给团队绑了集群级 edit，等于人人能读所有 namespace 的 Secret。按 namespace 最小 Role；高危 verbs（exec/secrets/create pods）单独审批。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">没配 NetworkPolicy，网络全扁平</div><div class="pd">一个 Pod 被攻破就能直连集群内所有服务（数据库、Redis、API）。默认拒绝 + 按需放行；先确认 CNI 支持 NP（flannel 不支持）。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">镜像用 latest、不扫描、不签名</div><div class="pd">latest 让"部署的到底是什么"不可知；不扫描让已知 CVE 躺到被利用；不签名让供应链投毒无法检测。CI 里扫描 + 签名，准入时验签 + digest 锁定。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">不关 automountServiceAccountToken</div><div class="pd">每个 Pod 默认挂 SA token，容器内一步 curl K8s API 就能按 SA 权限行事。应用不需要调 API server 的就显式 false；默认 SA 不绑任何 Role。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 给容器设 privileged: true 的直接后果是？</div>
+      <button class="opt">容器启动更快</button>
+      <button class="opt">容器内进程获得宿主机 root 级能力，可挂载宿主设备、访问宿主文件系统</button>
+      <button class="opt">网络性能更好</button>
+      <div class="ans">正确答案：<b>等价于宿主机 root</b>。特权容器几乎关闭了所有隔离（设备访问、capabilities、部分 seccomp）。生产一律禁用；确有特权需求用白名单 capabilities 逐项授权。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于 K8s Secret，哪个说法正确？</div>
+      <button class="opt">Secret 内容被加密存储，很安全</button>
+      <button class="opt">Secret 只能被创建它的 namespace 访问，所以不需要 RBAC</button>
+      <button class="opt">默认 etcd 里 Secret 未加密，base64 只是编码，需要 EncryptionConfiguration + RBAC + 外部密钥管理加固</button>
+      <div class="ans">正确答案：<b>默认未加密 + base64 不是加密</b>。能读 etcd 或有 get secrets 权限的人都能还原。三件套：etcd 静态加密、RBAC 最小权限（get/list 分开授）、Vault/External Secrets 管理敏感凭据。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. Pod Security Standards 中 restricted 档要求不包括？</div>
+      <button class="opt">runAsNonRoot: true</button>
+      <button class="opt">seccompProfile: RuntimeDefault</button>
+      <button class="opt">privileged: true 才能满足</button>
+      <div class="ans">正确答案：<b>privileged 恰恰是 restricted 明确禁止的</b>。restricted = baseline 全部禁令 + runAsNonRoot + seccomp RuntimeDefault + drop ALL capabilities + allowPrivilegeEscalation: false，是生产默认目标。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 某 Pod 挂了宿主机的 /var/run/docker.sock，风险是？</div>
+      <button class="opt">只是日志目录，无风险</button>
+      <button class="opt">可通过 Docker API 创建挂载宿主机根目录的容器，直接控制宿主机</button>
+      <button class="opt">会影响容器网络性能</button>
+      <div class="ans">正确答案：<b>宿主机沦陷</b>。docker.sock 是 Docker 守护进程的控制接口，谁拿到谁就是宿主机 root。构建场景改用 Kaniko/BuildKit rootless，运行时不挂。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 集群里没配 NetworkPolicy 时的网络形态是？</div>
+      <button class="opt">所有 Pod 互相隔离</button>
+      <button class="opt">只有 ingress 能进</button>
+      <button class="opt">默认全通：任意 Pod 可直连任意 Pod，一个 Pod 失守即可横向扫荡</button>
+      <div class="ans">正确答案：<b>默认全通</b>。K8s 网络默认无策略，且很多 CNI（如 flannel）不支持 NetworkPolicy。必须先确认 CNI 支持，再做 default-deny + 按需放行。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 防止供应链投毒（镜像被篡改）的核心机制是？</div>
+      <button class="opt">镜像签名（cosign）+ 准入控制器验签，只允许受信 registry 的带 digest 镜像运行</button>
+      <button class="opt">给镜像加密码</button>
+      <button class="opt">镜像压缩一下</button>
+      <div class="ans">正确答案：<b>签名 + 验签准入</b>。CI 构建后用私钥签名，集群侧 Kyverno/Gatekeeper 验签后才允许运行，配合 SBOM/attestation 实现可追溯。"密码"和"压缩"与供应链信任无关。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>安全加固速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>runAsNonRoot: true</code><span class="desc">Pod 级强制非 root，镜像写 USER 0 会启动失败</span><button class="copy">复制</button></div>
+    <div class="crow"><code>allowPrivilegeEscalation: false</code><span class="desc">性价比最高的一行，断 setuid 提权链</span><button class="copy">复制</button></div>
+    <div class="crow"><code>readOnlyRootFilesystem: true</code><span class="desc">根文件系统只读，可写路径用 emptyDir 显式挂</span><button class="copy">复制</button></div>
+    <div class="crow"><code>capabilities: {drop: ["ALL"]}</code><span class="desc">丢掉全部 capabilities，按需 add</span><button class="copy">复制</button></div>
+    <div class="crow"><code>seccompProfile: {type: RuntimeDefault}</code><span class="desc">运行时默认系统调用过滤，restricted 档硬性要求</span><button class="copy">复制</button></div>
+    <div class="crow"><code>automountServiceAccountToken: false</code><span class="desc">容器内不挂 SA token，断 API server 攻击路径</span><button class="copy">复制</button></div>
+    <div class="crow"><code>image: repo/app:v1@sha256:...</code><span class="desc">digest 锁定，部署可复现、可审计</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pod-security.kubernetes.io/enforce=restricted</code><span class="desc">namespace 标签启用 PSS restricted 档</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>CIS 基线自查清单</h3>
+  <pre><span class="c"># 集群加固自查（15 条，kube-bench 可自动化大半）</span>
+[ ] 所有生产 namespace enforce PSS restricted（系统 ns 至少 baseline）
+[ ] 无特权 Pod；无 hostPath 挂载；无 docker.sock 挂载
+[ ] 全部 Pod runAsNonRoot + drop ALL caps + 只读根文件系统
+[ ] 全部 Pod seccompProfile RuntimeDefault
+[ ] 不需要调 API server 的 Pod 全部 automountServiceAccountToken: false
+[ ] 默认 SA 零绑定；团队无 cluster-admin/edit 集群级绑定
+[ ] NetworkPolicy default-deny 覆盖全部业务 namespace
+[ ] etcd 静态加密开启（KMS 优先）；etcd 端口不对集群外暴露
+[ ] API server --anonymous-auth=false；控制平面节点访问白名单
+[ ] 镜像 registry 白名单 + digest 锁定 + cosign 验签准入
+[ ] CI 集成 Trivy 扫描（HIGH/CRITICAL 阻断）；SBOM 随产物归档
+[ ] runc/containerd/内核版本在补丁基线内（盯 CVE-2019-5736 类公告）
+[ ] 审计日志开启并外发（API server audit policy）
+[ ] Falco 或等价运行时行为监控（异常 exec、读 /etc/shadow）
+[ ] 节点 SSH 禁密码、自动安全更新、最小化安装</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>distroless</b></td><td>只含应用及其运行时依赖的基础镜像，无 shell 无包管理器</td></tr>
+    <tr><td><b>runAsNonRoot</b></td><td>securityContext 字段，强制容器不能以 root 启动</td></tr>
+    <tr><td><b>capabilities</b></td><td>Linux 权能细分（CAP_NET_BIND_SERVICE 等），drop ALL 后按需加</td></tr>
+    <tr><td><b>seccomp</b></td><td>系统调用过滤机制，RuntimeDefault profile 挡住逃逸常用调用</td></tr>
+    <tr><td><b>AppArmor</b></td><td>基于路径的强制访问控制，用注解给容器加载 profile</td></tr>
+    <tr><td><b>PSS</b></td><td>Pod Security Standards：privileged/baseline/restricted 三档内置基线</td></tr>
+    <tr><td><b>RBAC</b></td><td>K8s 基于角色的访问控制，Role/ClusterRole + Binding 组合授权</td></tr>
+    <tr><td><b>ServiceAccount</b></td><td>Pod 的身份，token 默认自动挂载，不需要时应关闭</td></tr>
+    <tr><td><b>EncryptionConfiguration</b></td><td>API server 的静态加密配置，让 etcd 里的 Secret 加密存储</td></tr>
+    <tr><td><b>NetworkPolicy</b></td><td>Pod 级网络访问控制，需 CNI 支持，默认无策略全通</td></tr>
+    <tr><td><b>特权容器</b></td><td>privileged: true，关闭隔离，等价宿主机 root</td></tr>
+    <tr><td><b>docker.sock 挂载</b></td><td>把宿主 Docker 控制接口暴露给容器，等于给宿主机 root</td></tr>
+    <tr><td><b>hostPID/Network/IPC</b></td><td>与宿主共享进程/网络/IPC 命名空间，绕过隔离边界</td></tr>
+    <tr><td><b>容器逃逸</b></td><td>从容器内突破到宿主机/其他容器，靠内核漏洞或配置错误</td></tr>
+    <tr><td><b>CVE-2019-5736</b></td><td>runc 覆盖宿主二进制实现的逃逸，修复于 1.0-rc6 之后</td></tr>
+    <tr><td><b>CVE-2022-0492</b></td><td>利用 cgroup v1 release_agent 的容器逃逸</td></tr>
+    <tr><td><b>准入控制器</b></td><td>对象创建/修改前的拦截校验点（admission webhook）</td></tr>
+    <tr><td><b>Kyverno / OPA Gatekeeper</b></td><td>两种主流 K8s 策略引擎，分别用 YAML 和 Rego 描述策略</td></tr>
+    <tr><td><b>cosign</b></td><td>Sigstore 的镜像签名/验签工具，供应链信任的基石</td></tr>
+    <tr><td><b>SBOM</b></td><td>软件物料清单，列出镜像内全部组件及版本，漏洞响应必备</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>在 kind 里做一次完整加固演练 —— ① 把上面的 hardened Pod 模板 apply 上去，逐项删配置（去掉 runAsNonRoot、给 privileged）观察 PSS restricted 的拒绝信息；② 用 <span class="k">kubectl get pods -A -o json | jq ...</span> 三条命令扫一遍集群；③ 装 Kyverno，写一条"只允许 registry.example.com 带 digest 镜像"的策略，然后尝试部署一个 nginx:latest 确认被拒；④ 用 <span class="k">cosign sign</span> 给本地 registry 的镜像签名，再用 Kyverno verifyImages 放行。<br><br>
+    <b>之后值得单独学：</b>服务网格（Istio）的 mTLS 与 AuthorizationPolicy、OPA Gatekeeper 的 Rego 策略工程化、eBPF 运行时安全（Tetragon/Falco）、以及集群级零信任落地（见网络与零信任篇）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 容器与 K8s 安全 · 上线前务必检查：非 root、只读根fs、NetworkPolicy、RBAC、镜像签名</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（Pod 安全）和模块 5（逃逸）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在自己的集群里 apply 这些 YAML。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起个本地集群：kind create cluster 或 minikube start，配合 kubectl 边看边打';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

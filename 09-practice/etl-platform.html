@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 ETL 与数据同步平台</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 9 期 · 实战篇</span>
+    <h1>二十分钟学透 ETL 与数据同步平台</h1>
+    <p class="sub">数据同步的难点不在"搬数据"，在<b>不丢、不重、可对账、扛得住 schema 变更</b>。这篇讲机制：ETL/ELT 怎么选、全量/增量/CDC 的取舍、DataX 与 Flink CDC 的真实配置、调度依赖与补数据、数据质量与血缘、对账怎么做，以及<b>update_time 全表扫描、上游加列、大事务拖垮 CDC、删除丢失</b>这些经典事故。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>3</b> 种同步模式</span>
+      <span class="chip"><b>4</b> 个框架选型</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边问自己：你现在负责的同步链路，今天丢数据的概率有多大</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <p class="lead">练 CDC 必须有一个<b>开了 binlog 的 MySQL</b>。DataX 从官网下载即可运行，不需要额外服务。</p>
+  <pre><span class="c"># 源库：MySQL 8，开启 ROW 格式 binlog + GTID（CDC 的前提）</span>
+docker run -d --name mysql-src -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root123 \
+  mysql:8.0 --server-id=1 --log-bin=mysql-bin --binlog-format=ROW \
+  --gtid-mode=ON --enforce-gtid-consistency=ON
+
+<span class="c"># CDC 账号必须有的两个权限（很多人漏掉第二个）</span>
+<span class="b">CREATE USER</span> 'cdc'@'%' <span class="b">IDENTIFIED BY</span> 'cdc123';
+<span class="b">GRANT</span> SELECT, REPLICATION SLAVE, REPLICATION CLIENT <span class="b">ON</span> *.* <span class="b">TO</span> 'cdc'@'%';
+
+<span class="c"># DataX：解压即用，Python 版入口是 bin/datax.py</span>
+<span class="c"># https://github.com/alibaba/DataX/releases</span>
+python bin/datax.py job/mysql2mysql.json
+
+<span class="c"># 造测试数据：50 万行订单</span>
+<span class="b">INSERT INTO</span> t_order(user_id, amount, status, update_time)
+<span class="b">SELECT</span> FLOOR(RAND()*10000), ROUND(RAND()*1000,2), 'PAID', NOW()
+<span class="b">FROM</span> information_schema.columns a, information_schema.columns b
+<span class="b">LIMIT</span> 500000;</pre>
+  <div class="callout warn">
+    <b>CDC 的三条硬前提：</b>① binlog-format=ROW（Statement 格式拿不到前后镜像，CDC 工具基本不支持）；② 账号有 REPLICATION SLAVE / REPLICATION CLIENT；③ 表<b>必须有主键</b>——没有主键的 binlog 事件解析后无法定位行，Flink CDC 直接报错，Canal 只能以列值硬匹配。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>ETL vs ELT 与三种同步模式</h2></div>
+  <h3>ETL 与 ELT 的区别只有一个：转换发生在哪</h3>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:250px">ETL</th><th>ELT</th></tr>
+    <tr><td><b>转换位置</b></td><td>抽取后、加载<b>前</b>，在独立转换引擎里完成（Kettle、DataX + Spark）</td><td>先加载进数仓/数据湖，<b>在仓内</b>用 SQL 转换（Hive、Spark、Doris、dbt）</td></tr>
+    <tr><td><b>中间存储</b></td><td>需要独立的转换区，链路长、组件多</td><td>直接落 ODS 贴源层，链路短</td></tr>
+    <tr><td><b>扩展性</b></td><td>转换引擎是瓶颈，数据量涨就得扩引擎</td><td>数仓本身弹性扩缩容，转换只是 SQL</td></tr>
+    <tr><td><b>调试成本</b></td><td>可视化编排，但排查要翻配置和日志</td><td>转换逻辑就是 SQL，可单步执行、可 diff</td></tr>
+    <tr><td><b>适用</b></td><td>异构系统、 legacy 数仓、需要复杂清洗逻辑</td><td>云数仓（Snowflake/BigQuery/StarRocks/Doris）+ dbt，<b>当前主流</b></td></tr>
+  </table>
+  <div class="callout">
+    <b>一句话选择：</b>新平台直接走 <b>ELT</b>——同步层只负责"原样搬进 ODS"（这也让同步层变得简单可靠），所有清洗、关联、聚合做成 SQL 模型分层（ODS→DWD→DWS→ADS）。只有"数据还没进仓就要过滤掉大部分"或"源和目标异构且无法用 SQL 表达"时才用 ETL。
+  </div>
+
+  <h3>三种同步模式的取舍</h3>
+  <table>
+    <tr><th style="width:100px">模式</th><th style="width:230px">机制</th><th>源库压力</th><th>延迟</th><th>一致性风险</th></tr>
+    <tr><td><b>全量</b></td><td><span class="k">SELECT * </span>整表拉取，覆盖或截断目标表</td><td>高（大表全扫）</td><td>分钟~小时级</td><td>低（自包含，跑完即完整快照）</td></tr>
+    <tr><td><b>增量</b></td><td>按水线字段（<span class="k">update_time &gt; ?</span>）拉变更</td><td>中（依赖索引）</td><td>分钟级</td><td><b>高</b>：漏更新、漏删除、时钟回拨</td></tr>
+    <tr><td><b>CDC</b></td><td>伪装成从库订阅 binlog，捕获 INSERT/UPDATE/DELETE</td><td><b>低</b>（只读日志，不查表）</td><td><b>秒级</b></td><td>中：需处理顺序、重复、schema 变更</td></tr>
+  </table>
+  <pre><span class="c"># 增量同步的水线 SQL（正确形态）</span>
+<span class="b">SELECT</span> id, user_id, amount, status, update_time
+<span class="b">FROM</span> t_order
+<span class="b">WHERE</span> update_time &gt;= <span class="y">'${last_watermark}'</span>
+  <span class="b">AND</span> update_time &lt;  <span class="y">'${batch_end}'</span>      <span class="c"># 右开区间，防止下一批漏/重</span>
+<span class="b">ORDER BY</span> update_time
+<span class="b">LIMIT</span> 100000;
+
+<span class="c"># 跑完后：last_watermark = batch_end，落库到一张 watermark 表</span>
+<span class="c"># 增量同步的两个硬条件：</span>
+<span class="c"># 1. update_time 上必须有索引，否则每次全表扫描</span>
+<span class="c"># 2. 历史行不允许被 update_time 之前的 UPDATE 改状态</span>
+<span class="c">#    （"改旧单状态"的业务会永远漏掉这条变更）</span></pre>
+  <h4>容量估算（给计算过程）</h4>
+  <p>一张 <b>5000 万行、平均单行 500 字节</b>的订单表：<br>
+  全量数据量 = 5×10<sup>7</sup> × 500B = 2.5×10<sup>10</sup>B ≈ <b>23.3 GB</b>。<br>
+  按每天 1% 行发生变更、每次变更涉及整行 = 500B 计：日增量 ≈ 5×10<sup>5</sup> × 500B = <b>250 MB/天</b>。<br>
+  若 1 小时内要同步完全量 23.3 GB：持续带宽 = 23.3 GB × 8 / 3600 s ≈ <b>51.8 Mbps</b>，留一倍余量 → 链路至少 <b>100 Mbps</b>。这就是"要不要上 CDC"的决策依据：全量每天 100 Mbps 跑 1 小时，多数内网链路和源库 IO 都吃不消。</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>批处理框架：DataX / SeaTunnel / Flink 批</h2></div>
+  <table>
+    <tr><th style="width:110px">框架</th><th style="width:250px">定位</th><th>关键机制</th><th>适用</th></tr>
+    <tr><td><b>DataX</b></td><td>阿里开源离线同步，插件化读写</td><td>splitPk 分片、channel 流式 pipeline、速度控制</td><td>DB→DB / DB→数仓的定时全量、增量</td></tr>
+    <tr><td><b>SeaTunnel</b></td><td>新一代（原 Waterdrop），连接器生态丰富</td><td>一套 API 跑 Spark/Flink/Zeta 自研引擎</td><td>多源汇聚、湖仓一体</td></tr>
+    <tr><td><b>Flink 批</b></td><td>流批一体引擎的批模式</td><td>与实时作业同构，代码复用</td><td>大宽表加工、复杂转换、已有 Flink 团队</td></tr>
+    <tr><td><b>Kettle/PDI</b></td><td>老牌 ETL 工具</td><td>可视化作业设计</td><td>legacy 系统维护，新项目不建议</td></tr>
+  </table>
+  <h3>DataX 真实任务配置（MySQL → MySQL 全量 + 限速）</h3>
+  <pre>{
+  <span class="y">"job"</span>: {
+    <span class="y">"setting"</span>: {
+      <span class="y">"speed"</span>: {
+        <span class="y">"channel"</span>: 3,
+        <span class="y">"byte"</span>: 10485760
+      },
+      <span class="y">"errorLimit"</span>: {
+        <span class="y">"record"</span>: 0,
+        <span class="y">"percentage"</span>: 0.02
+      }
+    },
+    <span class="y">"content"</span>: [
+      {
+        <span class="y">"reader"</span>: {
+          <span class="y">"name"</span>: <span class="g">"mysqlreader"</span>,
+          <span class="y">"parameter"</span>: {
+            <span class="y">"username"</span>: <span class="g">"reader"</span>,
+            <span class="y">"password"</span>: <span class="g">"reader_pwd"</span>,
+            <span class="y">"column"</span>: [<span class="g">"id"</span>, <span class="g">"user_id"</span>, <span class="g">"amount"</span>, <span class="g">"status"</span>, <span class="g">"update_time"</span>],
+            <span class="y">"splitPk"</span>: <span class="g">"id"</span>,
+            <span class="y">"where"</span>: <span class="g">"update_time &gt;= '2026-10-17 00:00:00'"</span>,
+            <span class="y">"connection"</span>: [
+              {
+                <span class="y">"jdbcUrl"</span>: [<span class="g">"jdbc:mysql://127.0.0.1:3306/orders"</span>],
+                <span class="y">"table"</span>: [<span class="g">"t_order"</span>]
+              }
+            ]
+          }
+        },
+        <span class="y">"writer"</span>: {
+          <span class="y">"name"</span>: <span class="g">"mysqlwriter"</span>,
+          <span class="y">"parameter"</span>: {
+            <span class="y">"username"</span>: <span class="g">"writer"</span>,
+            <span class="y">"password"</span>: <span class="g">"writer_pwd"</span>,
+            <span class="y">"writeMode"</span>: <span class="g">"insert"</span>,
+            <span class="y">"column"</span>: [<span class="g">"id"</span>, <span class="g">"user_id"</span>, <span class="g">"amount"</span>, <span class="g">"status"</span>, <span class="g">"update_time"</span>],
+            <span class="y">"preSql"</span>: [<span class="g">"TRUNCATE TABLE dw.dwd_order"</span>],
+            <span class="y">"connection"</span>: [
+              {
+                <span class="y">"jdbcUrl"</span>: <span class="g">"jdbc:mysql://127.0.0.1:3306/dw?rewriteBatchedStatements=true"</span>,
+                <span class="y">"table"</span>: [<span class="g">"dwd_order"</span>]
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}</pre>
+  <h4>这份配置里每个关键参数在决定什么</h4>
+  <table>
+    <tr><th style="width:130px">参数</th><th>作用与坑</th></tr>
+    <tr><td class="f">splitPk: id</td><td>DataX 按主键范围把表切成 N 个分片，每个 Task 读一片。<b>不加则单线程读整表</b>；主键分布不均（如按时间递增的 id，新数据集中在尾部）会造成分片倾斜</td></tr>
+    <tr><td class="f">channel: 3</td><td>reader→writer 的缓冲区队列数，控制内存占用和背压。默认 1，大表调 3~5</td></tr>
+    <tr><td class="f">byte: 10485760</td><td>每秒最多 10 MB，<b>保护源库和网卡</b>。不限速的 DataX 能把源库 IO 打满，连带线上业务变慢</td></tr>
+    <tr><td class="f">errorLimit</td><td>脏数据容忍度。record=0 表示一条都不许错。设 percentage 前想清楚：脏数据静默跳过 = 丢数据</td></tr>
+    <tr><td class="f">preSql: TRUNCATE</td><td>全量覆盖场景先清空目标表。<b>必须确认下游没人读这张表</b>，否则清空到灌完之间窗口期查不到数据</td></tr>
+    <tr><td class="f">rewriteBatchedStatements</td><td>MySQL JDK5+ 驱动参数，把多条 INSERT 合并成一条批量语句，写入性能可提升数倍</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>DataX 的语义边界：</b>单表任务不是原子的。失败时目标表可能处于"清了一半、灌了一半"的状态，重跑前必须自己处理。而且 DataX <b>不感知目标端已有数据</b>，幂等要么靠 preSql 清表（全量），要么靠目标端 <span class="k">ON DUPLICATE KEY UPDATE</span>（增量）。把 DataX 当"插一次就跑完"的工具，重复执行就是重复数据。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>实时同步：Canal / Debezium / Flink CDC</h2></div>
+  <table>
+    <tr><th style="width:110px">工具</th><th style="width:250px">架构</th><th>schema 变更</th><th>一致性</th></tr>
+    <tr><td><b>Canal</b></td><td>server 伪装 MySQL 从库拉 binlog，client 消费（常用 canal-server + MQ）</td><td>弱（需 client 自行适配）</td><td>at-least-once，客户端自己幂等</td></tr>
+    <tr><td><b>Debezium</b></td><td>基于 Kafka Connect，source connector 读 binlog 写 Kafka topic</td><td><b>强</b>：DDL 事件进独立 schema change topic</td><td>at-least-once；快照阶段支持 exactly-once 语义</td></tr>
+    <tr><td><b>Flink CDC</b></td><td>flink-cdc-connectors 内嵌 Debezium 反序列化，直接出 DataStream</td><td>强（自动传播部分 DDL）</td><td>checkpoint + 2PC sink 可做到 exactly-once</td></tr>
+  </table>
+  <h3>Flink CDC SQL 方式（生产常用形态）</h3>
+  <pre><span class="c">-- 一张 binlog 源表，自动解析 DML（含 DELETE）</span>
+<span class="b">CREATE TABLE</span> orders_cdc (
+  id          BIGINT,
+  user_id     BIGINT,
+  amount      DECIMAL(10,2),
+  status      VARCHAR(16),
+  update_time TIMESTAMP(3),
+  <span class="b">PRIMARY KEY</span> (id) <span class="b">NOT ENFORCED</span>
+) <span class="b">WITH</span> (
+  <span class="y">'connector'</span> = <span class="g">'mysql-cdc'</span>,
+  <span class="y">'hostname'</span> = <span class="g">'127.0.0.1'</span>,
+  <span class="y">'port'</span> = <span class="g">'3306'</span>,
+  <span class="y">'username'</span> = <span class="g">'flink'</span>,
+  <span class="y">'password'</span> = <span class="g">'flink'</span>,
+  <span class="y">'database-name'</span> = <span class="g">'orders'</span>,
+  <span class="y">'table-name'</span> = <span class="g">'t_order'</span>,
+  <span class="y">'server-id'</span> = <span class="g">'5400-5404'</span>,
+  <span class="y">'scan.incremental.snapshot.enabled'</span> = <span class="g">'true'</span>
+);
+
+<span class="c">-- 实时宽表：订单流 JOIN 用户维表，写入下游</span>
+<span class="b">INSERT INTO</span> dw.dwd_order_full
+<span class="b">SELECT</span> o.id, o.user_id, u.name, o.amount, o.status, o.update_time
+<span class="b">FROM</span> orders_cdc o
+<span class="b">JOIN</span> users_cdc u <span class="b">ON</span> o.user_id = u.id;</pre>
+  <h4>Java DataStream 版的核心两行（说明 schema 也是数据流的一部分）</h4>
+  <pre><span class="c">// binlog 源是 Flink Source，支持从 checkpoint 位点恢复，重启不丢</span>
+MySqlSource&lt;String&gt; source = MySqlSource.&lt;String&gt;builder()
+    .hostname(<span class="g">"127.0.0.1"</span>).port(3306)
+    .databaseList(<span class="g">"orders"</span>).tableList(<span class="g">"orders.t_order"</span>)
+    .username(<span class="g">"flink"</span>).password(<span class="g">"flink"</span>)
+    .deserializer(new JsonDebeziumDeserializationSchema())
+    .startupOptions(StartupOptions.initial())
+    .build();
+env.fromSource(source, WatermarkStrategy.noWatermarks(), <span class="g">"mysql-cdc"</span>);</pre>
+  <h3>一致性保证的三层防线</h3>
+  <ol>
+    <li><b>语义层：CDC 本身是 at-least-once。</b>任务重启、重试必然产生重复事件，一致性靠<b>目标端幂等</b>兜底——主键冲突时 <span class="k">INSERT ... ON DUPLICATE KEY UPDATE</span>，或目标库用 <span class="k">REPLACE INTO</span>。</li>
+    <li><b>顺序层：单表的 binlog 事件严格按提交顺序排列，但写进 Kafka 多分区后会乱序。</b>必须<b>按主键取模分区</b>，保证同一行的所有变更进同一分区、有序消费，否则"先删后插"可能被消费成"先插后删"，最终留下旧值。</li>
+    <li><b>事务层：要 exactly-once 就上 Flink checkpoint + 两阶段提交 sink</b>（如 Kafka）。代价是延迟增加和 sink 必须支持事务（MySQL JDBC sink 目前只做到幂等写，不是真正的 2PC）。</li>
+  </ol>
+  <div class="callout danger">
+    <b>大事务是 CDC 的头号杀手。</b>源库一个事务 UPDATE 了 200 万行，binlog 会连续吐 200 万条变更事件。CDC 消费端反序列化跟不上，<b>lag 从秒级涨到小时级</b>，下游看到的数据停留在几小时前。发现 lag 涨先查源库：<span class="k">SELECT * FROM information_schema.innodb_trx WHERE trx_started &lt; NOW() - INTERVAL 60 SECOND</span>，揪出长事务让它改批量提交。同时给 CDC 任务配 lag 告警（binlog 位点差 &gt; 100MB 或延迟 &gt; 30s 即告警）。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>任务调度与依赖</h2></div>
+  <p class="lead">调度系统的本质是<b>按 DAG 在正确的时间触发正确的任务，并在失败时知道该重试哪些</b>。数据同步管道的调度比离线批处理更敏感：上游晚到 10 分钟，下游全部指标延迟。</p>
+  <table>
+    <tr><th style="width:150px">依赖类型</th><th style="width:250px">定义</th><th>坑</th></tr>
+    <tr><td><b>同周期依赖</b></td><td>T 日任务依赖 T 日的上游任务（最常见）</td><td>上游延迟 → 级联等待， SLA 层层透支</td></tr>
+    <tr><td><b>跨周期依赖</b></td><td>T 日 02:00 的全量任务依赖 T-1 日所有小时任务</td><td>依赖判断错误会读到不完整分区</td></tr>
+    <tr><td><b>自依赖</b></td><td>本任务上一个实例完成才能触发下一个（串行化）</td><td>上次实例卡住 → 本次永不触发，静默停摆</td></tr>
+  </table>
+  <h4>调度器选型</h4>
+  <table>
+    <tr><th style="width:150px">系统</th><th style="width:250px">依赖模型</th><th>适用</th></tr>
+    <tr><td><b>Airflow</b></td><td>Python 定义 DAG，XCom 传参，生态大</td><td>云数仓 ELT、Python 数据团队</td></tr>
+    <tr><td><b>DolphinScheduler</b></td><td>可视化 DAG，国产，工作流+数据质量一体</td><td>国内中台、多团队共用调度</td></tr>
+    <tr><td><b>XXL-Job</b></td><td>轻量，单任务粒度为主，路由/分片广播</td><td>同步任务、轻量批处理（详见调度专题）</td></tr>
+  </table>
+  <h4>补数据（backfill）的正确姿势</h4>
+  <pre><span class="c"># 补数据是事故高发区：直接改调度周期触发，会级联触发整条下游 DAG</span>
+<span class="c"># 正确做法：补数据任务打标记，只跑自己，不触发下游</span>
+<span class="b">INSERT INTO</span> dw.dwd_order
+<span class="b">SELECT</span> * <span class="b">FROM</span> ods.t_order_raw
+<span class="b">WHERE</span> dt = <span class="y">'2026-10-12'</span>
+  <span class="b">AND</span> is_backfill = 1;   <span class="c"># 分区标记，与日常跑批物理隔离</span>
+
+<span class="c"># 补完再单独触发下游的"指定分区"实例，而不是整个 DAG</span>
+<span class="c"># 核心原则：补数据是手术，不是扫射。能按分区/按日期精确重跑，就别整条链路重跑</span></pre>
+  <div class="callout warn">
+    <b>SLA 倒逼设计：</b>给每条链路定义"承诺完成时间"（如 07:00 前产出 T-1 报表），拆解为每个节点的 deadline，哪个节点超时就告警到责任人，而不是等下游业务方早上来问"怎么还没数据"。同步任务的监控四件套：<b>运行时长趋势、成功率、数据量波动（±30% 告警）、端到端延迟（源库最新时间 vs 目标库最新时间）</b>。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>数据质量与血缘</h2></div>
+  <h3>校验规则：强规则阻断，弱规则告警</h3>
+  <table>
+    <tr><th style="width:120px">规则类型</th><th style="width:260px">检查 SQL 示例</th><th>级别</th></tr>
+    <tr><td><b>主键唯一</b></td><td class="f">SELECT id, COUNT(*) c FROM t GROUP BY id HAVING c &gt; 1</td><td>强（阻断下游）</td></tr>
+    <tr><td><b>空值率</b></td><td class="f">SELECT COUNT(*) FROM t WHERE user_id IS NULL</td><td>强（核心字段）</td></tr>
+    <tr><td><b>枚举合法</b></td><td class="f">SELECT DISTINCT status FROM t WHERE status NOT IN ('PAID','REFUND')</td><td>弱→强</td></tr>
+    <tr><td><b>行数波动</b></td><td class="f">ABS(today_count - avg_7d) / avg_7d &gt; 0.3</td><td>弱（大促会误报，设白名单）</td></tr>
+    <tr><td><b>值域检查</b></td><td class="f">SELECT COUNT(*) FROM t WHERE amount &lt; 0</td><td>强</td></tr>
+    <tr><td><b>主外键</b></td><td class="f">LEFT JOIN 维表 ON ... WHERE 维表.id IS NULL</td><td>弱（维表延迟会误报）</td></tr>
+  </table>
+  <div class="callout">
+    <b>规则怎么落地：</b>同步任务后置一个"质量检查步骤"，强规则失败 → 任务标红 + 阻断下游 + 通知值班；弱规则失败 → 记录质量报告不阻断。工具有 Great Expectations（Python）、Deequ（Spark）、DolphinScheduler 内置质量模块。<b>别追求规则全覆盖</b>——先从"主键唯一 + 空值率 + 行数波动"三条开始，它们能拦住 80% 的事故。
+  </div>
+  <h3>血缘（Lineage）：自动化解析，禁止人工维护</h3>
+  <p>血缘回答两个问题：<b>"这张表的下游有哪些，改它会影响谁"</b>和<b>"这个指标数字错了，从哪条链路开始查"</b>。实现方式是解析 ETL 任务的 SQL AST 提取表/字段依赖，按标准协议上报（<b>OpenLineage</b> 是当前事实标准，Marquez/DataHub/Apollo Atlas 可做存储与可视化）。</p>
+  <pre><span class="c"># 血缘为什么必须自动解析：</span>
+<span class="c"># 人工维护的 wiki 在第一次表改名后就是废纸，没人会记得更新</span>
+<span class="c"># 正确链路：任务调度器/OOzzie 每次执行时上报 OpenLineage 事件</span>
+<span class="c">#   → collector 落库 → 前端画表级/字段级血缘图 → 支持影响分析</span>
+<span class="c"># 关键能力：改表前先查"下游消费者列表"，群里挨个通知</span></pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>schema 变更处理与一致性对账</h2></div>
+  <h3>上游 DDL 是同步链路最常见的"无预警故障"</h3>
+  <table>
+    <tr><th style="width:120px">变更类型</th><th style="width:270px">对同步任务的影响</th><th>处理方式</th></tr>
+    <tr><td><b>加列（有默认值）</b></td><td>增量 SQL 列清单不含新列 → 新列数据永远丢；binlog 含新字段但 writer 列不匹配 → 报错</td><td>同步配置加"自动同步列"或定期 diff 源/目标 schema</td></tr>
+    <tr><td><b>删列</b></td><td>目标端残留该列，binlog 里消失 → 目标端永远保留旧值</td><td>目标表同步 DROP，或映射为 NULL</td></tr>
+    <tr><td><b>改类型（加宽）</b></td><td>INT→BIGINT：binlog 解析正常，目标端写入可能截断</td><td>目标端类型同步扩大，先改下游再改上游</td></tr>
+    <tr><td><b>改类型（缩窄）</b></td><td>VARCHAR(64)→VARCHAR(32)：超长值写入失败或截断</td><td><b>禁止缩窄</b>，或同步任务加长度校验</td></tr>
+    <tr><td><b>改主键 / 加主键</b></td><td>splitPk 失效、CDC 解析报错、幂等键变化</td><td>停机变更，评估全量重建</td></tr>
+  </table>
+  <pre><span class="c"># Debezium 的 schema 变更处理：DDL 事件进独立 topic</span>
+<span class="c"># myserver.orders.t_order        → 数据事件（DML）</span>
+<span class="c"># myserver.schema-changes.orders → DDL 事件（ALTER TABLE 等）</span>
+<span class="c"># 消费者要订阅两个 topic，否则上游加列后 consumer 反序列化直接抛异常</span>
+
+<span class="c"># Flink CDC 的 schema 变更传播（有限支持）：</span>
+<span class="c"># 加列、删列会自动传播到下游；但改主键、改列类型会抛异常</span>
+<span class="c"># 应对：把 CDC 任务的目标表建成"宽表 + JSON 扩展列"，吸收新增字段</span>
+<span class="c"># ALTER TABLE dw.dwd_order ADD COLUMN extra JSON DEFAULT NULL;</span></pre>
+  <div class="callout danger">
+    <b>最典型的静默事故：</b>上游给 t_order 加了 <span class="k">coupon_amount</span> 列，同步任务因为列清单写死而<b>不报错也不同步新列</b>，报表少算优惠金额，三周后财务对账才发现。解法：① 同步配置不要写死列清单（或写"SELECT *"）；② 每日跑一次 schema diff 作业，源目标结构不一致即告警；③ 关键表新列上线走变更评审。
+  </div>
+  <h3>一致性对账：最后防线，不能省</h3>
+  <table>
+    <tr><th style="width:110px">层级</th><th style="width:250px">方法</th><th>能发现什么</th></tr>
+    <tr><td><b>行数对账</b></td><td class="f">SELECT COUNT(*) FROM src 对比 dst</td><td>整表丢失、任务整体失败</td></tr>
+    <tr><td><b>聚合对账</b></td><td class="f">SUM(amount), MAX(id) 按分区对比</td><td>部分行丢失、金额被改小</td></tr>
+    <tr><td><b>内容对账</b></td><td>MD5(GROUP_CONCAT(...ORDER BY id)) 全表 checksum</td><td>行内容被篡改、更新丢失（成本最高）</td></tr>
+    <tr><td><b>实时对账</b></td><td>CDC 变更流与目标端逐条比对（如 Flink 双流 JOIN）</td><td>分钟级不一致，不用等 T+1</td></tr>
+  </table>
+  <pre><span class="c">-- T+1 聚合对账 SQL（按天分区）</span>
+<span class="b">SELECT</span> dt,
+       <span class="b">COUNT</span>(*)      <span class="b">AS</span> cnt_src,
+       <span class="b">SUM</span>(amount)   <span class="b">AS</span> amt_src
+<span class="b">FROM</span> ods.t_order_raw
+<span class="b">WHERE</span> dt = <span class="y">'2026-10-17'</span>
+<span class="b">GROUP BY</span> dt;
+
+<span class="c">-- 与数仓侧同口径结果对比，差异 &gt; 0 即写入对账差异表：</span>
+<span class="c">-- 差异表字段：dt, table_name, check_type, src_value, dst_value, status</span>
+<span class="c">-- 修复流程：标记 status=待重跑 → 只重跑该分区 → 复检 → 关闭</span>
+<span class="c">-- 关键：对账任务本身也要监控（对账任务挂了 = 系统瞎了）</span></pre>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>容量与性能</h2></div>
+  <h3>并行度估算公式</h3>
+  <pre><span class="c"># 批处理并行度</span>
+并行度 = 表数量 × 单表分片数
+单表分片数 = 表数据量 ÷ 单 Task 吞吐（DataX 经验值 5~20 MB/s，取决于行宽）
+<span class="c"># 例：10 张表共 50 GB，单 task 10 MB/s，要求 1 小时完成</span>
+<span class="c">#   需要 50GB/3600s ≈ 14 MB/s 持续 → 至少 2 个 task</span>
+<span class="c">#   考虑 3 倍余量（源库竞争、网络抖动、GC）→ 每表 2~4 片</span>
+
+<span class="c"># CDC 并行度</span>
+并行度 = 库表数 ÷ 单 task 可监听表数
+<span class="c"># Flink CDC 单 task 监听多表（一张 binlog 流拆多表），并行度 = min(表数, 集群 slot 数)</span>
+<span class="c"># 注意：Flink CDC 的并行度不能大于表的 binlog 分区有序性要求，</span>
+<span class="c">#       单表提升并行度会破坏表内顺序，只能按表分</span></pre>
+  <h3>源库保护与带宽</h3>
+  <table>
+    <tr><th style="width:150px">手段</th><th>做法</th></tr>
+    <tr><td><b>读从库</b></td><td>DataX/Canal 指向只读从库，隔离主库压力（注意从库延迟会造成数据滞后）</td></tr>
+    <tr><td><b>限速</b></td><td>DataX <span class="k">speed.byte</span>；Flink 源限 <span class="k">executor 并行度 + 背压</span>； Canal <span class="k">canal.instance.memory.bufferSize</span></td></tr>
+    <tr><td><b>错峰</b></td><td>大表全量排在业务低峰（02:00-05:00），与调度 SLA 联动</td></tr>
+    <tr><td><b>分片避开热点</b></td><td>splitPk 选分布均匀的列（如 user_id 哈希列），不要选自增主键或时间列</td></tr>
+  </table>
+  <h3>必须盯的监控指标</h3>
+  <div class="cmds">
+    <div class="crow"><code>CDC lag（秒）</code><span class="desc">binlog 最新位点时间 - 当前消费位点时间，&gt; 60s 告警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>binlog 位点差（MB）</code><span class="desc">累计未消费 binlog 量，突增 = 大事务或消费阻塞</span><button class="copy">复制</button></div>
+    <div class="crow"><code>任务运行时长</code><span class="desc">与历史 P95 对比，劣化 50% 即预警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>数据量波动</code><span class="desc">本次同步行数 vs 近 7 天同时段均值，±30% 告警</span><button class="copy">复制</button></div>
+    <div class="crow"><code>源库主从延迟</code><span class="desc">Seconds_Behind_Master，同步期间持续上涨说明压垮了从库</span><button class="copy">复制</button></div>
+    <div class="crow"><code>目标端写入失败率</code><span class="desc">按错误码分组：超时/死锁/列不匹配分别报警</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>binlog 会被自动清理，这是 CDC 的隐藏红线。</b>MySQL <span class="k">binlog_expire_logs_seconds</span>（默认 2592000 = 30 天）过期后旧位点失效。如果 CDC 任务挂了 3 天没人管，恢复时报"binlog file not found"，<b>只能重新全量快照</b>。所以 CDC 任务必须有：① 位点 checkpoint 持久化；② 任务存活告警（挂了 10 分钟就喊人）；③ 定期演练"从 checkpoint 恢复"。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">增量同步靠 update_time，但字段上没索引</div><div class="pd">每次同步全表扫描，源库 CPU 打满，连带线上业务变慢。加组合索引 (update_time, id)，并 EXPLAIN 确认走索引。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">"改旧单"导致增量永久漏数据</div><div class="pd">业务把 30 天前的订单状态从"已完成"改为"已退款"，水线 SQL 永远捞不回来。历史数据修正要么触发全量，要么用 binlog 兜底（CDC 天然覆盖）。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">增量同步丢 DELETE</div><div class="pd">update_time 模式只能感知插入和更新，源库的删除操作在目标端永远少一行。需要感知删除就走 CDC，或源库软删除（改状态位而非真删）。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">重复执行 = 重复数据（无幂等）</div><div class="pd">任务失败重跑，目标端又插一遍。幂等三选一：主键冲突 ON DUPLICATE KEY UPDATE、REPLACE INTO、或先按主键删除再插入。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">上游加列，同步任务静默少一列</div><div class="pd">列清单写死在配置里，新列既不报错也不同步，报表口径悄悄变化。每日 schema diff 作业 + 配置不写死列清单。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">splitPk 选自增主键，分片严重倾斜</div><div class="pd">id 1~1000 万集中在最近三个月，尾部分片数据量是头部的几十倍，任务整体被最慢分片拖住。换分布均匀的列，或先按时间范围预分区再各自分片。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">大事务把 CDC lag 拖到小时级</div><div class="pd">源库一个事务改 200 万行，binlog 连续涌入，消费端跟不上，下游数据停留在几小时前。规范批量提交（每批 1 万行一个事务），监控 innodb_trx 长事务。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">补数据触发整条 DAG，下游重复计算</div><div class="pd">为了修一天的数据，重跑上游导致下游十个任务全部重新计算，成本翻倍且报表互相覆盖。补数据必须打标记、按分区精确重跑、不自动触发下游。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">binlog 过期，CDC 位点失效</div><div class="pd">CDC 任务故障 3 天没人处理，binlog 被自动清理，恢复时只能全量重建，期间数据空洞。监控任务存活 + 位点连续性，故障恢复 SOP 写清楚。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">敏感数据明文同步到数仓</div><div class="pd">手机号、身份证全量落 ODS，数仓权限比业务库宽得多，等于扩大暴露面。入库前脱敏（掩码/哈希/保留格式加密），数仓按列授权，审计导出行为。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. ETL 和 ELT 最本质的区别是？</div>
+      <button class="opt">ETL 只能用于离线，ELT 只能用于实时</button>
+      <button class="opt">转换发生的位置：ETL 在加载前转换，ELT 先加载进数仓再用 SQL 转换</button>
+      <button class="opt">ETL 不支持 CDC，ELT 支持</button>
+      <div class="ans">正确答案：<b>转换发生的位置</b>。ELT 依赖数仓的弹性算力，把清洗逻辑变成 SQL 模型，是当前云数仓的主流做法；ETL 的转换在独立引擎里完成，链路更长但适合异构场景。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 增量同步用 <span class="k">WHERE update_time &gt; last_watermark</span> 捞数据，以下哪个场景会丢数据？</div>
+      <button class="opt">源库在同步窗口内插入了 100 万行新订单</button>
+      <button class="opt">源库删除了一批 30 天前的历史订单</button>
+      <button class="opt">源库把一笔订单的金额从 100 改成了 200</button>
+      <div class="ans">正确答案：<b>删除历史订单</b>。水线模式只捕获"水线之后发生变化的行"：删除的目标行 update_time 不会变（且行已不存在），增量 SQL 永远感知不到。插入和更新都会被 update_time 捕获。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. DataX 配置中 splitPk 的作用是？</div>
+      <button class="opt">指定分片字段，按该列的值域把表切成多个分片，多 Task 并行读取</button>
+      <button class="opt">指定目标表的写入主键，用于幂等</button>
+      <button class="opt">指定排序字段，保证数据有序写入</button>
+      <div class="ans">正确答案：<b>分片读取</b>。DataX 按 splitPk 的范围把单表拆成多个分片，每个 Task 读一片，这是它并行的来源。不配 splitPk 则单线程读整表，大表会跑得非常慢。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 为什么说 CDC 对源库的压力比全量 SELECT 小得多？</div>
+      <button class="opt">CDC 只在夜间运行，全量在白天运行</button>
+      <button class="opt">CDC 用了压缩传输，数据量更小</button>
+      <button class="opt">CDC 伪装成从库读 binlog 日志，不执行任何查询 SQL，不占用源库的查询资源</button>
+      <div class="ans">正确答案：<b>读 binlog，不查表</b>。CDC 通过复制协议订阅已经写好的日志，源库的 CPU、Buffer Pool、IO 都不受影响。但要注意：大事务会让 binlog 流量突增，消费端 lag 上涨。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. Flink CDC 任务重启后，如何保证已经处理过的 binlog 事件不重复影响下游？</div>
+      <button class="opt">依靠 binlog 位点精确到条，天然不重复</button>
+      <button class="opt">checkpoint 保证至少一次语义，重复由目标端幂等写入（主键冲突更新）兜底</button>
+      <button class="opt">依靠 Kafka 消费组的 offset 去重</button>
+      <div class="ans">正确答案：<b>at-least-once + 目标端幂等</b>。Flink checkpoint 恢复时会重放部分事件，这是设计使然；真正去重靠目标端主键冲突时走 UPDATE 分支。追求 exactly-once 需要 2PC sink，代价是延迟和复杂度。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 一条 5000 万行、单行 500B 的表，全量约多少数据量？要在 1 小时内同步完，不考虑余量至少需要多少持续带宽？</div>
+      <button class="opt">约 23.3 GB，持续带宽约 52 Mbps</button>
+      <button class="opt">约 2.5 GB，持续带宽约 5.6 Mbps</button>
+      <button class="opt">约 233 GB，持续带宽约 518 Mbps</button>
+      <div class="ans">正确答案：<b>23.3 GB / 52 Mbps</b>。计算：5×10<sup>7</sup> × 500B = 2.5×10<sup>10</sup>B ≈ 23.3 GB；带宽 = 23.3 GB × 8 ÷ 3600 s ≈ 51.8 Mbps。实际工程要再留 2~3 倍余量给源库竞争、网络抖动和失败重试。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查配置</h3>
+  <div class="cmds">
+    <div class="crow"><code>splitPk + channel + speed.byte</code><span class="desc">DataX 三件套：分片并行、缓冲、限速</span><button class="copy">复制</button></div>
+    <div class="crow"><code>binlog-format=ROW</code><span class="desc">CDC 的硬前提，Statement/Mixed 都不行</span><button class="copy">复制</button></div>
+    <div class="crow"><code>server-id=5400-5404</code><span class="desc">Flink CDC 分配从库 ID 的范围，不能和现有从库冲突</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gtid-mode=ON</code><span class="desc">开启 GTID，主从切换后位点不断裂</span><button class="copy">复制</button></div>
+    <div class="crow"><code>rewriteBatchedStatements=true</code><span class="desc">MySQL JDBC 批量写优化，数倍提升</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ON DUPLICATE KEY UPDATE</code><span class="desc">增量写入幂等的标准写法</span><button class="copy">复制</button></div>
+    <div class="crow"><code>information_schema.innodb_trx</code><span class="desc">查 MySQL 长事务，CDC lag 暴涨时第一个查它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN SELECT ... WHERE update_time&gt;?</code><span class="desc">验证增量 SQL 是否走索引</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT COUNT(*), SUM(amount) 按分区对比</code><span class="desc">T+1 聚合对账的最小实现</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键参数速查</h3>
+  <pre><span class="c"># MySQL 源库（CDC 场景必须确认的三项）</span>
+log-bin = mysql-bin
+binlog-format = ROW
+gtid-mode = ON
+enforce-gtid-consistency = ON
+binlog_expire_logs_seconds = 2592000   <span class="c"># 默认 30 天；CDC 位点必须在此窗口内恢复</span>
+
+<span class="c"># DataX 限速（channel 数 × byte 每秒上限）</span>
+<span class="g">"speed"</span>: { <span class="g">"channel"</span>: 3, <span class="g">"byte"</span>: 10485760 }
+
+<span class="c"># Flink CDC 源表关键参数</span>
+<span class="y">'server-id'</span> = <span class="g">'5400-5404'</span>
+<span class="y">'scan.incremental.snapshot.enabled'</span> = <span class="g">'true'</span>   <span class="c"># 无锁增量快照，不锁表</span>
+<span class="y">'scan.snapshot.fetch.size'</span> = <span class="g">'1024'</span>          <span class="c"># 快照分片大小</span>
+<span class="y">'debezium.snapshot.mode'</span> = <span class="g">'initial'</span>        <span class="c"># initial / latest / never</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>ETL / ELT</b></td><td>抽取后在加载前转换 / 先加载进仓再用 SQL 转换</td></tr>
+    <tr><td><b>ODS / DWD / DWS / ADS</b></td><td>贴源层 / 明细层 / 汇总层 / 应用层，数仓经典四层</td></tr>
+    <tr><td><b>CDC</b></td><td>变更数据捕获，订阅数据库 binlog 获取增删改事件流</td></tr>
+    <tr><td><b>binlog</b></td><td>MySQL 的归档日志，CDC 的数据源，ROW 格式记录行变更前后镜像</td></tr>
+    <tr><td><b>水线 watermark</b></td><td>增量同步的进度标记，记录上次同步到的位置（时间或 ID）</td></tr>
+    <tr><td><b>GTID</b></td><td>全局事务 ID，主从切换后能唯一定位 binlog 位点，避免断裂</td></tr>
+    <tr><td><b>splitPk</b></td><td>DataX 的分片字段，决定单表如何切分给多个 Task 并行读</td></tr>
+    <tr><td><b>channel</b></td><td>DataX reader 到 writer 的缓冲队列，控制内存与背压</td></tr>
+    <tr><td><b>快照 snapshot</b></td><td>CDC 启动时的全量初始化阶段，之后才切到增量流</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作执行多次结果一致，靠主键冲突更新实现</td></tr>
+    <tr><td><b>exactly-once</b></td><td>恰好一次语义，通常靠 checkpoint + 两阶段提交实现，代价是延迟</td></tr>
+    <tr><td><b>DAG</b></td><td>有向无环图，表达任务间的依赖关系</td></tr>
+    <tr><td><b>backfill 补数据</b></td><td>历史分区重跑，必须精确到分区且不级联触发下游</td></tr>
+    <tr><td><b>血缘 lineage</b></td><td>表/字段级依赖关系图，支撑影响分析与故障定界</td></tr>
+    <tr><td><b>OpenLineage</b></td><td>开源的元数据与血缘采集标准协议</td></tr>
+    <tr><td><b>对账</b></td><td>源与目标按行数/聚合/内容逐层比对，数据一致性的最后防线</td></tr>
+    <tr><td><b>lag</b></td><td>CDC 消费延迟，源库最新位点时间与消费位点时间之差</td></tr>
+    <tr><td><b>schema drift</b></td><td>上下游表结构在没有协同的情况下发生漂移，同步任务随之故障或静默丢列</td></tr>
+    <tr><td><b>SLA</b></td><td>服务等级承诺，数据场景指"承诺完成时间"，拆解到每个节点</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用上面 Docker 起的 MySQL 完成这五件事 —— ① 配一个 DataX 任务，含 splitPk + 限速 + preSql 清表，跑 50 万行全量并观察 Task 数；② 把 splitPk 去掉再跑一次，对比耗时；③ 给 update_time 加索引，写一个增量任务，跑两次验证不重不漏；④ 源库 DELETE 一行，观察增量任务捞不回来，再切换 Flink CDC 验证能捕获；⑤ 上游加一列，看你的同步任务报错还是静默丢列。<br><br>
+    <b>之后值得单独学：</b>Debezium 的 snapshot 机制细节、Flink CDC 2.x 的整库同步与 schema 变更传播、数据湖格式（Iceberg/Hudi 的增量查询）、以及湖仓一体下的 ELT 编排（dbt + Airline/Airflow）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 ETL 与数据同步平台 · 上线前务必确认：幂等、对账、schema diff、CDC lag 告警</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（CDC 一致性）和模块 6（schema 变更与对账）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对着你负责的同步链路逐条检查。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边问自己：你现在负责的同步链路，今天丢数据的概率有多大';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

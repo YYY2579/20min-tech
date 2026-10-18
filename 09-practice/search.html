@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 搜索系统设计实战</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 搜索系统设计实战</h1>
+    <p class="sub">搜索的本质是<b>用倒排索引把"词"快速映射到"文档"，再用打分函数把最相关的排前面</b>。这篇讲机制：查询解析怎么分词纠错、相关性怎么调、索引怎么在实时性和成本间权衡、ES 怎么配置，以及"搜不到"和"搜得慢"两类经典坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>召回/排序/重排</b> 三段式</span>
+      <span class="chip"><b>BM25 + LTR</b> 相关性</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 ES 单节点跟着敲：docker run -d -p 9200:9200 elasticsearch:8</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>倒排索引：搜索的地基</h2></div>
+  <p class="lead">数据库用 B+ 树按"值"找行，适合精确匹配；<b>搜索的核心场景是"按词找文档"，倒排索引就是为此而生。</b></p>
+  <pre><span class="c"># 正排 vs 倒排（3 篇文档的例子）</span>
+<span class="y">正排</span>（文档 → 含哪些词）：
+  doc1: "手机 快充 充电器"
+  doc2: "快充 数据线"
+  doc3: "充电器 车载"
+
+<span class="y">倒排</span>（词 → 含它的文档 + 位置信息）：
+  "手机"   → [(doc1, pos0)]
+  "快充"   → [(doc1, pos1), (doc2, pos0)]
+  "充电器" → [(doc1, pos2), (doc3, pos0)]
+  "数据线" → [(doc2, pos1)]
+  "车载"   → [(doc3, pos1)]
+
+<span class="c"># 查询"快充 充电器"→ 取两个词的交集/并集 + TF-IDF 类打分排序</span>
+<span class="c"># 词典 term dictionary 常驻内存（FST 压缩），posting list 按块压缩存磁盘</span></pre>
+  <table>
+    <tr><th style="width:140px">结构</th><th>作用</th><th>工程要点</th></tr>
+    <tr><td><b>Term Dictionary</b></td><td>词 → posting list 偏移</td><td>用 FST（有限状态转换机）压缩，内存占用小、查询快</td></tr>
+    <tr><td><b>Posting List</b></td><td>词出现的文档 ID + 词频 + 位置</td><td>按块（block）压缩存储，按需解压</td></tr>
+    <tr><td><b>Doc Values</b></td><td>文档 ID → 字段值（列式）</td><td>排序、聚合、高亮用，不参与倒排</td></tr>
+    <tr><td><b>Stored Fields</b></td><td>原始文档内容</td><td>返回结果时取，占磁盘大头</td></tr>
+  </table>
+  <div class="callout">
+    <b>一个关键认知：ES 的"索引"是"库表 + 倒排 + 正排"的合体。</b>一个 index 类似数据库的一张表，一个 document 类似一行。区别在：ES 的字段要么进倒排（text 类型，可搜）、要么进 doc values（keyword/数值，可排序聚合）、要么 stored（可取回原文）。<b>字段类型选错是搜索效果差的第一大原因。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>搜索架构：查询解析 / 召回 / 排序 / 重排</h2></div>
+  <pre><span class="c">┌─────────────────────────────────────────────────────────────┐</span>
+<span class="c">│ 1. 查询解析 Query Analysis                                  │</span>
+<span class="c">│    分词 → 词权重 → 同义词扩展 → 拼写纠错 → 意图识别           │</span>
+<span class="c">└──────────────────────┬──────────────────────────────────────┘</span>
+                       <span class="g">│ 结构化查询</span>
+<span class="c">┌──────────────────────▼──────────────────────────────────────┐</span>
+<span class="c">│ 2. 召回 Recall（毫秒级，从海量文档中取候选集）                 │</span>
+<span class="c">│    倒排多路召回 + 向量召回(ANN) + 业务规则召回(新品/广告)      │</span>
+<span class="c">└──────────────────────┬──────────────────────────────────────┘</span>
+                       <span class="g">│ 候选集（千~万级）</span>
+<span class="c">┌──────────────────────▼──────────────────────────────────────┐</span>
+<span class="c">│ 3. 排序 Rank（粗排 BM25 + 业务权重，输出 Top N）               │</span>
+<span class="c">└──────────────────────┬──────────────────────────────────────┘</span>
+                       <span class="g">│ Top 100~500</span>
+<span class="c">┌──────────────────────▼──────────────────────────────────────┐</span>
+<span class="c">│ 4. 重排 Rerank（精排/业务逻辑：去重、多样性、广告插位、LTR）   │</span>
+<span class="c">└─────────────────────────────────────────────────────────────┘</span></pre>
+  <table>
+    <tr><th style="width:110px">阶段</th><th style="width:150px">目标</th><th>延迟预算</th></tr>
+    <tr><td><b>查询解析</b></td><td>把用户输入变成可执行的结构化查询</td><td>&lt; 5ms（本地词典 + 缓存）</td></tr>
+    <tr><td><b>召回</b></td><td>尽可能全，宁可多不可漏</td><td>&lt; 50ms，多路并行</td></tr>
+    <tr><td><b>排序</b></td><td>相关性排序，取 Top N</td><td>&lt; 30ms</td></tr>
+    <tr><td><b>重排</b></td><td>业务目标优先：新鲜度、多样性、商业插入</td><td>&lt; 20ms，纯内存计算</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>"搜不到"大概率是召回的问题，"排得烂"是排序的问题。</b>排查时先看召回：用户搜"苹果手机"，分词后"苹果"命中了水果类文档，但用户要的是电子产品 —— 这是查询理解/词权重问题，调 BM25 参数没用。<b>先定位阶段，再调参数</b>，是搜索调优的基本纪律。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>索引构建：全量 + 增量、实时性权衡</h2></div>
+  <p class="lead">索引构建要平衡三个矛盾：<b>实时性（新数据多久可搜）、成本（构建/存储开销）、稳定性（不影响线上）。</b></p>
+  <h3>三种构建方式</h3>
+  <table>
+    <tr><th style="width:130px">方式</th><th style="width:160px">实时性</th><th>适用</th></tr>
+    <tr><td><b>全量重建</b></td><td>小时~天级</td><td>离线数据、 mapping 变更（字段类型改不了，只能重建索引）</td></tr>
+    <tr><td><b>增量近实时</b></td><td>秒级（refresh 间隔）</td><td>业务主链路写入，ES 原生 refresh（默认 1s）</td></tr>
+    <tr><td><b>实时流</b></td><td>毫秒级</td><td>日志/埋点类，Kafka → Flink → ES，或 CDC 直连</td></tr>
+  </table>
+  <h3>主流架构：全量 + 增量双写，别名切换</h3>
+  <pre><span class="c"># 经典索引重建流程（零停机）</span>
+1. 建新索引：products_v2（新 mapping/新分词器）
+2. 全量回填：从 DB 读历史数据，bulk 写入 v2（限速，别打爆集群）
+3. 增量追平：消费 binlog/MQ，把 2 期间的数据变更同步到 v2
+4. 校验：v2 文档数 vs DB 记录数，抽样比对关键字段
+5. 原子切换：POST /_aliases { actions: [
+     {remove: {index: products_v1, alias: products}},
+     {add:    {index: products_v2, alias: products}}
+   ]}                          <span class="c"># 别名切换是原子的，业务无感知</span>
+6. 观察 24h → 删除 v1
+
+<span class="c"># 日常增量：业务写 DB → CDC(Debezium/Canal) → MQ → 消费组写 ES</span>
+<span class="c"># 关键：以 DB 为主，ES 可随时重建 —— ES 是"派生数据"，不是事实来源</span></pre>
+  <h3>实时性权衡的量化决策</h3>
+  <table>
+    <tr><th style="width:150px">场景</th><th>refresh 间隔</th><th>理由</th></tr>
+    <tr><td>商品/内容搜索</td><td>30s</td><td>用户对新品即时性不敏感，省 merge 开销</td></tr>
+    <tr><td>订单/工单搜索</td><td>1s（默认）</td><td>客服刚建的工单要马上能查到</td></tr>
+    <tr><td>日志检索</td><td>5~30s + rollover</td><td>写入量巨大，segment 小文件多是灾难</td></tr>
+    <tr><td>IM 消息搜索</td><td>近实时 = 写引擎特殊优化</td><td>秒级都不行，需专门方案（写后立即可查）</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>把 ES 当数据库用的代价：</b>直接让 ES 做事实存储（不接 DB 做主库），一旦索引损坏/迁移/mapping 改错，数据恢复极其痛苦。正确姿势：<b>DB 是唯一事实来源，ES 是从属视图，任何时候都能从 DB 全量重建</b>。做不到这点，就不是搜索系统，是又一个不敢动的事故源。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>查询分析：分词、同义词、纠错</h2></div>
+  <p class="lead">查询分析是"理解用户想搜什么"，中文场景的难点全在这：<b>分词歧义、同义表达、手滑打错。</b></p>
+  <h3>分词器选型（中文）</h3>
+  <table>
+    <tr><th style="width:150px">分词器</th><th>原理</th><th>适用</th></tr>
+    <tr><td><b>IK（ik_smart / ik_max_word）</b></td><td>词典 + 算法切分，细/粗粒度</td><td>通用中文，ES 生态最常用</td></tr>
+    <tr><td><b>HanLP / Jieba</b></td><td>NLP 模型，词性/实体识别</td><td>需要实体识别的场景</td></tr>
+    <tr><td><b>拼音 / 边缘 n-gram</b></td><td>按字/拼音切</td><td>输入即搜（search-as-you-type）</td></tr>
+    <tr><td><b>standard</b></td><td>按空格/标点粗切</td><td>英文够用，中文会把整句当一个词</td></tr>
+  </table>
+  <pre><span class="c"># ES 自定义分析器：索引用细粒度，搜索用粗粒度（常见组合拳）</span>
+PUT /products
+{
+  <span class="g">"settings"</span>: {
+    <span class="g">"analysis"</span>: {
+      <span class="g">"filter"</span>: {
+        <span class="g">"my_synonyms"</span>: {                          <span class="c">// 同义词 filter</span>
+          <span class="g">"type"</span>: <span class="g">"synonym"</span>,
+          <span class="g">"synonyms"</span>: [<span class="g">"手机,电话,phone"</span>, <span class="g">"电脑,计算机,computer"</span>]
+        }
+      },
+      <span class="g">"analyzer"</span>: {
+        <span class="g">"index_analyzer"</span>: {                       <span class="c">// 写入时细切，召回全</span>
+          <span class="g">"type"</span>: <span class="g">"custom"</span>, <span class="g">"tokenizer"</span>: <span class="g">"ik_max_word"</span>,
+          <span class="g">"filter"</span>: [<span class="g">"my_synonyms"</span>]
+        },
+        <span class="g">"search_analyzer"</span>: {                      <span class="c">// 查询时粗切，精度高</span>
+          <span class="g">"type"</span>: <span class="g">"custom"</span>, <span class="g">"tokenizer"</span>: <span class="g">"ik_smart"</span>
+        }
+      }
+    }
+  },
+  <span class="g">"mappings"</span>: {
+    <span class="g">"properties"</span>: {
+      <span class="g">"title"</span>: { <span class="g">"type"</span>: <span class="g">"text"</span>, <span class="g">"analyzer"</span>: <span class="g">"index_analyzer"</span>,
+                 <span class="g">"search_analyzer"</span>: <span class="g">"search_analyzer"</span> }
+    }
+  }
+}</pre>
+  <h3>纠错与查询理解</h3>
+  <table>
+    <tr><th style="width:140px">能力</th><th>做法</th><th style="width:190px">工程要点</th></tr>
+    <tr><td><b>拼写纠错</b></td><td>编辑距离（Levenshtein）+ 词频，fuzzy 查询</td><td>fuzzy 只对低频词开，高频词纠错反而帮倒忙</td></tr>
+    <tr><td><b>同义词扩展</b></td><td>索引侧或查询侧扩展（synonym graph）</td><td>扩展要控制爆炸："手机"扩出 20 个同义词会拖慢查询</td></tr>
+    <tr><td><b>停用词</b></td><td>"的了吧呢"过滤</td><td>别过度，搜"什么不能带上飞机"停用词是有意义的</td></tr>
+    <tr><td><b>意图识别</b></td><td>分类/实体模型，改写查询</td><td>"苹果"搜出水果还是手机，看用户历史与上下文</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>同义词的两个真实坑：</b>① <b>索引侧加同义词</b>会让"手机"和"电话"的文档互相污染，搜电话出来一堆手机；② <b>查询侧扩展</b>会让查询变长变慢。折中：核心同义词查询侧扩（可控），长尾同义词干脆不放 —— 同义词表是需要持续运营的资产，不是配一次就完的配置。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>相关性排序：BM25 + 业务权重 + LTR</h2></div>
+  <h3>BM25：ES 默认打分的本质</h3>
+  <p>BM25 是 TF-IDF 的改进版，核心直觉：<b>词在文档里出现越多越相关（TF），但越常见的词越不值钱（IDF），长文档要吃亏修正（长度归一）。</b></p>
+  <pre><span class="c"># BM25 打分（简化式）</span>
+score(D, q) = Σ over terms t in q:
+    IDF(t) × (f(t,D) × (k1 + 1)) / (f(t,D) + k1 × (1 - b + b × |D|/avgdl))
+
+<span class="c"># IDF(t)  = ln((N - n(t) + 0.5) / (n(t) + 0.5) + 1)   N=总文档数, n=含该词文档数</span>
+<span class="c"># f(t,D)  = 词 t 在文档 D 中的出现次数</span>
+<span class="c"># |D|    = 文档字段长度，avgdl = 平均长度</span>
+<span class="c"># k1(默认1.2) 控制 TF 饱和度：词频从 1→2 加分明显，10→11 几乎不加</span>
+<span class="c"># b(默认0.75) 控制长度惩罚：b=1 完全惩罚长文档，b=0 不惩罚</span>
+
+<span class="c"># ES 中调整相关性：sim function_score</span>
+{
+  <span class="g">"query"</span>: { <span class="g">"function_score"</span>: {
+    <span class="g">"query"</span>: { <span class="g">"match"</span>: { <span class="g">"title"</span>: { <span class="g">"query"</span>: <span class="g">"快充 充电器"</span>,
+                                            <span class="g">"boost"</span>: 2.0 } }},   <span class="c">// 标题命中加权</span>
+    <span class="g">"functions"</span>: [
+      { <span class="g">"field_value_factor"</span>: { <span class="g">"field"</span>: <span class="g">"sales"</span>, <span class="g">"modifier"</span>: <span class="g">"log1p"</span>,
+                                  <span class="g">"factor"</span>: 0.1, <span class="g">"missing"</span>: 1 } }   <span class="c">// 销量加分</span>
+    ],
+    <span class="g">"boost_mode"</span>: <span class="g">"multiply"</span>
+  }}
+}</pre>
+  <h3>业务权重调优</h3>
+  <table>
+    <tr><th style="width:150px">信号</th><th>作用</th><th>注意</th></tr>
+    <tr><td>字段加权（title &gt; body）</td><td>标题命中比正文命中更重要</td><td>用 multi_match 的 fields 权重，别全靠 boost</td></tr>
+    <tr><td>时间衰减</td><td>新内容加分（资讯、社区）</td><td>gauss/exp 衰减函数，半衰期按业务设</td></tr>
+    <tr><td>热度/销量</td><td>电商把交易数据混入相关性</td><td>log1p 平滑，防头部商品通吃</td></tr>
+    <tr><td>个性化</td><td>按用户历史偏好加权</td><td>实时特征缓存 + 批量计算混合</td></tr>
+  </table>
+  <h3>LTR（Learning to Rank）简述</h3>
+  <p>当人工调参到瓶颈，用机器学习代替手调：<b>把 (查询, 文档) 对的特征（BM25 分、点击率、新鲜度、字段覆盖度）喂给模型，模型输出相关性分数。</b></p>
+  <pre><span class="c"># LTR 落地路径（渐进式，别一步到位）</span>
+阶段1：日志埋点 —— 记录 query/doc/特征/点击位置，攒训练数据
+阶段2：pointwise 回归（LambdaMART 类）离线训练，导出模型
+阶段3：ES 6.1+ 原生支持 rescorer 插件（ltr query），对 Top N 重打分
+阶段4：点击日志回流 → 在线 A/B → 模型迭代，闭环
+
+<span class="c"># 现实建议：日活搜索量 &lt; 100 万时，BM25 + function_score 调参性价比最高；</span>
+<span class="c"># 量级和团队都到位再上 LTR —— LTR 的坑在特征工程和冷启动，不在算法</span></pre>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>性能优化：缓存、分片、超时降级</h2></div>
+  <h3>分片规划</h3>
+  <table>
+    <tr><th style="width:150px">参数</th><th>建议</th></tr>
+    <tr><td><b>分片大小</b></td><td>每分片 10~50 GB（日志类 30~50GB，搜索类可到 100GB）</td></tr>
+    <tr><td><b>分片数</b></td><td>总分片数 ≈ 节点数 × 1~2 倍，别让一个索引占满集群</td></tr>
+    <tr><td><b>过度分片的代价</b></td><td>每分片都有固定开销（内存、文件句柄、元数据），1000 个小分片能拖垮集群</td></tr>
+    <tr><td><b>副本</b></td><td>1 副本起步（吞吐 + 高可用），读多可加到 2</td></tr>
+  </table>
+  <pre><span class="c"># 索引生命周期：日志类按天/周 rollover，自动 ILM</span>
+PUT /_ilm/policy/logs-policy
+{
+  <span class="g">"policy"</span>: {
+    <span class="g">"phases"</span>: {
+      <span class="g">"hot"</span>:    { <span class="g">"actions"</span>: { <span class="g">"rollover"</span>: { <span class="g">"max_size"</span>: <span class="g">"50gb"</span>, <span class="g">"max_age"</span>: <span class="g">"1d"</span> } } },
+      <span class="g">"warm"</span>:   { <span class="g">"min_age"</span>: <span class="g">"2d"</span>,  <span class="g">"actions"</span>: { <span class="g">"shrink"</span>: {}, <span class="g">"forcemerge"</span>: { <span class="g">"max_num_segments"</span>: 1 } } },
+      <span class="g">"delete"</span>: { <span class="g">"min_age"</span>: <span class="g">"30d"</span>, <span class="g">"actions"</span>: { <span class="g">"delete"</span>: {} } }
+    }
+  }
+}</pre>
+  <h3>缓存体系（ES 自带三层）</h3>
+  <table>
+    <tr><th style="width:150px">缓存</th><th>缓存什么</th><th>注意事项</th></tr>
+    <tr><td><b>Page Cache</b></td><td>热的 segment 文件</td><td>给 ES 分 &lt; 50% 内存，其余给 JVM</td></tr>
+    <tr><td><b>Request Cache</b></td><td>聚合结果（size=0 的查询）</td><td>自动失效于 refresh</td></tr>
+    <tr><td><b>Query Cache</b></td><td>filter 的 bitset 结果</td><td>按分片缓存，高频 filter 收益大</td></tr>
+  </table>
+  <h3>超时与降级</h3>
+  <pre><span class="c"># 查询三层防线</span>
+1. timeout 参数：GET /products/_search?timeout=500ms   <span class="c">// 超时返回部分结果而非挂死</span>
+2. 应用侧熔断：ES P99 延迟 &gt; 1s 或错误率 &gt; 5% → 切降级逻辑
+   （返回缓存的热词结果 / 空结果 + "搜索服务开小差"）
+3. 终态兜底：ES 整体不可用 → 返回空列表，<span class="y">主链路（浏览/下单）绝不能依赖搜索可用</span>
+
+<span class="c"># 慢查询治理三板斧</span>
+① 禁止深分页：from + size &gt; 10000 报错，改用 search_after 游标
+② 通配符开头的查询（*手机）全表扫描，禁
+③ 聚合维度高基数（user_id 分组）先预计算或限流</pre>
+  <div class="callout warn">
+    <b>深分页为什么慢：</b>from=10000, size=10 意味着协调节点要从每个分片取回 10010 条，全局排序后再丢掉前 10000 条。<b>分片越多越惨（数据量 × 分片数）。</b>解法：search_after 游标翻页（记住上一页最后一条的排序值）、或限制最大页深（Google 也只让你翻几十页）。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>ELK vs 专用方案、数据同步、容量估算</h2></div>
+  <h3>技术选型</h3>
+  <table>
+    <tr><th style="width:160px">方案</th><th>优势</th><th>劣势</th><th>适用</th></tr>
+    <tr><td><b>ELK / Elastic Stack</b></td><td>生态全、ES 查询强、Kibana 可视化</td><td>重（JVM）、贵（商业许可）、运维复杂</td><td>日志检索 + 通用搜索，业界默认选择</td></tr>
+    <tr><td><b>OpenSearch</b></td><td>ES 7.10 开源分支，无许可争议</td><td>生态略小于 ES</td><td>怕 license 风险的自建</td></tr>
+    <tr><td><b>专用搜索（Meilisearch/Typesense）</b></td><td>轻量、开箱即用的容错搜索</td><td>数据量上限低（千万级以下）</td><td>站内即时搜索、中小数据量</td></tr>
+    <tr><td><b>自建/云搜索（OpenSearch Service 等）</b></td><td>免运维、弹性</td><td>成本随规模上升</td><td>不想养 ES 团队的业务</td></tr>
+  </table>
+  <h3>数据同步：CDC 双写对比</h3>
+  <pre><span class="c"># 方案一：双写（业务同时写 DB 和 ES）—— 不推荐</span>
+优点：简单，实时
+缺点：<span class="r">不一致无法兜底</span>。DB 成功 ES 失败 → 数据缺失；
+      ES 成功 DB 失败 → 幽灵数据；无重试机制，排查靠猜
+
+<span class="c"># 方案二：CDC 单写（推荐）</span>
+业务只写 DB → binlog(Debezium/Canal) → MQ(Kafka) → 消费组写 ES
+优点：业务零侵入；ES 挂了下游补消费，最终一致；可重放重建
+缺点：秒级延迟；消费组要保证顺序（同主键进同分区）
+
+<span class="c"># 方案三：定时全量校验补偿</span>
+CDC 之外，每日比对 DB 与 ES 记录数/checksum，差异进补偿队列
+<span class="c"># 这是"ES 与 DB 不一致"的唯一根治手段，必配</span></pre>
+  <h3>容量估算（算例）</h3>
+  <pre><span class="c"># 背景：商品搜索，500 万文档，平均每文档 1KB（含 2 个 text 字段）</span>
+<span class="y">原始数据</span>：500 万 × 1KB            = 5 GB
+<span class="y">倒排索引</span>：约为原文的 20%~40%    ≈ 1~2 GB
+<span class="y">doc values</span>：数值/关键词字段       ≈ 0.5~1 GB
+<span class="y">_source</span>：原文存储                 = 5 GB
+<span class="y">合计每副本</span> ≈ 12~14 GB，含 1 副本 ≈ 25 GB
+<span class="y">结论</span>：3 数据节点（每节点 8 GB 堆内存 + 16 GB 物理）绰绰有余
+
+<span class="c"># 写入吞吐估算：日增 5 万文档（上架+更新）</span>
+峰值写入 = 5 万 × 3（重复更新系数）/ 86400 ≈ 2 doc/s
+<span class="c"># 可忽略。但大促批量改价（一次改 50 万）→ bulk 限速 + 错峰</span>
+
+<span class="c"># 查询 QPS：峰值 200 QPS，P99 &lt; 100ms</span>
+单分片查询 ≈ 5~20ms，3 分片并行 → 足够，无需额外优化
+<span class="c"># 真正的瓶颈通常在聚合和深分页，不在简单 match 查询</span></pre>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>核心配置示例</h2></div>
+  <pre><span class="c"># ===== 1. 索引 mapping（关键决策全在这）=====</span>
+PUT /products
+{
+  <span class="g">"settings"</span>: {
+    <span class="g">"number_of_shards"</span>: 3,              <span class="c">// 建后不可改，按数据量规划</span>
+    <span class="g">"number_of_replicas"</span>: 1,
+    <span class="g">"refresh_interval"</span>: <span class="g">"30s"</span>,             <span class="c">// 商品可搜延迟 30s，省 merge</span>
+    <span class="g">"analysis"</span>: { <span class="g">"analyzer"</span>: { <span class="g">"default"</span>: { <span class="g">"type"</span>: <span class="g">"ik_max_word"</span> } } }
+  },
+  <span class="g">"mappings"</span>: {
+    <span class="g">"dynamic"</span>: <span class="g">"strict"</span>,                     <span class="c">// 禁字段漂移，防 mapping 爆炸</span>
+    <span class="g">"properties"</span>: {
+      <span class="g">"title"</span>:      { <span class="g">"type"</span>: <span class="g">"text"</span>, <span class="g">"analyzer"</span>: <span class="g">"ik_max_word"</span>,
+                   <span class="g">"fields"</span>: { <span class="g">"keyword"</span>: { <span class="g">"type"</span>: <span class="g">"keyword"</span> } } },  <span class="c">// 多字段：可搜+可精确聚合</span>
+      <span class="g">"brand"</span>:      { <span class="g">"type"</span>: <span class="g">"keyword"</span> },        <span class="c">// 筛选/聚合一律 keyword</span>
+      <span class="g">"price"</span>:      { <span class="g">"type"</span>: <span class="g">"scaled_float"</span>, <span class="g">"scaling_factor"</span>: 100 }, <span class="c">// 分转元，精度不丢</span>
+      <span class="g">"sales"</span>:      { <span class="g">"type"</span>: <span class="g">"integer"</span>, <span class="g">"doc_values"</span>: <span class="b">true</span> },
+      <span class="g">"on_sale_at"</span>: { <span class="g">"type"</span>: <span class="g">"date"</span> },
+      <span class="g">"attrs"</span>:      { <span class="g">"type"</span>: <span class="g">"nested"</span>,            <span class="c">// 数组对象要 nested，防错位</span>
+                   <span class="g">"properties"</span>: { <span class="g">"k"</span>: {<span class="g">"type"</span>:<span class="g">"keyword"</span>}, <span class="g">"v"</span>: {<span class="g">"type"</span>:<span class="g">"keyword"</span>} } }
+    }
+  }
+}
+
+<span class="c"># ===== 2. 查询：相关性 + 业务权重 + 过滤 =====</span>
+GET /products/_search
+{
+  <span class="g">"query"</span>: { <span class="g">"function_score"</span>: {
+    <span class="g">"query"</span>: { <span class="g">"bool"</span>: {
+      <span class="g">"must"</span>: [
+        { <span class="g">"multi_match"</span>: {
+          <span class="g">"query"</span>: <span class="g">"快充 充电器"</span>,
+          <span class="g">"fields"</span>: [<span class="g">"title^3"</span>, <span class="g">"description^1"</span>],   <span class="c">// 标题权重 x3</span>
+          <span class="g">"type"</span>: <span class="g">"best_fields"</span>
+        }}
+      ],
+      <span class="g">"filter"</span>: [                                              <span class="c">// filter 不打分、可缓存</span>
+        { <span class="g">"term"</span>:  { <span class="g">"brand"</span>: <span class="g">"Anker"</span> } },
+        { <span class="g">"range"</span>: { <span class="g">"price"</span>: { <span class="g">"gte"</span>: 0, <span class="g">"lte"</span>: 20000 } } }
+      ]
+    }},
+    <span class="g">"functions"</span>: [
+      { <span class="g">"field_value_factor"</span>: { <span class="g">"field"</span>: <span class="g">"sales"</span>, <span class="g">"modifier"</span>: <span class="g">"log1p"</span>, <span class="g">"factor"</span>: 0.2 } },
+      { <span class="g">"gauss"</span>: { <span class="g">"on_sale_at"</span>: { <span class="g">"origin"</span>: <span class="g">"now"</span>, <span class="g">"scale"</span>: <span class="g">"30d"</span>, <span class="g">"decay"</span>: 0.5 } }  <span class="c">// 30 天衰减一半</span>
+    ],
+    <span class="g">"boost_mode"</span>: <span class="g">"multiply"</span>, <span class="g">"score_mode"</span>: <span class="g">"sum"</span>
+  }},
+  <span class="g">"from"</span>: 0, <span class="g">"size"</span>: 20,                        <span class="c">// 深分页换 search_after</span>
+  <span class="g">"_source"</span>: [<span class="g">"title"</span>, <span class="g">"price"</span>, <span class="g">"brand"</span>],      <span class="c">// 只取要的字段，省带宽</span>
+  <span class="g">"timeout"</span>: <span class="g">"500ms"</span>
+}
+
+<span class="c"># ===== 3. bulk 写入（唯一正确的姿势）=====</span>
+POST /_bulk
+{ <span class="g">"index"</span>: { <span class="g">"_index"</span>: <span class="g">"products"</span>, <span class="g">"_id"</span>: <span class="g">"P1001"</span> } }   <span class="c">// 显式 _id，天然幂等</span>
+{ <span class="g">"title"</span>: <span class="g">"Anker 快充充电器"</span>, <span class="g">"price"</span>: 9900, <span class="g">"brand"</span>: <span class="g">"Anker"</span> }
+{ <span class="g">"update"</span>: { <span class="g">"_index"</span>: <span class="g">"products"</span>, <span class="g">"_id"</span>: <span class="g">"P1002"</span> } }
+{ <span class="g">"doc"</span>: { <span class="g">"price"</span>: 8900 }, <span class="g">"doc_as_upsert"</span>: <span class="b">true</span> }    <span class="c">// 更新幂等</span>
+
+<span class="c"># bulk 铁律：每批 5~15MB / 1000~5000 条；失败项重试，别整批重试</span>
+<span class="c"># refresh 策略：批量导入时先 "refresh_interval": -1，导完再打开</span></pre>
+  <div class="callout danger">
+    <b>三个一犯就痛的配置错误：</b>① <b>dynamic: true</b> 放任业务字段漂移，半年后 mapping 里几百个垃圾字段，集群变慢；② <b>text 字段直接做排序/聚合</b>（fielddata 爆炸，直接 OOM）；③ <b>用默认分片数建小索引</b>，几十个索引 × 5 分片，集群被元数据拖死。<b>新索引上线前过一遍 mapping review</b>，比出事后重建代价小一百倍。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">业务双写 DB 和 ES，数据不一致无法兜底</div><div class="pd">DB 成功 ES 失败就丢数据，且无重试、无法感知。必须改 CDC 单写（binlog → MQ → 消费组写 ES），再加每日全量校验补偿。双写看似简单，实则是数据不一致的无底洞。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">mapping 字段漂移，集群越来越慢</div><div class="pd">业务加了新字段没管，ES 自动动态映射，几百个无用字段拖垮一切。mapping 设 dynamic: strict 禁止未知字段，新字段走评审上线。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">深分页 from + size = 10000+</div><div class="pd">协调节点要从每个分片取上万条再全局排序丢弃，延迟爆炸甚至 OOM。翻页一律 search_after 游标，并对页深设上限。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">text 字段上排序/聚合，fielddata OOM</div><div class="pd">对 text 字段聚合会现场建 fielddata 正排，堆内存直接爆。聚合/排序用 keyword 字段（multi-fields 一份数据两种索引），数值排序用数值类型。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">过度分片：几百个小分片拖垮集群</div><div class="pd">每分片有固定元数据和文件开销，索引建的时候随手 5 分片，一年后集群几千分片。单分片目标 10~50GB，总分片数 ≈ 节点数 × 1~2。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">搜索做成了强依赖，ES 一挂全站瘫痪</div><div class="pd">首页/列表页直连 ES，没有降级逻辑。搜索必须是"可降级依赖"：ES 挂了返回空列表/缓存兜底，主链路（详情、下单）照常工作。熔断 + 超时 + 降级三件套配齐。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">同义词表拍了一次脑袋就再也不管</div><div class="pd">用户搜"电脑"找不到"计算机"，搜"喵"找不到"猫"。同义词是持续运营的资产：从搜索日志挖高频无结果 query，每周补充词表并评估扩展爆炸。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">相关性只调 BM25 参数，不看查询理解</div><div class="pd">搜"苹果"返回一堆水果，调 k1/b 永远调不好。根因在查询解析阶段（分词、意图、词权重），不在打分函数。先查分词结果，再谈调参。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">JVM 堆给了 32GB，GC 停顿秒级</div><div class="pd">ES 堆内存超过 32GB 就失去压缩指针优化，CMS/G1 停顿变长。堆设物理内存的 50% 且封顶 32GB（一般 16GB 足够），另一半留给 page cache。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">批量导入直接 full refresh，segment 爆炸</div><div class="pd">每次 bulk 都触发 refresh，产生几千个小 segment，查询慢且 merge 打满 CPU。批量导入先关 refresh，导完 forcemerge，日常 refresh 30s 起步。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 用户搜索"苹果手机"返回了大量水果苹果，最该先排查哪个环节？</div>
+      <button class="opt">BM25 的 k1 和 b 参数没调好</button>
+      <button class="opt">查询解析阶段：分词结果、词权重、意图识别</button>
+      <button class="opt">分片数不够，召回不全</button>
+      <div class="ans">正确答案：<b>先查查询解析</b>。"苹果手机"应分成"苹果/手机"或整体识别为手机品类，词权重和意图错了，后面打分再准也白搭。调 k1/b 是排序阶段的事，解决不了"召回了错文档"的问题。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. DB 与 ES 数据同步，最可靠的方案是？</div>
+      <button class="opt">业务代码里同时写 DB 和 ES，失败就抛异常</button>
+      <button class="opt">定时任务每小时全量同步一次</button>
+      <button class="opt">业务只写 DB，CDC 采集 binlog 经 MQ 消费写 ES，再加每日校验补偿</button>
+      <div class="ans">正确答案：<b>CDC 单写 + 校验补偿</b>。双写有不一致无兜底、无重试的硬伤；小时级全量同步实时性不够。CDC 让业务零侵入，MQ 提供可靠重试，日校验保证最终一致。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 ES 分页，from + size 超过 10000 会怎样，正确做法是？</div>
+      <button class="opt">延迟急剧上升甚至 OOM，应改用 search_after 游标翻页</button>
+      <button class="opt">完全正常，ES 支持任意深度分页</button>
+      <button class="opt">会自动降级为 scroll API，无需关心</button>
+      <div class="ans">正确答案：<b>search_after 游标</b>。深分页要从每个分片取 from+size 条再全局排序丢弃，成本 = 数据量 × 分片数。search_after 用上一页排序值定位，跳过历史数据，代价恒定。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 500 万文档、每文档 1KB 的商品搜索索引，合理的分片规划是？</div>
+      <button class="opt">1 个分片，减少分布式开销</button>
+      <button class="opt">约 3 个分片 + 1 副本，单分片控制在 10~50GB</button>
+      <button class="opt">50 个分片，越多查询越快</button>
+      <div class="ans">正确答案：<b>3 分片 + 1 副本</b>。数据含索引和 _source 约 12~14GB/副本，3 分片每片约 4~5GB（略小但可接受，留增长空间）。过度分片有元数据和内存开销，分片不是越多越快。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 想让"新品"在搜索结果中靠前，同时不影响相关性主线，应该用？</div>
+      <button class="opt">修改 BM25 的 k1 参数</button>
+      <button class="opt">把所有新品文档的 title 重复三遍</button>
+      <button class="opt">function_score 里加 gauss/exp 时间衰减函数，作为排序加权项</button>
+      <div class="ans">正确答案：<b>function_score 时间衰减</b>。衰减函数把"新鲜度"作为叠加因子混入打分，主查询（BM25）不受影响。k1 控制词频饱和度和新鲜度无关；堆砌关键词是作弊且会被相关性反噬。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 搜索系统高可用的正确姿势是？</div>
+      <button class="opt">搜索降级为可降级依赖：超时 + 熔断 + 空结果兜底，主链路不阻塞</button>
+      <button class="opt">给每个服务配 3 个 ES 集群，全部挂掉才不可用</button>
+      <button class="opt">搜索不可用时抛异常，让前端显示错误页</button>
+      <div class="ans">正确答案：<b>超时 + 熔断 + 降级</b>。搜索是体验增强而非交易主链路，ES 整体故障时应返回空列表或缓存兜底，商品详情/下单照常。多集群是过度设计，抛异常会把一个边缘故障放大成全站故障。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>ES 运维速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>GET /_cluster/health</code><span class="desc">集群健康：green/yellow/red 与分片状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_cat/indices?v&amp;s=store.size:desc</code><span class="desc">按存储大小列出索引，找大索引</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_nodes/stats?filter_path=**.jvm.mem.heap_used_percent</code><span class="desc">各节点 JVM 堆使用率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /products/_analyze {field:"title","text":"快充充电器"}</code><span class="desc">验证分词结果，调优第一步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /products/_search?explain=true</code><span class="desc">看每条结果为什么得这个分</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_cat/segments/products?v</code><span class="desc">看 segment 数量，判断是否该 merge</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /products/_forcemerge?max_num_segments=1</code><span class="desc">合并 segment（只读索引/归档时用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /_ilm/policy</code><span class="desc">索引生命周期管理（热→温→删）</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>倒排索引</b></td><td>词 → 文档列表的映射，搜索的核心数据结构</td></tr>
+    <tr><td><b>Term Dictionary</b></td><td>词典，常驻内存（FST 压缩），词到 posting 的入口</td></tr>
+    <tr><td><b>Posting List</b></td><td>词出现的文档 ID、词频、位置，按块压缩存储</td></tr>
+    <tr><td><b>Doc Values</b></td><td>列式存储的字段值，支撑排序聚合</td></tr>
+    <tr><td><b>分词 Analyzer</b></td><td>把文本切成词元的组件：字符过滤 + 分词器 + 词元过滤</td></tr>
+    <tr><td><b>同义词 Synonym</b></td><td>等价词扩展，"手机/电话/phone"互为同义</td></tr>
+    <tr><td><b>召回 Recall</b></td><td>从海量文档中取候选集，追求全而快</td></tr>
+    <tr><td><b>排序 Rank</b></td><td>对候选集按相关性打分排序，取 Top N</td></tr>
+    <tr><td><b>重排 Rerank</b></td><td>精排阶段：业务逻辑、多样性、广告、LTR 精打分</td></tr>
+    <tr><td><b>BM25</b></td><td>ES 默认打分算法：TF 饱和 + IDF 反文档频率 + 长度归一</td></tr>
+    <tr><td><b>TF-IDF</b></td><td>词频 × 逆文档频率，相关性的经典直觉</td></tr>
+    <tr><td><b>LTR</b></td><td>用机器学习模型替代手工调参的相关性排序</td></tr>
+    <tr><td><b>Refresh</b></td><td>让新写入可搜的动作，默认 1s，批量导入应关闭</td></tr>
+    <tr><td><b>Segment</b></td><td>倒排索引的最小存储单元，小而多是性能灾难</td></tr>
+    <tr><td><b>Forcemerge</b></td><td>强制合并 segment，归档/只读索引优化手段</td></tr>
+    <tr><td><b>Shard / Replica</b></td><td>分片（数据分块）与副本（冗余 + 读扩展）</td></tr>
+    <tr><td><b>Search After</b></td><td>游标式深分页，用排序值定位下一页</td></tr>
+    <tr><td><b>CDC</b></td><td>变更数据捕获，从 binlog 捕获 DB 变更做同步</td></tr>
+    <tr><td><b>Nested</b></td><td>ES 对象数组类型，保持数组内对象的关联关系</td></tr>
+    <tr><td><b>Mapping 爆炸</b></td><td>动态字段无限增长导致的集群性能问题</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① docker 起 ES + Kibana，建一个商品索引（ik 分词 + keyword 品牌 + scaled_float 价格）；② 灌 10 万条商品，用 _analyze 看分词结果，对比 ik_smart 与 ik_max_word；③ 分别用 match 和 function_score（销量 log1p + 时间衰减）搜同一关键词，解释排序差异；④ 测一次 from+size=10000 的延迟，再换 search_after 对比；⑤ 用 Logstash/Debezium 搭一条 MySQL → ES 的 CDC 同步，中途 kill 消费组观察恢复。<br><br>
+    <b>之后值得单独学：</b>向量检索与混合搜索（BM25 + Embedding，ES 8 的 kNN 字段）、查询意图分类、电商搜索的类目预测、以及多语言搜索（CJK 分词器的坑）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 搜索系统设计实战 · 上线前务必检查：mapping、refresh 间隔、深分页</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（相关性）和模块 7（配置示例）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 ES 里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 ES 单节点跟着敲：docker run -d -p 9200:9200 elasticsearch:8';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

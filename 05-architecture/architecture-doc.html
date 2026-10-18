@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透架构文档与 ADR</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透架构文档与 ADR</h1>
+    <p class="sub">架构文档的价值不在"写完"，而在<b>不过期</b>。这篇讲三件事：C4 四级视图怎么画、ADR 怎么把"为什么"留痕、以及怎么让文档跟着代码一起活。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip">C4 <b>4</b> 级视图</span>
+      <span class="chip"><b>2</b> 份真实 ADR</span>
+      <span class="chip"><b>10</b> 个文档坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">边看边数：你团队里有几份文档，是上周之后就没人改过的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>架构文档写给谁看</h2></div>
+  <p class="lead">动笔前先回答一个问题：<b>这份文档是给谁看的？</b>读者错了，内容全是废话。架构文档不是论文，是工程资产——评判标准是"三个月后还有人靠它做决定吗"。</p>
+  <table>
+    <tr><th style="width:140px">读者</th><th style="width:230px">他关心什么</th><th>文档必须回答的问题</th></tr>
+    <tr><td><b>新入职开发</b></td><td>系统全貌、代码从哪读起</td><td>系统由哪几个服务组成？一个请求的数据流是什么？入口仓库是哪个？</td></tr>
+    <tr><td><b>运维 / DevOps</b></td><td>部署形态、外部依赖、故障点</td><td>有几个部署单元？依赖哪些外部系统（各自 SLA）？哪些组件没有副本？</td></tr>
+    <tr><td><b>产品 / 业务方</b></td><td>能力边界、改造成本</td><td>哪些需求好做、哪些难做、为什么？哪些是历史包袱不能动？</td></tr>
+    <tr><td><b>评审 / 审计</b></td><td>合规、安全控制点</td><td>数据怎么分级？传输和存储怎么加密？审计日志在哪、留多久？</td></tr>
+    <tr><td><b>半年后的你自己</b></td><td>当时为什么这么设计</td><td>这个方案评估过哪些备选？为什么否掉了？哪些是妥协？</td></tr>
+  </table>
+  <h3>文档要服务的四个目的</h3>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>新人 onboarding</div><div class="cd">把"口头传承"变成可检索资产。可度量目标：新人第一次独立提 PR 的时间从 2 周降到 3 天。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>跨团队沟通</div><div class="cd">一份共同的图。会议上所有人指着同一个容器视图讨论，而不是各自心里一张不同的图。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>决策留痕</div><div class="cd">ADR。防止同一个技术争论每两年爆发一次——因为没人记得两年前已经吵过并且有结论。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>影响分析</div><div class="cd">改一个容器之前，先查谁依赖它。数据流图是依赖分析的底图，拍脑袋改法事故的源头。</div></div>
+  </div>
+  <h3>质量属性必须可度量</h3>
+  <p>"高性能、高可用、高安全"这类词在架构文档里等于没写。每个属性都要有数字、条件和测量方式：</p>
+  <table>
+    <tr><th style="width:110px">属性</th><th style="width:200px">不合格写法</th><th>合格写法</th></tr>
+    <tr><td><b>可用性</b></td><td>系统高可用</td><td>全年 99.95%，允许计划外停机 4.38 小时；核心接口有降级开关</td></tr>
+    <tr><td><b>延迟</b></td><td>响应速度要快</td><td>详情页 P99 &lt; 300ms（1 万 QPS、缓存命中率 90% 条件下实测）</td></tr>
+    <tr><td><b>持久性</b></td><td>数据不丢</td><td>RPO = 0（同步复制），RTO &lt; 5 分钟；允许丢失最近 1 秒非核心日志</td></tr>
+    <tr><td><b>安全</b></td><td>安全可靠</td><td>通过等保三级；敏感字段 AES-256-GCM 加密；审计日志留存 180 天</td></tr>
+    <tr><td><b>扩展性</b></td><td>支持水平扩展</td><td>无状态服务，HPA 3 分钟内容量翻倍；分片键为用户 ID，支持 32 分片</td></tr>
+  </table>
+  <div class="callout">
+    <b>每篇架构文档至少回答三个问题：</b>系统是什么（上下文）、由什么组成（容器）、为什么是它（ADR）。回答不了这三条的文档，基本都是摆设——写它花了两周，读它没人超过五分钟。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>C4 模型：四级视图</h2></div>
+  <p class="lead">C4 是 Simon Brown 提出的一套架构图抽象层级。核心思想像看地图：<b>先看全国，再看城市，最后才看街道——不允许一上来就画到门牌号。</b></p>
+  <table>
+    <tr><th style="width:135px">层级</th><th style="width:175px">回答的问题</th><th style="width:185px">图里的元素</th><th>示例</th></tr>
+    <tr><td><b>L1 Context</b><br>系统上下文</td><td>我们建的系统是什么？谁在用？和哪些外部系统交互？</td><td>1 个系统方块 + 用户角色 + 外部系统</td><td>电商系统、买家、卖家、微信支付、ERP</td></tr>
+    <tr><td><b>L2 Container</b><br>容器</td><td>系统由哪些可独立运行/部署的单元组成？各用什么技术？</td><td>Web 应用、API 服务、数据库、缓存、消息队列</td><td>SPA + 订单 API + MySQL + Redis + Kafka</td></tr>
+    <tr><td><b>L3 Component</b><br>组件</td><td>每个容器内部有哪些模块？职责和交互是什么？</td><td>控制器、领域服务、仓储、客户端适配器</td><td>OrderController、PricingService、StockClient</td></tr>
+    <tr><td><b>L4 Code</b><br>代码</td><td>类、接口、数据结构长什么样？</td><td>类图、ER 图</td><td>交给 IDE / 代码生成，不手绘</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>最大的误解：Container 不是 Docker 容器。</b>C4 里的 Container 指"独立运行的进程/应用"——一个 Spring Boot jar、一个数据库实例、一个 Node 服务都算。它常常恰好跑在一个 Docker 容器里，但两件事没有必然关系。
+  </div>
+  <h3>画图规则</h3>
+  <ul>
+    <li><b>自上而下逐层细化</b>：L1 里的每个外部系统，在 L2 里体现为一组接口，而不是重新画一遍业务细节。</li>
+    <li><b>每层图必须自包含</b>：只看当前这一张图就能看懂，不需要对照上层。</li>
+    <li><b>不允许跳级</b>：从 L1 直接蹦到类图，读者五分钟内必然流失。</li>
+    <li><b>一图只讲一件事</b>：要么讲数据流，要么讲部署拓扑，不要混在一张图里。</li>
+    <li><b>每个元素带技术标注</b>：L2 的方块上必须写"Spring Boot 3 + PostgreSQL 15"这种级别，只写"订单服务"四个字的信息量约等于零。</li>
+  </ul>
+  <h3>维护策略（不同层级不同待遇）</h3>
+  <table>
+    <tr><th style="width:90px">层级</th><th style="width:220px">维护频率</th><th>谁来维护</th></tr>
+    <tr><td><b>L1</b></td><td>业务或系统边界变化时更新（通常半年到一年一次）</td><td>架构师</td></tr>
+    <tr><td><b>L2</b></td><td>每次发布核对一次，有变化即更新（与 CI 比对配合）</td><td>架构师 + 各服务 owner</td></tr>
+    <tr><td><b>L3</b></td><td>重大重构时更新，平时不动</td><td>服务 owner</td></tr>
+    <tr><td><b>L4</b></td><td>不手维护，用 IDE 生成或代码即文档</td><td>没人</td></tr>
+  </table>
+  <h4>L1 上下文图（Mermaid 文本，可直接渲染）</h4>
+  <pre><span class="c">%% 买家/卖家/外部系统与"电商系统"的边界，一张图说清楚</span>
+graph LR
+  buyer["买家"] --&gt;|"下单 / 支付"| shop["电商系统"]
+  seller["卖家"] --&gt;|"商品 / 发货"| shop
+  shop --&gt;|"支付请求"| wx["微信支付 API"]
+  shop --&gt;|"库存同步"| erp["公司 ERP"]
+  shop --&gt;|"消息"| mq[("Kafka")]</pre>
+  <h4>L2 容器图（带技术栈标注）</h4>
+  <pre>graph LR
+  spa["React SPA"] --&gt;|"HTTPS / JSON"| gw["API 网关 Nginx"]
+  gw --&gt; order["订单服务 Spring Boot 3.2"]
+  gw --&gt; auth["认证服务 Spring Boot 3.2"]
+  order --&gt; db[("PostgreSQL 15")]
+  order --&gt; cache[("Redis 7")]
+  order --&gt; mq{{"Kafka 3.7"}}
+  mq --&gt; settle["结算任务 Spring Batch"]</pre>
+  <div class="callout">
+    <b>C4 是抽象层级工具箱，不是 UML 套件。</b>它的胜负手是"从 L1 讲起"——先让所有人对系统边界达成共识，再谈内部结构。跳过 L1 直接讲组件的会议，通常以吵架收场，因为每个人心里的"系统"根本不是同一个东西。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>文档模板：六块就够</h2></div>
+  <p class="lead">不要从空白页开始。arc42 模板有 12 节，完整版没人坚持得下来；工程上能长期存活的只有下面 6 块。<b>用固定模板的好处：评审者知道去哪找内容，作者不会漏项。</b></p>
+  <table>
+    <tr><th style="width:130px">板块</th><th style="width:330px">内容</th><th>对应 C4 层</th></tr>
+    <tr><td><b>1. 系统上下文</b></td><td>一段话概述 + L1 图 + 外部依赖表（名称 / 用途 / SLA / 负责人 / 不可用时降级预案）</td><td>L1</td></tr>
+    <tr><td><b>2. 容器视图</b></td><td>L2 图 + 容器表（名称 / 技术栈 / 职责 / 部署单元 / 数据存储）</td><td>L2</td></tr>
+    <tr><td><b>3. 关键决策</b></td><td>ADR 索引：编号 / 标题 / 状态 / 日期，逐条链接到 docs/adr/ 下的文件</td><td>—</td></tr>
+    <tr><td><b>4. 质量属性</b></td><td>可度量目标表：属性 / 目标值 / 当前实测值 / 测量方式与频率</td><td>—</td></tr>
+    <tr><td><b>5. 风险与技术债</b></td><td>风险表：描述 / 影响 / 概率 / 缓解措施 / 责任人 / 复盘日期</td><td>—</td></tr>
+    <tr><td><b>6. 运维信息</b></td><td>部署拓扑、环境清单、SLO、值班表、runbook 链接、常用排查命令</td><td>—</td></tr>
+  </table>
+  <h4>骨架示例（直接复制改内容）</h4>
+  <pre><span class="c"># 订单平台架构文档</span>
+
+&gt; 负责人：@zhangsan   最后更新：2026-10-10   版本：v3
+&gt; 本文档与代码同仓，变更走 PR 评审。
+
+<span class="b">## 1. 系统上下文</span>
+
+一句话：订单平台承接买家下单、卖家发货、支付结果落地，
+对外依赖微信支付与公司 ERP。
+
+![context](diagrams/context.mmd)
+
+| 外部系统 | 用途 | SLA | 负责人 | 不可用时降级 |
+|---|---|---|---|---|
+| 微信支付 API | 支付与退款 | 99.99% | 支付组 | 转人工收银台 |
+| 公司 ERP | 库存同步 | 99.9% | 供应链组 | 本地库存兜底 30 分钟 |
+
+<span class="b">## 2. 容器视图</span>
+
+| 容器 | 技术栈 | 职责 | 部署单元 |
+|---|---|---|---|
+| 订单 API | Spring Boot 3.2 + PostgreSQL 15 | 下单主链路 | k8s: order-api（6 pods） |
+| 对账任务 | Spring Batch | T+1 对账 | k8s: reconcile（1 pod） |
+
+<span class="b">## 3. 关键决策</span>
+
+| 编号 | 标题 | 状态 | 日期 |
+|---|---|---|---|
+| ADR-0007 | 订单库选型 PostgreSQL | 已接受 | 2026-03-12 |
+| ADR-0012 | 支付通知用本地消息表 | 已接受 | 2026-04-02 |
+
+<span class="b">## 4. 质量属性</span>
+
+| 属性 | 目标 | 当前实测 | 测量方式 |
+|---|---|---|---|
+| 下单接口延迟 | P99 &lt; 500ms | 320ms | SkyWalking 日统计 |
+| 可用性 | 99.95% | 99.97% | 月度事故复盘 |
+
+<span class="b">## 5. 风险与技术债</span>
+
+| 风险 | 影响 | 概率 | 缓解 | 责任人 | 复盘日期 |
+|---|---|---|---|---|---|
+| 订单表单表超 5 亿行 | 查询劣化 | 高 | 引入 Citus 分片 | @lisi | 2027-Q1 |
+
+<span class="b">## 6. 运维信息</span>
+
+- SLO：下单成功率 99.9%，错误预算 43 分钟/月
+- 值班：见 PagerDuty 排班
+- Runbook：[数据库主从切换](runbook/order-db-failover.md)</pre>
+  <div class="callout warn">
+    <b>文档第一行永远应该是"负责人 + 最后更新日期 + 版本"。</b>没有这三行，读者无法判断该不该信这份文档——而判断成本一高，大家的理性选择就是不信任何文档。署名"架构组"等于没署名，必须是具名的人。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>ADR：把"为什么"写下来</h2></div>
+  <p class="lead">代码记录了系统"是什么"，ADR 记录"<b>为什么是它而不是别的</b>"。没有 ADR 的团队，每隔一段时间就把同样的选型争论重新吵一遍，因为没人记得上次的结论和理由。</p>
+  <h3>三要素</h3>
+  <table>
+    <tr><th style="width:120px">部分</th><th style="width:200px">回答什么</th><th>写作要求</th></tr>
+    <tr><td><b>背景 Context</b></td><td>当时面对什么问题、有哪些约束</td><td>写"逼你决策的力量"：截止日期、团队技能、合规要求、历史包袱</td></tr>
+    <tr><td><b>决策 Decision</b></td><td>最终选了什么</td><td>一句话能说完，主动语态："选择 PostgreSQL 15 作为订单库"</td></tr>
+    <tr><td><b>后果 Consequences</b></td><td>选了之后发生了什么</td><td>好的 / 坏的 / 中性的分开列；坏处必须写缓解措施</td></tr>
+  </table>
+  <h3>MADR 模板（社区最常用的 Markdown ADR 格式）</h3>
+  <pre><span class="c"># ADR-0007：订单库选型 PostgreSQL</span>
+
+- 状态：已接受
+- 日期：2026-03-12
+- 决策者：@zhangsan @lisi
+- 取代：ADR-0003（MySQL 选型，2024-08-15）
+- 相关：ADR-0005、ADR-0009
+
+<span class="b">## 背景</span>
+
+订单主链路需要 ACID 事务（扣库存与建单必须原子）；
+运营后台有 20+ 维度组合筛选；商品快照 schema 频繁变化。
+团队 6 名后端均有 PostgreSQL 运维经验，无人有 MongoDB 经验。
+
+<span class="b">## 决策驱动因素</span>
+
+- 事务正确性优先于模型灵活性
+- 复杂查询性能（运营后台不可接受 3 秒级响应）
+- 运维成本：优先复用团队现有技能
+
+<span class="b">## 备选方案</span>
+
+1. <span class="r">MongoDB 7</span> —— 文档模型适配商品快照，但多文档事务需额外设计，
+   且团队无运维经验，招人成本高。
+2. <span class="r">MySQL 8.0</span> —— 生态最熟，但 JSON 查询与窗口函数弱于 PG，
+   运营后台 20 维筛选需要大量中间表。
+3. <span class="g">PostgreSQL 15</span> —— 事务强、JSONB、窗口函数完善，团队有经验。
+
+<span class="b">## 决策</span>
+
+选择 PostgreSQL 15 作为订单库，商品快照用 JSONB 列存储。
+
+<span class="b">## 后果</span>
+
+- 好：下单主链路用单库事务覆盖，无需引入 Seata AT 模式。
+- 好：运营筛选 SQL 从 3.2s 降到 180ms（窗口函数 + 部分索引）。
+- 坏：水平分片方案弱于 MySQL 生态，单表过 5 亿行时需引入 Citus，
+      预计 3 人周改造成本。
+- 中性：DBA 工具链需从 MySQL 迁移，预计 2 人周。</pre>
+  <h3>第二条真实 ADR（反面教材修正版）</h3>
+  <pre><span class="c"># ADR-0012：支付结果通知用本地消息表而非 TCC</span>
+
+- 状态：已接受   日期：2026-04-02   决策者：@wangwu
+
+<span class="b">## 背景</span>
+
+支付回调后需通知积分服务加积分。业务允许秒级延迟，
+但不能丢（丢一次积分 = 一次客诉 + 一次人工补单）。
+
+<span class="b">## 备选方案</span>
+
+1. TCC：积分服务需改造出 Try/Confirm/Cancel 三个接口，强一致但侵入大。
+2. 本地消息表：订单库同事务写 outbox，准实时投递 + 对账兜底，积分服务零改造。
+
+<span class="b">## 决策</span>
+
+选择本地消息表 + 准实时对账。积分到账延迟 &lt; 5s。
+
+<span class="b">## 后果</span>
+
+- 好：积分服务无侵入；消息不丢（同库事务保证）。
+- 坏：积分到账有秒级延迟；需实现对账任务（已排期 2026-05）。</pre>
+  <h3>编号与状态规则</h3>
+  <ul>
+    <li><b>编号单调递增、永不复用</b>：文件名 <span class="k">docs/adr/0007-order-database-postgresql.md</span>，编号是引用锚点。</li>
+    <li><b>状态流转</b>：提议 → 已接受 →（被新 ADR 取代 | 已废弃）。只追加，不删改——历史决策也是资产。</li>
+    <li><b>一个 ADR 只做一个决策</b>：把三件事写进一份 ADR，等于都没写清楚。</li>
+    <li><b>被否决的备选必须写进"备选方案"节</b>：这是 ADR 最值钱的部分，直接消灭下一轮重复争论。</li>
+  </ul>
+  <div class="callout ok">
+    <b>评审 ADR 时重点审两节："备选方案"和"坏的后果"。</b>只写"我们决定用 X"的 ADR 是装饰品；写清楚"评估过 Y，因为 Z 否掉，选了 X 的代价是 W"的 ADR，才能让半年后的新人（和你自己）不重蹈覆辙。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>文档即代码：Diagrams as Code</h2></div>
+  <p class="lead">图用文本写，跟代码一起入库、一起评审、一起 diff。<b>手绘工具导出的 PNG 进不了 git diff，改图成本高到没人愿意改——这就是"图与实现脱节"的根因。</b></p>
+  <table>
+    <tr><th style="width:100px">工具</th><th style="width:200px">渲染方式</th><th style="width:110px">git diff</th><th>适合场景</th></tr>
+    <tr><td><b>Mermaid</b></td><td>GitHub / GitLab / VS Code 原生渲染；命令行 mmdc 出图</td><td>友好（纯文本）</td><td>团队内 80% 的图：架构图、流程图、时序图。1 小时上手</td></tr>
+    <tr><td><b>PlantUML</b></td><td>需 Java 运行时或在线服务器渲染</td><td>友好（纯文本）</td><td>复杂 UML：精细时序图、部署图、状态图</td></tr>
+    <tr><td><b>draw.io</b></td><td>GUI 编辑，存 XML</td><td>差（XML diff 不可读）</td><td>白板讨论、评审会现场画；不适合长期维护</td></tr>
+    <tr><td><b>Excalidraw</b></td><td>GUI 编辑，存 JSON</td><td>差</td><td>手绘风格草图，讲概念、做分享</td></tr>
+  </table>
+  <h4>Mermaid 时序图（支付回调链路）</h4>
+  <pre>sequenceDiagram
+  participant B as 买家
+  participant A as 订单API
+  participant P as 支付服务
+  participant M as Kafka
+  B-&gt;&gt;A: POST /api/orders
+  A-&gt;&gt;A: 校验库存(Redis)
+  A-&gt;&gt;P: 创建支付单
+  P--&gt;&gt;A: payId
+  A--&gt;&gt;B: 201 {payId}
+  Note over A,P: 支付结果回调走 Kafka 异步落地
+  P-&gt;&gt;M: 支付成功事件
+  M-&gt;&gt;A: 消费并更新订单状态</pre>
+  <h4>PlantUML 部署图</h4>
+  <pre>@startuml
+skinparam componentStyle rectangle
+node "K8s 集群" {
+  [订单 API pods] --&gt; [PostgreSQL 主]
+  [订单 API pods] --&gt; [Redis]
+  [订单 API pods] --&gt; [Kafka]
+  [对账任务] --&gt; [PostgreSQL 主]
+}
+[订单 API pods] ..&gt; [微信支付 API] : HTTPS
+@enduml</pre>
+  <h3>入库与评审：四条纪律</h3>
+  <ol>
+    <li><b>文档放业务仓库的 docs/ 目录</b>，不是 Confluence / 语雀 /  wiki：和代码共享同一个 PR 生命周期。</li>
+    <li><b>Definition of Done 加一条</b>："行为变更必须同步文档"。PR 模板放一个勾选框，reviewer 有权因此打回。</li>
+    <li><b>图放 diagrams/*.mmd / *.puml，Markdown 引用</b>，不贴截图。截图无法 review、无法搜索、无法 diff。</li>
+    <li><b>CI 三件套</b>：Markdown 风格检查、死链检查、图渲染检查（渲染失败说明语法写错，图已经坏了）。</li>
+  </ol>
+  <h4>CI 配置示例</h4>
+  <pre><span class="c"># .github/workflows/docs.yml</span>
+name: docs
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Markdown 风格检查
+        run: npx markdownlint-cli2 "docs/**/*.md"
+      - name: 死链检查
+        run: npx lychee docs/ README.md --exclude-mail
+      - name: 图渲染检查（渲染失败则 CI 失败）
+        run: npx @mermaid-js/mermaid-cli -i docs/diagrams/context.mmd -o /tmp/context.svg</pre>
+  <div class="callout ok">
+    <b>文本图的真正红利在评审环节。</b>PR 里图变了，diff 直接告诉你"订单 API 到 Kafka 的连线被删了"——这个变更因此被认真讨论。截图图的变更从来没人审过，因为看 diff 只看得到一堆二进制字节变了。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>保鲜机制：让文档不过期</h2></div>
+  <p class="lead">文档腐烂（documentation rot）是默认结局，不是意外。<b>保鲜靠机制，不靠觉悟。</b>下面六条按性价比排序，第一条最值得做。</p>
+  <table>
+    <tr><th style="width:130px">机制</th><th style="width:330px">具体做法</th><th>频率</th></tr>
+    <tr><td><b>同仓同 PR</b></td><td>docs/ 与代码同一仓库，行为变更在同一个 PR 里提交文档更新</td><td>每次变更</td></tr>
+    <tr><td><b>DoD 卡点</b></td><td>PR 模板勾选"文档已同步"，reviewer 可因此打回；和代码评审同一场</td><td>每次 PR</td></tr>
+    <tr><td><b>CI 比对真实部署</b></td><td>每日拉取集群 deployment 列表与文档容器表比对，不一致即告警到值班群</td><td>每日</td></tr>
+    <tr><td><b>ADR 季度回顾</b></td><td>把半年前的 ADR 标注为"仍有效 / 部分过时 / 已被演进替代"</td><td>每季度</td></tr>
+    <tr><td><b>事故回路</b></td><td>复盘发现"文档没写 X"，48 小时内补文档并指定具名 owner</td><td>事故后</td></tr>
+    <tr><td><b>单一 owner</b></td><td>每份文档一个具名负责人，禁止署名"架构组"这种集体名词</td><td>长期</td></tr>
+  </table>
+  <h4>CI 比对脚本（容器视图 vs 集群实际）</h4>
+  <pre><span class="c">#!/usr/bin/env bash</span>
+<span class="c"># 每日跑：文档声明的部署单元与集群实际 deployment 比对</span>
+kubectl get deploy -n order -o name | sed <span class="y">'s|deployment.apps/||'</span> | sort &gt; /tmp/actual.txt
+grep -oP <span class="y">'(?&lt;=\| k8s: )[a-z0-9-]+'</span> docs/architecture.md | sort &gt; /tmp/documented.txt
+if ! diff -u /tmp/documented.txt /tmp/actual.txt; then
+  echo "容器视图与集群不一致，请更新 docs/architecture.md"
+  exit 1
+fi</pre>
+  <h3>三个腐烂指标（每月看一次）</h3>
+  <ul>
+    <li><b>时间差</b>：文档最后修改时间与对应代码目录最后提交时间相差 &gt; 90 天 → 进腐烂清单，owner 限期处理。</li>
+    <li><b>ADR 引用数</b>：没人引用的 ADR 说明该决策已无人关心，要么合并进新 ADR，要么标记废弃。</li>
+    <li><b>新人反馈</b>：onboarding 时记录"文档没答上来的问题"，每月汇总补录——这是文档缺口最真实的来源。</li>
+  </ul>
+  <div class="callout ok">
+    <b>最有效的单条机制是"文档与代码同 PR"。</b>它不增加任何工作量，只是把"改代码顺手改文档"从美德变成流程。反过来，任何"每季度集中更新一次文档"的制度，最后都会退化成每季度集中编一次文档。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>十个真实的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">文档写完即过期</div><div class="pd">立项时写一份精美 PPT，上线后再没人打开。正确做法：只维护 L1/L2 两张图 + ADR 索引，进仓库跟代码走评审，砍掉一切"为评审而写"的章节。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">图与实现脱节</div><div class="pd">文档画的是 3 个服务，实际已经拆成 7 个。解法是 CI 每日比对文档容器表与集群 deployment 清单，不一致直接告警，不等季度盘点。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只有架构图，没有决策记录</div><div class="pd">后人只看到"用了 Kafka"，不知道"评估过 RabbitMQ 因为运维成本否掉"，于是重复争论。ADR 必须记录被否决的备选和理由。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用 UML 类图讲架构</div><div class="pd">一上来画 20 个类的继承关系，读者五分钟就跑了。用 C4 从上下文开始，一层一层讲；类图只在讲具体模块时用。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">文档只写给评审看</div><div class="pd">满篇"高内聚低耦合"，没有一个具体数字。每个质量属性都要可度量：P99 多少毫秒、可用性几个 9、SLO 是什么。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">没有版本和 owner</div><div class="pd">共享盘里躺着 arch_v1.ppt、arch_v2.ppt、arch_final_真的final.ppt。单一事实源：放仓库、带日期、带具名负责人。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">文档评审走过场</div><div class="pd">文档评审和代码评审分开进行，代码合了文档没更新。把"文档已同步"写进 PR 模板和 DoD，reviewer 有权打回。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">图用手绘工具画</div><div class="pd">每次改图要开 draw.io、导出 PNG、上传，改图成本高到没人改，最后图彻底躺平。用 Mermaid 文本图：diff 可见、PR 里直接渲染。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">ADR 只记结论不记背景</div><div class="pd">"我们决定用 Kafka"——三个月后没人知道为什么，也不敢改。MADR 模板强制写背景、决策驱动、备选方案三节，缺一节打回。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把架构文档写成需求文档</div><div class="pd">写满功能列表和原型截图，真正的部署拓扑、数据流、SLO 一个字没有。固定六块模板，写完对照检查，缺块打回。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="0">
+      <div class="qt">1. 新同学入职，你想让他在 10 分钟内理解"系统与外部世界的边界"，应该给他看哪张图？</div>
+      <button class="opt">C4 L1 系统上下文图</button>
+      <button class="opt">C4 L2 容器图</button>
+      <button class="opt">数据库 ER 图</button>
+      <button class="opt">部署拓扑图</button>
+      <div class="ans">正确答案：<b>C4 L1 系统上下文图</b>。它只回答一个问题：系统是什么、谁在用、和谁交互。ER 图和部署图都预设了读者已经懂系统结构，不适合作为第一张图。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. ADR 的核心三要素是？</div>
+      <button class="opt">需求 / 设计 / 排期</button>
+      <button class="opt">问题 / 方案 / 负责人</button>
+      <button class="opt">背景 / 决策 / 后果</button>
+      <div class="ans">正确答案：<b>背景 / 决策 / 后果</b>。背景写"当时面对什么约束"，决策写"选了什么"，后果写"好的坏的中性的分开列"。MADR 模板在这三节之外补充了决策驱动因素和备选方案。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 为什么团队应该用 Mermaid 文本画图，而不是 draw.io 导出 PNG 贴文档？</div>
+      <button class="opt">PNG 文件太大，占存储</button>
+      <button class="opt">文本图能进 git diff，图的变更可以被 PR 评审看见</button>
+      <button class="opt">Mermaid 画出来的图更好看</button>
+      <div class="ans">正确答案：<b>能进 git diff</b>。图变了，diff 直接显示"哪条连线被删了"，变更因此被认真评审。PNG 的变更在 diff 里只是一堆二进制字节，从来没人审过。draw.io 适合白板讨论，不适合长期维护。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 团队第三次争论"要不要上 Kafka"，前两次讨论没有任何记录。最该补的机制是？</div>
+      <button class="opt">更详细的架构 PPT</button>
+      <button class="opt">每周技术分享</button>
+      <button class="opt">代码评审规范</button>
+      <button class="opt">ADR 决策留痕</button>
+      <div class="ans">正确答案：<b>ADR 决策留痕</b>。争论反复发生的根源是"决策和理由没有落盘"，每次都是新人重新推演。一份记录备选方案和否决理由的 ADR 能直接终结重复争论。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 关于 C4 L4 Code 图（类图 / ER 图），推荐的做法是？</div>
+      <button class="opt">每季度手绘更新一次，保持准确</button>
+      <button class="opt">不手维护，用 IDE 生成或代码即文档</button>
+      <button class="opt">画得越细越好，覆盖每个私有方法</button>
+      <div class="ans">正确答案：<b>不手维护</b>。L4 变化频率太高，手绘必腐化。用 IDE 的类图生成、ER 工具或文档注释（Javadoc / TypeDoc）即可，把维护成本降到零。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 以下哪项最能防止架构文档过期？</div>
+      <button class="opt">文档与代码同仓，行为变更走同一个 PR 评审</button>
+      <button class="opt">每季度安排一次集中文档更新周</button>
+      <button class="opt">把文档链接发到全员群提醒大家看</button>
+      <button class="opt">要求文档写满 50 页以上</button>
+      <div class="ans">正确答案：<b>同仓同 PR</b>。它把"顺手改文档"从美德变成流程卡点，成本几乎为零。集中更新周最后都会退化成集中编文档；发链接和凑页数对保鲜没有任何作用。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>npx markdownlint-cli2 "docs/**/*.md"</code><span class="desc">Markdown 风格检查，进 CI</span><button class="copy">复制</button></div>
+    <div class="crow"><code>npx lychee docs/ --exclude-mail</code><span class="desc">死链检查，防止文档链接腐烂</span><button class="copy">复制</button></div>
+    <div class="crow"><code>npx @mermaid-js/mermaid-cli -i x.mmd -o x.svg</code><span class="desc">命令行渲染 Mermaid 图，验证语法</span><button class="copy">复制</button></div>
+    <div class="crow"><code>adr init docs/adr &amp;&amp; adr new "订单库选型"</code><span class="desc">adr-tools 生成带编号的 ADR 文件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>plantuml -tsvg diagram.puml</code><span class="desc">PlantUML 命令行渲染</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git log --diff-filter=M --since="90 days ago" -- docs/</code><span class="desc">查文档最近修改记录，找腐烂文件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get deploy -n order -o name</code><span class="desc">拉集群实际部署单元，与容器视图比对</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mkdir -p docs/{adr,diagrams,runbook}</code><span class="desc">初始化文档目录骨架</span><button class="copy">复制</button></div>
+  </div>
+  <h3>目录结构</h3>
+  <pre>repo/
+├── docs/
+│   ├── architecture.md          <span class="c"># 主文档（六块模板）</span>
+│   ├── diagrams/
+│   │   ├── context.mmd          <span class="c"># C4 L1 系统上下文</span>
+│   │   ├── containers.mmd       <span class="c"># C4 L2 容器视图</span>
+│   │   └── order-flow.puml      <span class="c"># 时序图 / 部署图</span>
+│   ├── adr/
+│   │   ├── 0007-order-database-postgresql.md
+│   │   └── 0012-payment-notify-local-message.md
+│   └── runbook/
+│       └── order-db-failover.md <span class="c"># 主从切换操作手册</span>
+└── .github/workflows/docs.yml   <span class="c"># CI：lint + 死链 + 渲染检查</span></pre>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>C4 模型</b></td><td>Simon Brown 提出的四级架构视图抽象：Context / Container / Component / Code</td></tr>
+    <tr><td><b>系统上下文 Context</b></td><td>L1 视图：系统一个方块 + 用户角色 + 外部系统，只讲边界不讲内部</td></tr>
+    <tr><td><b>容器 Container</b></td><td>L2 视图元素：独立运行的进程/应用，不是 Docker 容器</td></tr>
+    <tr><td><b>组件 Component</b></td><td>L3 视图元素：容器内部的主要模块及其职责</td></tr>
+    <tr><td><b>ADR</b></td><td>架构决策记录：背景 / 决策 / 后果三要素的短文档</td></tr>
+    <tr><td><b>MADR</b></td><td>最流行的 Markdown ADR 模板，含状态、决策驱动、备选方案等字段</td></tr>
+    <tr><td><b>arc42</b></td><td>经典架构文档模板，12 节；工程实用版通常压缩为 6 块</td></tr>
+    <tr><td><b>Diagrams as Code</b></td><td>用文本（Mermaid / PlantUML）画图，可入库、可 diff、可评审</td></tr>
+    <tr><td><b>Mermaid</b></td><td>轻量图文本语言，GitHub/GitLab 原生渲染，支持流程图/时序图等</td></tr>
+    <tr><td><b>PlantUML</b></td><td>老牌 UML 文本工具，适合复杂时序图与部署图，需 Java 环境渲染</td></tr>
+    <tr><td><b>文档即代码</b></td><td>Docs as Code：文档与代码同仓、同评审、同生命周期</td></tr>
+    <tr><td><b>单一事实源 SSOT</b></td><td>同一信息只有一份权威副本，其他位置只放链接</td></tr>
+    <tr><td><b>Definition of Done</b></td><td>完成的定义；加入"文档已同步"一条可根治文档脱节</td></tr>
+    <tr><td><b>质量属性</b></td><td>可用性 / 延迟 / 持久性等非功能需求，必须写成可度量数字</td></tr>
+    <tr><td><b>SLO / SLA</b></td><td>内部服务等级目标 / 对外服务等级协议，错误预算的基础</td></tr>
+    <tr><td><b>RTO / RPO</b></td><td>恢复时间目标（停机多久可接受）/ 恢复点目标（可丢多少数据）</td></tr>
+    <tr><td><b>文档腐烂</b></td><td>Documentation Rot：文档与实现渐进式脱节的必然趋势</td></tr>
+    <tr><td><b>架构漂移</b></td><td>Architecture Drift：实现渐进偏离既定架构且无人纠正</td></tr>
+    <tr><td><b>Runbook</b></td><td>运维操作手册：故障场景的逐步处置步骤，值班时照着做</td></tr>
+    <tr><td><b>技术债</b></td><td>为速度主动欠下的设计账，需登记、计息、定期还</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>本周就能做的三件事：</b>① 给主力仓库建 docs/adr/ 目录，把最近一次技术争论写成第一份 ADR（含被否掉的备选）；② 把现有架构 PPT 转成 C4 L1 + L2 两张 Mermaid 图，放进 docs/ 并在 PR 模板加一行"文档已同步（如涉及行为变更）"；③ 给主文档加上"负责人 + 最后更新日期 + 版本"三行头部。<br><br>
+    <b>之后值得深入：</b>arc42 完整模板、C4 的 Structurizr 工具链（代码生成图）、以及把威胁建模文档（DFD）也纳入 docs/ 与安全架构篇联动。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透架构文档与 ADR · 检验标准：三个月后还有没有人靠它做决定</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（ADR）和模块 6（保鲜机制）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边给团队文档挑一处毛病。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='边看边数：你团队里有几份文档，是上周之后就没人改过的？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

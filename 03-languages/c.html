@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 C 与内存</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 编程语言</span>
+    <h1>二十分钟学透 C 与内存</h1>
+    <p class="sub">C 的语法小到一张纸就能写完，<b>难的是它什么都不替你检查</b>。这篇讲指针到底在算什么、结构体为什么有空洞、未定义行为为什么能让优化器把你的判断整段删掉，以及怎么用工具把这些错误抓出来。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>5</b> 大内存错误</span>
+      <span class="chip"><b>6</b> 类未定义行为</span>
+      <span class="chip"><b>10</b> 个常见坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议装 gcc 或 clang + gdb + valgrind：gcc --version、gdb --version</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>准备一个能被工具检查的环境</h2></div>
+  <pre><span class="c">// 编译时永远带上这三个：调试符号、警告、不优化</span>
+gcc -g -Wall -Wextra -O0 demo.c -o demo
+
+<span class="c">// demo.c：一个"看起来没问题"的程序</span>
+<span class="b">#include</span> &lt;stdio.h&gt;
+<span class="b">#include</span> &lt;stdlib.h&gt;
+<span class="b">#include</span> &lt;string.h&gt;
+
+<span class="b">int</span> main(<span class="b">void</span>) {
+    <span class="b">char</span> *p = malloc(8);
+    strcpy(p, <span class="g">"hello"</span>);
+    printf(<span class="g">"%s\n"</span>, p);
+    <span class="c">// free(p);          // ← 故意注释掉，用 valgrind 看会发生什么</span>
+    <span class="b">return</span> 0;
+}
+
+<span class="c"># 用工具跑一遍，看它能不能抓出泄漏</span>
+valgrind --leak-check=full ./demo</pre>
+  <div class="callout">
+    <b>先建立正确预期：</b>C 编译器<b>默认不阻止任何内存错误</b>。数组越界、释放后使用、类型双关，全都能编译通过。你的安全感只能来自三样东西：<b>编译警告、sanitizer、以及读代码时对内存布局的直觉</b>。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>指针的本质：地址加类型</h2></div>
+  <p class="lead">指针变量里存的是一个地址。<b>但只有地址不够 —— 类型决定了从这个地址读几个字节、怎么解释这几个字节、以及 +1 到底加多少。</b></p>
+  <pre><span class="b">int</span>    n = 0x01020304;
+<span class="b">int</span>   *pi = &amp;n;
+<span class="b">char</span>  *pc = (<span class="b">char</span> *)&amp;n;
+
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(pi));      <span class="c">// 8，64 位平台上指针固定 8 字节</span>
+printf(<span class="g">"%p\n"</span>,  (<span class="b">void</span> *)pi);      <span class="c">// 同一个地址</span>
+printf(<span class="g">"%p\n"</span>,  (<span class="b">void</span> *)pc);      <span class="c">// 同一个地址</span>
+
+printf(<span class="g">"%d\n"</span>, *pi);              <span class="c">// 一次读 4 字节</span>
+printf(<span class="g">"%d\n"</span>, *pc);              <span class="c">// 一次读 1 字节（有符号 char 可能是负数）</span>
+
+printf(<span class="g">"%p %p\n"</span>, (<span class="b">void</span> *)(pi + 1), (<span class="b">void</span> *)(pc + 1));
+<span class="c">// pi + 1 前进 4 字节；pc + 1 前进 1 字节</span>
+<span class="c">// 指针运算的单位是 sizeof(*p)，不是 1 字节</span></pre>
+  <table>
+    <tr><th style="width:170px">写法</th><th>含义</th><th>常见误解</th></tr>
+    <tr><td class="f">p + 1</td><td>前进 sizeof(*p) 字节</td><td>以为前进 1 字节</td></tr>
+    <tr><td class="f">*(p + i)</td><td>等价于 p[i]</td><td>以为 p[i] 是特殊语法</td></tr>
+    <tr><td class="f">&amp;p[i]</td><td>等价于 p + i</td><td>—</td></tr>
+    <tr><td class="f">p-&gt;m</td><td>等价于 (*p).m</td><td>—</td></tr>
+    <tr><td class="f">void *</td><td>只存地址，<b>不能解引用、不能做指针运算</b></td><td>GCC 允许 void* 按 1 字节算，但那是扩展，不是标准 C</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>指针大小和类型无关。</b>64 位平台上 <span class="k">char*</span>、<span class="k">int*</span>、<span class="k">struct Foo*</span> 都是 8 字节。<b>但指针运算和类型强相关</b>，把 <span class="k">int*</span> 强转成 <span class="k">char*</span> 再 +1，行为完全不同。函数指针在极少数平台（如部分 DSP、老式 x86 分段模式）大小可能不同，不要假设它们一定相等。
+  </div>
+  <h3>多级指针与"指针的指针"</h3>
+  <pre><span class="b">int</span> n = 42;
+<span class="b">int</span> *p = &amp;n;      <span class="c">// p 指向 n</span>
+<span class="b">int</span> **pp = &amp;p;    <span class="c">// pp 指向 p</span>
+
+**pp = 100;        <span class="c">// 两次解引用，改的是 n</span>
+printf(<span class="g">"%d\n"</span>, n); <span class="c">// 100</span>
+
+<span class="c">// 典型用途：函数里要修改调用方的指针本身</span>
+<span class="b">void</span> alloc(<span class="b">int</span> **out, <span class="b">size_t</span> n) {
+    *out = malloc(n * <span class="b">sizeof</span>(<span class="b">int</span>));
+}
+<span class="b">int</span> *arr = NULL;
+alloc(&amp;arr, 10);   <span class="c">// 必须传 &amp;arr，否则函数改的是副本</span></pre>
+  <div class="callout ok">
+    <b>NULL 不是 0 号地址的保证。</b>C 标准只保证 <span class="k">NULL</span> 是一个"不等于任何对象地址"的空指针常量，<b>它的二进制表示不一定全 0</b>（虽然几乎所有现代平台都是）。所以判空要写 <span class="k">if (p == NULL)</span> 或 <span class="k">if (!p)</span>，不要写 <span class="k">if ((intptr_t)p == 0)</span>。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>数组与指针退化：sizeof 为什么会骗你</h2></div>
+  <pre><span class="b">int</span> a[10];
+
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(a));        <span class="c">// 40（10 × 4）</span>
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(a[0]));     <span class="c">// 4</span>
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(a) / <span class="b">sizeof</span>(a[0]));  <span class="c">// 10，求元素个数的标准写法</span>
+
+<span class="b">int</span> *p = a;                      <span class="c">// 数组名退化为指向首元素的指针</span>
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(p));        <span class="c">// 8，不是 40</span></pre>
+  <h3>退化的三个例外</h3>
+  <table>
+    <tr><th style="width:220px">场景</th><th>结果</th></tr>
+    <tr><td><span class="k">sizeof(a)</span></td><td>整个数组的字节数，<b>不退化</b></td></tr>
+    <tr><td><span class="k">&amp;a</span></td><td>类型是 <span class="k">int (*)[10]</span>，<b>不退化</b>；<span class="k">&amp;a + 1</span> 跳过整个数组</td></tr>
+    <tr><td>用字符串字面量初始化字符数组</td><td><span class="k">char s[] = "abc"</span> 得到 4 字节数组，<b>不退化</b></td></tr>
+    <tr><td><b>其他所有表达式</b></td><td>退化为指向首元素的指针</td></tr>
+  </table>
+  <h3>函数参数里的数组其实是指针</h3>
+  <pre><span class="c">// 下面三种写法在编译器眼里完全一样，都是 int *</span>
+<span class="b">void</span> f(<span class="b">int</span> a[10]);
+<span class="b">void</span> f(<span class="b">int</span> a[]);
+<span class="b">void</span> f(<span class="b">int</span> *a);
+
+<span class="b">void</span> f(<span class="b">int</span> a[10]) {
+    printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(a));   <span class="c">// 8，不是 40！</span>
+}
+
+<span class="c">// 所以长度必须单独传，这是 C 接口里最常见的参数组合</span>
+<span class="b">void</span> process(<span class="b">const int</span> *a, <span class="b">size_t</span> n);</pre>
+  <div class="callout danger">
+    <b>这个坑的经典后果：</b>在函数里写 <span class="k">for (i = 0; i &lt; sizeof(a)/sizeof(a[0]); i++)</span>，在 main 里是对的，挪进函数就变成 <span class="k">8/4 = 2</span>，只处理前两个元素。<b>而且它不会报错，只是结果不对。</b>
+  </div>
+  <h3>二维数组的类型</h3>
+  <pre><span class="b">int</span> m[3][4];
+
+<span class="c">// m 退化为指向"含 4 个 int 的数组"的指针，类型是 int (*)[4]</span>
+<span class="c">// m[i] 是 int[4]，再退化为 int*</span>
+<span class="c">// m[i][j] 等价于 *(*(m + i) + j)</span>
+
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(m));       <span class="c">// 48</span>
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(m[0]));    <span class="c">// 16</span>
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(m[0][0])); <span class="c">// 4</span>
+
+<span class="c">// 作为参数时，第二维不能省</span>
+<span class="b">void</span> g(<span class="b">int</span> m[][4], <span class="b">int</span> rows);   <span class="c">// ✓</span>
+<span class="c">// void g(int **m, int rows);     // ✗ 类型不兼容，int** 不是二维数组</span></pre>
+  <div class="callout warn">
+    <b>不要用 <span class="k">int **</span> 接收二维数组。</b>二维数组是一整块连续内存，<span class="k">m[i]</span> 是靠 <span class="k">m + i*4*sizeof(int)</span> 算出来的；而 <span class="k">int**</span> 是"指针的数组"，需要先读一个指针再跳转。<b>两者内存布局完全不同</b>，混用会读到完全错误的位置。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>内存布局：段、栈、堆，以及结构体里的空洞</h2></div>
+  <pre><span class="c">// 典型 Linux x86-64 进程地址空间（从高地址到低地址）</span>
+┌──────────────────────────────┐ 0x7fff...
+│  栈 stack（向下增长）          │ 局部变量、返回地址、参数
+│      ↓                       │ 默认上限通常 8MB（ulimit -s）
+├──────────────────────────────┤
+│  mmap 区（共享库、大块分配）    │
+├──────────────────────────────┤
+│      ↑                       │
+│  堆 heap（向上增长）           │ malloc / free
+├──────────────────────────────┤
+│  .bss   未初始化全局/静态      │ 不占文件空间，加载时清零
+├──────────────────────────────┤
+│  .data  已初始化全局/静态      │
+├──────────────────────────────┤
+│  .rodata 字符串字面量、常量     │ 只读，写入会段错误
+├──────────────────────────────┤
+│  .text  机器码                │ 只读 + 可执行
+└──────────────────────────────┘ 0x400000...
+<span class="c">// 具体顺序依平台和链接脚本而变，不要写代码依赖它</span></pre>
+  <table>
+    <tr><th style="width:120px">区域</th><th>存什么</th><th>谁管理</th><th>典型错误</th></tr>
+    <tr><td><b>栈</b></td><td>局部变量、函数调用帧</td><td>编译器自动</td><td>返回局部数组的指针（悬垂）</td></tr>
+    <tr><td><b>堆</b></td><td>malloc 出来的内存</td><td>程序员</td><td>泄漏、重复释放、越界</td></tr>
+    <tr><td><b>.data</b></td><td>初始化的全局/静态变量</td><td>加载器</td><td>—</td></tr>
+    <tr><td><b>.bss</b></td><td>未初始化或初始化为 0 的全局/静态变量</td><td>加载器清零</td><td>误以为它占可执行文件体积</td></tr>
+    <tr><td><b>.rodata</b></td><td>字符串字面量、const 全局</td><td>只读映射</td><td>修改字面量（UB，通常段错误）</td></tr>
+  </table>
+  <h3>结构体对齐：为什么 sizeof 比字段加起来大</h3>
+  <pre><span class="b">struct</span> A {
+    <span class="b">char</span>  c;   <span class="c">// 偏移 0，占 1 字节</span>
+    <span class="b">int</span>   i;   <span class="c">// 偏移 4（前面补 3 字节）</span>
+    <span class="b">char</span>  d;   <span class="c">// 偏移 8</span>
+};              <span class="c">// sizeof = 12（末尾再补 3 字节，凑成 4 的倍数）</span>
+
+<span class="b">struct</span> B {
+    <span class="b">int</span>   i;   <span class="c">// 偏移 0</span>
+    <span class="b">char</span>  c;   <span class="c">// 偏移 4</span>
+    <span class="b">char</span>  d;   <span class="c">// 偏移 5</span>
+};              <span class="c">// sizeof = 8（末尾补 2 字节）</span>
+
+<span class="c">// 字段一样，只是顺序不同：12 字节 vs 8 字节，差 50%</span></pre>
+  <p><b>规则有两条：</b>① 每个字段的起始偏移必须是它自身对齐要求的整数倍（<span class="k">int</span> 通常是 4）；② 结构体总大小必须是<b>最大对齐要求</b>的整数倍，这样数组里每个元素都自然对齐。</p>
+  <div class="callout">
+    <b>为什么要对齐？</b>CPU 访问内存是按字（word）或缓存行（64 字节）来的。<b>一个 4 字节的 int 如果横跨两个缓存行，需要两次访问再拼接</b>；某些架构（早期 ARM、SPARC）遇到未对齐访问会直接触发总线错误，不是慢，是崩。原子操作更是硬性要求对齐。
+  </div>
+  <h3>缓存行与伪共享</h3>
+  <pre><span class="c">// 一个缓存行通常 64 字节。两个线程各改一个变量，</span>
+<span class="c">// 如果它们落在同一行，会互相把对方的缓存行置为无效</span>
+
+<span class="b">struct</span> Counter {
+    <span class="b">long</span> a;    <span class="c">// 线程 1 改</span>
+    <span class="b">long</span> b;    <span class="c">// 线程 2 改 —— 与 a 同行，产生伪共享</span>
+};
+
+<span class="c">// 解决：用填充把两个变量推到不同缓存行</span>
+<span class="b">struct</span> Padded {
+    <span class="b">long</span> a;
+    <span class="b">char</span> pad[64 - <span class="b">sizeof</span>(<span class="b">long</span>)];
+    <span class="b">long</span> b;
+};
+<span class="c">// 或使用 _Alignas(64)</span></pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>字符串：一个 \0 引发的所有问题</h2></div>
+  <pre><span class="c">// C 没有"字符串类型"，只有"以 \0 结尾的 char 数组"这个约定</span>
+<span class="b">char</span> s[] = <span class="g">"abc"</span>;        <span class="c">// 栈上 4 字节：'a' 'b' 'c' '\0'，可修改</span>
+<span class="b">char</span> *p  = <span class="g">"abc"</span>;        <span class="c">// 指向 .rodata，修改是 UB（通常段错误）</span>
+
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(s));   <span class="c">// 4，编译期就知道</span>
+printf(<span class="g">"%zu\n"</span>, <span class="b">sizeof</span>(p));   <span class="c">// 8，指针大小</span>
+printf(<span class="g">"%zu\n"</span>, strlen(s));   <span class="c">// 3，运行时数到 \0 为止</span>
+printf(<span class="g">"%zu\n"</span>, strlen(p));   <span class="c">// 3</span></pre>
+  <table>
+    <tr><th style="width:150px">函数</th><th>行为</th><th>问题</th></tr>
+    <tr><td class="f">strlen</td><td>从指针开始数到 <span class="k">\0</span></td><td>O(n)；没有 <span class="k">\0</span> 就会一直读下去</td></tr>
+    <tr><td class="f">sizeof</td><td>编译期求值，数组是总字节数</td><td>对指针永远是指针大小</td></tr>
+    <tr><td class="f">strcpy</td><td>复制到 <span class="k">\0</span> 为止</td><td><b>完全不检查目标容量</b>，缓冲区溢出的头号来源</td></tr>
+    <tr><td class="f">strcat</td><td>追加到目标末尾</td><td>同样不检查剩余空间</td></tr>
+    <tr><td class="f">sprintf</td><td>格式化到缓冲区</td><td>不知道缓冲区多大</td></tr>
+    <tr><td class="f">strncpy</td><td>最多复制 n 字节</td><td><b>源串长度 ≥ n 时不补 <span class="k">\0</span></b>，得到的不是合法字符串</td></tr>
+    <tr><td class="f">snprintf</td><td>最多写 n 字节，<b>保证以 <span class="k">\0</span> 结尾</b></td><td>返回值是"原本想写的长度"，可能大于 n</td></tr>
+  </table>
+  <pre><span class="b">char</span> buf[8];
+strcpy(buf, <span class="g">"this is way too long"</span>);   <span class="c">// 溢出，写坏栈上的相邻数据</span>
+
+<span class="c">// strncpy 的经典陷阱</span>
+<span class="b">char</span> dst[8];
+strncpy(dst, <span class="g">"0123456789"</span>, <span class="b">sizeof</span>(dst));
+printf(<span class="g">"%s\n"</span>, dst);   <span class="c">// 没有 \0，越界读，行为不确定</span>
+
+<span class="c">// 正确做法一：手动补 \0</span>
+strncpy(dst, src, <span class="b">sizeof</span>(dst) - 1);
+dst[<span class="b">sizeof</span>(dst) - 1] = <span class="g">'\0'</span>;
+
+<span class="c">// 正确做法二：snprintf 一步到位</span>
+snprintf(dst, <span class="b">sizeof</span>(dst), <span class="g">"%s"</span>, src);</pre>
+  <div class="callout danger">
+    <b>strcpy 为什么危险？</b>它没有任何"目标有多长"的信息 —— 函数签名里就没有这个参数。<b>它只知道自己要复制到源串的 <span class="k">\0</span> 为止</b>，目标装不下就写穿。这是几十年来最多的一类安全漏洞（缓冲区溢出）的根源，也是很多远程代码执行的入口。
+  </div>
+  <h3>memcpy 与 memmove</h3>
+  <pre><span class="b">char</span> buf[16] = <span class="g">"0123456789"</span>;
+
+<span class="c">// memmove 处理重叠区间，内部会判断方向</span>
+memmove(buf + 2, buf, 5);      <span class="c">// 结果 "0101234789"</span>
+
+<span class="c">// memcpy 不保证处理重叠，重叠时行为未定义</span>
+<span class="c">// memcpy(buf + 2, buf, 5);    // ✗ 可能得到错误结果</span>
+
+<span class="c">// 经验：不确定是否重叠就用 memmove，代价通常可以忽略</span></pre>
+  <div class="callout warn">
+    <b>strtok 不可重入。</b>它把"下一次从哪里开始"存在函数内部的静态变量里，<b>多线程同时用会互相踩</b>，甚至嵌套调用都会错乱。多线程或需要嵌套时用 <span class="k">strtok_r</span>（POSIX），它把状态放在调用方传进来的 <span class="k">char **saveptr</span> 里。
+  </div>
+  <div class="callout">
+    <b>strlen 返回的是字节数，不是字符数。</b>UTF-8 下一个汉字占 3 字节，一个 emoji 可能占 4 字节。用 <span class="k">strlen("中文")</span> 得到 6，不是 2。<b>C 标准库没有"按字符遍历 UTF-8"的函数</b>，要么用第三方库，要么自己按首字节的高位判断码点长度。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>未定义行为：编译器可以假设它不存在</h2></div>
+  <p class="lead">UB（Undefined Behavior）不是"结果不确定"，而是<b>标准对程序的行为不作任何要求</b>。优化器有权假设"这段代码永远不会执行到 UB"，并据此删改代码。</p>
+  <h3>六类最常见的 UB</h3>
+  <table>
+    <tr><th style="width:190px">类型</th><th>例子</th><th>后果</th></tr>
+    <tr><td><b>有符号整数溢出</b></td><td><span class="k">INT_MAX + 1</span></td><td>优化器可以假设 <span class="k">x + 1 &gt; x</span> 恒成立</td></tr>
+    <tr><td><b>数组越界</b></td><td><span class="k">a[10]</span>（长度 10）</td><td>读到相邻变量或栈保护页，可能段错误</td></tr>
+    <tr><td><b>空指针解引用</b></td><td><span class="k">*p</span> 而 <span class="k">p == NULL</span></td><td>段错误；优化器也可能直接删掉判空</td></tr>
+    <tr><td><b>未初始化读取</b></td><td><span class="k">int x; if (x)</span></td><td>读到任意值，且可能让编译器做出错误推断</td></tr>
+    <tr><td><b>严格别名违规</b></td><td>用 <span class="k">float*</span> 读 <span class="k">int</span> 的内存</td><td><span class="k">-O2</span> 下重排导致读到旧值</td></tr>
+    <tr><td><b>求值顺序 / 序列点</b></td><td><span class="k">i = i++ + 1</span></td><td>C11 起明确是 UB，结果不可预测</td></tr>
+  </table>
+  <h3>为什么"优化器删掉了我的判空"</h3>
+  <pre><span class="c">// 一段看起来在防御空指针的代码</span>
+<span class="b">int</span> deref(<span class="b">int</span> *p) {
+    <span class="b">int</span> v = *p;        <span class="c">// 如果 p 是 NULL，这里已经是 UB</span>
+    <span class="b">if</span> (p == NULL) {   <span class="c">// ← 优化器认为这行永远不成立，直接删掉</span>
+        <span class="b">return</span> 0;
+    }
+    <span class="b">return</span> v;
+}
+<span class="c">// 因为"解引用空指针是 UB"意味着"p 一定非空"，于是判空是死代码</span>
+<span class="c">// GCC/Clang 在 -O2 下确实会删掉这个分支</span>
+
+<span class="c">// 正确写法：先判空，再解引用</span>
+<span class="b">int</span> deref(<span class="b">int</span> *p) {
+    <span class="b">if</span> (p == NULL) <span class="b">return</span> 0;
+    <span class="b">return</span> *p;
+}</pre>
+  <div class="callout danger">
+    <b>另一个经典例子：有符号溢出。</b>
+    <pre style="margin-top:8px"><span class="b">int</span> f(<span class="b">int</span> x) {
+    <span class="b">if</span> (x + 1 &lt; x) <span class="b">return</span> 1;   <span class="c">// 本意是检测溢出</span>
+    <span class="b">return</span> 0;
+}</pre>
+    因为 <span class="k">x + 1</span> 不允许溢出，优化器可以推出 <span class="k">x + 1 &gt; x</span> 恒成立，于是整个 <span class="k">if</span> 被删掉，函数永远返回 0。<b>用 <span class="k">-fwrapv</span> 可以强制回绕语义，但更该做的是用无符号数或编译器内建函数判断。</b>
+  </div>
+  <h3>严格别名：为什么 float* 读 int 会出错</h3>
+  <pre><span class="c">// 违反严格别名规则（strict aliasing）</span>
+<span class="b">int</span>   n = 0x3f800000;
+<span class="b">float</span> f = *(<span class="b">float</span> *)&amp;n;      <span class="c">// UB：通过 float* 访问 int 对象</span>
+
+<span class="c">// -O2 下编译器可能认为这两个指针不可能指向同一块内存，从而重排读写顺序</span>
+
+<span class="c">// 正确做法一：memcpy（编译器会优化成一条 mov，零开销）</span>
+<span class="b">float</span> f;
+memcpy(&amp;f, &amp;n, <span class="b">sizeof</span> f);
+
+<span class="c">// 正确做法二：union 类型双关（C99 起允许，C++ 不允许）</span>
+<span class="b">union</span> { <span class="b">int</span> i; <span class="b">float</span> f; } u = { .i = 0x3f800000 };
+printf(<span class="g">"%f\n"</span>, u.f);</pre>
+  <div class="callout warn">
+    <b>UB 最可怕的地方是"它现在能跑"。</b>换编译器版本、换优化级别、在中间加一行 <span class="k">printf</span>，行为都可能突变。这类 bug 叫 heisenbug —— <b>你一加日志它就好了，一删日志又坏了</b>。所以"我测过没问题"对 UB 毫无意义。
+  </div>
+  <div class="callout ok">
+    <b>能抓一部分 UB 的工具：</b><span class="k">-fsanitize=undefined</span>（UBSan）会在运行时检查有符号溢出、移位越界、空指针、对齐错误、部分别名问题。<b>开销很小（通常 10%~30%），建议在测试环境常开。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>内存管理：五个错误，一个对策</h2></div>
+  <pre><span class="b">void</span> *malloc(<span class="b">size_t</span> n);              <span class="c">// 分配 n 字节，内容不确定</span>
+<span class="b">void</span> *calloc(<span class="b">size_t</span> cnt, <span class="b">size_t</span> sz); <span class="c">// 分配 cnt*sz 字节并清零</span>
+<span class="b">void</span> *realloc(<span class="b">void</span> *p, <span class="b">size_t</span> n);     <span class="c">// 调整大小，可能搬家</span>
+<span class="b">void</span>  free(<span class="b">void</span> *p);                 <span class="c">// 归还，p 必须来自 malloc/calloc/realloc</span>
+
+<span class="c">// 标准写法：先检查，再使用</span>
+<span class="b">int</span> *a = malloc(100 * <span class="b">sizeof</span>(<span class="b">int</span>));
+<span class="b">if</span> (a == NULL) { <span class="c">/* 处理失败，不要继续 */</span> }
+
+<span class="c">// realloc 的坑：失败时返回 NULL，但原指针仍然有效</span>
+<span class="b">int</span> *tmp = realloc(a, 200 * <span class="b">sizeof</span>(<span class="b">int</span>));
+<span class="b">if</span> (tmp == NULL) { <span class="c">/* a 还在，不能丢 */</span> }
+<span class="b">else</span> { a = tmp; }</pre>
+  <h3>五个错误</h3>
+  <table>
+    <tr><th style="width:130px">错误</th><th>表现</th><th>典型原因</th></tr>
+    <tr><td><b>重复释放</b></td><td>glibc 报 <span class="k">double free or corruption</span>，或堆结构被破坏后随机崩</td><td>两条路径都 free 了同一个指针；循环里 free 没置空</td></tr>
+    <tr><td><b>野指针</b></td><td>读到垃圾值，或段错误</td><td>free 之后没置 NULL，继续用</td></tr>
+    <tr><td><b>泄漏</b></td><td>RSS 持续上涨，最终 OOM</td><td>忘记 free；指针被覆盖，原地址再也拿不到</td></tr>
+    <tr><td><b>越界</b></td><td>写坏相邻内存或堆元数据，崩溃点离案发现场很远</td><td>循环多跑一次；<span class="k">malloc(n)</span> 却写了 n+1</td></tr>
+    <tr><td><b>释放后使用</b></td><td>读到已被重新分配的数据；偶尔"看起来正常"</td><td>free 后还在用指针，尤其是被别的线程复用之后</td></tr>
+  </table>
+  <pre><span class="c">// 越界如何破坏堆：malloc 返回的块前面有元数据</span>
+┌────────────┬──────────────────┬────────────┐
+│ 块头(大小等) │  用户可用区域      │ 下一块头    │
+└────────────┴──────────────────┴────────────┘
+<span class="c">// 写超了就会改到下一块的块头，free 时才崩，栈已经指不到源头</span>
+
+<span class="c">// free 之后立即置空，是最便宜的习惯</span>
+free(p);
+p = NULL;      <span class="c">// 再 free 一次是合法的 no-op</span></pre>
+  <div class="callout warn">
+    <b>三个容易忽略的细节：</b>① <span class="k">free(NULL)</span> 是合法的，什么都不做；② <span class="k">malloc(0)</span> 的返回值可以是 NULL，也可以是"可 free 的唯一指针"，两种都符合标准，所以别对 0 字节做假设；③ <b>只能 free malloc 家族返回的原始指针</b>，<span class="k">free(p + 1)</span> 或 free 栈地址都会破坏堆。
+  </div>
+  <h3>减少碎片与分配次数</h3>
+  <pre><span class="c">// ① 批量分配，而不是循环里一次次 malloc</span>
+<span class="b">int</span> *arr = malloc(n * <span class="b">sizeof</span>(<span class="b">int</span>));   <span class="c">// 一次</span>
+
+<span class="c">// ② 固定大小对象用内存池，避免频繁 split/merge</span>
+<span class="c">// ③ 长期运行的服务，考虑 jemalloc / tcmalloc 替换默认分配器</span>
+<span class="c">//    多线程下它们的锁竞争通常明显更小</span>
+
+<span class="c">// ④ 能用栈就用栈：生命周期明确的小数组没必要上堆</span>
+<span class="b">int</span> buf[256];   <span class="c">// 栈上，函数返回自动回收，零分配开销</span></pre>
+  <div class="callout danger">
+    <b><span class="k">alloca</span> 不是 malloc 的替代品。</b>它在<b>当前函数的栈帧</b>上分配，函数返回自动释放，看起来很美。但：① 大小不受控时直接爆栈；② 不能在循环里用（每次循环都分配，直到函数返回才释放）；③ 不可移植。<b>只适合"大小很小且编译期可估算"的场景，绝大多数情况下不该用。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>预处理器与宏：它只是文本替换</h2></div>
+  <pre><span class="c">// 预处理阶段发生在编译之前，只做三件事：文件包含、宏替换、条件编译</span>
+<span class="b">#include</span> &lt;stdio.h&gt;      <span class="c">// 把整个头文件文本插进来</span>
+<span class="b">#define</span> MAX 100          <span class="c">// 之后所有 MAX 被替换成 100</span>
+<span class="b">#ifdef</span> DEBUG             <span class="c">// 条件编译</span>
+    printf(<span class="g">"debug\n"</span>);
+<span class="b">#endif</span></pre>
+  <h3>宏的三个经典错误</h3>
+  <pre><span class="c">// 错误一：没有括号，优先级被破坏</span>
+<span class="b">#define</span> SQUARE(x) x * x
+SQUARE(1 + 2)          <span class="c">// 展开成 1 + 2 * 1 + 2 = 5，不是 9</span>
+
+<span class="c">// 修正：每个参数和整体都加括号</span>
+<span class="b">#define</span> SQUARE(x) ((x) * (x))
+
+<span class="c">// 错误二：参数被求值多次</span>
+<span class="b">int</span> i = 5;
+SQUARE(i++)            <span class="c">// 展开成 ((i++) * (i++)) —— 同一表达式里改两次 i，UB</span>
+
+<span class="c">// 即使加了括号也救不了，因为宏是文本替换，不是函数调用</span>
+
+<span class="c">// 错误三：多语句宏在 if 后面被拆散</span>
+<span class="b">#define</span> LOG(msg) printf(msg); fflush(stdout);
+<span class="b">if</span> (ok) LOG(<span class="g">"hi"</span>);   <span class="c">// 展开后只有 printf 在 if 里，fflush 无条件执行</span>
+
+<span class="c">// 修正：用 do { } while (0) 包起来</span>
+<span class="b">#define</span> LOG(msg) <span class="b">do</span> { printf(msg); fflush(stdout); } <span class="b">while</span> (0)</pre>
+  <div class="callout ok">
+    <b>为什么是 <span class="k">do { } while (0)</span> 而不是 <span class="k">{ }</span>？</b>因为 <span class="k">if (x) { ... }; else ...</span> 里的那个分号会让 else 悬空，编译失败。而 <span class="k">do { } while (0)</span> 后面必须跟分号，正好和函数调用写法一致，在任何上下文里都安全。
+  </div>
+  <h3>用函数替代宏</h3>
+  <pre><span class="c">// C99 起可以用 static inline，兼顾类型检查和零开销</span>
+<span class="b">static inline int</span> square(<span class="b">int</span> x) { <span class="b">return</span> x * x; }
+
+<span class="c">// 优点：参数只求值一次、有类型检查、能调试、能取地址</span>
+<span class="c">// static 保证每个 .c 文件有一份内部链接的副本，不会重复定义</span>
+
+<span class="c">// 只写 inline 不给 static 放在头文件里，可能链接失败</span>
+<span class="c">// （C99 的 inline 语义和 C++ 不同，容易踩坑）</span></pre>
+  <table>
+    <tr><th style="width:150px">写法</th><th>类型检查</th><th>求值次数</th><th>能调试</th></tr>
+    <tr><td class="f">#define</td><td>无</td><td>看写法，可能多次</td><td>难（符号被替换掉）</td></tr>
+    <tr><td class="f">static inline</td><td>有</td><td>一次</td><td>可以</td></tr>
+    <tr><td class="f">普通函数</td><td>有</td><td>一次</td><td>可以，但有调用开销</td></tr>
+  </table>
+  <div class="callout warn">
+    <b><span class="k">assert</span> 也是宏，也会带来副作用问题。</b>定义 <span class="k">NDEBUG</span> 后（release 构建常这么做），<span class="k">assert(expr)</span> 整个消失，<b>expr 里的函数调用也不会执行</b>。
+    <pre style="margin-top:8px">assert(init_device() == 0);   <span class="c">// release 下 init_device() 根本不会被调用</span></pre>
+    所以断言里只放纯检查，不要放有副作用的表达式。
+  </div>
+  <h3>static 的三个含义</h3>
+  <table>
+    <tr><th style="width:230px">位置</th><th>含义</th></tr>
+    <tr><td>函数内的局部变量</td><td>生命周期变成整个程序，只初始化一次</td></tr>
+    <tr><td>文件作用域的变量/函数</td><td><b>内部链接</b>，其他 .c 文件看不见，避免命名冲突</td></tr>
+  </table>
+  <div class="callout">
+    <b>头文件里的 <span class="k">static</span> 函数：每个包含它的 .c 都会得到一份副本。</b>这避免了重复定义，但会让代码体积变大，也让"函数指针比较"变得不可靠（不同 .c 里地址不同）。<b>头文件里优先用 <span class="k">static inline</span>，让编译器决定要不要真的内联。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>调试与检测：gdb、valgrind、sanitizer</h2></div>
+  <h3>gdb 的七个命令够用九成场景</h3>
+  <table>
+    <tr><th style="width:200px">命令</th><th>作用</th></tr>
+    <tr><td class="f">gcc -g -O0 -o app app.c</td><td>带调试符号编译，<b>不要优化</b>，否则断点和变量会被优化掉</td></tr>
+    <tr><td class="f">gdb ./app</td><td>启动调试</td></tr>
+    <tr><td class="f">run / r</td><td>运行；崩溃后停住</td></tr>
+    <tr><td class="f">break file.c:42 / b func</td><td>下断点</td></tr>
+    <tr><td class="f">next / step</td><td>单步（不进入函数）/ 单步（进入函数）</td></tr>
+    <tr><td class="f">print p / p *p / p arr[3]</td><td>看变量、解引用、看数组元素</td></tr>
+    <tr><td class="f">backtrace / bt</td><td>调用栈，崩溃后第一件事</td></tr>
+  </table>
+  <pre><span class="c"># 程序已经崩了，只有 core 文件</span>
+gdb ./app core
+(gdb) bt                 <span class="c"># 看崩溃时的调用栈</span>
+(gdb) frame 1
+(gdb) info locals        <span class="c"># 看这一帧的所有局部变量</span>
+(gdb) p *ptr             <span class="c"># 看指针指向的内容</span>
+
+<span class="c"># 多线程程序：一次看所有线程的栈</span>
+(gdb) thread apply all bt</pre>
+  <div class="callout">
+    <b>段错误时最该看三样：</b>① <span class="k">bt</span> 找到崩溃函数；② 那一帧的指针值；③ <span class="k">info registers</span> 看出错指令地址。<b>地址很小（如 0x8）通常是"空指针 + 字段偏移"，地址很大且规整通常是野指针。</b>
+  </div>
+  <h3>valgrind memcheck</h3>
+  <pre>gcc -g -O0 app.c -o app
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./app
+
+<span class="c"># 典型输出</span>
+==1234== Invalid write of size 4
+==1234==    at 0x4005A1: main (app.c:12)
+==1234==  Address 0x5204048 is 0 bytes after a block of size 40 alloc'd
+==1234==    at 0x4C2FB0F: malloc (vg_replace_malloc.c:299)
+
+==1234== HEAP SUMMARY:
+==1234==    definitely lost: 8 bytes in 1 blocks
+==1234==    indirectly lost: 0 bytes in 0 blocks</pre>
+  <table>
+    <tr><th style="width:150px">能力</th><th>说明</th></tr>
+    <tr><td><b>能查</b></td><td>堆越界、释放后使用、重复释放、未初始化读取、内存泄漏</td></tr>
+    <tr><td><b>不能查</b></td><td>栈上越界（部分能查）、全局变量越界、数据竞争（要用 helgrind）</td></tr>
+    <tr><td><b>开销</b></td><td><b>10~50 倍</b>，只适合测试和小规模复现</td></tr>
+  </table>
+  <h3>Sanitizer：编译期插桩，运行期检查</h3>
+  <pre><span class="c"># AddressSanitizer：堆/栈/全局越界、UAF、双重释放、泄漏</span>
+gcc -g -fsanitize=address -fno-omit-frame-pointer app.c -o app
+
+<span class="c"># UndefinedBehaviorSanitizer：有符号溢出、移位越界、空指针、对齐</span>
+gcc -g -fsanitize=undefined app.c -o app
+
+<span class="c"># 组合使用（最常用的组合）</span>
+gcc -g -fsanitize=address,undefined app.c -o app
+
+<span class="c"># 泄漏检测默认开启，可用环境变量控制</span>
+ASAN_OPTIONS=detect_leaks=1 ./app</pre>
+  <table>
+    <tr><th style="width:120px">工具</th><th>抓什么</th><th>开销</th><th>注意</th></tr>
+    <tr><td><b>ASan</b></td><td>越界、UAF、双重释放、泄漏</td><td><b>约 2 倍</b>内存和少量 CPU</td><td>编译和链接都要加参数</td></tr>
+    <tr><td><b>UBSan</b></td><td>有符号溢出、移位、空指针、对齐</td><td>10%~30%</td><td>开销小，适合常开</td></tr>
+    <tr><td><b>TSan</b></td><td>数据竞争</td><td>5~15 倍</td><td>只能发现实际发生的竞争</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>ASan 和 valgrind 不能同时用。</b>两者都接管内存分配器，一起开通常会直接崩或给出混乱结果。<b>选择建议：日常开发和 CI 用 ASan + UBSan（快、集成简单）；需要精确定位泄漏来源时再用 valgrind 的 <span class="k">--track-origins</span>。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个"能编译、能跑、会炸"的写法</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 strcpy / sprintf 往固定大小的缓冲区里写</div><div class="pd">它们不知道目标有多大，源数据一长就写穿。这是缓冲区溢出的头号来源，用 snprintf 并检查返回值。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">free 之后继续使用指针</div><div class="pd">这块内存可能已经被分配给别人，你读到的是别人的数据，写进去会破坏别人的状态。free 后立刻置 NULL。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">返回指向局部变量的指针</div><div class="pd">函数返回后栈帧就失效了，那块内存随时会被下一次调用覆盖。编译器通常会给警告，但不会阻止你。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">在函数里用 sizeof(arr)/sizeof(arr[0]) 求长度</div><div class="pd">数组参数已经退化成指针，结果是 8/4=2。长度必须作为单独的参数传进来。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">给宏传带副作用的参数</div><div class="pd">SQUARE(i++) 会展开成两次 i++，同一个表达式里改两次变量是 UB。宏参数被求值的次数取决于宏体里出现了几次。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">不检查 malloc 的返回值</div><div class="pd">分配失败返回 NULL，直接解引用就是段错误。在内存受限的嵌入式环境里这非常常见。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">随手用 __attribute__((packed)) 省空间</div><div class="pd">所有字段变成未对齐，x86 上变慢，ARM 上可能直接崩。优先调整字段顺序，通常能白拿 20%~50% 空间。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用 x + 1 &lt; x 检测有符号溢出</div><div class="pd">有符号溢出是 UB，优化器会假设它不发生，直接把整个判断删掉。改用无符号数或编译器内建函数。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 int 存指针或地址</div><div class="pd">64 位平台上指针 8 字节、int 4 字节，高位被截断。要用 intptr_t / uintptr_t，且只在确实需要整数运算时用。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">多线程读写同一个全局变量却以为"只是读"</div><div class="pd">C11 之前标准里根本没有线程概念；即使现在，无同步的并发读写也是数据竞争，属于 UB，优化器可能把读提到循环外。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. <span class="k">int *p</span> 指向一个 int，<span class="k">p + 1</span> 实际前进了多少字节？</div>
+      <button class="opt">1 字节</button>
+      <button class="opt">sizeof(int) 字节，通常是 4</button>
+      <button class="opt">8 字节，因为指针是 8 字节</button>
+      <div class="ans">正确答案：<b>sizeof(int)</b>。指针运算的单位是"所指类型的大小"，不是 1 字节，也不是指针自身的大小。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. <span class="k">void f(int a[10])</span> 里 <span class="k">sizeof(a)</span> 是多少？</div>
+      <button class="opt">40</button>
+      <button class="opt">10</button>
+      <button class="opt">8，数组参数已经退化成指针</button>
+      <div class="ans">正确答案：<b>8</b>。形参里的 <span class="k">int a[10]</span> 和 <span class="k">int *a</span> 完全等价，方括号里的数字没有约束力。长度必须单独传。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. <span class="k">struct { char c; int i; char d; }</span> 在常见平台上 sizeof 是多少？</div>
+      <button class="opt">6</button>
+      <button class="opt">12，中间补 3 字节、末尾补 3 字节</button>
+      <button class="opt">9</button>
+      <div class="ans">正确答案：<b>12</b>。int 要求 4 字节对齐，c 后面补 3 字节；整体大小要是最大对齐的倍数，末尾再补 3 字节。把 int 放最前面就能压到 8。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. <span class="k">strncpy(dst, "0123456789", sizeof(dst))</span>（dst 是 8 字节）之后，dst 一定是个合法字符串吗？</div>
+      <button class="opt">是，strncpy 会保证以 \0 结尾</button>
+      <button class="opt">是，只要 n 不超过 dst 大小就安全</button>
+      <button class="opt">不一定，源串长度 ≥ n 时不会补 \0</button>
+      <div class="ans">正确答案：<b>不一定</b>。strncpy 只在源串短于 n 时用 \0 填充；源串更长时写满 n 字节且不加终止符。用 n-1 再手动补 \0，或直接用 snprintf。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. <span class="k">if (x + 1 &lt; x) return 1;</span> 在 -O2 下最可能发生什么？</div>
+      <button class="opt">正确检测到溢出并返回 1</button>
+      <button class="opt">整个判断被优化掉，函数永远返回 0</button>
+      <button class="opt">编译报错</button>
+      <div class="ans">正确答案：<b>被优化掉</b>。有符号溢出是 UB，优化器假设它不会发生，推出 x+1 &gt; x 恒成立，判空分支成为死代码。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 关于 ASan 与 valgrind，哪个说法对？</div>
+      <button class="opt">两者可以同时开，效果更好</button>
+      <button class="opt">valgrind 开销更小，应该优先用</button>
+      <button class="opt">ASan 是编译期插桩、开销约 2 倍；valgrind 是动态翻译、开销 10~50 倍，两者不能同时用</button>
+      <div class="ans">正确答案：<b>第三个</b>。ASan 编译期插桩、速度快，适合 CI；valgrind 运行时翻译指令，慢但不需重编。两者都接管分配器，不能同开。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <div class="cmds">
+    <div class="crow"><code>gcc -g -Wall -Wextra -O0 app.c -o app</code><span class="desc">开发期编译：调试符号 + 全警告 + 不优化</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -g -fsanitize=address,undefined app.c -o app</code><span class="desc">开启 ASan + UBSan</span><button class="copy">复制</button></div>
+    <div class="crow"><code>valgrind --leak-check=full ./app</code><span class="desc">查泄漏与越界（慢，但不需要重编）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gdb ./app core</code><span class="desc">用 core 文件定位崩溃现场</span><button class="copy">复制</button></div>
+    <div class="crow"><code>bt / frame N / info locals</code><span class="desc">看调用栈、切栈帧、看局部变量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>x/16xb ptr</code><span class="desc">按十六进制看内存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>watch var</code><span class="desc">变量被改时自动断下</span><button class="copy">复制</button></div>
+    <div class="crow"><code>thread apply all bt</code><span class="desc">打印所有线程的调用栈</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>编译选项速查</h3>
+  <pre>-g                       <span class="c"># 调试符号，gdb 必需</span>
+-Wall -Wextra            <span class="c"># 打开常用警告，几乎零成本</span>
+-Werror                  <span class="c"># 警告当错误，CI 里建议开</span>
+-O0 / -O2 / -O3          <span class="c"># 优化级别，调试用 O0</span>
+-fsanitize=address       <span class="c"># 越界、UAF、泄漏</span>
+-fsanitize=undefined     <span class="c"># 有符号溢出、移位、空指针</span>
+-fno-omit-frame-pointer  <span class="c"># 保留帧指针，调用栈更准</span>
+-fstack-protector-strong <span class="c"># 栈溢出检测</span>
+-std=c11 / -std=c17      <span class="c"># 指定标准版本</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>数组退化</b></td><td>数组名在大多数表达式里变成指向首元素的指针</td></tr>
+    <tr><td><b>悬垂指针</b></td><td>指向已释放或已失效内存的指针</td></tr>
+    <tr><td><b>野指针</b></td><td>未初始化或 free 后未置空的指针</td></tr>
+    <tr><td><b>UB</b></td><td>未定义行为，标准不作任何要求，优化器可任意假设</td></tr>
+    <tr><td><b>序列点</b></td><td>表达式求值顺序的约束点，跨过它之前所有副作用必须完成</td></tr>
+    <tr><td><b>严格别名</b></td><td>不同类型的指针不能指向同一对象，否则 UB</td></tr>
+    <tr><td><b>对齐</b></td><td>对象地址必须是某个值的整数倍，否则访问变慢或崩溃</td></tr>
+    <tr><td><b>padding</b></td><td>为满足对齐而在字段之间或末尾插入的空洞字节</td></tr>
+    <tr><td><b>缓存行</b></td><td>CPU 与内存之间搬运数据的最小单位，通常 64 字节</td></tr>
+    <tr><td><b>伪共享</b></td><td>两个线程改同一缓存行里的不同变量，互相让对方的缓存失效</td></tr>
+    <tr><td><b>堆元数据</b></td><td>分配器放在每块内存前后的管理信息，越界会破坏它</td></tr>
+    <tr><td><b>内部链接</b></td><td>符号只在本编译单元可见，用 static 实现</td></tr>
+    <tr><td><b>memcheck</b></td><td>valgrind 的内存检查工具，查泄漏、越界、未初始化读</td></tr>
+    <tr><td><b>ASan</b></td><td>AddressSanitizer，编译期插桩的内存错误检测器</td></tr>
+    <tr><td><b>UBSan</b></td><td>UndefinedBehaviorSanitizer，检测各类未定义行为</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个 <span class="k">struct</span>，用 <span class="k">offsetof</span> 打印每个字段的偏移，再调整顺序对比 sizeof；② 故意写一个 <span class="k">strcpy</span> 溢出，用 ASan 看它报的"0 bytes after a block"；③ 用 gdb 跟一个链表，打印每个节点的地址和 next；④ 写一个 <span class="k">x+1&lt;x</span> 的溢出检测，用 <span class="k">-O2</span> 和 <span class="k">-O0</span> 分别反汇编对比；⑤ 用 valgrind 跑一个泄漏程序，看 definitely lost 和 still reachable 的区别。<br><br>
+    <b>之后值得单独学：</b>C11 的 <span class="k">_Atomic</span> 与内存序、<span class="k">restrict</span> 的语义与误用、自定义分配器与 arena、以及用 <span class="k">-fsanitize=fuzzer</span> 做模糊测试。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 C 与内存 · 上线前确认：没有裸 strcpy、没有未检查的 malloc、ASan/UBSan 跑过、core 文件能生成</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 5（UB）和模块 6（内存管理）是最容易出安全事故的两节，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边用 gcc -fsanitize=address 跑一遍。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议装 gcc 或 clang + gdb + valgrind：gcc --version、gdb --version';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

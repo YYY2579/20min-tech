@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透秒杀系统设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+/* 分层架构图（纯 HTML/CSS） */
+.layer{border:1px solid var(--line);border-radius:10px;margin-top:10px;overflow:hidden}
+.layer .lt{background:var(--bg);border-bottom:1px solid var(--line);padding:7px 14px;font-size:13px;font-weight:600;color:var(--muted)}
+.layer .lb{padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px}
+.box{font-size:12.5px;border:1px solid var(--line);border-radius:7px;padding:5px 11px;background:var(--card);color:#3A3A36;white-space:nowrap}
+.box b{color:var(--ink)}
+/* 漏斗图（HTML/CSS） */
+.funnel{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.fstep{display:flex;align-items:center;gap:12px}
+.fbar{height:34px;border-radius:7px;display:flex;align-items:center;padding:0 12px;color:#fff;font-size:13px;font-weight:600;white-space:nowrap}
+.fnum{font-size:12.5px;color:var(--muted);flex:1;min-width:0}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 9 期 · 实战篇</span>
+    <h1>二十分钟学透秒杀系统设计</h1>
+    <p class="sub">秒杀不是"高并发版下单"，是<b>有损服务设计</b>：100 万人抢 100 件货，系统的目标不是让 100 万人都成功，而是<b>让该成功的成功、该拒绝的快速拒绝、系统不挂</b>。这篇讲透削峰、预扣、隔离、对账四件事。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">请求漏斗 <b>100万→100</b></span>
+      <span class="chip">Redis 预扣 <b>10万 QPS</b></span>
+      <span class="chip"><b>4</b> 层限流参数</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边画漏斗：从用户点击到扣库存成功，每一层拦掉多少请求、拦在哪。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>秒杀的特殊性：三个"不均"</h2></div>
+  <p class="lead">普通大促是"流量涨 10 倍"，秒杀是"流量涨 1000 倍且全部砸向同一个 SKU"。秒杀系统的所有设计，都来自三个不均。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>时间不均</div><div class="cd">10 万 QPS 集中在<b>开抢后 1~3 秒</b>，3 秒后归零。扩容来不及，必须提前按峰值备好</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>读写不均</div><div class="cd">读（详情页/资格校验）远大于写（扣库存）。<b>但真正的竞争全在写</b>——100 人抢最后 1 件</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>冷热不均</div><div class="cd">99% 的 SKU 无人问津，1% 的爆款承接全部流量。<b>热点隔离</b>由此而来</div></div>
+  </div>
+  <p>本篇算例参照系：<b>100 件库存的爆款，活动页曝光 500 万人次，开抢瞬间涌入 30 万并发请求，实际库存 100 件</b>。有效请求率 = 100/300000 = <b>0.03%</b>——系统 99.97% 的工作是"快速拒绝"，这就是秒杀的本质。</p>
+  <div class="callout">
+    <b>秒杀的设计哲学（先记住这句）：</b>把<b>尽可能多的请求挡在离用户最近的地方</b>。每一层拦截都让到达数据库的请求指数级减少：前端答题 → 网关限流 → 令牌校验 → Redis 预扣，四层下来，真正落到 MySQL 的写只有 100 条（= 库存数）。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>整体架构：四层漏斗</h2></div>
+  <p class="lead">秒杀链路是标准的漏斗结构：每一层的唯一职责是<b>用最低成本拦掉最多请求</b>。</p>
+  <div class="funnel">
+    <div class="fstep"><div class="fbar" style="width:100%;background:var(--faint)">第 0 层 · 前端：按钮置灰 / 答题 / 动态 URL</div><span class="fnum">30 万并发 → 12 万</span></div>
+    <div class="fstep"><div class="fbar" style="width:78%;background:var(--violet)">第 1 层 · CDN + 网关限流：静态化 + limit_req</div><span class="fnum">12 万 → 1.2 万（拦 90%）</span></div>
+    <div class="fstep"><div class="fbar" style="width:52%;background:var(--accent)">第 2 层 · 秒杀服务：资格校验 + 令牌发放</div><span class="fnum">1.2 万 → 1200（令牌 = 库存 10 倍）</span></div>
+    <div class="fstep"><div class="fbar" style="width:26%;background:var(--ok)">第 3 层 · Redis 预扣：Lua 原子扣库存</div><span class="fnum">1200 → 100（= 库存数）</span></div>
+    <div class="fstep"><div class="fbar" style="width:8%;background:var(--ink)">第 4 层 · 异步落库：MQ → MySQL 订单</div><span class="fnum">100 条写（不参与并发竞争）</span></div>
+  </div>
+  <div class="layer"><div class="lt">分层架构（读写分离，异步优先）</div><div class="lb"><span class="box"><b>前端</b> 按钮置灰/答题/排队动画/动态 URL</span><span class="box"><b>网关</b> 限流/黑名单/风控</span><span class="box"><b>秒杀服务</b> 资格/令牌/排队（无状态，可水平扩）</span><span class="box"><b>Redis</b> 库存预扣/令牌/资格</span><span class="box"><b>MQ</b> 异步下单/削峰填谷</span><span class="box"><b>MySQL</b> 订单落库（唯一真相）</span></div></div>
+  <h4>核心原则</h4>
+  <ul>
+    <li><b>读多写少，读走缓存，写走异步</b>：资格校验、库存查询全部读 Redis；下单是写，必须经过令牌 + 预扣两道闸</li>
+    <li><b>一切同步调用只保留"必要最小集"</b>：秒杀链路同步调用 = 资格校验 + Redis 预扣，<b>总共 2 次</b>。计价、优惠券、积分全部异步甚至省略</li>
+    <li><b>请求有损是特性不是 bug</b>：99.97% 的请求被拒绝是设计目标。返回"已抢完"要快（&lt; 10ms），不要让用户转圈等失败</li>
+  </ul>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>削峰：把 30 万请求摊薄</h2></div>
+  <p class="lead">削峰是秒杀的第一武器。四种手段，成本递增、效果也递增，<b>组合使用</b>。</p>
+  <h4>手段一：答题 / 验证码（拉长时间维度）</h4>
+  <ul>
+    <li><b>作用</b>：把 1 秒内涌入的请求拉长到 5~30 秒（答题需要时间），同时把"脚本请求"挡在门外（黑产没有廉价的人肉答题产能）</li>
+    <li><b>实现</b>：开抢前展示答题/滑块，答对才发"答题通过凭证"（带签名 + 时效）；服务端只认凭证</li>
+    <li><b>代价</b>：真实用户体验受损，只用于高价值爆款（茅台、iPhone），普通商品不用</li>
+  </ul>
+  <h4>手段二：隐藏秒杀地址（防脚本蹲点）</h4>
+  <pre><span class="c">// 秒杀开始前，接口地址对客户端不可见</span>
+<span class="c">// 1. 活动页不暴露真实下单 URL，只暴露"获取秒杀路径"接口</span>
+GET /seckill/path?activity_id=123
+<span class="c">// 2. 服务端返回动态路径（带签名，一次性，绑定用户）：</span>
+<span class="c">//    /seckill/buy/a8f3d?token=hmac(activity_id, user_id, timestamp)</span>
+<span class="c">// 3. 下单接口校验 token 的签名 + 时效（如 60 秒）+ 一次性（Redis 记录已用）</span>
+<span class="c">// 效果：黑产脚本提前蹲点失效，因为路径开抢后才生成且每人不同</span></pre>
+  <h4>手段三：排队 + 令牌（流量整形）</h4>
+  <ul>
+    <li><b>令牌桶</b>：系统按库存的 10 倍发放令牌（如 1000 个），只有持令牌的请求能进预扣环节。<b>令牌数是并发写量的总闸</b></li>
+    <li><b>排队</b>：拿不到令牌的请求进入排队（前端转圈动画），服务端按序放行或直接返回"排队人数过多"</li>
+    <li><b>结果轮询</b>：异步下单后，客户端每 1~2 秒轮询下单结果，<b>不用长连接等</b>（长连接把 30 万请求全挂住，连接数爆炸）</li>
+  </ul>
+  <h4>手段四：预约资格（开抢前分流）</h4>
+  <p>活动前 1~3 天开放预约，只给预约用户开放购买入口。<b>30 万并发直接降到预约人数的量级</b>（通常 1/10），且预约名单本身是风控数据（过滤羊毛党）。大促标配。</p>
+  <div class="callout warn">
+    <b>削峰手段的选型逻辑：</b>验证码伤用户体验、隐藏地址防不住人肉、排队让等待变长、预约缩盘子。<b>没有完美方案，只有组合</b>：预约缩量（提前 10 倍）→ 答题/验证码（再 3 倍 + 防机器）→ 令牌（最后 10 倍）→ 预扣（兜底到库存数）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>库存扣减：Redis 预扣 + 异步落库</h2></div>
+  <p class="lead">秒杀的库存扣减只有一种正确姿势：<b>Redis 做唯一扣减点（ Lua 保证原子），MySQL 做最终记录，MQ 异步衔接，对账兜底</b>。直接扣 MySQL 的都已阵亡（行锁竞争见电商篇）。</p>
+  <h4>Lua 原子预扣（含防重 + 限购）</h4>
+  <pre><span class="c">-- KEYS[1]=库存key KEYS[2]=用户已购key ARGV[1]=userId ARGV[2]=限购数</span>
+<span class="b">local</span> stock = <span class="b">tonumber</span>(redis.call(<span class="y">'get'</span>, KEYS[1]) <span class="b">or</span> <span class="y">'-1'</span>)
+<span class="b">if</span> stock == -1 <span class="b">then</span> <span class="b">return</span> -3 <span class="b">end</span>        <span class="c">-- 未预热，拒绝</span>
+<span class="b">if</span> stock &lt;= 0 <span class="b">then</span> <span class="b">return</span> -1 <span class="b">end</span>          <span class="c">-- 售罄</span>
+<span class="b">local</span> bought = <span class="b">tonumber</span>(redis.call(<span class="y">'hget'</span>, KEYS[2], ARGV[1]) <span class="b">or</span> <span class="y">'0'</span>)
+<span class="b">if</span> bought &gt;= <span class="b">tonumber</span>(ARGV[2]) <span class="b">then</span> <span class="b">return</span> -2 <span class="b">end</span>  <span class="c">-- 超限购</span>
+redis.call(<span class="y">'decrby'</span>, KEYS[1], 1)
+redis.call(<span class="y">'hincrby'</span>, KEYS[2], ARGV[1], 1)
+redis.call(<span class="y">'expire'</span>, KEYS[2], 86400)
+<span class="b">return</span> stock - 1                       <span class="c">-- 返回扣后库存</span></pre>
+  <h4>异步下单链路</h4>
+  <pre><span class="c">// 1. 预扣成功 → 发 MQ（带 msg_id），立即返回用户"抢购成功，订单生成中"</span>
+<span class="c">// 2. 消费端：消费消息 → 幂等校验（msg_id 唯一索引）→ 写 MySQL 订单（待支付）</span>
+<span class="c">// 3. 用户轮询订单状态：待支付 → 展示收银台；30 分钟未支付 → 关单 + 回补库存</span>
+
+<span class="c">// 关键：MQ 消息必须带 msg_id，消费端用它去重（重试/重复投递不产生重复单）</span>
+<span class="c">// 关键：订单表的唯一键 = msg_id（或 (activity_id, user_id)），DB 层兜底幂等</span></pre>
+  <h4>超时未付：库存回补</h4>
+  <pre><span class="c"># 关单链路（两个都要做，保证最终一致）</span>
+<span class="c"># 1. 延时消息：下单时发一条 30 分钟延时 MQ；到期检查订单状态</span>
+<span class="c">#    - 仍是待支付 → 关单 + Redis 库存 +1 + MySQL 预占释放</span>
+<span class="c">#    - 已支付 → 什么都不做</span>
+<span class="c"># 2. 补偿扫描（兜底）：定时任务扫"待支付且超时"的订单，防止延时消息丢失</span>
+
+<span class="c"># 回补的库存必须回到 Redis（用户可见的库存），否则出现</span>
+<span class="c"># "MySQL 显示有货但 Redis 已扣完"的分裂，超卖或丢单二选一</span></pre>
+  <div class="callout danger">
+    <b>防超卖的最终防线永远是对账：</b>Redis 预扣是内存操作，主从切换、AOF 丢数据都可能让 Redis 库存"凭空恢复"。<b>每日对账：Redis 库存 + 已下单未付 + 已支付 = 活动总库存</b>，偏差立即告警并冻结活动。<b>对 MySQL 而言，Redis 的数字只是影子，订单表里的记录才是法律真相。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>热点隔离</h2></div>
+  <p class="lead">秒杀流量 99% 打向同一个 SKU。不隔离的后果：这一个热点 key 打满 Redis 单节点、这一个 MySQL 行锁竞争瘫痪、<b>顺带把同集群的其他业务全部拖死</b>。</p>
+  <table>
+    <tr><th style="width:140px">隔离维度</th><th>做法</th></tr>
+    <tr><td><b>域名 / 入口</b></td><td>秒杀独立域名（<span class="k">miaosha.example.com</span>），DNS 独立解析，故障不互染</td></tr>
+    <tr><td><b>服务集群</b></td><td>独立秒杀服务 + 独立网关 + 独立限流阈值。秒杀集群只做"资格 + 令牌 + 预扣"三件事</td></tr>
+    <tr><td><b>Redis</b></td><td>独立 Redis 集群；<b>库存 key 分片</b>（见下）；活动元数据与库存分离</td></tr>
+    <tr><td><b>MySQL</b></td><td>独立库 + 独立连接池。连接池打满只影响秒杀，不波及主站</td></tr>
+    <tr><td><b>MQ</b></td><td>独立 topic。消费堆积不影响主站消息</td></tr>
+  </table>
+  <h4>热点 key 的三级拆解</h4>
+  <pre><span class="c">// 问题：100 个库存 1 个 key，10 万 QPS 全打这一个 Redis 节点</span>
+
+<span class="c">// 第 1 级：库存分片（把 1 个 key 拆成 N 个，随机扣一个）</span>
+stock:sku:10086:0 ~ stock:sku:10086:15   <span class="c">// 16 个分片，每片 6~7 件</span>
+<span class="c">// 扣减时随机选片：slot = random(0,15)，扣 stock:sku:10086:{slot}</span>
+<span class="c">// 热点分散到 16 个 key（若分片恰好在不同节点，则分散到 16 个节点）</span>
+
+<span class="c">// 第 2 级：本地缓存（网关/应用层）</span>
+<span class="c">// 资格校验结果（"该用户可否购买"）本地缓存 5~10 秒，读请求不再打 Redis</span>
+
+<span class="c">// 第 3 级：本地令牌分段（极端方案）</span>
+<span class="c">// 开抢前把 1000 个令牌均分到 100 台机器的本地队列，本机令牌本机扣</span>
+<span class="c">// Redis 只做总量校准。写竞争从"全网 10 万 QPS 打 1 个 key"降为"单机 100 QPS"</span></pre>
+  <div class="callout ok">
+    <b>隔离的验收标准：</b>秒杀集群整体宕机，主站下单、商品详情、支付<b>全部不受影响</b>。做不到这一点，说明隔离没做完——通常是"秒杀服务偷偷调用了主站库存服务"或"共用了数据库连接池"。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>限流、熔断、降级</h2></div>
+  <p class="lead">限流是秒杀的<b>主武器</b>（不是备用武器）。原则：<b>每一层按自己容量限流，按下游容量的 70% 设阈值</b>。</p>
+  <h4>四层限流参数（算例：30 万并发）</h4>
+  <table>
+    <tr><th style="width:130px">层级</th><th style="width:140px">阈值</th><th>算法与说明</th></tr>
+    <tr><td><b>前端</b></td><td>按钮置灰 + 答题</td><td>开抢后按钮置灰 5 秒（防疯狂连点），从源头减少请求数</td></tr>
+    <tr><td><b>网关（Nginx）</b></td><td>10 万 QPS</td><td><span class="k">limit_req_zone</span> 漏桶，按 IP + URI。超限直接返回 429 静态页，<b>不打到后端</b></td></tr>
+    <tr><td><b>秒杀服务</b></td><td>3 万 QPS</td><td>Sentinel 匀速器（令牌桶），削平突发；单机 1500 QPS × 20 台</td></tr>
+    <tr><td><b>Redis</b></td><td>连接数 500 + 热点 key 限流</td><td>单 key 超过 5 万 QPS 触发本地缓存顶包</td></tr>
+    <tr><td><b>MQ 消费</b></td><td>消费能力 = 2000 单/s</td><td>消费不过来就堆积（Kafka 保留 7 天），<b>绝不同步阻塞用户</b></td></tr>
+    <tr><td><b>MySQL</b></td><td>连接池 200</td><td>写只来自 MQ 消费（100 单/活动），连接池永远不会满</td></tr>
+  </table>
+  <h4>熔断与降级预案</h4>
+  <pre><span class="c"># 熔断触发条件（Sentinel 配置示例）</span>
+熔断策略：
+  - 慢调用比例 &gt; 50%（RT &gt; 200ms）持续 10s → 熔断 30s
+  - 异常比例 &gt; 30% → 熔断 30s
+
+<span class="c"># 降级清单（按优先级，触发即执行）</span>
+P0 库存查询降级：读本地缓存，允许 3 秒延迟
+P1 资格服务降级：只校验本地签名，跳过风控
+P2 风控降级：跳过实时风控，事后离线审计（高价值活动可接受）
+P3 排队降级：关闭排队，直接返回"已抢完"
+P4 活动降级：整个秒杀活动暂停，页面提示"活动太火爆"
+
+<span class="c"># 原则：宁可拒绝 100 万用户，不能挂 1 个数据库</span></pre>
+  <div class="callout warn">
+    <b>限流阈值拍脑袋是大忌：</b>每个阈值必须来自压测数据。网关 10 万 QPS = "秒杀集群能消化的极限 × 0.7"，不是"感觉 10 万差不多"。<b>没有全链路压测过的限流参数，等于没有限流。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>防刷与黑产对抗</h2></div>
+  <p class="lead">秒杀是黑产利润率最高的战场（抢茅台转手赚 1000+）。对抗是<b>持续军备竞赛</b>，没有一劳永逸。</p>
+  <table>
+    <tr><th style="width:150px">黑产手段</th><th>对应防御</th></tr>
+    <tr><td>脚本高频请求</td><td>动态 URL + 接口签名 + 单用户 QPS 限制（1 QPS）</td></tr>
+    <tr><td>虚拟机 / 群控多开</td><td>设备指纹（IMEI/IDFA/MAC + 行为特征）+ 同设备多账号关联封杀</td></tr>
+    <tr><td>批量注册小号</td><td>注册环节手机验证码 + 行为验证码 + 账号信誉分级（新号限制参与）</td></tr>
+    <tr><td>打码平台过验证码</td><td>行为验证码（滑块轨迹/点击热力图分析）+ 语音验证码兜底</td></tr>
+    <tr><td>秒杀器改包重放</td><td>接口参数签名 + nonce 一次性 + HTTPS 防中间人</td></tr>
+    <tr><td>内部人员泄露/串货</td><td>令牌与用户绑定 + 风控审计 + 数据权限最小化</td></tr>
+  </table>
+  <pre><span class="c"># 实时风控（Flink 流式计算，开抢前 5 分钟启动）</span>
+<span class="c"># 输入：点击流、登录流、下单流</span>
+<span class="c"># 规则（示例阈值）：</span>
+<span class="c"># - 单 IP 点击 &gt; 50 次/秒 → 打标"疑似机器"，进验证码队列</span>
+<span class="c"># - 单设备 &gt; 3 个账号参与 → 整设备拦截</span>
+<span class="c"># - 新注册 &lt; 24h 账号下单 → 提高抽检比例</span>
+<span class="c"># 输出：黑名单（网关直接拦）+ 验证码队列 + 审计日志</span></pre>
+  <div class="callout danger">
+    <b>限购是最后一道机械防线，必须做在原子层：</b>"一人一单"不能只在应用层判断（并发下双线程同时通过）。用 Redis 的 <span class="k">HINCRBY bought:{sku} {user_id} 1</span> 和预扣放在<b>同一个 Lua 脚本</b>里（见模块 3），DB 层再加 <span class="k">UNIQUE(activity_id, user_id)</span> 兜底。<b>两层都要，少一层就是事故。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>全链路压测</h2></div>
+  <p class="lead">秒杀系统的限流参数、扩容容量、降级阈值，<b>只能来自压测</b>。拍脑袋的参数等于没有。</p>
+  <h4>压测三件套</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>流量染色：</b>压测流量带标记（HTTP header <span class="k">x-stress-tag: gray</span>），全链路透传——网关、服务、Redis、MQ、DB 都能识别"这是压测流量"</div></div>
+    <div class="step"><div class="txt"><b>影子隔离：</b>染色的<b>写</b>落到影子库/影子表（与生产数据物理隔离），<b>读</b>可读生产（保证链路真实）。Redis 用独立 db，MQ 用独立 topic</div></div>
+    <div class="step"><div class="txt"><b>数据构造：</b>造 100 万测试账号、千万级商品 SKU、与生产同量级的库存，<b>用真实分布而不是全零数据</b>（缓存命中率才会真实）</div></div>
+  </div>
+  <h4>压测要回答的问题</h4>
+  <table>
+    <tr><th style="width:220px">问题</th><th>达标线（算例）</th></tr>
+    <tr><td>系统能扛多大峰值？</td><td>目标峰值的 1.5 倍 = 45 万并发</td></tr>
+    <tr><td>各层限流阈值多少？</td><td>逐层加压，找到每层开始拒绝/超时的临界点，取其 70%</td></tr>
+    <tr><td>MQ 堆积会怎样？</td><td>灌到消费 10 倍速，观察堆积量与消费恢复时间（应 &lt; 30 分钟）</td></tr>
+    <tr><td>Redis 热 key 表现？</td><td>单 key 10 万 QPS 下 RT 是否 &lt; 5ms，CPU 是否打满单节点</td></tr>
+    <tr><td>降级开关是否有效？</td><td>逐个触发降级开关，验证系统行为符合预案</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>压测的两个经典翻车点：</b>① <b>影子没做干净</b>——压测的"订单"写进了生产库，用户看到 phantom 订单；② <b>只压读不压写</b>——资格查询 50 万 QPS 扛住了，但没验证"令牌发放 + 预扣"的写路径，正式开抢时写链路先崩。压测必须覆盖<b>全链路 + 全读写 + 峰值 1.5 倍</b>。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>复盘指标与十个坑</h2></div>
+  <h4>复盘看什么（活动结束后 48 小时内）</h4>
+  <table>
+    <tr><th style="width:150px">类别</th><th>指标</th><th>参考线</th></tr>
+    <tr><td><b>业务</b></td><td>库存售罄用时、转化率（成功单/曝光）、客单价、黄牛识别率</td><td>售罄 &lt; 5 分钟为健康</td></tr>
+    <tr><td><b>技术</b></td><td>峰值 QPS、P99 RT、错误率、降级触发次数、MQ 峰值堆积、Redis 热点 RT</td><td>P99 &lt; 100ms，错误率 &lt; 0.1%</td></tr>
+    <tr><td><b>风控</b></td><td>拦截机器请求数、验证码通过率、黑产账号处置数</td><td>拦截率与误杀率同时监控</td></tr>
+    <tr><td><b>一致性</b></td><td>超卖笔数（必须为 0）、少卖笔数、对账差异单</td><td>超卖 = 事故，一票否决</td></tr>
+  </table>
+  <h4>十个线上坑</h4>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">秒杀与主站共用服务和数据库</div><div class="pd">秒杀打挂库存服务/DB，主站下单一起陪葬。独立域名、独立集群、独立连接池，隔离验收标准是"秒杀全挂主站无感"。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">直接扣 MySQL 库存</div><div class="pd">10 万人排队等一行锁，RT 飙升、连接池打满、雪崩。秒杀库存只走 Redis 预扣，MySQL 只做异步落库。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">Redis 预扣不做对账</div><div class="pd">Redis 主从切换/AOF 丢失让库存"凭空恢复"，超卖。每日对账：Redis + 未付 + 已付 = 总库存。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">令牌发放数大于库存承受力</div><div class="pd">发 10 万令牌但库存 100 件，预扣层照样被打满。令牌数 = 库存 × 5~10，与预扣能力匹配。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">没有分层限流，网关直穿数据库</div><div class="pd">30 万并发直接打到服务层。每层按下游容量 70% 设阈值，超限就近拒绝，别把请求往上传。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">秒杀地址提前暴露</div><div class="pd">脚本开抢前 1 秒开始蹲点，真实用户根本抢不到。动态 URL + 签名 + 一次性 token，地址开抢后才生成。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">MQ 堆积导致"抢到但没订单"</div><div class="pd">预扣成功就提示用户抢到了，但 MQ 消费延迟 10 分钟，用户查不到订单疯狂投诉。提示语用"订单生成中"并给轮询，堆积超阈值时降级返回"系统繁忙"。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">超时未付不释放库存</div><div class="pd">100 件货被 100 个不付款的"幽灵订单"锁死，活动实际少卖 80 件。延时消息 + 补偿扫描双保险回补 Redis。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">压测影子隔离不干净</div><div class="pd">压测订单写进生产库、压测消息发进生产 topic、压测账号下了真单。染色必须端到端透传，写全进影子。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">没有降级预案，一个依赖挂了全站 404</div><div class="pd">风控服务挂了 → 下单链路全挂；推荐服务挂了 → 秒杀页白屏。按 P0~P4 预案逐个演练，触发条件写进配置中心。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 秒杀库存扣减的正确姿势是？</div>
+      <button class="opt">MySQL 乐观锁 UPDATE ... WHERE stock&gt;0，影响行数判断</button>
+      <button class="opt">Redis Lua 原子预扣 + MQ 异步落库 + 每日对账</button>
+      <button class="opt">先 SELECT 查库存再 UPDATE，包在事务里</button>
+      <div class="ans">正确答案：<b>Redis 预扣 + 异步落库 + 对账</b>。MySQL 乐观锁在常规电商够用，但秒杀的 10 万并发会在一行锁上排队雪崩（行锁竞争上限约 3000~5000 TPS）。Redis DECR 可到 10 万+，代价是内存数据可能丢，必须对账兜底。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于削峰手段，说法错误的是？</div>
+      <button class="opt">答题/验证码能把瞬时请求拉长到数秒</button>
+      <button class="opt">令牌数量应该等于库存数量，严格控制并发写</button>
+      <button class="opt">隐藏秒杀地址可以防止脚本提前蹲点</button>
+      <div class="ans">正确答案：<b>令牌 = 库存数是错误的</b>。令牌应放库存的 5~10 倍：一部分持令牌用户会放弃支付/资格复审失败，留出缓冲才能把库存卖满。令牌数 = 库存数会导致大量库存卖不出去（少卖）。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 秒杀限流阈值应该怎么定？</div>
+      <button class="opt">根据压测找到每层能消化的临界点，取其 70% 配置</button>
+      <button class="opt">根据经验拍一个整数，比如网关统一 10 万</button>
+      <button class="opt">不限流，靠扩容解决，云弹性足够快</button>
+      <div class="ans">正确答案：<b>压测临界值的 70%</b>。秒杀流量集中在秒级，扩容来不及（扩容一台机器要分钟级），必须提前按峰值备好。没有压测数据支撑的限流参数等于没有限流。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 用户秒杀成功但 30 分钟未支付，系统应该？</div>
+      <button class="opt">保留订单，库存一直锁着，防止超卖</button>
+      <button class="opt">延时消息到期关单，Redis 库存 +1 回补，并释放 MySQL 预占</button>
+      <button class="opt">什么都不做，等活动结束人工处理</button>
+      <div class="ans">正确答案：<b>关单 + 回补 Redis + 释放预占</b>。不回补会导致"幽灵订单"锁死库存，活动实际少卖。延时消息 + 定时补偿扫描双保险，防止延时消息丢失造成库存泄漏。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于秒杀与主站的隔离，正确的验收标准是？</div>
+      <button class="opt">秒杀响应比主站快 50% 以上</button>
+      <button class="opt">秒杀用了独立的 UI 页面</button>
+      <button class="opt">秒杀集群整体宕机时，主站下单、详情、支付全部不受影响</button>
+      <div class="ans">正确答案：<b>秒杀全挂主站无感</b>。这要求独立域名、独立服务、独立 Redis/DB/连接池。常见没做干净的暗坑：秒杀服务偷偷调用主站库存服务、共用数据库连接池。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 100 件库存、30 万并发，四层漏斗各层的核心职责排序正确的是？</div>
+      <button class="opt">前端答题 → 网关限流 → 令牌校验 → Redis 预扣 → 异步落库</button>
+      <button class="opt">网关限流 → 前端答题 → Redis 预扣 → 令牌校验 → 异步落库</button>
+      <button class="opt">Redis 预扣 → 令牌校验 → 网关限流 → 前端答题 → 异步落库</button>
+      <div class="ans">正确答案：<b>前端答题 → 网关限流 → 令牌 → 预扣 → 异步落库</b>。原则是"把尽可能多的请求挡在离用户最近、成本最低的地方"：前端成本最低、DB 最贵，顺序反了就等于把最贵的资源暴露在最前面。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>核心配置速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>limit_req_zone / limit_req 10000r/s</code><span class="desc">网关漏桶限流，超限 429 静态页</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Lua: decrby stock:sku:id 1</code><span class="desc">Redis 原子预扣，10 万+ TPS</span><button class="copy">复制</button></div>
+    <div class="crow"><code>HINCRBY bought:sku:id user_id 1</code><span class="desc">一人一单限购，与预扣同脚本原子</span><button class="copy">复制</button></div>
+    <div class="crow"><code>令牌数 = 库存 × 5~10</code><span class="desc">并发写总闸，不是等于库存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>x-stress-tag: gray</code><span class="desc">压测流量染色 header，全链路透传</span><button class="copy">复制</button></div>
+    <div class="crow"><code>对账：Redis+未付+已付=总库存</code><span class="desc">每日跑，偏差立即告警冻结</span><button class="copy">复制</button></div>
+  </div>
+  <h3>容量与参数速查表（算例）</h3>
+  <table>
+    <tr><th style="width:220px">指标</th><th>本篇算例值</th></tr>
+    <tr><td>活动库存 / 涌入并发</td><td>100 件 / 30 万（有效率 0.03%）</td></tr>
+    <tr><td>网关限流阈值</td><td>10 万 QPS（压测临界 × 0.7）</td></tr>
+    <tr><td>秒杀服务限流</td><td>3 万 QPS（20 台 × 1500）</td></tr>
+    <tr><td>令牌数</td><td>1000（库存 × 10）</td></tr>
+    <tr><td>Redis 预扣能力</td><td>单机 10 万+ DECR/s</td></tr>
+    <tr><td>MQ 消费能力</td><td>2000 单/s（堆积靠 Kafka 缓冲）</td></tr>
+    <tr><td>压测目标</td><td>峰值 1.5 倍 = 45 万并发</td></tr>
+  </table>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>秒杀</b></td><td>限时限量抢购，99.97% 请求注定被拒绝的有损服务</td></tr>
+    <tr><td><b>削峰</b></td><td>把瞬时流量拉长/筛减：答题、排队、令牌、预约</td></tr>
+    <tr><td><b>令牌</b></td><td>进入下单环节的准入凭证，数量 = 库存的 5~10 倍</td></tr>
+    <tr><td><b>动态 URL</b></td><td>开抢后才生成、带签名、一次性的下单地址</td></tr>
+    <tr><td><b>预扣</b></td><td>Redis 侧原子扣减库存，MySQL 只做最终记录</td></tr>
+    <tr><td><b>异步落库</b></td><td>MQ 缓冲下单写，消费端幂等写订单表</td></tr>
+    <tr><td><b>库存回补</b></td><td>超时未付关单后 Redis 库存 +1，防幽灵订单</td></tr>
+    <tr><td><b>对账</b></td><td>每日核对 Redis + 未付 + 已付 = 总库存</td></tr>
+    <tr><td><b>热点隔离</b></td><td>独立域名/集群/Redis/DB，故障不互染</td></tr>
+    <tr><td><b>库存分片</b></td><td>热点 key 拆成 N 个随机扣，分散单节点压力</td></tr>
+    <tr><td><b>本地令牌</b></td><td>令牌预分到各机器本地队列，写竞争降为单机量级</td></tr>
+    <tr><td><b>漏桶 / 令牌桶</b></td><td>限流算法：恒定速率通过 / 允许一定突发</td></tr>
+    <tr><td><b>熔断</b></td><td>下游异常时快速失败，防止级联雪崩</td></tr>
+    <tr><td><b>降级</b></td><td>按预案关闭非核心功能，保核心链路</td></tr>
+    <tr><td><b>全链路压测</b></td><td>染色 + 影子库的真实峰值模拟，目标 = 峰值 1.5 倍</td></tr>
+    <tr><td><b>流量染色</b></td><td>压测流量打标记端到端透传，写进影子</td></tr>
+    <tr><td><b>设备指纹</b></td><td>采集硬件 + 行为特征识别群控/虚拟机</td></tr>
+    <tr><td><b>黄牛</b></td><td>用机器/小号抢购转卖的黑产从业者</td></tr>
+    <tr><td><b>少卖</b></td><td>库存因幽灵订单/令牌过紧没卖完，比超卖更隐蔽</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 Redis Lua 实现预扣 + 限购同脚本，压测单 key 上限；② 实现"动态 URL + 签名 + 一次性 token"，写个脚本模拟蹲点攻击；③ 搭 Nginx limit_req + Sentinel 两级限流，灌流量看拒绝分布；④ 模拟 MQ 消费堆积，验证降级预案和用户提示语；⑤ 给自己活动算一遍容量：令牌数、限流阈值、MQ 消费能力。<br><br>
+    <b>之后值得单独学：</b>行为验证码对抗、Flink 实时风控规则引擎、以及大促多活动并发的资源调度。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透秒杀系统设计 · 上线前务必检查：令牌倍数、对账脚本、压测报告</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（库存预扣）和模块 5（限流降级）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边画漏斗：每层拦掉多少请求、拦在哪。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边画漏斗：从用户点击到扣库存成功，每一层拦掉多少请求、拦在哪。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

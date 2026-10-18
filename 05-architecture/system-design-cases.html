@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>系统设计案例集 · 短链 / 秒杀 / 排行榜</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 15 期 · 高密度版</span>
+    <h1>系统设计案例集 · 短链 / 秒杀 / 排行榜</h1>
+    <p class="sub">三个经典案例，每个都走完整推演：<b>先算量级，再定方案，最后问"涨 10 倍先崩哪"</b>。这套流程就是系统设计和架构评审的通用骨架 —— 会推演比会背答案值钱得多。</p>
+    <div class="density">
+      <span class="chip"><b>3</b> 个完整案例</span>
+      <span class="chip">每个含<b>容量推演</b></span>
+      <span class="chip"><b>20+</b> 关键决策</span>
+      <span class="chip"><b>10</b> 个通用陷阱</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边在纸上把每个案例的容量估算推一遍 —— 这是系统设计的第一关。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个案例，一套方法论</h2></div>
+  <p class="lead">系统设计（System Design）不是"背架构图"，而是<b>在给定约束下做取舍并说明理由</b>。三个案例看起来毫不相干，但推演流程完全一样：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>澄清需求。</b>功能需求是什么？非功能需求（QPS、延迟、可用性、一致性）是什么？<b>先问清楚再动手</b>，这是所有案例的共同第一步。</div></div>
+    <div class="step"><div class="txt"><b>容量估算。</b>QPS、存储、缓存、带宽各是多少？<b>把数字算出来</b>，架构才有依据。这是新手最常跳过、也最加分的一步。</div></div>
+    <div class="step"><div class="txt"><b>接口与数据模型。</b>对外暴露什么接口？数据存成什么样？主键、索引、分片键怎么定？</div></div>
+    <div class="step"><div class="txt"><b>核心方案对比。</b>每个关键决策列出 2~3 个候选方案，讲清各自的代价，给出选择和理由。</div></div>
+    <div class="step"><div class="txt"><b>瓶颈与演进。</b>当前方案的瓶颈在哪？<b>量级涨 10 倍，哪里先崩？</b>这是区分"会做"和"想清楚了"的分水岭。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>一个贯穿全篇的换算常数，背下来：</b>一天 = 86400 秒 ≈ 10<sup>5</sup> 秒。<b>日均量 ÷ 10<sup>5</sup> ≈ 平均 QPS</b>。例如"日均 1 亿请求"≈ 平均 1000 QPS。峰值再乘峰值系数（普通业务 3~5，大促可到几十倍）。这个心算能让你在任何场合秒答量级。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">案例 1 · 短链</span><h2>需求与容量估算</h2></div>
+  <p class="lead"><b>短链系统</b>（URL Shortener）：把长 URL 压缩成一个短码，用户访问短链时跳转到原始地址，例如 <span class="k">https://s.cn/aB3xK9</span> → 原始长链接。</p>
+  <h4>需求澄清</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>内容</th></tr>
+    <tr><td><b>功能需求</b></td><td>① 输入长 URL 生成短码；② 访问短码 302 跳转；③ 可选：自定义短码、设置过期时间、访问统计</td></tr>
+    <tr><td><b>非功能需求</b></td><td>① <b>读远多于写</b>（读:写 ≈ 100:1）；② 跳转延迟要极低（&lt; 50ms）；③ 短码不可枚举（不能被爬虫顺序扫）；④ 高可用（跳转挂了等于业务挂了）</td></tr>
+    <tr><td><b>规模假设</b></td><td>每天新增 <b>1000 万</b>条短链，读写比 100:1</td></tr>
+  </table>
+  <h4>容量估算（把每一步都写出来）</h4>
+  <pre><span class="c"># ---- 1. QPS ----</span>
+<span class="b">写</span>：日均 10,000,000 条
+     平均写 QPS = 10,000,000 / 86400 ≈ <span class="g">116</span>
+     峰值写 QPS = 116 × 5（峰值系数）≈ <span class="g">580</span>
+
+<span class="b">读</span>：日均 10,000,000 × 100 = 1,000,000,000 次
+     平均读 QPS = 1,000,000,000 / 86400 ≈ <span class="y">11,574</span>
+     峰值读 QPS = 11,574 × 5 ≈ <span class="y">57,870</span>（约 5.8 万）
+
+<span class="c"># 结论：这是一个典型的「读密集型」系统，优化的重心在读路径</span>
+
+<span class="c"># ---- 2. 存储 ----</span>
+每条记录大小估算：
+  短码 7 字节 + 长 URL 平均 200 字节 + 创建时间/用户ID/过期时间等元数据 ≈ <span class="g">500 字节</span>
+
+3 年数据量 = 10,000,000 × 365 × 3 = 10,950,000,000 条（约 109.5 亿）
+总存储 = 109.5 亿 × 500 字节 ≈ <span class="r">5.5 TB</span>
+
+<span class="c"># 结论：单机 MySQL 放不下，必须分库分表；或冷热分层，老数据归档</span>
+
+<span class="c"># ---- 3. 缓存内存 ----</span>
+按二八定律：20% 的数据承担 80% 的访问
+若只缓存最近 7 天：10,000,000 × 7 = 7000 万条
+缓存单条 ≈ 短码 7 + URL 200 + Redis 对象开销 ≈ 300 字节
+缓存内存 = 70,000,000 × 300 字节 ≈ <span class="b">21 GB</span>
+
+<span class="c"># 结论：21GB 需要 Redis 分片（单实例 21GB 风险高），或缓存更短的时间窗口</span>
+
+<span class="c"># ---- 4. 带宽 ----</span>
+峰值读 5.8 万 QPS，每次跳转响应体极小（302 状态行 + Location 头 ≈ 300 字节）
+峰值出带宽 ≈ 57,870 × 300 字节 ≈ 17 MB/s ≈ <span class="g">140 Mbps</span>
+<span class="c"># 结论：带宽不是瓶颈，短链的响应体极小</span></pre>
+  <div class="callout ok">
+    <b>容量估算的三个产出：</b>① 读 QPS 5.8 万 → 必须用缓存扛读；② 存储 5.5 TB → 必须分库分表；③ 缓存 21 GB → Redis 要分片。<b>每一个数字都直接指向一个架构决策</b>，这就是"先算再做"的意义。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">案例 1 · 短链</span><h2>短码生成、读写路径与缓存</h2></div>
+  <h4>短码生成方案对比（核心决策）</h4>
+  <table>
+    <tr><th style="width:150px">方案</th><th>原理</th><th>优点 / 代价</th></tr>
+    <tr><td><b>自增 ID 转 62 进制</b></td><td>全局自增 ID（MySQL 自增 / Redis <span class="k">INCR</span> / 号段模式），把数字转成 62 进制字符</td><td><b>优点：</b>无冲突、长度短且可控、生成快。<b>代价：</b>顺序递增<b>可被枚举</b>（爬虫能顺扫）；需要发号器</td></tr>
+    <tr><td><b>哈希（MD5/SHA 截断）</b></td><td>对长 URL 做哈希，取前 N 位</td><td><b>优点：</b>无状态、相同 URL 得到相同短码（天然去重）。<b>代价：</b>有冲突，需加盐重试或用布隆过滤器；长度固定不可压缩</td></tr>
+    <tr><td><b>随机字符串</b></td><td>生成随机字符，查库确认不冲突</td><td><b>优点：</b>不可枚举。<b>代价：</b>需查重（多一次读）、随机数依赖；短码越短冲突概率越高</td></tr>
+    <tr><td><b>号段模式（推荐组合）</b></td><td>发号器一次取一段 ID（如 1~1000）缓存在内存，用完再取，减少发号器压力</td><td><b>优点：</b>性能高、不依赖每请求都打 DB。<b>代价：</b>进程重启会浪费一段号（无所谓）</td></tr>
+  </table>
+  <pre><span class="c"># 62 进制的容量（a-z A-Z 0-9 共 62 个字符）</span>
+62^6 = 568 亿     <span class="c"># 6 位够用很久</span>
+62^7 = 3.5 万亿   <span class="c"># 7 位基本用不完</span>
+
+<span class="c"># 自增 ID 转 62 进制示例</span>
+ID = 123456789  →  62 进制 = <span class="g">"8m0Kx"</span>
+
+<span class="c"># 缓解「可枚举」：在 ID 上做可逆混淆（如异或一个常数、位重排）</span>
+<span class="c"># 混淆后仍是唯一、无冲突的，但顺序被打乱，无法顺扫</span>
+obfuscated = id XOR 0x5DEECE66D
+short_code = base62(obfuscated)
+
+<span class="c"># 推荐组合：号段模式发号 + 混淆 + 62 进制 → 短、无冲突、不可枚举</span></pre>
+  <h4>写路径</h4>
+  <pre><span class="c"># 生成短链（写）</span>
+1. 校验长 URL 合法性（格式、长度上限、是否恶意/黑名单）
+2. <span class="y">可选</span>查是否已存在（去重；用哈希方案时天然去重）
+3. 向发号器取一个全局唯一 ID（号段模式：内存里取）
+4. ID 混淆 → 转 62 进制 → 得到短码
+5. 写入 DB：<span class="b">短码为主键</span>（或唯一索引），存长 URL + 元数据
+6. 写入缓存（可选，写时预热）
+7. 返回短链 https://s.cn/{short_code}
+
+<span class="c"># 关键：短码作为主键 / 唯一索引，天然防止重复写入</span></pre>
+  <h4>读路径（重点优化对象）</h4>
+  <pre><span class="c"># 访问短链（读，QPS 是写的 100 倍）</span>
+1. 收到短码
+2. <span class="g">查缓存</span> → 命中 → 返回 <span class="b">302</span> + Location: 原始 URL  （绝大多数请求走到这里就结束了）
+3. 未命中 → 查 DB → 回填缓存（Cache Aside）→ 返回 302
+4. 查不到 → 返回 404 或默认页
+
+<span class="c"># 302 还是 301？</span>
+<span class="b">302（临时重定向，推荐）</span>：浏览器每次都来问，服务端能统计访问量、能随时改目标
+<span class="y">301（永久重定向）</span>：浏览器会缓存，减少服务端压力，<span class="r">但失去统计能力、且改动不生效</span></pre>
+  <h4>缓存策略</h4>
+  <ul>
+    <li><b>Cache Aside（旁路缓存）</b>：读时先查缓存、未命中查库回填；写时先写库再删缓存。短链数据<b>几乎不变</b>，所以写冲突极少。</li>
+    <li><b>TTL 设置</b>：短链数据不可变，可以设长 TTL（如 7 天）甚至"永不过期 + LRU 淘汰"，让热点自然留在内存里。</li>
+    <li><b>穿透防护</b>：不存在的短码会被反复查询打库，需缓存空值或布隆过滤器兜底。</li>
+    <li><b>热点 key</b>：极少数爆款短链（如分享到社交平台的）会形成热 key，可加本地缓存（Caffeine）做多级缓存。</li>
+  </ul>
+  <div class="callout danger">
+    <b>最容易翻车的一个细节：短码可枚举。</b>如果短码就是 <span class="k">1, 2, 3...</span> 的 62 进制，爬虫可以从 <span class="k">"1"</span> 顺序扫到 <span class="k">"zzzzzz"</span>，把全站链接爬光。<b>解法是混淆或随机化短码</b>。另一个细节：<b>发号器本身会成为写路径的单点</b>，所以号段模式（一次取一批）比每请求打一次 Redis 更稳。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">案例 1 · 短链</span><h2>瓶颈与演进：量级涨 10 倍先崩哪</h2></div>
+  <table>
+    <tr><th style="width:170px">组件</th><th>当前状态</th><th>涨 10 倍后（读 58 万 QPS）</th></tr>
+    <tr><td><b>缓存 Redis</b></td><td>21GB，需分片</td><td><b>先崩。</b>单实例扛不住 58 万 QPS + 21GB。解法：Redis Cluster 分片，或加本地缓存挡掉大部分读</td></tr>
+    <tr><td><b>数据库</b></td><td>5.5TB，需分库分表</td><td>读请求大部分被缓存挡住，DB 压力可控；但缓存未命中时的回源会放大。<b>解法：读写分离 + 按短码哈希分片</b></td></tr>
+    <tr><td><b>发号器</b></td><td>号段模式，内存取号</td><td>写 QPS 5800，号段模式仍能扛。若换成每请求打 Redis 的方案，这里先崩</td></tr>
+    <tr><td><b>网络 / 带宽</b></td><td>140 Mbps</td><td>1.4 Gbps，仍不是瓶颈（响应体太小）</td></tr>
+    <tr><td><b>跳转延迟</b></td><td>&lt; 50ms</td><td>跨机房回源会拖慢。<b>解法：把热点短链推到 CDN / 边缘节点，就近跳转</b></td></tr>
+  </table>
+  <div class="callout ok">
+    <b>短链案例的三个通用结论：</b>① <b>读密集型系统，缓存是第一优先级</b>；② <b>不可枚举是短码生成方案的硬约束</b>，顺序 ID 必须混淆；③ <b>发号器是高并发写路径的隐藏单点</b>，号段模式是标准解法。这三点可以直接迁移到任何"生成唯一短标识"的场景。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">案例 2 · 秒杀</span><h2>核心难点与分层削流</h2></div>
+  <p class="lead"><b>秒杀系统</b>：在极短时间内（如 1 秒内）涌入海量用户抢购有限库存。核心难点就三个：<b>超卖、瞬时高并发、防刷</b>。</p>
+  <h4>需求澄清</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>内容</th></tr>
+    <tr><td><b>功能需求</b></td><td>① 展示商品和库存；② 抢购下单；③ 支付；④ 未支付超时释放库存</td></tr>
+    <tr><td><b>非功能需求</b></td><td>① <b>绝不超卖</b>（超卖 = 事故，必须赔付）；② 能扛瞬时百万级 QPS；③ 防脚本刷单；④ 下单接口要快（用户感知）</td></tr>
+    <tr><td><b>规模假设</b></td><td>商品库存 1000 件；秒杀开始瞬间涌入 100 万请求</td></tr>
+  </table>
+  <h4>量级估算</h4>
+  <pre><span class="c"># 100 万请求集中在 1 秒内 → 瞬时 QPS = 1,000,000</span>
+<span class="c"># 但真正需要落库的只有 1000 单（库存数量）</span>
+
+<span class="c"># 核心思路：把 100 万请求削成 1000 次真实下单</span>
+削减比 = 1,000,000 / 1000 = <span class="g">1000 : 1</span>
+<span class="c"># 也就是 99.9% 的请求应该在到达数据库之前就被挡掉</span>
+
+<span class="c"># 如果 100 万请求全部打到数据库：</span>
+<span class="r">数据库瞬间被打死，整个系统雪崩</span>
+<span class="c"># 所以秒杀架构的本质 = 分层限流 + 异步削峰</span></pre>
+  <h4>分层削流：把请求一层层减下去</h4>
+  <table>
+    <tr><th style="width:130px">层次</th><th>手段</th><th>削掉多少</th></tr>
+    <tr><td><b>1 前端</b></td><td>按钮置灰（防重复点击）、秒杀开始前禁止提交、随机延迟提交</td><td>过滤掉重复点击</td></tr>
+    <tr><td><b>2 页面静态化</b></td><td>商品详情页静态化推 CDN，秒杀开始前用户刷的是 CDN 静态页，<b>不打后端</b></td><td>把浏览流量全部挡在 CDN</td></tr>
+    <tr><td><b>3 验证码 / 答题</b></td><td>下单前先做验证码或简单算术题，<b>过滤掉脚本</b>、拉长请求时间</td><td>挡掉大部分机器流量</td></tr>
+    <tr><td><b>4 网关限流</b></td><td>令牌桶 / 漏桶算法，<b>只放固定速率</b>的请求进来（如 1 万 QPS），超出直接拒绝</td><td>把 100 万削到 1 万</td></tr>
+    <tr><td><b>5 应用层限流</b></td><td>按用户维度（同一用户限 1 次）、按商品维度限流</td><td>进一步削峰</td></tr>
+    <tr><td><b>6 库存前置</b></td><td>库存放 Redis，<b>不查数据库</b>判断是否有货，无货直接返回"已售罄"</td><td>把有货判断变成内存操作</td></tr>
+    <tr><td><b>7 消息队列</b></td><td>Redis 预扣成功的请求发到 MQ，<b>异步</b>创建订单</td><td>削峰填谷，保护数据库</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>分层削流的核心思想：让每一层只处理"该层能处理"的流量。</b>CDN 处理浏览、验证码挡脚本、网关限流削峰、Redis 判断库存、MQ 异步落库。<b>最终只有等于库存数量的请求会真正写数据库。</b>这和"给数据库加机器"是完全不同的思路 —— 前者是架构，后者是堆资源。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">案例 2 · 秒杀</span><h2>库存扣减方案对比与超卖解法</h2></div>
+  <h4>三种库存扣减方案对比</h4>
+  <table>
+    <tr><th style="width:140px">方案</th><th>做法</th><th>优点 / 代价</th></tr>
+    <tr><td><b>数据库行锁</b></td><td>直接 <span class="k">UPDATE ... WHERE stock &gt; 0</span> 靠 DB 行锁保证原子</td><td><b>优点：</b>简单、绝对不超卖。<b>代价：</b>行锁竞争严重，高并发下大量请求排队，DB 扛不住</td></tr>
+    <tr><td><b>Redis 预扣</b></td><td>用 Lua 脚本在 Redis 里原子判断并扣减</td><td><b>优点：</b>内存操作、高并发、极快。<b>代价：</b>要处理 Redis 与 DB 的一致性；Redis 挂了要有兜底</td></tr>
+    <tr><td><b>MQ 异步下单</b></td><td>Redis 扣减成功后发消息，消费者异步创建订单 + 扣 DB 库存</td><td><b>优点：</b>削峰、解耦、用户体验快（返回"排队中"）。<b>代价：</b>最终一致，需要处理消息丢失/重复</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>生产方案通常是三者组合：</b>Redis 预扣（挡掉 99.9%）→ MQ 异步（削峰）→ DB 落库（最终一致）。Redis 是"快速过滤器"，DB 是"最终账本"。
+  </div>
+  <h4>超卖的根本原因</h4>
+  <div class="callout danger">
+    <b>超卖 = "读-判断-写"三步不是原子操作。</b><br>
+    库存 = 1，两个请求同时进来：<br>
+    请求 A 读到 stock = 1 → 判断 &gt; 0 → 准备扣减<br>
+    请求 B 读到 stock = 1 → 判断 &gt; 0 → 准备扣减<br>
+    两个都判断通过 → 都执行扣减 → <b>stock 变成 -1，卖出了 2 件</b>。<br>
+    根因：并发下"判断有货"和"扣减库存"之间存在时间窗口，两个请求都通过了判断。解法只有一个方向：<b>让"判断 + 扣减"变成一步原子操作</b>。
+  </div>
+  <h4>解法一：数据库原子更新（不超卖的最强保证）</h4>
+  <pre><span class="c">-- 把「判断」写进 WHERE 条件，让数据库的行锁保证原子性</span>
+<span class="b">UPDATE</span> seckill_stock
+<span class="b">SET</span> stock = stock - 1
+<span class="b">WHERE</span> item_id = 1001 <span class="b">AND</span> stock <span class="g">&gt; 0</span>;
+
+<span class="c">-- 关键：检查 affected rows（受影响行数）</span>
+<span class="c">-- = 1 → 扣减成功，可以下单</span>
+<span class="c">-- = 0 → 库存已为 0，售罄，拒绝</span>
+<span class="c">-- 这一条 SQL 本身就不会产生超卖，因为 WHERE stock &gt; 0 和 SET 在同一个原子操作里</span>
+
+<span class="c">-- 乐观锁版本（另一种原子写法）</span>
+<span class="b">UPDATE</span> stock
+<span class="b">SET</span> stock = stock - 1, version = version + 1
+<span class="b">WHERE</span> item_id = 1001 <span class="b">AND</span> version = <span class="y">#{oldVersion}</span> <span class="b">AND</span> stock <span class="g">&gt; 0</span>;</pre>
+  <h4>解法二：Redis + Lua 原子扣减（高并发首选）</h4>
+  <pre><span class="c">-- Redis 的 Lua 脚本整体原子执行，中间不会被打断</span>
+<span class="c">-- KEYS[1] = 库存 key，例如 seckill:stock:1001</span>
+
+<span class="b">local</span> stock = redis.call(<span class="y">'GET'</span>, KEYS[1])
+<span class="b">if</span> <span class="b">not</span> stock <span class="b">then</span>
+  <span class="b">return</span> <span class="r">-1</span>          <span class="c">-- 库存 key 不存在</span>
+<span class="b">end</span>
+<span class="b">if</span> <span class="b">tonumber</span>(stock) <span class="g">&lt;= 0</span> <span class="b">then</span>
+  <span class="b">return</span> <span class="r">0</span>           <span class="c">-- 已售罄</span>
+<span class="b">end</span>
+redis.call(<span class="y">'DECR'</span>, KEYS[1])
+<span class="b">return</span> <span class="g">1</span>             <span class="c">-- 扣减成功</span>
+
+<span class="c">-- 调用方式（Java 伪代码）：</span>
+<span class="c">-- Long result = redis.eval(luaScript, Collections.singletonList("seckill:stock:1001"));</span>
+<span class="c">-- if (result == 1) { 发消息到 MQ 异步下单 } else { 返回"已售罄" }</span>
+
+<span class="c"># 为什么必须用 Lua？</span>
+<span class="r">✗ 错误</span>：先 GET 判断，再 DECR —— 两条命令之间有窗口，并发下超卖
+<span class="g">✓ 正确</span>：Lua 脚本整体原子执行，判断和扣减不可分割</pre>
+  <h4>Redis 与数据库的一致性</h4>
+  <ul>
+    <li><b>Redis 预扣成功但落库失败怎么办？</b> 靠 MQ 重试 + 幂等（用唯一订单号去重），保证最终一致。</li>
+    <li><b>Redis 挂了怎么办？</b> 降级到数据库原子更新（慢但正确），或直接返回"系统繁忙"。<b>绝不能因为 Redis 挂了就放行所有请求</b>。</li>
+    <li><b>怎么防止少卖？</b> 未支付订单超时释放库存时，要同时回补 Redis 和 DB，且回补要幂等（防止重复回补导致超卖）。</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">案例 2 · 秒杀</span><h2>订单状态机与演进：涨 10 倍先崩哪</h2></div>
+  <h4>订单状态机</h4>
+  <table>
+    <tr><th style="width:120px">状态</th><th>含义</th><th>转移条件</th></tr>
+    <tr><td><b>待支付</b></td><td>下单成功，占用库存，等待付款</td><td>用户支付 → 已支付；超时未付 → 已取消</td></tr>
+    <tr><td><b>已支付</b></td><td>付款成功，库存真正消耗</td><td>发货 → 已完成；退款 → 已退款</td></tr>
+    <tr><td><b>已取消</b></td><td>超时未支付，<b>库存需回补</b></td><td>终态</td></tr>
+    <tr><td><b>已关闭</b></td><td>风控/系统关闭的订单</td><td>终态</td></tr>
+  </table>
+  <h4>超时取消的实现</h4>
+  <pre><span class="c"># 方案一：Redis ZSet 延时队列（轻量）</span>
+ZADD order:delay &lt;到期时间戳&gt; &lt;orderId&gt;
+<span class="c"># 后台任务轮询：</span>
+ZRANGEBYSCORE order:delay 0 &lt;当前时间戳&gt; LIMIT 0 100
+<span class="c"># 取出到期的订单 → 取消 + 回补库存 → ZREM</span>
+
+<span class="c"># 方案二：MQ 延时消息（RabbitMQ TTL+DLX / RocketMQ 延时消息）</span>
+<span class="c"># 下单时发一条 15 分钟后投递的消息，消费者收到就取消订单</span>
+
+<span class="c"># 方案三：定时扫表（最简单，但大表下慢）</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> orders <span class="b">WHERE</span> status = <span class="y">'待支付'</span> <span class="b">AND</span> created_at <span class="g">&lt;</span> NOW() - INTERVAL 15 MINUTE;
+<span class="c"># 需要 status + created_at 联合索引，且要分页避免全表扫</span>
+
+<span class="c"># 回补库存必须幂等：用「已回补」标记或唯一约束防止重复回补</span>
+<span class="b">UPDATE</span> stock <span class="b">SET</span> stock = stock + 1 <span class="b">WHERE</span> item_id = 1001 <span class="b">AND</span> order_id = ? <span class="b">AND</span> released = 0;</pre>
+  <div class="callout warn">
+    <b>超时取消的两个坑：</b>① <b>回补不幂等</b> —— 消息重复投递导致库存被回补两次，反而超卖；② <b>取消和支付并发</b> —— 用户在第 14 分 59 秒支付，同时定时任务在取消。必须用状态机 + CAS（Compare And Swap，比较并交换）保证只有一个操作成功：<span class="k">UPDATE orders SET status='已支付' WHERE id=? AND status='待支付'</span>。
+  </div>
+  <h4>瓶颈与演进：量级涨 10 倍</h4>
+  <table>
+    <tr><th style="width:150px">组件</th><th>涨 10 倍后的瓶颈</th><th>解法</th></tr>
+    <tr><td><b>Redis 库存 key</b></td><td><b>先崩。</b>单个商品的库存 key 是超级热 key，1000 万 QPS 全打到一个分片</td><td><b>库存分桶</b>：把 1000 库存拆成 10 个桶各 100，请求随机打到一个桶，分散热点</td></tr>
+    <tr><td><b>MQ</b></td><td>消息量暴增，消费跟不上导致积压</td><td>增加消费者、分区扩容；用 Kafka 分区提高并行度</td></tr>
+    <tr><td><b>数据库写入</b></td><td>订单表写入量大</td><td>分库分表（按订单 ID 或用户 ID）；异步写 + 批量提交</td></tr>
+    <tr><td><b>网关限流</b></td><td>限流阈值本身成为配置热点</td><td>限流规则本地化 + 定期拉取，避免每次限流都查配置中心</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>秒杀案例的三个通用结论：</b>① <b>绝不超卖靠的是原子操作</b>（DB 的 <span class="k">WHERE stock &gt; 0</span> 或 Redis 的 Lua）；② <b>分层削流比堆机器有效</b>，让每一层只处理它该处理的流量；③ <b>热 key 要用分桶打散</b>，一个商品的库存不能只放一个 key。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">案例 3 · 排行榜</span><h2>需求、为什么用 ZSet 与数据结构</h2></div>
+  <p class="lead"><b>排行榜</b>：实时展示用户按某种分数（积分、票数、销售额）的排名，支持查前 N 名、查某人排名、查某区间。</p>
+  <h4>需求澄清</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>内容</th></tr>
+    <tr><td><b>功能需求</b></td><td>① 实时更新分数；② 查 Top N；③ 查某用户的排名和分数；④ 查区间（第 100~200 名）；⑤ 多维度榜（日榜 / 周榜 / 总榜）</td></tr>
+    <tr><td><b>非功能需求</b></td><td>① 排名要<b>实时</b>（不能是 T+1 离线）；② 更新要快（每次加分都要反映）；③ 查询要快（&lt; 10ms）</td></tr>
+    <tr><td><b>规模假设</b></td><td>1000 万用户参与排名</td></tr>
+  </table>
+  <h4>为什么用 Redis ZSet</h4>
+  <table>
+    <tr><th style="width:170px">操作</th><th>ZSet 复杂度</th><th>说明</th></tr>
+    <tr><td><b>插入 / 更新分数</b></td><td class="f">O(log N)</td><td>底层是跳表（skiplist），插入时维护有序性</td></tr>
+    <tr><td><b>查排名 ZRANK</b></td><td class="f">O(log N)</td><td>直接返回名次，不用扫全表</td></tr>
+    <tr><td><b>取 Top N ZREVRANGE</b></td><td class="f">O(log N + M)</td><td>M 是返回条数，从跳表尾部倒序取</td></tr>
+    <tr><td><b>按分数区间查</b></td><td class="f">O(log N + M)</td><td>ZRANGEBYSCORE，天然的区间查询</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>为什么不用 MySQL？</b>排行榜每次更新分数，如果用 <span class="k">ORDER BY score DESC LIMIT 10</span> 实时查，在千万行数据上即便有索引也要几十到几百毫秒，且每次查询都消耗数据库 CPU。<b>排行榜是"写少读多 + 需要有序 + 需要实时排名"的典型场景，正是 ZSet 的主场。</b>MySQL 只适合做离线的全量榜或最终持久化。
+  </div>
+  <h4>数据结构设计</h4>
+  <pre><span class="c"># 核心：一个 ZSet 就是一张榜</span>
+<span class="c"># member = 用户 ID，score = 分数</span>
+ZADD rank:20261015 1000 "user:1001"
+ZADD rank:20261015 2500 "user:1002"
+ZADD rank:20261015 1800 "user:1003"
+
+<span class="c"># 取前 10 名（带分数）</span>
+ZREVRANGE rank:20261015 0 9 WITHSCORES
+
+<span class="c"># 查某人的排名（ZREVRANK 从高到低，返回 0-based）</span>
+ZREVRANK rank:20261015 "user:1001"     <span class="c"># 返回 2，表示第 3 名</span>
+
+<span class="c"># 加分（原子操作）</span>
+ZINCRBY rank:20261015 50 "user:1001"
+
+<span class="c"># 取区间：第 100~200 名</span>
+ZREVRANGE rank:20261015 99 199 WITHSCORES
+
+<span class="c"># 多维度榜：用不同的 key 区分</span>
+rank:daily:20261015    <span class="c"># 日榜</span>
+rank:weekly:2026W42    <span class="c"># 周榜</span>
+rank:all               <span class="c"># 总榜</span></pre>
+  <div class="callout warn">
+    <b>同分怎么办？</b> ZSet 的 score 相同时，按 member 的字典序排。如果业务要求"同分先到者排前"，就要把 score 设计成组合值：<br>
+    <span class="k">score = 真实分数 × 10^10 + (10^10 - 到达时间戳)</span><br>
+    这样分数高的排前，同分时时间早的（时间戳小 → 补数大）排前。<b>关键：分数部分要占足够高位，避免和时间部分串位。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">案例 3 · 排行榜</span><h2>分片聚合、深翻分页与演进</h2></div>
+  <h4>分片与聚合：大榜拆小榜</h4>
+  <p>1000 万用户的单个 ZSet 会有内存和热点压力。拆分思路有两种：</p>
+  <table>
+    <tr><th style="width:170px">方案</th><th>做法</th><th>代价</th></tr>
+    <tr><td><b>按用户 ID 哈希分片</b></td><td>拆成 N 个小榜（如 16 个），每个榜放一部分用户</td><td>查全局 Top N 时要<b>从 N 个榜各取 Top N 归并</b>（聚合）</td></tr>
+    <tr><td><b>只维护 Top N</b></td><td>Redis 里只保留前 1000 名，全量榜放数据库/离线计算</td><td>查榜外用户排名要另算；但内存和性能最优</td></tr>
+    <tr><td><b>两级榜</b></td><td>Redis 存热榜（Top N），MySQL 存全量；定期从全量重算热榜</td><td>榜单有延迟；重算有成本</td></tr>
+  </table>
+  <pre><span class="c"># 聚合示例：从 16 个分片榜取全局 Top 10</span>
+<span class="c"># 1. 每个分片取自己的 Top 10（并行查询）</span>
+ZREVRANGE rank:shard:0 0 9 WITHSCORES
+ZREVRANGE rank:shard:1 0 9 WITHSCORES
+... （16 个分片）
+
+<span class="c"># 2. 应用层归并 16 × 10 = 160 条，取分数最高的 10 条</span>
+<span class="c"># 3. 返回给用户</span>
+
+<span class="c"># 优化：如果只需要 Top 10，每个分片取 Top 10 就够（数学上保证）</span>
+<span class="c"># 但如果是「查某人全局排名」，就得遍历所有分片查 ZREVRANK 再累加</span>
+<span class="c"># → 这就是分片的代价：全局排名查询变贵</span></pre>
+  <h4>分页深翻问题</h4>
+  <div class="callout danger">
+    <b>深翻（Deep Pagination）指翻到很后面的页</b>，例如"第 10000 页"。用 <span class="k">ZREVRANGE key 99990 99999</span> 虽然 Redis 内部是 O(log N + M)，但 start 很大时仍要定位跳表节点，且"翻到第 10000 页"这种需求本身往往是无意义的（没人真会看第 10000 页）。<br>
+    <b>更好的方案：用分数游标替代 offset。</b>记住上一页最后一条的 score，下一页用 <span class="k">ZREVRANGEBYSCORE key (lastScore -inf LIMIT 0 10</span> 继续取。这样每次都从游标处继续，不随页码变深而变慢。<b>缺点：不能随机跳到任意页。</b>
+  </div>
+  <pre><span class="c"># 游标分页（推荐）：不随页码加深而变慢</span>
+<span class="c"># 第一页</span>
+ZREVRANGEBYSCORE rank:all +inf -inf LIMIT 0 10
+<span class="c"># 记下最后一条的 score = 1850</span>
+
+<span class="c"># 下一页：取分数小于 1850 的</span>
+ZREVRANGEBYSCORE rank:all (1850 -inf LIMIT 0 10
+
+<span class="c"># 对比 offset 分页（不推荐深翻）</span>
+ZREVRANGE rank:all 99990 99999   <span class="r"># 页码越深越慢</span></pre>
+  <h4>持久化与重建</h4>
+  <ul>
+    <li><b>Redis 内存数据不可靠：</b>重启、主从切换都可能丢数据，所以 ZSet 不能是唯一数据源。</li>
+    <li><b>持久化策略：</b>Redis 开 AOF/RDB 只是缓解；<b>真正的权威数据应落在数据库</b>（如用户积分表）。</li>
+    <li><b>重建方式：</b>日榜可以在每天零点用定时任务从流水/积分表<b>全量重算</b>一次；或增量地从变更日志（binlog/消息）重放。</li>
+    <li><b>双写一致性：</b>加分时同时写 DB 和 Redis（DB 为准）；Redis 丢了就从 DB 重建。</li>
+  </ul>
+  <h4>瓶颈与演进：量级涨 10 倍</h4>
+  <table>
+    <tr><th style="width:150px">组件</th><th>涨 10 倍后（1 亿用户）</th><th>解法</th></tr>
+    <tr><td><b>单个 ZSet</b></td><td><b>先崩。</b>1 亿成员的 ZSet 内存巨大且成为热点</td><td>按用户哈希分片成几十个小榜；或只保留 Top N 热榜</td></tr>
+    <tr><td><b>全局排名查询</b></td><td>要遍历所有分片，延迟累加</td><td>预聚合、定期把全局排名刷进一张"排名快照"表</td></tr>
+    <tr><td><b>写放大</b></td><td>每次加分都是 ZINCRBY，高频写</td><td>本地聚合后批量写（如每 100ms 合并一次加分）</td></tr>
+    <tr><td><b>持久化</b></td><td>大 ZSet 的 RDB 快照耗时长</td><td>在从库做持久化；分片后每个实例数据量下降</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>排行榜案例的三个通用结论：</b>① <b>"有序 + 实时排名"用 ZSet 是标准答案</b>；② <b>分片能扩展容量，但代价是全局排名变贵</b>，要权衡；③ <b>深翻分页用分数游标替代 offset</b>，这是所有有序集合分页的通用技巧。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>跨案例的十个通用陷阱</h2></div>
+  <p class="lead">这三个案例共享同一批"看起来对、实际会翻车"的设计陷阱。它们几乎出现在所有系统设计里。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只算平均 QPS，不算峰值</div><div class="pd">用日均 QPS 做容量规划，高峰必崩。容量必须按峰值（均值 × 峰值系数）规划，且留冗余。这是短链、秒杀、排行榜共同的第一个坑。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">短码用顺序自增，导致可枚举</div><div class="pd">爬虫从短码 1 顺序扫到最大，全站链接被爬光。必须对 ID 做混淆或使用随机短码。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 301 当 302 用（或反之）</div><div class="pd">301 永久重定向会被浏览器缓存，失去统计能力且改动不生效；302 临时重定向才能统计和随时改目标。短链默认用 302。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">秒杀库存只放 Redis，不做 DB 兜底</div><div class="pd">Redis 挂了或数据丢失，库存判断失效，要么全放行（超卖）要么全拒绝（业务损失）。DB 必须是最终账本，Redis 只是快速过滤器。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">Redis 扣库存不用 Lua，先 GET 再 DECR</div><div class="pd">两条命令之间有窗口，并发下超卖。判断和扣减必须在同一个 Lua 脚本里原子执行。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">超时订单回补库存不幂等</div><div class="pd">消息重复投递导致库存被回补多次，反而超卖。回补必须带幂等标记（唯一约束或 released 字段）。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">排行榜用 MySQL 实时 ORDER BY 查</div><div class="pd">千万行上每次查询几十到几百毫秒，且消耗 DB CPU。实时有序排名是 ZSet 的活，MySQL 只做离线全量榜。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">排行榜同分没有二级排序</div><div class="pd">同分时排名不稳定，用户会看到自己的名次跳动。要么把时间戳编进 score，要么明确业务接受按 member 字典序。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">缓存与数据库双写不一致</div><div class="pd">先更新库再更新缓存（并发写脏），或先删缓存再更新库（读回旧值）。正确姿势是 Cache Aside：先更新库，再删缓存，配合 TTL 兜底。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">热点 key 不做分桶</div><div class="pd">一个爆款商品的库存、一个爆款短链的缓存，会把单个分片的 CPU 打满。库存要分桶、热缓存要加本地缓存，把热点打散。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1.（短链）日均 1 亿次跳转，读写比 100:1。平均读 QPS 大约是多少？</div>
+      <button class="opt">100</button>
+      <button class="opt">1000</button>
+      <button class="opt">约 1157（1 亿 ÷ 86400）</button>
+      <div class="ans">正确答案：<b>约 1157</b>。1 亿 / 86400 ≈ 1157。记住"一天 ≈ 10<sup>5</sup> 秒"，日均量除以 10<sup>5</sup> 就是平均 QPS。峰值还要再乘峰值系数（3~5）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2.（短链）为什么短码生成不推荐直接用顺序自增 ID？</div>
+      <button class="opt">自增 ID 会重复</button>
+      <button class="opt">顺序递增导致短码可被枚举，爬虫能顺序扫光全站链接</button>
+      <button class="opt">自增 ID 转 62 进制后太长</button>
+      <div class="ans">正确答案：<b>可被枚举</b>。顺序短码可被爬虫从 1 顺序扫描。解法是对 ID 做可逆混淆（异或 + 位重排）或使用随机短码，既保持唯一无冲突，又不可顺扫。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3.（秒杀）库存为 1，两个请求并发扣减，结果库存变成 -1。根本原因是？</div>
+      <button class="opt">"读-判断-写"三步不是原子操作，两个请求都通过了"有货"判断</button>
+      <button class="opt">数据库不支持并发</button>
+      <button class="opt">库存字段类型不对</button>
+      <div class="ans">正确答案：<b>非原子操作</b>。两个请求都读到 stock=1、都判断 &gt;0、都扣减。解法是让判断和扣减原子化：DB 用 <span class="k">UPDATE ... WHERE stock &gt; 0</span>，Redis 用 Lua 脚本。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4.（秒杀）用 Redis 扣库存，为什么必须用 Lua 脚本而不是 GET 后再 DECR？</div>
+      <button class="opt">Lua 更快</button>
+      <button class="opt">Lua 语法更好看</button>
+      <button class="opt">Lua 整体原子执行，GET 判断和 DECR 之间没有窗口，避免超卖</button>
+      <div class="ans">正确答案：<b>Lua 原子执行</b>。分开的 GET + DECR 两条命令之间存在时间窗口，并发下会超卖。Lua 脚本作为一个整体执行，中间不被打断，保证判断和扣减的原子性。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5.（排行榜）实现实时排行榜，为什么首选 Redis ZSet 而不是 MySQL？</div>
+      <button class="opt">ZSet 能存更多数据</button>
+      <button class="opt">ZSet 底层是跳表，插入和查排名都是 O(log N)，天然有序、实时更新，而 MySQL 实时 ORDER BY 在千万行上太慢</button>
+      <button class="opt">MySQL 不支持排序</button>
+      <div class="ans">正确答案：<b>ZSet 的跳表结构</b>。ZSet 支持 O(log N) 的插入、查排名、取区间，天然适合"实时有序排名"。MySQL 每次实时 ORDER BY 都要消耗大量 CPU 且延迟高，只适合做离线全量榜。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6.（排行榜）排行榜翻到很后面的页（如第 10000 页），更好的做法是？</div>
+      <button class="opt">用分数游标分页（ZREVRANGEBYSCORE + LIMIT），记住上一页末尾的 score 继续取，避免 offset 深翻</button>
+      <button class="opt">直接加大 Redis 内存</button>
+      <button class="opt">用 ZREVRANGE 加大 offset 就行</button>
+      <div class="ans">正确答案：<b>分数游标分页</b>。offset 越深定位成本越高且这种需求本身无意义。用上一页最后一条的 score 作为游标，用 <span class="k">ZREVRANGEBYSCORE key (lastScore -inf LIMIT 0 10</span> 继续取，成本恒定。缺点是不能随机跳页。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>答题框架与术语表</h2></div>
+  <h3>系统设计 / 评审的答题框架</h3>
+  <p class="lead">不管是面试还是技术方案评审，按这个顺序推演，逻辑最清晰、也最容易拿分。</p>
+  <pre><span class="c"># ===== 第一步：澄清需求（别急着画架构）=====</span>
+[ ] 功能需求：核心功能是什么？哪些是可选功能？
+[ ] 非功能需求：QPS / 延迟 / 可用性 / 一致性要求
+[ ] 规模假设：用户数、日活、数据量、增长曲线
+[ ] 明确的非目标：这个系统不做什么？
+
+<span class="c"># ===== 第二步：容量估算（最容易加分）=====</span>
+[ ] 平均 QPS = 日均量 / 86400；峰值 QPS = 平均 × 峰值系数
+[ ] 存储 = 条数 × 单条大小 × 保留时长
+[ ] 缓存 = 热数据条数 × 单条大小
+[ ] 带宽 = 峰值 QPS × 单次响应大小
+<span class="c"># 每个数字都要指向一个架构决策</span>
+
+<span class="c"># ===== 第三步：接口设计 =====</span>
+[ ] 对外暴露哪些接口？入参出参是什么？
+[ ] 幂等性如何保证？（尤其是写接口）
+
+<span class="c"># ===== 第四步：数据模型 =====</span>
+[ ] 主键 / 分片键怎么定？
+[ ] 需要哪些索引？
+[ ] 数据量涨了怎么分片？
+
+<span class="c"># ===== 第五步：高层设计 =====</span>
+[ ] 组件有哪些？（网关 / 应用 / 缓存 / DB / MQ / 存储）
+[ ] 关键链路的数据流是怎样的？（一个请求经过哪些组件）
+
+<span class="c"># ===== 第六步：深入关键点 =====</span>
+[ ] 挑 2~3 个难点深入（缓存策略、一致性、并发、热点）
+[ ] 每个决策给出 2~3 个候选方案 + 代价 + 选择理由
+
+<span class="c"># ===== 第七步：瓶颈与演进（区分会做和想清楚）=====</span>
+[ ] 当前瓶颈在哪？
+[ ] 量级涨 10 倍，哪里先崩？
+[ ] 怎么扩展？（加机器 / 分片 / 异步 / 缓存 / 降级）</pre>
+
+  <h3>三个案例的关键决策速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>平均 QPS = 日均量 / 86400</code><span class="desc">容量估算的第一公式（一天≈10^5 秒）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>峰值 QPS = 平均 QPS × 峰值系数</code><span class="desc">普通 3~5，大促数十倍</span><button class="copy">复制</button></div>
+    <div class="crow"><code>base62(obfuscate(id))</code><span class="desc">短码生成：无冲突 + 不可枚举</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZREVRANGE rank 0 9 WITHSCORES</code><span class="desc">排行榜 Top 10</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZREVRANK rank "user:1001"</code><span class="desc">查某人排名（0-based）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZINCRBY rank 50 "user:1001"</code><span class="desc">原子加分</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZREVRANGEBYSCORE rank (1850 -inf LIMIT 0 10</code><span class="desc">游标分页，避免 offset 深翻</span><button class="copy">复制</button></div>
+    <div class="crow"><code>UPDATE stock SET stock=stock-1 WHERE item_id=? AND stock&gt;0</code><span class="desc">数据库原子扣减，靠 WHERE 防超卖</span><button class="copy">复制</button></div>
+    <div class="crow"><code>redis.call('DECR', KEYS[1])</code><span class="desc">Redis Lua 原子扣库存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZADD order:delay &lt;ts&gt; &lt;orderId&gt;</code><span class="desc">Redis ZSet 做延时队列（超时取消）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SET key value NX EX 30</code><span class="desc">分布式锁（防重复下单）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>UPDATE orders SET status='已支付' WHERE id=? AND status='待支付'</code><span class="desc">状态机 CAS，解决支付/取消并发</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>QPS</b></td><td>Queries Per Second，每秒请求数</td></tr>
+    <tr><td><b>峰值系数</b></td><td>峰值 QPS 与平均 QPS 的比值，用于容量规划</td></tr>
+    <tr><td><b>短码 / 短链</b></td><td>把长 URL 映射成的短标识及其服务</td></tr>
+    <tr><td><b>62 进制</b></td><td>用 a-z A-Z 0-9 共 62 个字符表示数字，短且区分大小写</td></tr>
+    <tr><td><b>号段模式</b></td><td>发号器一次取一段 ID 缓存到内存，减少发号器压力</td></tr>
+    <tr><td><b>302 重定向</b></td><td>临时重定向，浏览器每次都会重新请求，可统计可修改</td></tr>
+    <tr><td><b>301 重定向</b></td><td>永久重定向，浏览器会缓存，省流量但失去统计能力</td></tr>
+    <tr><td><b>Cache Aside</b></td><td>旁路缓存：读时先查缓存、写时先更新库再删缓存</td></tr>
+    <tr><td><b>超卖</b></td><td>卖出数量超过库存，并发下非原子操作导致</td></tr>
+    <tr><td><b>削峰填谷</b></td><td>用队列把瞬时高峰流量摊平到一段时间内处理</td></tr>
+    <tr><td><b>令牌桶 / 漏桶</b></td><td>两种限流算法，前者允许突发、后者恒定速率</td></tr>
+    <tr><td><b>库存分桶</b></td><td>把总库存拆成多个小桶分散到不同 key，打散热点</td></tr>
+    <tr><td><b>幂等</b></td><td>同一个操作执行多次，结果与执行一次相同</td></tr>
+    <tr><td><b>状态机</b></td><td>用有限状态和转移规则管理订单等对象的生命周期</td></tr>
+    <tr><td><b>CAS</b></td><td>Compare And Swap，比较并交换，用于并发下安全的状态转移</td></tr>
+    <tr><td><b>延时队列</b></td><td>消息延迟一段时间才被消费，用于超时取消等场景</td></tr>
+    <tr><td><b>ZSet</b></td><td>Redis 有序集合，底层跳表，支持按分数排序和查排名</td></tr>
+    <tr><td><b>跳表 skiplist</b></td><td>多层链表结构，实现 O(log N) 的插入和查找</td></tr>
+    <tr><td><b>深翻分页</b></td><td>翻到很后面的页，offset 越大成本越高</td></tr>
+    <tr><td><b>热 key</b></td><td>访问量异常集中的 key，会把单个分片打满</td></tr>
+    <tr><td><b>削流 / 限流</b></td><td>在请求到达核心系统前按速率限制流量</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用附录的七步框架，把这三个案例各自在纸上重新推演一遍，不看答案；② 自选一个你熟悉的系统（如微博 Feed、订单系统），套同一套框架推容量、找瓶颈；③ 把"涨 10 倍先崩哪"这个问题，对你负责的每个系统都问一遍；④ 用 Redis 亲手实现一个 ZSet 排行榜 + 一个 Lua 原子扣库存，跑起来看效果。<br><br>
+    <b>之后值得单独学：</b>分布式事务（2PC / TCC / Saga / 本地消息表）、一致性哈希与分库分表中间件、消息队列的可靠投递与顺序性、以及分布式限流与熔断组件（Sentinel / Hystrix / Resilience4j）。
+  </div>
+</section>
+
+</main>
+
+<footer>系统设计案例集 · 短链 / 秒杀 / 排行榜 · 通用套路：先算量级，再定方案，最后问"涨 10 倍先崩哪"</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。三个案例的通用套路：先算量级，再找瓶颈，最后问「涨 10 倍先崩哪」。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边读边把每个案例的容量估算推一遍。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边在纸上把每个案例的容量估算推一遍 —— 这是系统设计的第一关。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

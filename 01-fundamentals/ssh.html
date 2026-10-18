@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 SSH</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 工程基础</span>
+    <h1>二十分钟学透 SSH</h1>
+    <p class="sub">SSH 天天用，但多数人只会 <span class="k">ssh user@host</span>。真正拉开差距的是三件事：<b>密钥怎么管、隧道怎么打、服务怎么加固</b>。这篇按"一次连接的生命周期"讲，把每个环节的边界说清楚。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种端口转发</span>
+      <span class="chip"><b>5</b> 类加固项</span>
+      <span class="chip"><b>9</b> 个踩坑点</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开两台机器（或一台 + 本地回环）跟着敲 —— 隧道和跳板不动手是学不会的</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先确认版本与连通性</h2></div>
+  <pre><span class="c"># 客户端和服务端版本（OpenSSH 8.x 之后默认禁用 ssh-rsa 签名）</span>
+ssh -V
+sshd -V 2&gt;&amp;1 | head -1
+
+<span class="c"># 生成一把现代密钥（ed25519，默认 256 位）</span>
+ssh-keygen -t ed25519 -a 100 -C "you@laptop"
+
+<span class="c"># 把公钥装到目标机（比手工 cat 追加更安全，会帮你建目录设权限）</span>
+ssh-copy-id -i ~/.ssh/id_ed25519.pub deploy@10.0.0.5
+
+<span class="c"># 验证：能登录，且不需要输密码</span>
+ssh -o BatchMode=yes deploy@10.0.0.5 'echo ok'</pre>
+  <table>
+    <tr><th style="width:150px">文件</th><th style="width:110px">权限</th><th>作用</th></tr>
+    <tr><td class="f">~/.ssh/</td><td>700</td><td>目录本身不能对组和其他人开放</td></tr>
+    <tr><td class="f">~/.ssh/id_ed25519</td><td>600</td><td><b>私钥。绝不能外传</b>，也不能是 644</td></tr>
+    <tr><td class="f">~/.ssh/id_ed25519.pub</td><td>644</td><td>公钥，可以随便给</td></tr>
+    <tr><td class="f">~/.ssh/authorized_keys</td><td>600</td><td>服务端允许登录的公钥列表</td></tr>
+    <tr><td class="f">~/.ssh/known_hosts</td><td>600</td><td>记录你连过的服务器的 host key，用于防中间人</td></tr>
+    <tr><td class="f">~/.ssh/config</td><td>600</td><td>客户端配置，建议 600（里面有主机名和用户名）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>先记住一条：SSH 的权限检查是"宁可错杀"的。</b><br>
+    私钥是 644、<span class="k">~/.ssh</span> 是 755、<span class="k">authorized_keys</span> 的属主不是当前用户 —— 任何一条不满足，服务端都会<b>直接拒绝公钥认证</b>，而且默认只回一句 <span class="k">Permission denied (publickey)</span>，不告诉你原因。排查时先看 <span class="k">ssh -vvv</span> 的输出。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>一次连接到底发生了什么</h2></div>
+  <p class="lead">SSH 不是"加密的 telnet"。它在一条 TCP 连接上做了三件独立的事：<b>协商算法、验证服务器身份、验证用户身份</b>。三件事分开理解，故障就能分层定位。</p>
+  <pre><span class="c"># 连接建立的五个阶段（简化）</span>
+
+<span class="b">1. TCP 三次握手</span>            <span class="c"># 连到 22 端口</span>
+        │
+<span class="b">2. 版本交换</span>                <span class="c"># 双方各发一行 "SSH-2.0-OpenSSH_9.6"</span>
+        │
+<span class="b">3. 算法协商 + 密钥交换</span>      <span class="c"># 交换 KEXINIT，用 curve25519 算出共享密钥</span>
+        │                       <span class="c"># 这一步之后就全部加密了</span>
+<span class="b">4. 验证服务器</span>              <span class="c"># 服务器用 host key 签名，客户端比对 known_hosts</span>
+        │
+<span class="b">5. 验证用户</span>                <span class="c"># 公钥 / 密码 / 键盘交互 / GSSAPI</span>
+        │
+<span class="g">   加密信道建立，开始跑 shell 或命令</span></pre>
+  <h4>阶段 3：密钥交换在解决什么</h4>
+  <table>
+    <tr><th style="width:150px">要解决的问题</th><th>做法</th></tr>
+    <tr><td><b>在不安全信道上协商出密钥</b></td><td>Diffie-Hellman 类算法（curve25519-sha256、diffie-hellman-group-exchange-sha256）。双方各出一个临时私钥，公开部分交换后能算出同一个共享密钥，<b>窃听者拿不到</b></td></tr>
+    <tr><td><b>前向保密</b></td><td>每次连接都用<b>临时</b>密钥对（ephemeral）。即使以后服务器的长期私钥泄露，也解不开之前录下的流量</td></tr>
+    <tr><td><b>防重放</b></td><td>交换过程带随机数和会话 ID，同一份握手包重放无效</td></tr>
+  </table>
+  <h4>阶段 4：host key 与 known_hosts</h4>
+  <p>密钥交换只能保证"这条信道不被窃听"，但<b>没法证明对面是谁</b> —— 中间人可以分别和两边握手。所以服务器要用自己的<b>长期私钥</b>（host key）对握手内容签名，客户端第一次连接时把公钥记进 <span class="k">known_hosts</span>，以后每次比对。</p>
+  <pre><span class="c"># 第一次连接，会问你信不信这个指纹</span>
+The authenticity of host '10.0.0.5' can't be established.
+ED25519 key fingerprint is SHA256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+
+<span class="c"># 更安全的做法：从带外渠道拿到指纹，手工比对</span>
+ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+<span class="c"># 输出：256 SHA256:xxxx root@host (ED25519)</span>
+
+<span class="c"># 指纹变了（重装系统 / 换机器 / 中间人）</span>
+<span class="r">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+<span class="r">@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @</span>
+<span class="r">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+
+<span class="c"># 确认是正常的系统重装后，删掉旧记录</span>
+ssh-keygen -R 10.0.0.5
+<span class="c"># 如果开了 HashKnownHosts，known_hosts 里的主机名是哈希过的，也要用 -R</span></pre>
+  <div class="callout danger">
+    <b>看到 host key 变更告警，绝对不要习惯性 <span class="k">rm known_hosts</span>。</b><br>
+    这个告警的含义是"<b>对面的身份和上次不一样了</b>"，可能是重装系统，也可能是<b>有人在中间人攻击</b>。正确流程：① 通过带外渠道（控制台、云厂商面板、同事）确认服务器是否重装或换 IP；② 用 <span class="k">ssh-keygen -lf</span> 比对指纹；③ 确认无误后再 <span class="k">ssh-keygen -R</span>。<br>
+    把 <span class="k">StrictHostKeyChecking</span> 设成 <span class="k">no</span> 来"图省事"，等于把这层防护整个关掉。折中的选择是 <span class="k">accept-new</span>：首次自动接受，之后变更仍然报错。
+  </div>
+  <h4>阶段 5：公钥认证的具体流程</h4>
+  <pre><span class="c"># 关键点：私钥永远不离开客户端</span>
+
+客户端                                      服务端
+  │                                           │
+  │  "我想用这把公钥登录"  ──────────────────&gt; │
+  │  （发送公钥，或只发指纹）                    │  查 authorized_keys
+  │                                           │
+  │  &lt;──────────  挑战：一段随机数据（用公钥加密） │
+  │                                           │
+  │  用私钥解密 / 签名  ─────────────────────&gt; │  用公钥验签
+  │                                           │
+  │  &lt;──────────  认证通过                     │
+
+<span class="c"># 所以：authorized_keys 里放的是公钥，泄露它不会导致别人能登录</span>
+<span class="c"># 但私钥泄露 = 别人可以冒充你，必须立刻从所有 authorized_keys 里删掉对应公钥</span></pre>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>密钥管理：选型、口令、agent</h2></div>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:150px">公钥长度</th><th>评价</th></tr>
+    <tr><td><b>ed25519</b></td><td>68 字节（256 位）</td><td><b>默认首选。</b>签名快、密钥短、没有可调参数（也就没有配错的空间）。OpenSSH 6.5+ 支持</td></tr>
+    <tr><td><b>rsa</b></td><td>3072 / 4096 位</td><td>兼容老系统（比如很旧的网络设备、老版本 Git 服务）。<b>至少 3072 位</b>，1024 位已不安全</td></tr>
+    <tr><td><b>ecdsa</b></td><td>256 / 384 / 521 位</td><td>能用，但实现依赖 NIST 曲线，部分团队出于信任原因不选</td></tr>
+    <tr><td><b>ed25519-sk</b></td><td>—</td><td>密钥存在 FIDO2 硬件钥匙里，<b>物理接触才能签名</b>。高安全场景</td></tr>
+  </table>
+  <pre><span class="c"># 生成 ed25519（-a 是 KDF 轮数，越大越抗暴力破解，100 是常用值）</span>
+ssh-keygen -t ed25519 -a 100 -C "alice@laptop-2026"
+
+<span class="c"># 兼容场景才用 RSA，且必须 3072 位以上</span>
+ssh-keygen -t rsa -b 4096 -o -a 100 -C "alice@legacy"
+
+<span class="c"># 给已有私钥加 / 改口令</span>
+ssh-keygen -p -f ~/.ssh/id_ed25519
+
+<span class="c"># 看公钥指纹和类型</span>
+ssh-keygen -lf ~/.ssh/id_ed25519.pub</pre>
+  <h4>passphrase 到底防什么</h4>
+  <p>私钥文件落在磁盘上，如果<b>没有口令</b>，任何拿到这个文件的人（备份泄露、笔记本丢失、误提交到 Git）都能直接登录。加了口令后，私钥在磁盘上是加密的，攻击者需要暴力破解口令。</p>
+  <table>
+    <tr><th style="width:150px">场景</th><th>建议</th></tr>
+    <tr><td>个人笔记本</td><td><b>一定要有口令</b>，配合 ssh-agent 免去重复输入</td></tr>
+    <tr><td>CI / 自动化</td><td>通常无口令，但必须<b>限定权限</b>（只读、只能部署到特定目录），并放在密钥管理服务里</td></tr>
+    <tr><td>服务器之间互信</td><td>无口令 + <span class="k">authorized_keys</span> 里加 <span class="k">from=</span> 限制来源 IP</td></tr>
+  </table>
+  <h4>ssh-agent：把解密后的私钥留在内存里</h4>
+  <pre><span class="c"># 启动 agent（多数桌面环境会自动起）</span>
+eval "$(ssh-agent -s)"
+
+<span class="c"># 加入密钥，输入一次口令，之后本次登录内都不再问</span>
+ssh-add ~/.ssh/id_ed25519
+ssh-add -l          <span class="c"># 列出已加载的密钥指纹</span>
+ssh-add -D          <span class="c"># 全部清除</span>
+
+<span class="c"># 带超时：3600 秒后自动失效（更安全）</span>
+ssh-add -t 3600 ~/.ssh/id_ed25519
+
+<span class="c"># macOS 可以把口令存进 Keychain，重启后也不用重输</span>
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+
+<span class="c"># 确认当前 shell 能看到 agent</span>
+echo $SSH_AUTH_SOCK</pre>
+  <div class="callout danger">
+    <b>agent 转发（<span class="k">ssh -A</span>）是一把双刃剑。</b><br>
+    它让你从 A 跳到 B 之后，还能用 A 上的密钥去连 C，私钥本身不用复制到 B。但代价是：<b>B 上的 root 用户可以通过 <span class="k">SSH_AUTH_SOCK</span> 借用你的 agent，以你的身份登录任何信任这把钥匙的机器</b>。B 一旦被入侵，攻击者就能横向移动。<br>
+    <b>三条实践：</b>① 只在必要时开 <span class="k">-A</span>，不要写进全局配置；② 用 <span class="k">ssh-add -c</span>，每次使用都弹确认；③ 更安全的替代是 <b>ProxyJump</b> —— 它只做 TCP 转发，不把你的 agent 暴露给跳板机。
+  </div>
+  <h4>多把密钥怎么区分</h4>
+  <pre><span class="c"># 默认情况下，ssh 会按顺序尝试 ~/.ssh/id_* 里的所有密钥</span>
+<span class="c"># 服务器通常只允许尝试 6 次（MaxAuthTries），密钥多了会被拒</span>
+
+<span class="c"># 解法一：在 config 里为每个 Host 指定密钥 + IdentitiesOnly</span>
+Host github.com
+  IdentityFile ~/.ssh/id_ed25519_github
+  IdentitiesOnly yes        <span class="c"># 只用这一把，不遍历 agent 里的其他钥匙</span>
+
+Host gitlab.internal
+  IdentityFile ~/.ssh/id_ed25519_work
+  IdentitiesOnly yes
+
+<span class="c"># 解法二：不同用途不同密钥，文件名自带语义</span>
+<span class="c"># id_ed25519_personal / id_ed25519_work / id_ed25519_ci</span>
+
+<span class="c"># 验证某台机器实际用了哪把钥匙</span>
+ssh -v git@github.com 2&gt;&amp;1 | grep -i "Offering public key"</pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>~/.ssh/config：把长命令变成别名</h2></div>
+  <p class="lead">这是投入产出比最高的一个文件。写一次，之后所有 <span class="k">ssh</span>、<span class="k">scp</span>、<span class="k">rsync</span>、<span class="k">git</span> 都自动生效。</p>
+  <pre><span class="c"># ~/.ssh/config  权限 600</span>
+
+<span class="b">Host</span> web
+  <span class="b">HostName</span> 10.0.0.5
+  <span class="b">User</span> deploy
+  <span class="b">Port</span> 2222
+  <span class="b">IdentityFile</span> ~/.ssh/id_ed25519_web
+  <span class="b">IdentitiesOnly</span> yes
+
+<span class="b">Host</span> db
+  <span class="b">HostName</span> db.internal.example.com
+  <span class="b">User</span> dba
+  <span class="b">ProxyJump</span> bastion
+
+<span class="b">Host</span> bastion
+  <span class="b">HostName</span> 203.0.113.10
+  <span class="b">User</span> jump
+  <span class="b">IdentityFile</span> ~/.ssh/id_ed25519_jump
+
+<span class="c"># 通配符：内网机器统一走跳板 + 统一用户</span>
+<span class="b">Host</span> 10.0.0.*
+  <span class="b">User</span> ops
+  <span class="b">ProxyJump</span> bastion
+  <span class="b">ServerAliveInterval</span> 30
+  <span class="b">ServerAliveCountMax</span> 3
+
+<span class="c"># 所有主机通用的默认值（放在文件末尾，前面匹配到的优先）</span>
+<span class="b">Host</span> *
+  <span class="b">ServerAliveInterval</span> 30
+  <span class="b">ServerAliveCountMax</span> 3
+  <span class="b">AddKeysToAgent</span> yes
+  <span class="b">HashKnownHosts</span> yes
+
+<span class="c"># 拆分文件，团队可以共享一部分、个人保留一部分</span>
+<span class="b">Include</span> ~/.ssh/config.d/*
+<span class="b">Include</span> ~/.ssh/config.work</pre>
+  <table>
+    <tr><th style="width:180px">字段</th><th>说明</th></tr>
+    <tr><td class="f">Host</td><td>你敲的别名，可以写多个（空格分隔），支持 <span class="k">*</span> 和 <span class="k">?</span> 通配</td></tr>
+    <tr><td class="f">HostName</td><td>真实域名或 IP。不写则等于 Host 的值</td></tr>
+    <tr><td class="f">User</td><td>登录用户名。不写则用本机当前用户名</td></tr>
+    <tr><td class="f">Port</td><td>端口，默认 22</td></tr>
+    <tr><td class="f">IdentityFile</td><td>私钥路径，可以写多行，按顺序尝试</td></tr>
+    <tr><td class="f">IdentitiesOnly</td><td><b>只用手动指定的密钥</b>，不遍历 agent。多密钥场景必写</td></tr>
+    <tr><td class="f">ProxyJump</td><td>先连跳板机，再从跳板机连目标</td></tr>
+    <tr><td class="f">LocalForward / RemoteForward</td><td>把端口转发写进配置，登录即建立</td></tr>
+    <tr><td class="f">RequestTTY / RemoteCommand</td><td>登录后直接执行命令，不进入交互 shell</td></tr>
+    <tr><td class="f">ControlMaster / ControlPath / ControlPersist</td><td>连接复用：第一条连接建好后，后续连接直接走这条 TCP，省掉握手</td></tr>
+  </table>
+  <pre><span class="c"># 连接复用：批量操作几十台机器时，能把总耗时砍掉一半以上</span>
+<span class="b">Host</span> *
+  <span class="b">ControlMaster</span> auto
+  <span class="b">ControlPath</span> ~/.ssh/cm-%r@%h:%p
+  <span class="b">ControlPersist</span> 10m
+
+<span class="c"># 效果：第一次 ssh 建立连接，10 分钟内再连同一台机器是毫秒级</span>
+<span class="c"># 关闭某条复用的连接</span>
+ssh -O exit web
+
+<span class="c"># 注意：ControlPath 太长会超过 Unix socket 的 108 字节上限</span>
+<span class="c"># 用 %C 让 ssh 自己算一个短哈希</span>
+<span class="b">ControlPath</span> ~/.ssh/cm-%C</pre>
+  <div class="callout">
+    <b>配置的匹配规则：</b>SSH 从文件顶部往下读，<b>每个参数取第一个匹配到的值</b>，而不是最后一个。所以"通配的默认值"要放在文件末尾，而具体的 Host 块要放在前面。<br>
+    这条规则和大多数配置文件（后面的覆盖前面的）相反，是排查"我明明配了为什么不生效"的第一嫌疑人。用 <span class="k">ssh -G web</span> 可以直接打印出最终生效的完整配置。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>端口转发：三种方向，三个真实场景</h2></div>
+  <p class="lead">端口转发的本质是：<b>SSH 客户端在本地监听一个端口，把收到的 TCP 连接塞进加密信道，由另一端帮你连到目标</b>。方向不同，用途完全不同。</p>
+  <table>
+    <tr><th style="width:90px">参数</th><th style="width:130px">名字</th><th style="width:210px">谁在监听</th><th>典型场景</th></tr>
+    <tr><td class="f">-L</td><td>本地转发</td><td><b>你的机器</b>监听，流量发往远端网络</td><td>访问只对服务器内网开放的数据库、管理后台</td></tr>
+    <tr><td class="f">-R</td><td>远程转发</td><td><b>服务器</b>监听，流量发回你的机器</td><td>把本地开发服务暴露给远程；穿透 NAT</td></tr>
+    <tr><td class="f">-D</td><td>动态转发</td><td>你的机器监听一个 SOCKS 代理端口</td><td>浏览器 / 命令行走 SOCKS，按目标动态连</td></tr>
+  </table>
+  <h4>-L：把远端的内网服务搬到本地</h4>
+  <pre><span class="c"># 场景：MySQL 只监听 127.0.0.1:3306，公网连不上</span>
+<span class="c"># 语法：-L [本地绑定地址:]本地端口:目标主机:目标端口</span>
+ssh -N -L 13306:127.0.0.1:3306 deploy@10.0.0.5
+
+<span class="c"># 然后本地就能连了（注意：连的是 127.0.0.1，不是远端）</span>
+mysql -h 127.0.0.1 -P 13306 -u app -p
+
+<span class="c"># 目标主机是"从服务器视角看"的地址，可以是内网另一台机器</span>
+ssh -N -L 15432:db.internal:5432 deploy@10.0.0.5
+
+<span class="c"># 参数说明</span>
+<span class="b">-N</span>   不执行远程命令，只做转发（不加会给你一个 shell，占着终端）
+<span class="b">-f</span>   转到后台（配合 -N 使用）
+<span class="b">-T</span>   不分配 TTY
+
+<span class="c"># 只想让本机访问，绑 127.0.0.1（默认）</span>
+<span class="c"># 想让局域网同事也能用，绑 0.0.0.0 —— 但这等于把内网服务暴露给整个局域网</span>
+ssh -N -L 0.0.0.0:13306:127.0.0.1:3306 deploy@10.0.0.5</pre>
+  <h4>-R：把本地服务推到远端</h4>
+  <pre><span class="c"># 场景一：本地起了个 3000 端的服务，想让远程机器（或远程的同事）访问</span>
+ssh -N -R 8080:127.0.0.1:3000 deploy@10.0.0.5
+<span class="c"># 现在在 10.0.0.5 上访问 http://127.0.0.1:8080 就是你的本地 3000</span>
+
+<span class="c"># 场景二：穿透 NAT，让公网机器反连内网机器</span>
+<span class="c"># 内网机器主动连出去，公网机器监听 2222</span>
+ssh -N -R 2222:127.0.0.1:22 root@203.0.113.10
+<span class="c"># 之后从公网机器：ssh -p 2222 localhost 就能进内网机器</span>
+
+<span class="c"># 默认 -R 只在远端的 127.0.0.1 上监听</span>
+<span class="c"># 要让外部能连，服务端 sshd_config 必须开：</span>
+<span class="b">GatewayPorts</span> yes        <span class="c"># 或 clientspecified，由客户端指定绑定地址</span>
+
+<span class="c"># 端口被占用时让服务器自动分配</span>
+ssh -N -R 0:127.0.0.1:3000 deploy@10.0.0.5
+<span class="c"># 加 -v 可以看到 "Allocated port 41234 for remote forward"</span></pre>
+  <h4>-D：一个 SOCKS5 代理，按目标动态转发</h4>
+  <pre><span class="c"># 在本地 1080 起一个 SOCKS5 代理，所有流量从 10.0.0.5 出去</span>
+ssh -N -D 1080 deploy@10.0.0.5
+
+<span class="c"># 命令行验证：看出口 IP 是不是服务器</span>
+curl --socks5-hostname 127.0.0.1:1080 https://ifconfig.me
+
+<span class="c"># git 走代理</span>
+git -c http.proxy=socks5h://127.0.0.1:1080 clone https://github.com/org/repo
+
+<span class="c"># 浏览器：设置 SOCKS5 代理为 127.0.0.1:1080，勾选"代理 DNS"</span>
+<span class="c"># 否则 DNS 仍在本地解析，会泄露你访问的域名</span></pre>
+  <div class="callout warn">
+    <b>三个容易忽略的边界：</b><br>
+    ① <span class="k">-L</span> 的目标地址是<b>从 SSH 服务端解析</b>的，不是从你本地解析。所以 <span class="k">-L 3306:db:3306</span> 里的 <span class="k">db</span> 要在服务器的网络里能解析。<br>
+    ② <span class="k">-R</span> 默认只绑远端的回环地址，<b>不开 <span class="k">GatewayPorts</span> 的话外网连不上</b>，这不是防火墙问题。<br>
+    ③ 转发是<b>明文进隧道、明文出隧道</b>：SSH 只保证中间那段加密，两端的应用协议本身没有加密。别以为套了 SSH 就万事大吉。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>跳板机与 ProxyJump</h2></div>
+  <p class="lead">生产环境的目标机通常没有公网 IP，只能从堡垒机进。有两种做法：先登录堡垒机再手动 ssh（麻烦），或者让 SSH 客户端自动完成两跳（推荐）。</p>
+  <pre><span class="c"># 最直接：-J 指定跳板</span>
+ssh -J jump@203.0.113.10 deploy@10.0.0.5
+
+<span class="c"># 多级跳转：按顺序经过 bastion1、bastion2</span>
+ssh -J alice@bastion1,alice@bastion2 deploy@10.0.0.5
+
+<span class="c"># 每一跳都可以单独指定密钥和端口</span>
+ssh -J alice@bastion1:2222,bob@bastion2 deploy@10.0.0.5
+
+<span class="c"># 写进 config 后，日常只需要 ssh db</span>
+<span class="b">Host</span> db
+  <span class="b">HostName</span> 10.0.0.5
+  <span class="b">User</span> deploy
+  <span class="b">ProxyJump</span> alice@bastion1,alice@bastion2
+
+<span class="c"># 等价的旧写法：ProxyCommand（OpenSSH 7.3 之前没有 -J）</span>
+<span class="b">ProxyCommand</span> ssh -W %h:%p bastion
+<span class="c"># %h = 目标主机，%p = 目标端口</span>
+<span class="c"># -W 表示把 stdio 转发到目标的 host:port</span></pre>
+  <h4>ProxyJump 和 agent 转发的区别</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>ProxyJump</th><th>ssh -A（agent 转发）</th></tr>
+    <tr><td>跳板机上有没有你的私钥</td><td><b>没有</b>，只转发 TCP 字节流</td><td>私钥不在，但 <b>agent socket 在</b>，可被借用</td></tr>
+    <tr><td>跳板机被入侵的风险</td><td>低（只能看到加密流量）</td><td><b>高</b>（攻击者可以用你的身份连其他机器）</td></tr>
+    <tr><td>能否用不同密钥连每一跳</td><td>可以</td><td>通常共用 agent 里的钥匙</td></tr>
+    <tr><td>适用</td><td><b>默认选择</b></td><td>只在确实需要"从 B 再用我的身份连 C"时</td></tr>
+  </table>
+  <pre><span class="c"># 验证跳转链路：-v 会打印每一跳的握手</span>
+ssh -v -J jump@203.0.113.10 deploy@10.0.0.5
+
+<span class="c"># 常见失败：跳板机上没有目标机的 known_hosts，会卡在 yes/no</span>
+<span class="c"># 这时确认指纹后，在跳板机上先手动连一次，或者用 accept-new</span>
+ssh -o StrictHostKeyChecking=accept-new -J bastion deploy@10.0.0.5
+
+<span class="c"># 也可以让 scp / rsync 走跳板</span>
+scp -J bastion ./app.tar.gz deploy@10.0.0.5:/opt/
+rsync -avz -e "ssh -J bastion" ./dist/ deploy@10.0.0.5:/opt/dist/</pre>
+  <div class="callout ok">
+    <b>为什么 <span class="k">-J</span> 比"先 ssh 到堡垒机再 ssh"好：</b>后者会在堡垒机上留下你的私钥使用痕迹（如果你拷了钥匙），或者要求你在堡垒机上再输一次密码；而且 <span class="k">scp</span>、<span class="k">rsync</span>、<span class="k">git</span> 都没法直接复用。<span class="k">-J</span> 只做 TCP 层转发，<b>认证端到端发生在你和目标机之间</b>，堡垒机看不到内容，也不需要信任你的密钥。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>加固：把门关到只留一条缝</h2></div>
+  <p class="lead">一台暴露在公网的 22 端口，每天会收到几千到几万次撞库尝试。加固不是"可选优化"，是上线前的必做项。</p>
+  <pre><span class="c"># /etc/ssh/sshd_config.d/99-hardening.conf</span>
+<span class="c"># （Debian/Ubuntu 用 sshd_config.d/，RHEL 系确认 Include 指令是否存在）</span>
+
+<span class="b">PermitRootLogin</span> no                  <span class="c"># 禁止 root 直接登录，先建普通用户再 sudo</span>
+<span class="b">PasswordAuthentication</span> no          <span class="c"># 只允许公钥，彻底关掉密码撞库</span>
+<span class="b">KbdInteractiveAuthentication</span> no
+<span class="b">PubkeyAuthentication</span> yes
+<span class="b">PermitEmptyPasswords</span> no
+
+<span class="b">AllowUsers</span> deploy alice            <span class="c"># 白名单，比 AllowGroups 更细</span>
+<span class="b">MaxAuthTries</span> 3                      <span class="c"># 一次连接最多试 3 把钥匙</span>
+<span class="b">LoginGraceTime</span> 20                   <span class="c"># 20 秒内没完成认证就断开</span>
+<span class="b">MaxStartups</span> 10:30:60                <span class="c"># 限制并发未认证连接，缓解暴力破解</span>
+
+<span class="b">X11Forwarding</span> no
+<span class="b">AllowAgentForwarding</span> no
+<span class="b">AllowTcpForwarding</span> no               <span class="c"># 不需要隧道就关掉；需要时改成 local 或 yes</span>
+<span class="b">PermitTunnel</span> no
+
+<span class="b">ClientAliveInterval</span> 60
+<span class="b">ClientAliveCountMax</span> 3
+
+<span class="b">UsePAM</span> yes
+<span class="b">LogLevel</span> VERBOSE</pre>
+  <pre><span class="c"># 改完必须验证语法，否则重启后可能再也连不上</span>
+sshd -t
+<span class="c"># 再重启（先确保当前会话不要断，另开一个窗口测试）</span>
+systemctl reload sshd      <span class="c"># Debian/Ubuntu 服务名可能是 ssh</span>
+
+<span class="c"># 关键：改配置前先给自己留后路</span>
+<span class="c"># 1. 保持一个已登录的会话不要关</span>
+<span class="c"># 2. 用第二个终端测试新连接</span>
+<span class="c"># 3. 云主机确认控制台 / VNC 可用</span></pre>
+  <h4>authorized_keys 的四个限制项</h4>
+  <pre><span class="c"># 在公钥前面加逗号分隔的选项，只对这一把钥匙生效</span>
+<span class="b">from</span>="10.0.0.0/8,*.corp.example.com",<span class="b">command</span>="/usr/local/bin/backup.sh",<span class="b">restrict</span> ssh-ed25519 AAAA... alice@laptop
+
+<span class="c"># 逐项解释</span>
+<span class="b">from=</span>"..."         <span class="c"># 只接受来自这些 IP / 网段的连接（支持 CIDR 和通配符）</span>
+<span class="b">command=</span>"..."      <span class="c"># 强制登录后只执行这条命令，忽略客户端请求的 shell / 命令</span>
+<span class="b">restrict</span>             <span class="c"># 关闭所有转发能力（端口、agent、X11、pty）</span>
+<span class="b">no-pty</span>               <span class="c"># 不分配终端，只能跑非交互命令</span>
+<span class="b">permitopen=</span>"db:5432" <span class="c"># 只允许转发到这一个目标</span>
+<span class="b">expiry-time=</span>"20261231"  <span class="c"># 过期时间，到点自动失效</span>
+<span class="b">environment=</span>"A=1"    <span class="c"># 注入环境变量</span>
+
+<span class="c"># 验证某个 key 的选项是否生效</span>
+<span class="c"># 服务端日志里会显示：Accepted publickey for deploy ... </span></pre>
+  <div class="callout warn">
+    <b><span class="k">command=</span> 不是沙箱。</b>它只限制"登录后默认执行什么"，如果脚本本身有命令注入、或者允许传参，仍然可能被利用。真正的限制要靠<b>独立的系统用户 + 文件系统权限 + SELinux/AppArmor</b>。<br>
+    同理，<span class="k">from=</span> 依赖源 IP，在 NAT 或负载均衡后面可能全部变成同一个地址，白名单就失效了。
+  </div>
+  <h4>fail2ban：把撞库的 IP 关进小黑屋</h4>
+  <pre><span class="c"># /etc/fail2ban/jail.d/sshd.local</span>
+[sshd]
+enabled  = true
+port     = ssh
+filter   = sshd
+logpath  = /var/log/auth.log      <span class="c"># RHEL 系是 /var/log/secure</span>
+maxretry = 5                      <span class="c"># 5 次失败</span>
+findtime = 10m                    <span class="c"># 10 分钟内</span>
+bantime  = 1h                     <span class="c"># 封 1 小时</span>
+
+<span class="c"># 生效与查看</span>
+systemctl restart fail2ban
+fail2ban-client status sshd
+fail2ban-client set sshd unbanip 203.0.113.77
+
+<span class="c"># 注意：fail2ban 读的是日志。如果 sshd 没记失败日志（LogLevel 太低），它什么也看不到</span></pre>
+  <div class="callout danger">
+    <b>加固的顺序错了会把自己锁在门外。</b>正确顺序：<br>
+    ① 先确认公钥登录可用（<span class="k">ssh -o PreferredAuthentications=publickey</span>）；<br>
+    ② 再关密码登录；③ 再关 root 登录；④ 最后才改端口 / 上防火墙。<br>
+    每一步都用<b>另一个终端</b>验证，并且保留当前会话。<b>永远不要在一次操作里同时改端口和关密码</b> —— 一旦出错，只能去机房或云控制台。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>四类高频故障</h2></div>
+  <h4>1. Permissions 0644：权限太开放被拒</h4>
+  <pre><span class="r">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+<span class="r">@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @</span>
+<span class="r">@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@</span>
+Permissions 0644 for '/home/alice/.ssh/id_ed25519' are too open.
+
+<span class="c"># 修复</span>
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+chmod 600 ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/config
+
+<span class="c"># 服务端还有更隐蔽的一条：家目录不能对组可写</span>
+<span class="c"># 报错：Authentication refused: bad ownership or modes for directory /home/deploy</span>
+chmod g-w,o-w /home/deploy</pre>
+  <h4>2. 连接超时</h4>
+  <table>
+    <tr><th style="width:170px">现象</th><th>可能原因</th><th>怎么确认</th></tr>
+    <tr><td>卡在 <span class="k">Connecting to ...</span> 很久</td><td>防火墙丢包（DROP 而不是 REJECT）</td><td><span class="k">nc -vz -w 3 host 22</span>；<span class="k">traceroute -T -p 22 host</span></td></tr>
+    <tr><td>立刻 <span class="k">Connection refused</span></td><td>端口没监听，或 REJECT</td><td><span class="k">ss -lntp | grep :22</span>；<span class="k">systemctl status sshd</span></td></tr>
+    <tr><td>能连但很慢才出密码提示</td><td>服务端反向 DNS 解析超时</td><td>sshd_config 里 <span class="k">UseDNS no</span></td></tr>
+    <tr><td>登录后卡住</td><td>shell 启动脚本里有阻塞操作，或磁盘满</td><td>换 <span class="k">ssh -t host bash --noprofile --norc</span></td></tr>
+  </table>
+  <pre><span class="c"># 分层排查，不要一上来就重启 sshd</span>
+ping -c 2 10.0.0.5                 <span class="c"># 1. 网络可达？</span>
+nc -vz -w 3 10.0.0.5 22            <span class="c"># 2. 端口通？</span>
+ssh -vvv deploy@10.0.0.5           <span class="c"># 3. 卡在哪个阶段？</span>
+<span class="c"># 输出里重点看：</span>
+<span class="c">#   debug1: Connecting to ... port 22.</span>
+<span class="c">#   debug1: kex: algorithm: ...</span>
+<span class="c">#   debug1: Authentications that can continue: publickey</span>
+<span class="c">#   debug1: Offering public key: ...</span>
+<span class="c">#   debug1: Server accepts key: ...</span></pre>
+  <h4>3. host key 变更</h4>
+  <pre><span class="c"># 先看新指纹，和服务器控制台上的一致吗</span>
+ssh-keyscan -t ed25519 10.0.0.5 2&gt;/dev/null | ssh-keygen -lf -
+
+<span class="c"># 确认是重装 / 换机后，删掉旧记录</span>
+ssh-keygen -R 10.0.0.5
+<span class="c"># 如果 known_hosts 里是哈希条目，-R 也能处理</span>
+
+<span class="c"># 顺便清掉 IP 在 known_hosts 里的其他形式（比如 [host]:port）</span>
+ssh-keygen -R "[10.0.0.5]:2222"</pre>
+  <h4>4. agent 转发失效</h4>
+  <pre><span class="c"># 症状：在跳板机上 git clone 提示 Permission denied (publickey)</span>
+
+<span class="c"># 第一步：确认本地 agent 有钥匙</span>
+ssh-add -l
+
+<span class="c"># 第二步：确认转发开了（客户端）</span>
+ssh -A deploy@10.0.0.5
+<span class="c"># 或在 config 里：ForwardAgent yes（只对特定 Host 开）</span>
+
+<span class="c"># 第三步：确认服务端允许</span>
+grep -i AllowAgentForwarding /etc/ssh/sshd_config
+<span class="c"># 必须是 yes（默认是 yes，但加固时经常被关掉）</span>
+
+<span class="c"># 第四步：在远端看 socket 在不在</span>
+echo $SSH_AUTH_SOCK
+ssh-add -l
+
+<span class="c"># 第五步：sudo 之后失效 —— sudo 默认会清环境变量</span>
+sudo -E ssh-add -l       <span class="c"># 保留环境</span>
+<span class="c"># 或者 sudo 里配 env_keep += "SSH_AUTH_SOCK"</span></pre>
+  <div class="callout">
+    <b>排查 SSH 的通用方法：<span class="k">-v</span> 看流程，<span class="k">-vv</span> 看算法，<span class="k">-vvv</span> 看每一个字节。</b>大部分"玄学问题"在 <span class="k">-vvv</span> 的输出里都有明确的一行。服务端对应的是 <span class="k">/var/log/auth.log</span>（Debian 系）或 <span class="k">/var/log/secure</span>（RHEL 系），把两边的时间对齐看，比猜快得多。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>保持连接：别让会话莫名其妙断掉</h2></div>
+  <p class="lead">"SSH 过几分钟就断"几乎不是 SSH 的问题，而是<b>中间的网络设备（NAT、防火墙、负载均衡）清理了空闲连接表项</b>。两端都以为连接还在，实际上已经不通了。</p>
+  <table>
+    <tr><th style="width:190px">机制</th><th style="width:120px">在哪一端</th><th>作用与边界</th></tr>
+    <tr><td class="f">ServerAliveInterval</td><td>客户端</td><td>每隔 N 秒发一个加密的空包。<b>能穿过 NAT</b>，因为它是应用层数据</td></tr>
+    <tr><td class="f">ServerAliveCountMax</td><td>客户端</td><td>连续 N 次没响应就断开（默认 3）。所以总超时 ≈ Interval × CountMax</td></tr>
+    <tr><td class="f">ClientAliveInterval</td><td>服务端</td><td>服务端主动问客户端"还活着吗"。适合"客户端不配 keepalive"的场景</td></tr>
+    <tr><td class="f">TCPKeepAlive</td><td>内核</td><td><b>只能检测对端主机是否宕机，不能防止 NAT 表项过期</b>，因为保活包可能被中间设备丢弃或不转发</td></tr>
+    <tr><td class="f">ControlPersist</td><td>客户端</td><td>复用连接，减少重复握手；不是保活机制</td></tr>
+  </table>
+  <pre><span class="c"># 客户端：写进 ~/.ssh/config 的 Host * 块</span>
+<span class="b">ServerAliveInterval</span> 30
+<span class="b">ServerAliveCountMax</span> 3
+<span class="c"># 效果：90 秒内没响应才断开；期间每 30 秒有一个小包，NAT 不会清理表项</span>
+
+<span class="c"># 服务端：/etc/ssh/sshd_config</span>
+<span class="b">ClientAliveInterval</span> 60
+<span class="b">ClientAliveCountMax</span> 3
+<span class="c"># 效果：服务端每 60 秒探测一次，3 次无响应就释放会话</span>
+
+<span class="c"># 临时用（不改配置）</span>
+ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 deploy@10.0.0.5</pre>
+  <h4>mosh：为高延迟和移动网络设计的替代品</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th>SSH</th><th>mosh</th></tr>
+    <tr><td>传输层</td><td>TCP</td><td><b>UDP</b>（默认 60000-61000）</td></tr>
+    <tr><td>断线恢复</td><td>连接断了就没了，要重连</td><td><b>换 IP、切 Wi-Fi、休眠唤醒后自动恢复</b></td></tr>
+    <tr><td>输入延迟</td><td>每次按键要等服务端回显</td><td><b>本地预测回显</b>，高延迟下体验明显更好</td></tr>
+    <tr><td>端口转发</td><td>支持</td><td><b>不支持</b></td></tr>
+    <tr><td>认证</td><td>完整的 SSH</td><td>先用 SSH 登录，再由 mosh 接管会话</td></tr>
+  </table>
+  <pre><span class="c"># 安装（两端都要）</span>
+apt install mosh        <span class="c"># 或 yum install mosh</span>
+
+<span class="c"># 使用：先走 SSH 认证，然后切到 UDP</span>
+mosh deploy@10.0.0.5
+
+<span class="c"># 指定端口范围（防火墙要放行 UDP）</span>
+mosh --server="mosh-server new -p 60001:60100" deploy@10.0.0.5
+
+<span class="c"># 注意：mosh 不保持 SSH 会话本身，它接管的是一个 shell</span>
+<span class="c"># 所以 mosh + tmux 才是完整方案：mosh 抗网络抖动，tmux 抗进程被杀</span></pre>
+  <div class="callout ok">
+    <b>远程开发的标准组合：</b><br>
+    <span class="k">ssh → tmux new -s work</span>，所有长任务跑在 tmux 里。断线后重新 <span class="k">ssh</span>，再 <span class="k">tmux attach -t work</span>，现场原样恢复。<br>
+    如果网络本身很差（跨国、4G、频繁切换网络），把 <span class="k">ssh</span> 换成 <span class="k">mosh</span>，但<b>仍然在里面跑 tmux</b> —— 两者解决的是不同层的问题，不能互相替代。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>九个真实踩过的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">私钥权限是 644</div><div class="pd">客户端直接拒绝使用这把钥匙，报 <span class="k">UNPROTECTED PRIVATE KEY FILE</span>。执行 <span class="k">chmod 600 ~/.ssh/id_*</span>，目录 <span class="k">chmod 700 ~/.ssh</span>。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">看到 host key 变更就删 known_hosts</div><div class="pd">这等于关掉了中间人防护。先带外确认指纹，再 <span class="k">ssh-keygen -R</span>。把 <span class="k">StrictHostKeyChecking</span> 设成 no 是更糟的做法。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">在 config 里把 <span class="k">Host *</span> 写在最前面</div><div class="pd">SSH 是"第一个匹配到的值生效"，<span class="k">Host *</span> 放前面会吃掉所有默认值，后面的具体配置反而不生效。通配块永远放末尾。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">多把密钥时不写 <span class="k">IdentitiesOnly yes</span></div><div class="pd">客户端会把 agent 里的钥匙挨个试一遍，超过服务端 <span class="k">MaxAuthTries</span>（默认 6）就被拒，报 <span class="k">Too many authentication failures</span>。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 <span class="k">ssh -A</span> 做日常跳板</div><div class="pd">跳板机上的 root 可以借用你的 agent 登录其他机器。默认用 <span class="k">ProxyJump</span>，只在确有必要时开转发，并配合 <span class="k">ssh-add -c</span>。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为 <span class="k">-R</span> 配好就能被外网访问</div><div class="pd">服务端默认只在 127.0.0.1 监听。要外部可达，sshd_config 必须开 <span class="k">GatewayPorts yes</span>，同时防火墙放行。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">一次操作里同时改端口 + 关密码登录</div><div class="pd">配错了就彻底失去访问，只能去云控制台。加固要分步做，每一步用另一个终端验证，并保留当前会话。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把 <span class="k">TCPKeepAlive</span> 当成防断线手段</div><div class="pd">它是内核级探测，保活包可能被 NAT 丢弃，防不住表项过期。要用应用层的 <span class="k">ServerAliveInterval</span>。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">私钥被提交进了 Git</div><div class="pd">即使后来删掉，历史里仍然有。立刻从所有 <span class="k">authorized_keys</span> 移除对应公钥、换新密钥，并检查服务器日志有没有异常登录。<b>预防靠 .gitignore + 提交前扫描。</b></div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 公钥认证过程中，私钥会在什么时候传给服务器？</div>
+      <button class="opt">登录时一次性传给服务器，服务器保存后用于后续认证</button>
+      <button class="opt">永远不传。服务器用公钥加密挑战，客户端用私钥签名，服务器验签</button>
+      <button class="opt">只在第一次连接时传，之后靠会话密钥</button>
+      <div class="ans">正确答案：<b>永远不传</b>。这是公钥认证的核心：私钥只在客户端本地参与运算。所以 <span class="k">authorized_keys</span> 泄露不会导致别人能登录，但私钥泄露等于身份被盗。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. <span class="k">known_hosts</span> 的作用是？</div>
+      <button class="opt">记录允许登录的用户名</button>
+      <button class="opt">缓存服务器的 IP，加快连接</button>
+      <button class="opt">保存服务器的 host key，下次连接时比对，防止中间人</button>
+      <div class="ans">正确答案：<b>第三项</b>。密钥交换只能保证信道不被窃听，不能证明对面是谁。host key 的比对补上了这一环，所以"变更告警"必须认真对待。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 要把远端只能内网访问的 MySQL（127.0.0.1:3306）映射到本地 13306，用？</div>
+      <button class="opt">ssh -N -L 13306:127.0.0.1:3306 user@server</button>
+      <button class="opt">ssh -N -R 13306:127.0.0.1:3306 user@server</button>
+      <button class="opt">ssh -N -D 13306 user@server</button>
+      <div class="ans">正确答案：<b>-L</b>。本地转发：在你的机器上监听 13306，流量经 SSH 到服务器，再由服务器连它的 127.0.0.1:3306。<span class="k">-R</span> 方向相反，<span class="k">-D</span> 是 SOCKS 代理。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于 <span class="k">ProxyJump</span> 和 <span class="k">ssh -A</span>，哪个说法对？</div>
+      <button class="opt">两者等价，都是通过跳板机连接</button>
+      <button class="opt">ProxyJump 只转发 TCP，不把 agent 暴露给跳板机，更安全</button>
+      <button class="opt">ssh -A 更安全，因为私钥不离开本机</button>
+      <div class="ans">正确答案：<b>第二项</b>。<span class="k">-A</span> 虽然不复制私钥，但把 agent socket 暴露在跳板机上，root 可以借用它。ProxyJump 只做字节流转发，认证端到端完成。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 客户端报 <span class="k">Permissions 0644 ... are too open</span>，应该？</div>
+      <button class="opt">改成 777，保证能读</button>
+      <button class="opt">把私钥移到 /tmp</button>
+      <button class="opt">chmod 600 私钥，chmod 700 ~/.ssh</button>
+      <div class="ans">正确答案：<b>第三项</b>。SSH 要求私钥只有属主可读写，目录只有属主可访问。放宽权限会被直接拒绝，这是保护机制不是 bug。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 想防止 SSH 会话被 NAT 超时断开，最有效的是？</div>
+      <button class="opt">客户端设 ServerAliveInterval 30</button>
+      <button class="opt">客户端设 TCPKeepAlive yes</button>
+      <button class="opt">把端口从 22 改成 2222</button>
+      <div class="ans">正确答案：<b>ServerAliveInterval</b>。它在应用层定期发加密空包，能穿过 NAT 并刷新表项。TCPKeepAlive 是内核级探测，保活包可能被中间设备丢弃，防不住表项过期。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>ssh-keygen -t ed25519 -a 100 -C "note"</code><span class="desc">生成现代密钥</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh-copy-id -i ~/.ssh/id_ed25519.pub user@host</code><span class="desc">安装公钥到目标机</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh-keygen -lf key.pub</code><span class="desc">查看密钥指纹</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh-keygen -R host</code><span class="desc">删除 known_hosts 里的旧记录</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh-add -l</code><span class="desc">列出 agent 里已加载的密钥</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh-add -t 3600 key</code><span class="desc">加载密钥并设置 1 小时过期</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -G host</code><span class="desc">打印最终生效的完整配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -vvv user@host</code><span class="desc">逐阶段调试连接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -N -L 13306:127.0.0.1:3306 user@host</code><span class="desc">本地转发，访问远端内网服务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -N -R 8080:127.0.0.1:3000 user@host</code><span class="desc">远程转发，把本地服务推给远端</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -N -D 1080 user@host</code><span class="desc">动态转发，起一个 SOCKS5 代理</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -J bastion user@target</code><span class="desc">经跳板机连接目标</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ssh -O exit host</code><span class="desc">关闭复用的连接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sshd -t</code><span class="desc">校验 sshd 配置语法</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nc -vz -w 3 host 22</code><span class="desc">测端口是否可达</span><button class="copy">复制</button></div>
+    <div class="crow"><code>fail2ban-client status sshd</code><span class="desc">查看被封禁的 IP</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mosh user@host</code><span class="desc">高延迟 / 移动网络下的替代方案</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>一份客户端 config 模板</h3>
+  <pre><span class="b">Host</span> *
+  <span class="b">ServerAliveInterval</span> 30
+  <span class="b">ServerAliveCountMax</span> 3
+  <span class="b">AddKeysToAgent</span> yes
+  <span class="b">HashKnownHosts</span> yes
+  <span class="b">IdentitiesOnly</span> yes
+
+<span class="b">Host</span> bastion
+  <span class="b">HostName</span> 203.0.113.10
+  <span class="b">User</span> jump
+  <span class="b">IdentityFile</span> ~/.ssh/id_ed25519_jump
+
+<span class="b">Host</span> web
+  <span class="b">HostName</span> 10.0.0.5
+  <span class="b">User</span> deploy
+  <span class="b">Port</span> 2222
+  <span class="b">IdentityFile</span> ~/.ssh/id_ed25519_web
+  <span class="b">ProxyJump</span> bastion
+
+<span class="b">Host</span> db
+  <span class="b">HostName</span> db.internal
+  <span class="b">User</span> dba
+  <span class="b">ProxyJump</span> bastion
+  <span class="b">LocalForward</span> 13306:127.0.0.1:3306</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>host key</b></td><td>服务器自己的长期密钥对，用于向客户端证明"我是这台机器"</td></tr>
+    <tr><td><b>known_hosts</b></td><td>客户端保存的服务器 host key 列表，变更时告警</td></tr>
+    <tr><td><b>KEX</b></td><td>Key Exchange，密钥交换。双方在不安全信道上协商出会话密钥</td></tr>
+    <tr><td><b>前向保密</b></td><td>每次会话用临时密钥，长期私钥泄露也解不开历史流量</td></tr>
+    <tr><td><b>公钥认证</b></td><td>服务器用公钥加密挑战，客户端用私钥签名，私钥不出本机</td></tr>
+    <tr><td><b>ed25519</b></td><td>现代椭圆曲线签名算法，密钥短、速度快，默认首选</td></tr>
+    <tr><td><b>passphrase</b></td><td>保护私钥文件的口令，防止文件泄露后被直接使用</td></tr>
+    <tr><td><b>ssh-agent</b></td><td>内存中持有已解密私钥的守护进程，免去重复输口令</td></tr>
+    <tr><td><b>agent 转发</b></td><td>把 agent socket 暴露到远端，方便跳转，但有被借用风险</td></tr>
+    <tr><td><b>本地转发 -L</b></td><td>本机监听端口，流量经 SSH 发往远端网络</td></tr>
+    <tr><td><b>远程转发 -R</b></td><td>远端监听端口，流量经 SSH 发回本机</td></tr>
+    <tr><td><b>动态转发 -D</b></td><td>本机起 SOCKS 代理，按目标动态决定连哪里</td></tr>
+    <tr><td><b>ProxyJump</b></td><td>只做 TCP 转发的多级跳转，不暴露 agent</td></tr>
+    <tr><td><b>堡垒机</b></td><td>唯一允许从公网进入的跳板主机，集中审计</td></tr>
+    <tr><td><b>authorized_keys</b></td><td>服务端允许登录的公钥列表，可带 from / command 等限制</td></tr>
+    <tr><td><b>fail2ban</b></td><td>读日志，按失败次数自动封禁来源 IP</td></tr>
+    <tr><td><b>ServerAliveInterval</b></td><td>客户端定期发保活包，防止 NAT 表项过期</td></tr>
+    <tr><td><b>mosh</b></td><td>基于 UDP 的移动 shell，抗断线和漫游，但不支持端口转发</td></tr>
+    <tr><td><b>ControlMaster</b></td><td>连接复用，多条会话共享同一条 TCP，省掉重复握手</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 生成一对 ed25519 密钥，加口令，用 ssh-agent 加载；② 写一份 config，给两台机器配别名和不同密钥；③ 用 <span class="k">-L</span> 把一台机器的 3306 映射到本地并连上去；④ 用 <span class="k">-J</span> 穿过一台跳板机；⑤ 在测试机上关掉密码登录，用另一个终端验证，再故意把权限改成 644 看报错。<br><br>
+    <b>之后值得单独学：</b>SSH 证书（用 CA 签发短期证书，替代到处分发 authorized_keys）、<span class="k">sshd_config</span> 的 Match 块做按用户/来源的差异化策略、以及基于硬件的 <span class="k">ed25519-sk</span> 密钥。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 SSH · 默认公钥登录、默认走 ProxyJump、默认不开 agent 转发</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（端口转发）和模块 6（加固）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 开两个终端，一个连、一个改配置。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开两台机器（或一台 + 本地回环）跟着敲 —— 隧道和跳板不动手是学不会的';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

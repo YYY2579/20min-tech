@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透分库分表</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 10 期 · 高密度版</span>
+    <h1>二十分钟学透分库分表</h1>
+    <p class="sub">分库分表本身不难，难在<b>拆完之后不出事</b>：扩容不抖动、ID 不冲突、跨分片查询不把内存打爆、迁移可回滚。这篇按"什么时候拆 → 怎么拆 → 拆完怎么办"的顺序讲。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种分片算法</span>
+      <span class="chip"><b>4</b> 种分布式事务方案</span>
+      <span class="chip"><b>3</b> 种扩容路线</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 MySQL 8.0 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起一个 MySQL 8.0</span>
+docker run -d -p 3306:3306 --name mysql8 -e MYSQL_ROOT_PASSWORD=root mysql:8.0
+
+<span class="c"># 连上去</span>
+docker exec -it mysql8 mysql -uroot -proot
+
+<span class="c"># 造一张千万级的订单表（后面所有模块都用它）</span>
+<span class="b">CREATE TABLE</span> t_order (
+  order_id     <span class="y">BIGINT</span>      <span class="b">NOT NULL</span>,
+  user_id      <span class="y">BIGINT</span>      <span class="b">NOT NULL</span>,
+  amount       <span class="y">DECIMAL</span>(10,2) <span class="b">NOT NULL</span>,
+  status       <span class="y">TINYINT</span>     <span class="b">NOT NULL</span> <span class="b">DEFAULT</span> 0,
+  create_time  <span class="y">DATETIME</span>    <span class="b">NOT NULL</span>,
+  <span class="b">PRIMARY KEY</span> (order_id),
+  <span class="b">KEY</span> idx_user (user_id)
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c"># 用存储过程灌 1000 万行（约 2~5 分钟）</span>
+<span class="b">DELIMITER</span> //
+<span class="b">CREATE PROCEDURE</span> proc_fill(IN n <span class="y">INT</span>)
+<span class="b">BEGIN</span>
+  <span class="b">DECLARE</span> i <span class="y">INT</span> <span class="b">DEFAULT</span> 0;
+  <span class="b">START TRANSACTION</span>;
+  <span class="b">WHILE</span> i &lt; n <span class="b">DO</span>
+    <span class="b">INSERT INTO</span> t_order <span class="b">VALUES</span> (i+1, <span class="b">FLOOR</span>(<span class="b">RAND</span>()*1000000), <span class="b">ROUND</span>(<span class="b">RAND</span>()*1000,2), <span class="b">FLOOR</span>(<span class="b">RAND</span>()*4), <span class="b">NOW</span>(3) - <span class="b">INTERVAL</span> <span class="b">FLOOR</span>(<span class="b">RAND</span>()*365) <span class="b">DAY</span>);
+    <span class="b">SET</span> i = i + 1;
+  <span class="b">END WHILE</span>;
+  <span class="b">COMMIT</span>;
+<span class="b">END</span> //
+<span class="b">DELIMITER</span> ;
+
+<span class="b">CALL</span> proc_fill(10000000);
+<span class="b">ANALYZE TABLE</span> t_order;   <span class="c">-- 更新统计信息，优化器选索引要用</span></pre>
+  <div class="callout warn">
+    <b>先说结论：</b>分库分表是<b>单向门</b>——拆完之后，SQL 写法、事务边界、运维方式全变，而且几乎拆不回去。所以先用这一节的表把"是不是真该拆"想清楚，别急着动手。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>什么时候必须分：四个硬信号</h2></div>
+  <p class="lead">拆分的触发条件不是"表变大了"，而是下面四个信号里<b>至少命中两个</b>。只看数据量很容易过度设计。</p>
+  <table>
+    <tr><th style="width:150px">信号</th><th style="width:200px">经验阈值</th><th>为什么是它</th></tr>
+    <tr><td><b>单表行数</b></td><td>&gt; 1000 万行<br>（保守 500 万，激进 3000 万）</td><td>InnoDB 二级索引 B+ 树到 3~4 层，且 DDL（加字段/加索引）变更锁表时间从秒级涨到小时级，备份恢复时间同步变长</td></tr>
+    <tr><td><b>单库连接数</b></td><td>活跃连接 &gt; 500<br>（MySQL 默认 max_connections=151）</td><td>连接是内存 + 线程，云 RDS 的连接配额通常更小；连接打满后表现为"间歇性连不上"</td></tr>
+    <tr><td><b>写 QPS</b></td><td>持续 &gt; 5000<br>（单机写瓶颈经验值）</td><td>单机写受 redo/undo 刷盘、行锁竞争、purge 线程限制，加从库不解决写入</td></tr>
+    <tr><td><b>单实例数据量</b></td><td>&gt; 500 GB</td><td>mysqldump 备份要 2~4 小时；xtrabackup 物理备份 30~60 分钟起；<b>恢复时间（RTO）超出业务容忍</b></td></tr>
+  </table>
+  <h4>一组可对照的算术</h4>
+  <pre><span class="c"># 1000 万行 × 行大小 1KB ≈ 10GB 数据</span>
+<span class="c"># 二级索引 idx_user：每条约 20B（8B user_id + 8B 主键 + 页开销）→ 约 200MB，树高 3 层</span>
+<span class="c"># 行大小涨到 4KB（宽表含 text）：1000 万行 ≈ 40GB，一页 16KB 只放 4 行，页分裂更频繁</span></pre>
+  <div class="callout ok">
+    <b>拆之前的三条捷径（按优先级排序）：</b><br>
+    ① <b>读扩散</b>：加从库做读写分离，读 QPS 问题先不拆；<br>
+    ② <b>归档</b>：3 个月前的完成订单搬到历史库/冷存储，主表瘦身 70% 很常见，很多"该拆表"的团队其实只是没归档；<br>
+    ③ <b>垂直拆分优先于水平拆分</b>：把大字段（text/blob）和低频字段拆到扩展表，成本低、收益立竿见影。<br>
+    以上都不见效，再上分库分表。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>垂直拆分 vs 水平拆分</h2></div>
+  <p class="lead">两个词只差一个字，但拆的对象、解决的问题、引入的麻烦完全不同。<b>90% 的场景应该先垂直拆，水平拆是最后手段。</b></p>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:250px">垂直拆分</th><th>水平拆分（分库分表）</th></tr>
+    <tr><td><b>拆什么</b></td><td>列 / 表：按业务域或字段访问频率拆</td><td>行：按分片键把数据行分散到多库多表</td></tr>
+    <tr><td><b>解决什么</b></td><td>库内表耦合、单库连接数耗尽、大字段拖慢整行扫描</td><td>单表行数过大、单库容量/写入并发上限</td></tr>
+    <tr><td><b>不解决什么</b></td><td>单表 2000 万行照样慢</td><td>跨分片查询变复杂（这是代价不是收益）</td></tr>
+    <tr><td><b>引入复杂度</b></td><td>跨库 JOIN、跨库事务（可用最终一致）</td><td>分片键设计、跨分片查询/分页/聚合、全局 ID、分布式事务、扩容迁移</td></tr>
+    <tr><td><b>典型动作</b></td><td>用户库 / 订单库 / 支付库分离；text 字段拆扩展表</td><td>t_order 按 user_id % 16 拆成 16 张表 / 2 个库</td></tr>
+    <tr><td><b>回退成本</b></td><td>低：合并回单库即可</td><td><b>极高：基本不可逆</b></td></tr>
+  </table>
+  <pre><span class="c">-- ===== 垂直拆分的两种形态 =====</span>
+
+<span class="c">-- 形态一：按业务域分库（微服务化同步进行）</span>
+db_user    <span class="c">-- t_user, t_user_addr         用户域</span>
+db_order   <span class="c">-- t_order, t_order_item       交易域</span>
+db_pay     <span class="c">-- t_pay_flow, t_refund        支付域</span>
+
+<span class="c">-- 形态二：按访问频率拆表（冷热分离，最实用）</span>
+<span class="c">-- 拆前：宽表含 4KB text 详情，遍历 1000 万行 ≈ 40GB，一页 16KB 只放 4 行</span>
+<span class="b">CREATE TABLE</span> t_order (order_id <span class="y">BIGINT</span> <span class="b">PRIMARY KEY</span>, ..., detail <span class="y">TEXT</span>);  <span class="c">-- 行大小 4KB</span>
+<span class="c">-- 拆后：主表瘦身到 200B/行，一页放 16 行</span>
+<span class="b">CREATE TABLE</span> t_order (...);            <span class="c">-- 高频字段</span>
+<span class="b">CREATE TABLE</span> t_order_ext (order_id <span class="y">BIGINT</span> <span class="b">PRIMARY KEY</span>, detail <span class="y">TEXT</span>, invoice <span class="y">TEXT</span>);  <span class="c">-- 低频字段，详情页才 JOIN</span></pre>
+  <div class="callout danger">
+    <b>垂直拆分的头号坑：拆完之后原来一个本地事务变成两个库的分布式事务。</b>订单创建要同时写 db_order 和 db_pay，本地事务失效。<b>缓解手段：</b>① 合并写入方（同一服务内串行调用 + 最终一致）；② 能用消息补偿就别上 XA；③ 对强一致场景，评估是否根本不拆这两个库。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>四种分片算法</h2></div>
+  <p class="lead">分片算法回答一个问题：一条 order_id=12345 的数据，该去哪个库哪张表？选错算法，扩容时就要重写全量数据。</p>
+  <table>
+    <tr><th style="width:120px">算法</th><th style="width:230px">路由方式</th><th style="width:170px">优点</th><th>缺点</th></tr>
+    <tr><td><b>哈希取模</b></td><td class="f">db = key % 16</td><td>数据最均匀，无热点</td><td><b>扩容最痛苦</b>：16→32 库时 100% 数据要重新哈希迁移</td></tr>
+    <tr><td><b>范围分片</b></td><td class="f">order_id ∈ [0,1000w) → 库0</td><td>扩容友好（只迁边界后新增段）；范围查询天然命中单分片</td><td><b>尾部热点</b>：递增 ID 的写流量永远砸在最后一个分片</td></tr>
+    <tr><td><b>一致性哈希</b></td><td>key 映射到哈希环，归最近的节点</td><td>扩容只搬邻居约 1/N 的数据</td><td>节点少时严重倾斜，<b>必须配虚拟节点</b>；实现复杂</td></tr>
+    <tr><td><b>查表法</b></td><td>额外映射表：user_id → db_no</td><td>路由规则随时可改，支持按用户等级/地域定制</td><td>多一次查询（映射表自身要缓存 + 高可用）；映射表是单点</td></tr>
+  </table>
+  <h4>哈希取模 vs 范围分片：一张图看懂扩容代价</h4>
+  <pre><span class="c"># 取模：2 库扩 4 库，几乎所有 key 的归属都变了</span>
+order_id=100:  100 % 2  = 0 → 旧库0    100 % 4 = 0 → 新库0   <span class="g">(没搬)</span>
+order_id=101:  101 % 2  = 1 → 旧库1    101 % 4 = 1 → 新库1   <span class="g">(没搬)</span>
+order_id=102:  102 % 2  = 0 → 旧库0    102 % 4 = 2 → 新库2   <span class="r">(要搬)</span>
+order_id=103:  103 % 2  = 1 → 旧库1    103 % 4 = 3 → 新库3   <span class="r">(要搬)</span>
+<span class="c"># 结论：偶数库翻倍时约 75% 数据需要迁移（1/4 留下，3/4 搬走）</span>
+
+<span class="c"># 范围：2 库扩 4 库，只把"后半段"切一刀，前两个库不动</span>
+旧: [0,5000w) → 库0, [5000w,1亿) → 库1
+新: [0,2500w) → 库0, [2500w,5000w) → 库1, [5000w,7500w) → 库2, [7500w,1亿) → 库3
+<span class="c"># 只迁移了原库1的数据，且迁移期间可灰度切换路由规则</span></pre>
+  <h4>ShardingSphere 真实分片算法（5.x 内置 SPI）</h4>
+  <pre><span class="c"># 在 sharding-algorithms 里配置，以下均为官方内置类型</span>
+t_order_mod:            <span class="c"># MOD：整数取模</span>
+  type: MOD
+  props:
+    sharding-count: 16          <span class="c">-- 分 16 个逻辑单元</span>
+
+t_order_hash_mod:       <span class="c"># HASH_MOD：先哈希再取模，避免数字型 key 规律分布</span>
+  type: HASH_MOD
+  props:
+    sharding-count: 16
+
+t_order_range:          <span class="c"># BOUNDARY_RANGE：范围分片</span>
+  type: BOUNDARY_RANGE
+  props:
+    sharding-ranges: 1000000,5000000,10000000   <span class="c">-- 4 个区间 4 个分片</span>
+
+t_order_inline:         <span class="c"># INLINE：Groovy 表达式，最灵活</span>
+  type: INLINE
+  props:
+    algorithm-expression: t_order_$->{order_id % 16}
+    <span class="c">-- 库路由表达式：ds_$->{user_id % 2}</span>
+
+t_order_class_based:    <span class="c"># CLASS_BASED：自定义 SPI 实现类</span>
+  type: CLASS_BASED
+  props:
+    strategy: STANDARD
+    algorithmClassName: com.example.MyShardingAlgorithm</pre>
+  <div class="callout warn">
+    <b>算法选择的工程经验：</b><br>
+    ① 日订单量 &lt; 100 万且未来 3 年可控 → <b>哈希取模</b>，简单均匀，别为想象中的扩容提前付费；<br>
+    ② 按 user_id 分片是电商的默认答案（买家查订单是最高频路径，user_id 做分片键保证"我的订单"落单库）；<br>
+    ③ 范围分片只适合"按时间归档"的表（日志、流水），必须配好边界滚动策略，否则尾库必热；<br>
+    ④ <b>一致性哈希 + 虚拟节点主要用于缓存层和自研分库中间件</b>，用 ShardingSphere 的话，它的定位算法（MOD 系列）已经够用。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>分布式 ID：雪花算法与号段模式</h2></div>
+  <p class="lead">分库分表后 <span class="k">AUTO_INCREMENT</span> 彻底报废：多个库各自从 1 开始，主键直接冲突。必须换发号器。<b>雪花和号段占了生产环境的 95%</b>，其余是 UUID 和 Redis incr。</p>
+  <h4>雪花算法（Snowflake）的 64 bit 构成</h4>
+  <pre>┌─┬─────────────────────────────┬───────────────┬───────────────┐
+│0│        41 bit 时间戳         │  10 bit 机器号 │  12 bit 序列号 │
+│ │  毫秒级，可用 2^41 ms        │  2^10=1024 个  │ 2^12=4096 个   │
+│ │  ≈ 69.7 年                   │   工作节点     │  每毫秒每节点   │
+└─┴─────────────────────────────┴───────────────┴───────────────┘
+      ↑ 永远置 0，保证 ID 为正数
+
+<span class="c"># 容量算术（必须记住这组数）</span>
+单节点单毫秒最多：2^12 = <span class="g">4096</span> 个 ID
+单节点每秒最多：  4096 × 1000 = <span class="g">409.6 万</span> 个 ID
+全网最多：        409.6 万 × 1024 节点 ≈ <span class="g">41.9 亿</span> 个/秒
+总可用时长：      2^41 ms ≈ 69.7 年（从自定义纪元起算，如 2020-01-01）</pre>
+  <pre><span class="c"># 一个 Java 实现的时序部分（核心逻辑）</span>
+<span class="b">synchronized long</span> nextId() {
+  <span class="b">long</span> now = currentMillis();
+  <span class="b">if</span> (now &lt; lastTimestamp) {
+    <span class="c">// 时钟回拨：NTP 同步导致时间倒退</span>
+    <span class="b">throw new</span> RuntimeException(<span class="y">"Clock moved backwards"</span>); <span class="c">// 拒绝发号，阻塞等待</span>
+  }
+  <span class="b">if</span> (now == lastTimestamp) {
+    seq = (seq + 1) &amp; 4095;        <span class="c">// 同毫秒内序列号 +1，用位与实现取模循环</span>
+    <span class="b">if</span> (seq == 0) { now = waitNextMillis(); }  <span class="c">// 4096 个用完，自旋到下一毫秒</span>
+  } <span class="b">else</span> {
+    seq = 0;
+  }
+  lastTimestamp = now;
+  <span class="b">return</span> (now &lt;&lt; 22) | (workerId &lt;&lt; 12) | seq;   <span class="c">// 左移 22 = 10(机器) + 12(序列)</span>
+}</pre>
+  <h4>号段模式（Leaf/美团 segment 方案）</h4>
+  <pre><span class="c">-- 号段表：每个业务一行，一次取一段</span>
+<span class="b">CREATE TABLE</span> leaf_alloc (
+  biz_tag     <span class="y">VARCHAR</span>(64)  <span class="b">PRIMARY KEY</span>,
+  max_id      <span class="y">BIGINT</span>       <span class="b">NOT NULL</span>,
+  step        <span class="y">INT</span>         <span class="b">NOT NULL</span>,   <span class="c">-- 每次发放的号段长度，如 1000</span>
+  update_time <span class="y">TIMESTAMP</span>    <span class="b">DEFAULT</span> <span class="b">CURRENT_TIMESTAMP</span> <span class="b">ON UPDATE CURRENT_TIMESTAMP</span>
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c">-- 发号：一条 UPDATE 原子占用一个号段（利用行锁，天然互斥）</span>
+<span class="b">UPDATE</span> leaf_alloc <span class="b">SET</span> max_id = max_id + step <span class="b">WHERE</span> biz_tag = <span class="y">'order'</span>;
+<span class="b">SELECT</span> max_id, step <span class="b">FROM</span> leaf_alloc <span class="b">WHERE</span> biz_tag = <span class="y">'order'</span>;
+<span class="c">-- 拿到 [max_id, max_id+step)，在内存里逐个 +1 发放，发完再取下一段</span>
+
+<span class="c">-- 双 buffer 优化：内存常驻两个号段，后台线程提前异步加载下一段，</span>
+<span class="c">-- 当前段用到 10% 时触发加载，发号路径永不被 DB 延迟阻塞</span></pre>
+  <h4>四种方案横向对比</h4>
+  <table>
+    <tr><th style="width:110px">方案</th><th style="width:120px">趋势</th><th style="width:130px">DB 压力</th><th style="width:110px">性能</th><th>致命短板</th></tr>
+    <tr><td><b>雪花算法</b></td><td>大致递增（同节点）</td><td>零依赖</td><td>百万级/秒</td><td><b>时钟回拨</b>导致 ID 重复或发号阻塞</td></tr>
+    <tr><td><b>号段模式</b></td><td>递增但有跳跃</td><td>极低（一次取 1000）</td><td>百万级/秒</td><td>依赖 DB 可用性；号段浪费（重启丢未用完的段）</td></tr>
+    <tr><td><b>UUID</b></td><td>无序</td><td>零依赖</td><td>纳秒级</td><td>36 字符，索引膨胀 ~9 倍，页分裂严重，<b>不要做主键</b></td></tr>
+    <tr><td><b>Redis incr</b></td><td>严格递增</td><td>高（每次网络往返）</td><td>十万级/秒</td><td>Redis 故障丢号；持久化策略丢数据风险</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>选型建议：</b>绝大多数业务用<b>雪花</b>（有成熟实现：百度 uid-generator、美团 Leaf、滴滴 TinyID、MyBatis-Plus 的 ASSIGN_ID）。对"ID 必须严格单调递增且连续"的场景（如财务单号展示）用<b>号段模式</b>。二者可以组合：<b>号段保证趋势递增，雪花的高位塞入业务/租户标识</b>。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>跨分片查询与聚合</h2></div>
+  <p class="lead">拆分前一条 SQL 搞定的事，拆分后要拆成"下发 → 归并 → 二次加工"。ShardingSphere 的归并策略分三种，理解它们才能预测慢在哪。</p>
+  <table>
+    <tr><th style="width:150px">归并类型</th><th style="width:220px">适用 SQL</th><th>原理与风险</th></tr>
+    <tr><td><b>流式归并</b></td><td class="f">ORDER BY ... LIMIT</td><td>各分片按索引有序返回，中间件做堆归并逐条出数。<b>内存 O(分片数)</b>，不会爆</td></tr>
+    <tr><td><b>内存归并</b></td><td class="f">GROUP BY / DISTINCT</td><td>各分片全量结果拉回内存，用 HashMap 聚合。<b>分片数 × 结果集大时直接 OOM</b></td></tr>
+    <tr><td><b>装饰者归并</b></td><td class="f">LIMIT</td><td>把 limit 改写下推（limit 100000,10 → 各分片 limit 100010,10 再归并），数据量随 offset 线性涨</td></tr>
+  </table>
+  <h4>问题一：按非分片键查订单（最经典）</h4>
+  <pre><span class="c">-- 场景：t_order 按 order_id % 16 分片，现在要按 user_id 查</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;
+
+<span class="c">-- 方案 A：全分片扫描 + 归并（16 次查询，慢，仅适合低频后台）</span>
+<span class="c">-- 方案 B：二级索引冗余（推荐）—— 维护一张按 user_id 分片的索引表</span>
+<span class="b">CREATE TABLE</span> t_order_idx_user (
+  user_id  <span class="y">BIGINT</span>,
+  order_id <span class="y">BIGINT</span>,
+  <span class="b">PRIMARY KEY</span> (order_id),
+  <span class="b">KEY</span> idx_user (user_id)
+) ;  <span class="c">-- 按 user_id % 16 分片，查到 order_id 后再回订单库精确查</span>
+
+<span class="c">-- 方案 C：基因法（把 user_id 的低位嵌入 order_id）</span>
+<span class="c">-- 构造：order_id = (seq &lt;&lt; 4) | (user_id % 16)</span>
+<span class="c">-- 查询：用 user_id % 16 推出分片号，同时从 order_id 中也能推出 user_id 的分片基因</span>
+<span class="c">-- 好处：order_id 和 user_id 两个维度都能定位到同一分片，避免跨库</span></pre>
+  <h4>问题二：跨库 JOIN</h4>
+  <pre><span class="c">-- 反例：订单和订单项分在不同库，中间件做笛卡尔积再过滤</span>
+<span class="b">SELECT</span> o.*, i.product_id <span class="b">FROM</span> t_order o <span class="b">JOIN</span> t_order_item i <span class="b">ON</span> o.order_id = i.order_id;
+
+<span class="c">-- 正解一：绑定表（bindingTables）—— 两个表用相同分片键 + 相同算法，</span>
+<span class="c">-- 中间件知道 o 和 i 一定在同库同号表，JOIN 下推到单库完成，零跨库</span>
+<span class="c">-- 正解二：应用层拆两次单库查询，在内存里 Map 关联</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;      <span class="c">-- 第 1 次：命中 1 个分片</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order_item <span class="b">WHERE</span> order_id <span class="b">IN</span> (...) <span class="c">-- 第 2 次：命中 1 个分片</span>
+
+<span class="c">-- 正解三：全局表（broadcastTables）—— 字典表 t_dict 冗余到每个库，</span>
+<span class="c">-- JOIN t_dict 时本地完成，不需要跨库</span></pre>
+  <h4>问题三：深分页</h4>
+  <pre><span class="c">-- 反例：offset 越大越慢，且慢得和分片数成正比</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">ORDER BY</span> create_time <span class="b">DESC LIMIT</span> 100000, 10;
+<span class="c">-- 16 个分片各取 100010 行 = 160 万行拉回内存归并，P99 直接几百毫秒到秒级</span>
+
+<span class="c">-- 正解：游标法（书签/延迟关联），把 offset 转成索引范围条件</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order
+<span class="b">WHERE</span> create_time &lt; <span class="y">'2026-10-16 23:59:59'</span>   <span class="c">-- 上一页最后一条的时间</span>
+<span class="b">ORDER BY</span> create_time <span class="b">DESC LIMIT</span> 10;                <span class="c">-- 每次只取 10 行，offset 消失</span></pre>
+  <div class="callout danger">
+    <b>聚合查询三条军规：</b>① <span class="k">count(*)</span>、<span class="k">sum()</span> 跨分片会把各分片结果集全拉回内存，亿级表一次就能让中间件 OOM，<b>能预聚合到汇总表就预聚合</b>；② 任何 <span class="k">LIMIT 大 offset</span> 都改书签/游标；③ 全局唯一键（如 user_phone 唯一索引）在分片后失效——同一手机号落到两个库都能插入成功，需要映射表路由或全局索引服务兜底。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>分布式事务：XA / Saga / TCC / 最终一致</h2></div>
+  <p class="lead">分库之后，"订单创建同时写订单库和支付库"这种本地事务就没了。四种方案的取舍本质是<b>用一致性换性能，还是用性能换一致性</b>。</p>
+  <table>
+    <tr><th style="width:90px">方案</th><th style="width:150px">原理</th><th style="width:90px">一致性</th><th style="width:90px">性能</th><th style="width:110px">侵入性</th><th>适用场景</th></tr>
+    <tr><td><b>XA/2PC</b></td><td>prepare + commit 两阶段，协调者统一提交</td><td>强一致</td><td>差（同步阻塞）</td><td>低</td><td>遗留系统、并发低、 legacy 改造</td></tr>
+    <tr><td><b>Saga</b></td><td>长事务拆成本地事务序列，失败时逐个执行补偿</td><td>最终一致</td><td>好</td><td>中</td><td>长流程（旅行预订、开户流程）</td></tr>
+    <tr><td><b>TCC</b></td><td>Try 预留资源 / Confirm 确认 / Cancel 释放</td><td>最终一致<br>（接近强一致）</td><td>好</td><td><b>高</b>（每个服务三个接口）</td><td>短平快、高并发、资源明确（库存/余额）</td></tr>
+    <tr><td><b>消息+对账</b></td><td>本地事务写消息表，投递后消费，定时对账补偿</td><td>最终一致</td><td>最好</td><td>低</td><td><b>互联网默认选择</b>，可接受秒级延迟</td></tr>
+  </table>
+  <h4>MySQL XA 的真实命令序列</h4>
+  <pre><span class="c">-- 一个跨两库的转账：扣款库 + 入账库</span>
+<span class="c">-- 阶段一：各分支 prepare</span>
+XA START <span class="y">'xa_db1_1'</span>;
+<span class="b">UPDATE</span> account <span class="b">SET</span> balance = balance - 100 <span class="b">WHERE</span> user_id = 1;  <span class="c">-- 库1</span>
+XA END <span class="y">'xa_db1_1'</span>;
+XA PREPARE <span class="y">'xa_db1_1'</span>;        <span class="c">-- 此时库1 已持久化但未提交，资源锁定</span>
+
+XA START <span class="y">'xa_db2_1'</span>;
+<span class="b">UPDATE</span> account <span class="b">SET</span> balance = balance + 100 <span class="b">WHERE</span> user_id = 2;  <span class="c">-- 库2</span>
+XA END <span class="y">'xa_db2_1'</span>;
+XA PREPARE <span class="y">'xa_db2_1'</span>;
+
+<span class="c">-- 阶段二：全部 prepare 成功才提交，任一失败则全部 rollback</span>
+XA COMMIT <span class="y">'xa_db1_1'</span>;  XA COMMIT <span class="y">'xa_db2_1'</span>;
+<span class="c">-- 或：XA ROLLBACK 'xa_db1_1'; XA ROLLBACK 'xa_db2_1';</span>
+
+<span class="c">-- 关键风险：prepare 之后协调者宕机，分支事务悬挂，资源一直锁着。</span>
+<span class="c">-- 必须配 XA RECOVER（MySQL 自动）或 seata 的 TC 侧定时回查</span>
+<span class="b">XA RECOVER</span>;   <span class="c">-- 查看处于 PREPARED 状态的分支</span></pre>
+  <h4>TCC 的三个阶段（以扣库存为例）</h4>
+  <pre><span class="c">-- Try：预留资源，不动最终状态</span>
+<span class="b">UPDATE</span> stock <span class="b">SET</span> frozen = frozen + 10 <span class="b">WHERE</span> sku = <span class="y">'A001'</span>;  <span class="c">-- 可用量不动</span>
+
+<span class="c">-- Confirm：确认扣减，把预留转正式（要求幂等，靠事务流水号去重）</span>
+<span class="b">UPDATE</span> stock <span class="b">SET</span> frozen = frozen - 10, sold = sold + 10 <span class="b">WHERE</span> sku = <span class="y">'A001'</span>;
+
+<span class="c">-- Cancel：释放预留（同样幂等）</span>
+<span class="b">UPDATE</span> stock <span class="b">SET</span> frozen = frozen - 10 <span class="b">WHERE</span> sku = <span class="y">'A001'</span>;
+
+<span class="c">-- 三个接口都要做幂等：INSERT INTO tcc_tran(xid, status) 先查再插</span>
+<span class="c">-- 空回滚（Try 没执行就 Cancel）、悬挂（Cancel 先于 Try 到）都要防护</span></pre>
+  <h4>最终一致性：本地消息表</h4>
+  <pre><span class="c">-- 同一个本地事务里：写业务数据 + 写消息（这是原子性的关键）</span>
+<span class="b">START TRANSACTION</span>;
+<span class="b">INSERT INTO</span> t_order (...) <span class="b">VALUES</span> (...);
+<span class="b">INSERT INTO</span> t_local_msg (id, payload, status) <span class="b">VALUES</span> (uuid, <span class="y">'{"orderId":100}'</span>, 0);
+<span class="b">COMMIT</span>;
+
+<span class="c">-- 定时任务扫描未发送消息投递 MQ，成功后标记 status=1；消费方幂等；每日对账补偿异常</span></pre>
+  <div class="callout ok">
+    <b>落地顺序建议：</b>先上<b>消息 + 对账</b>（成本最低、性能最好、能扛住 99% 场景）；资金类强一致且低并发的老系统短期用 <b>XA</b>（如 Seata 的 XA 模式）过渡；库存、余额这种资源明确的场景，量大了再升级 <b>TCC</b>；跨多家外部系统（航司、酒店）的长流程才考虑 <b>Saga</b>。<b>Saga 没有隔离性，中间态会被其他事务读到，设计时必须接受这个事实。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>扩容：双写迁移 / 预分片 / 一致性哈希</h2></div>
+  <p class="lead">扩容是分库分表生命周期里最危险的动作，比拆分本身危险。三条路线，按"事前准备成本"从低到高排。</p>
+  <h4>路线一：预分片（事中零成本，强烈推荐）</h4>
+  <pre><span class="c"># 一开始就按最大规模分逻辑表，例如 2 库 × 512 表 = 1024 张逻辑表</span>
+<span class="c"># 实际只部署 2 个库，每库 512 张表，大部分表是空的（空表只有结构，无数据）</span>
+<span class="c">#</span>
+<span class="c"># 扩容 2→4 库时：</span>
+<span class="c">#   1. 新库执行 512 张空表的 DDL</span>
+<span class="c">#   2. 路由规则从 user_id % 1024 映射到 2 库，改为按 1024 个分片重新分配</span>
+<span class="c">#   3. 逐分片迁移：把分片 512~1023 的数据搬到新库，双写校验后切流</span>
+<span class="c"># 全程不需要改一条业务 SQL，也不需要重新哈希已有数据</span>
+
+<span class="c"># 为什么是 1024 而不是 1000：1024 = 2^10，翻倍扩容时分片数成整数倍（2/4/8/16 整除），</span>
+<span class="c"># 取模映射无歧义；1000 拆 4 份会出现 250 这种不均匀边界</span></pre>
+  <h4>路线二：双写迁移（事后扩容的标准动作）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>全量同步</b>：用 mysqldump/xtrabackup 把旧库数据导入新库；导入期间产生的增量用 binlog（Canal/Debezium）回放追平</div></div>
+    <div class="step"><div class="txt"><b>双写</b>：业务写请求同时写新旧两套库。<b>注意双写不是事务的</b>——先写新成功、写旧失败要靠补偿队列重试，反之亦然</div></div>
+    <div class="step"><div class="txt"><b>校验</b>：比对两边条数、checksum（如每表 CRC32 聚合）、抽样逐字段比对。校验不通过必须先修数据再往下走</div></div>
+    <div class="step"><div class="txt"><b>切读</b>：读流量灰度切到新库，观察错误率和延迟，旧库保留只读兜底</div></div>
+    <div class="step"><div class="txt"><b>切写</b>：写流量切新库，此时旧库停写；保留双写窗口若干天作为回滚余地</div></div>
+    <div class="step"><div class="txt"><b>下线</b>：确认无回滚需求后旧库归档，双写代码摘除</div></div>
+  </div>
+  <pre><span class="c"># binlog 增量回放的关键配置（旧库）：必须是 ROW 格式、row_image=full</span>
+<span class="b">SET GLOBAL</span> binlog_format = <span class="y">'ROW'</span>;
+<span class="c"># 全量开始时记录 SHOW MASTER STATUS 的 File+Position，导入完成后从该点追增量</span></pre>
+  <h4>路线三：一致性哈希 + 虚拟节点</h4>
+  <pre><span class="c"># 环上 2^32 个点，key 哈希后顺时针找第一个节点</span>
+<span class="c"># 4 个物理节点无虚拟节点时实测负载比可达 3:1；每节点拆 150~200 个虚拟节点后方差 &lt; 10%</span>
+<span class="c"># 扩容只影响"新节点逆时针到下一个虚拟节点之间"的数据：4→5 节点搬约 1/5，取模要搬 3/4</span>
+<span class="c"># Redis Cluster 思路不同：固定 16384 个哈希槽按槽迁移，本质是查表法</span></pre>
+  <div class="callout warn">
+    <b>扩容期最大风险不是技术是组织：</b>双写期间两套库都可能短暂不一致，校验窗口要覆盖<b>至少一个完整业务周期（如月末结账）</b>。历史上多数扩容事故都死于"校验 3 天觉得没问题就切了，结果月底对账发现漏单"。另外，<b>扩容后必须重新 ANALYZE TABLE</b>，否则新库统计信息为空，优化器直接选错索引。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>ShardingSphere / MyCAT 生态与真实配置</h2></div>
+  <table>
+    <tr><th style="width:170px">产品</th><th style="width:150px">形态</th><th style="width:150px">语言支持</th><th>定位与注意点</th></tr>
+    <tr><td><b>ShardingSphere-JDBC</b></td><td>客户端 Jar 包</td><td>仅 Java</td><td>无代理层、性能最好；额外占用应用资源；升级要跟应用发版</td></tr>
+    <tr><td><b>Sharding-Proxy</b></td><td>独立代理服务</td><td>任意（MySQL 协议）</td><td>对应用透明、多语言可用；多一跳网络延迟；自身要高可用部署</td></tr>
+    <tr><td><b>MyCAT</b></td><td>独立代理服务</td><td>任意（MySQL 协议）</td><td>老牌分库中间件（Cobar 后继），1.6 之后社区活跃度下降，新项目不建议</td></tr>
+    <tr><td><b>Seata</b></td><td>事务协调者 TC</td><td>Java 为主</td><td>配合上面任一分库方案补上分布式事务（AT/XA/TCC/Saga 四种模式）</td></tr>
+  </table>
+  <h4>一份可直接参考的 ShardingSphere 5.x 配置</h4>
+  <pre><span class="c"># 2 个数据源，t_order 按 order_id 分 16 表，t_order_item 绑定表，t_dict 广播表</span>
+databaseName: sharding_db
+
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://10.0.0.1:3306/ds_0?serverTimezone=UTC&amp;useUnicode=true
+    username: app
+    password: app123
+  ds_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://10.0.0.2:3306/ds_1?serverTimezone=UTC&amp;useUnicode=true
+    username: app
+    password: app123
+
+rules:
+  - !SHARDING
+    tables:
+      t_order:
+        actualDataNodes: ds_${0..1}.t_order_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: order_id
+            shardingAlgorithmName: tbl_inline
+        keyGenerateStrategy:
+          column: order_id
+          keyGeneratorName: snowflake
+      t_order_item:
+        actualDataNodes: ds_${0..1}.t_order_item_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: order_id
+            shardingAlgorithmName: tbl_inline
+
+    <span class="c"># 绑定表：两个表分片键和算法一致，JOIN 时路由到同库同号表，避免笛卡尔积</span>
+    bindingTables:
+      - t_order, t_order_item
+
+    <span class="c"># 广播表：每个库都冗余一份，JOIN 本地完成</span>
+    broadcastTables:
+      - t_dict
+
+    shardingAlgorithms:
+      db_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_$->{user_id % 2}
+      tbl_inline:
+        type: INLINE
+        props:
+          algorithm-expression: t_order$->{order_id % 16}   <span class="c">-- 注意按库维度再取模</span>
+
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+        props:
+          worker-id: 1          <span class="c">-- 也可配为 IP 位运算自动分配</span>
+
+props:
+  sql-show: true               <span class="c">-- 打印改写后的真实 SQL，排查必开</span></pre>
+  <pre><span class="c"># 拆完之后业务代码零改动，还是写逻辑表名：</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;
+<span class="c"># 中间件改写为（可用 sql-show 验证）：</span>
+<span class="c"># SELECT * FROM ds_0.t_order_8 WHERE user_id = 888;</span>
+<span class="c"># 推导：user_id % 2 = 0 → ds_0；order_id 若=888 则 888 % 16 = 8 → t_order_8</span></pre>
+  <div class="callout">
+    <b>什么时候别用中间件：</b>分片数很少（2 库 4 表）、SQL 模式非常固定时，自己在 DAO 层"计算分片号 → 拼表名"只要几十行代码。<b>中间件的价值在治理（监控、限流、加密、影子库），不在分片本身。</b>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">深坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用自增主键当分片键</div><div class="pd">ID 递增等于时间递增，写流量永远砸在最后一个分片（尾库热点）；且多库各自 AUTO_INCREMENT 会撞主键。必须换雪花/号段全局 ID，再考虑分片。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">一致性哈希不加虚拟节点</div><div class="pd">4 个物理节点直接上环，实测负载比能到 3:1，一个节点打满其他在乘凉。每个物理节点至少配 150~200 个虚拟节点才能把方差压进 10%。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">扩容只加机器，忘了搬数据</div><div class="pd">新节点空跑、旧节点继续打满，监控上"扩容了但没完全扩容"。一致性哈希方案要主动触发再平衡；预分片方案要按分片逐个迁移并切流。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">跨库 JOIN 直接下发</div><div class="pd">中间件遇到跨库 JOIN 会做笛卡尔积再内存过滤：2 库 × 10 万行 = 10 亿次比对，直接把应用拖死。要么配 bindingTables，要么拆成两次单库查询在内存关联。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">深分页 limit 100000,10</div><div class="pd">每个分片都要返回 100010 行再归并，16 分片 = 160 万行回内存。改成书签/游标：WHERE create_time &lt; 上一页最后一条 LIMIT 10，offset 消失。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">双写迁移只写新不写旧</div><div class="pd">切回旧链路时发现丢了几个月数据，而旧链路往往还挂着别的报表任务。双写期必须双向可回滚，且全量校验（条数 + checksum + 抽样）通过后才能切流。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">雪花算法时钟回拨</div><div class="pd">NTP 同步让机器时间倒退 2 秒，序列号复用产出重复 ID，直接造成主键冲突或数据覆盖。对策：回拨 &lt; 阈值等待重试、&gt; 阈值拒绝发号并告警、或准备备用 workerId 段。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">字典表没做广播表，大表误配成广播表</div><div class="pd">t_dict 这种小字典表没配 broadcastTables，每次 JOIN 都跨 16 个库；反过来把千万级大表误配成广播表，会在每个库都冗余一份，磁盘和同步直接爆。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">以为唯一索引分片后还有全局约束力</div><div class="pd">user_phone 的唯一索引只在单库内生效，两个用户同手机号落到不同库都能插入成功，脏数据事后极难清理。要么路由到同库（查表法），要么维护全局唯一索引服务。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">count(*) / sum() 跨分片全量归并</div><div class="pd">各分片结果集全部拉回中间件内存做聚合，亿级表一次查询 OOM。能预聚合到汇总表就预聚合；必须实时的用游标分批拉取，别一次全量归并。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 单表 800 万行、读多写少、从库也扛不住了。按优先级，第一个该做的动作是？</div>
+      <button class="opt">直接水平分库分表</button>
+      <button class="opt">先做冷数据归档 + 大字段垂直拆分，不达标再考虑水平拆分</button>
+      <button class="opt">加缓存，别的一概不做</button>
+      <div class="ans">正确答案：<b>先归档 + 垂直拆分</b>。水平拆分是不可逆的单向门，应该最后做。读扩散优先加从库和缓存，容量问题优先归档冷数据，大字段拖慢扫描就垂直拆。三条捷径都无效才上分库分表。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 一致性哈希中"虚拟节点"的核心作用是？</div>
+      <button class="opt">提升哈希计算速度</button>
+      <button class="opt">让节点在环上分布更均匀，缓解数据倾斜</button>
+      <button class="opt">减少扩容时的数据迁移量</button>
+      <div class="ans">正确答案：<b>缓解数据倾斜</b>。物理节点少时环上位置随机性差，负载比可达 3:1；每节点拆出 150~200 个虚拟节点后方差可压到 10% 以内。减少迁移量是一致性哈希本身（相比取模）的特性，不是虚拟节点的功劳。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 雪花算法中，12 bit 序列号决定了单节点单毫秒最多产生多少个 ID？</div>
+      <button class="opt">1024 个</button>
+      <button class="opt">4096 个</button>
+      <button class="opt">65536 个</button>
+      <div class="ans">正确答案：<b>4096 个</b>。2^12 = 4096，即单节点每秒上限约 409.6 万个 ID。1024 是 10 bit 机器号的上限（节点数），65536 是 2^16，都不对。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. t_order 按 order_id % 16 分片，现在要支持"按 user_id 查订单列表"，最常用的方案是？</div>
+      <button class="opt">维护按 user_id 分片的二级索引表，先查 order_id 再回订单库</button>
+      <button class="opt">每次全分片扫描后归并排序</button>
+      <button class="opt">把 order_id 改成按 user_id 重新生成</button>
+      <div class="ans">正确答案：<b>二级索引冗余</b>（或基因法）。全分片扫描在 16 库 × 大表时代价不可接受；重新生成历史 ID 不可能。基因法是索引冗余的变体：把 user_id 的低位嵌进 order_id，两个维度都能定位同分片。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. TCC 分布式事务的三个阶段是？</div>
+      <button class="opt">Try - Commit - Rollback</button>
+      <button class="opt">Try - Confirm - Cancel</button>
+      <button class="opt">Begin - Prepare - Commit</button>
+      <div class="ans">正确答案：<b>Try-Confirm-Cancel</b>。Try 预留资源、Confirm 确认执行、Cancel 释放预留。Commit/Rollback 是 XA 的词汇；Begin-Prepare-Commit 是 2PC 的词汇。三个接口都必须幂等，还要防空回滚和悬挂。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 预分片方案（如一次分 1024 张逻辑表）的主要好处是？</div>
+      <button class="opt">提升单表查询性能</button>
+      <button class="opt">扩容时只迁移分片数据，不用改路由规则、不用全量重哈希</button>
+      <button class="opt">减少分布式 ID 的消耗</button>
+      <div class="ans">正确答案：<b>扩容零改造</b>。事前把路由格子打满（1024=2^10，翻倍整除友好），扩容只是把某些分片搬到新库，SQL 和路由逻辑一行不改。代价是早期要维护大量空表结构，以及单表行数被 1024 除过之后更小。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令与配置</h3>
+  <div class="cmds">
+    <div class="crow"><code>SHOW MASTER STATUS</code><span class="desc">拿 binlog File+Position，做全量同步的追平起点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SET GLOBAL binlog_format=ROW</code><span class="desc">增量同步前必须切 ROW 格式</span><button class="copy">复制</button></div>
+    <div class="crow"><code>XA START/END/PREPARE/COMMIT 'xid'</code><span class="desc">MySQL XA 两阶段提交四连</span><button class="copy">复制</button></div>
+    <div class="crow"><code>XA RECOVER</code><span class="desc">查看处于 PREPARED 状态的分支事务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mysqldump --single-transaction --master-data=2</code><span class="desc">一致性全量备份并记录 binlog 位点</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>分片算法表达式速查</h3>
+  <pre><span class="c"># ShardingSphere INLINE 表达式（Groovy）</span>
+algorithm-expression: t_order_$->{order_id % 16}     <span class="c"># 表路由：按 order_id 取模 16</span>
+algorithm-expression: ds_$->{user_id % 2}            <span class="c"># 库路由：按 user_id 取模 2</span>
+algorithm-expression: t_order_$->{order_id &gt;&gt; 4 &amp; 15}  <span class="c"># 位运算：高 4 位做表号（基因法变体）</span>
+<span class="c"># 分片基因法：order_id = (序列号 &lt;&lt; 4) | (user_id % 16)</span>
+<span class="c"># 反推：order_id &amp; 15 即 user_id 的低 4 位，路由信息直接编码在 ID 里</span>
+
+<span class="c"># 雪花 ID 位运算反推（Java）</span>
+timestamp  = (id &gt;&gt; 22) + customEpoch;   <span class="c"># 41 bit 时间戳</span>
+workerId  = (id &gt;&gt; 12) &amp; 0x3FF;         <span class="c"># 10 bit 机器号</span>
+sequence  = id &amp; 0xFFF;                  <span class="c"># 12 bit 序列号</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>垂直拆分</b></td><td>按列/业务域拆库拆表，解决耦合和单库容量，行数不降</td></tr>
+    <tr><td><b>水平拆分</b></td><td>按分片键把行分散到多库多表，解决行数和写并发</td></tr>
+    <tr><td><b>分片键</b></td><td>决定数据路由到哪个分片的列，选错全盘皆输</td></tr>
+    <tr><td><b>哈希取模</b></td><td>key % N 路由，最均匀但扩容要重哈希</td></tr>
+    <tr><td><b>范围分片</b></td><td>按 key 区间路由，扩容友好但有尾库热点</td></tr>
+    <tr><td><b>一致性哈希</b></td><td>环上顺时针找节点，扩容只搬约 1/N 数据</td></tr>
+    <tr><td><b>虚拟节点</b></td><td>物理节点在环上的多个副本，用于均衡负载</td></tr>
+    <tr><td><b>查表法</b></td><td>用额外映射表决定路由，灵活但多一次查询</td></tr>
+    <tr><td><b>基因法</b></td><td>把分片基因嵌进 ID，使多个维度都能定位同分片</td></tr>
+    <tr><td><b>绑定表</b></td><td>分片键与算法一致的表组，JOIN 可下推到单库</td></tr>
+    <tr><td><b>广播表</b></td><td>字典表在每个库冗余一份，JOIN 本地完成</td></tr>
+    <tr><td><b>雪花算法</b></td><td>1+41+10+12 bit 的发号器，单节点 409.6 万 ID/秒</td></tr>
+    <tr><td><b>号段模式</b></td><td>一次从 DB 取一段号在内存发放，双 buffer 消除阻塞</td></tr>
+    <tr><td><b>时钟回拨</b></td><td>机器时间倒退导致雪花 ID 重复或阻塞发号</td></tr>
+    <tr><td><b>XA / 2PC</b></td><td>prepare + commit 两阶段，强一致但同步阻塞</td></tr>
+    <tr><td><b>Saga</b></td><td>长事务序列 + 补偿回滚，无隔离性</td></tr>
+    <tr><td><b>TCC</b></td><td>Try-Confirm-Cancel，业务层实现，性能好侵入强</td></tr>
+    <tr><td><b>本地消息表</b></td><td>业务与消息同事务写入，异步投递 + 对账补偿</td></tr>
+    <tr><td><b>双写迁移</b></td><td>新旧库同时写、校验后切流的扩容标准动作</td></tr>
+    <tr><td><b>预分片</b></td><td>事前打满逻辑分片格子，扩容只搬数据不改路由</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>起两个 MySQL 实例：① 按本文配置搭一个 ShardingSphere-JDBC 最小工程（2 库 16 表），打开 sql-show 观察 SQL 改写；② 实现雪花发号器并压测单节点 QPS；③ 用 XA 完成一次跨两库转账，中途制造一次 prepare 后宕机观察悬挂事务；④ 给 16 张表灌不同数据量，验证尾库热点和深分页变慢。<br><br>
+    <b>之后值得单独学：</b>Seata 的 AT 模式（无侵入分布式事务）、Canal/Debezium 的 binlog 订阅、分库分表后的对账体系设计，以及 TiDB/OceanBase 这类原生分布式数据库。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透分库分表 · 动手前先想清楚：非拆不可吗？</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（分片算法）、模块 6（分布式事务）和模块 7（扩容）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 mysql 客户端里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 MySQL 8.0 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

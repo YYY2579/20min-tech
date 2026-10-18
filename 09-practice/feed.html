@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Feed 系统设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">实战系列 · 第 9 期 · 高密度版</span>
+    <h1>二十分钟学透 Feed 系统设计</h1>
+    <p class="sub">Feed 是<b>推拉模式的终极考场</b>。这篇直接讲机制：读扩散 vs 写扩散怎么选、大 V 怎么处理、为什么分页必须用游标、扇出风暴如何不炸集群。附带容量估算的完整算例。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种分发模式</span>
+      <span class="chip"><b>2</b> 种扩散方向</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边画一张关注关系图：A→B→C→D，标注每条边的扇出方向。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>Feed 到底在解什么问题</h2></div>
+  <p class="lead">一句话：<b>把"我关注的人产生的内容"，高效地组装成一条按时间排序的流，并在 200ms 内返回第 1 屏。</b>所有设计决策都源于这句话里的三个词：关注、组装、时间排序。</p>
+  <table>
+    <tr><th style="width:150px">系统</th><th style="width:220px">Feed 形态</th><th>核心挑战</th></tr>
+    <tr><td><b>微博 / Twitter</b></td><td>关注流（单向关注）</td><td>大 V 扇出、热点内容、未读管理</td></tr>
+    <tr><td><b>朋友圈 / 抖音关注</b></td><td>关系流（双向好友）</td><td>强关系、隐私控制、已读状态</td></tr>
+    <tr><td><b>抖音 / 头条推荐</b></td><td>推荐流（不依赖关注）</td><td>召回+排序模型、去重、兴趣衰减</td></tr>
+    <tr><td><b>GitHub / 钉钉</b></td><td>事件流（动态聚合）</td><td>聚合策略、@ 提及、通知合并</td></tr>
+  </table>
+  <div class="callout">
+    <b>先分清楚两种流：</b><b>关注流（Timeline）</b>依赖显式关注关系，内容是"我关注的人发的"；<b>推荐流</b>依赖画像和模型，内容是"算法觉得你会喜欢的"。本篇讲关注流的工程骨架，推荐流只在排序介入点处涉及。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>核心模型：内容、关注关系、时间线</h2></div>
+  <p class="lead">三个实体撑起整个系统：<b>内容（Content）</b>、<b>关注关系（Follow）</b>、<b>时间线（Timeline）</b>。Timeline 不是实体，是"视图"——由内容+关系计算出来的有序列表。</p>
+  <h3>1.1 核心表设计（MySQL，生产可用）</h3>
+  <pre><span class="c">-- 内容表：按内容 ID 分库分表（内容 ID 用雪花号，自带时间序）</span>
+<span class="b">CREATE TABLE</span> content (
+  id            <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,          <span class="c">-- 雪花 ID，高 41 位是毫秒时间戳</span>
+  user_id       <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,          <span class="c">-- 作者</span>
+  content_type  <span class="b">TINYINT</span> <span class="b">NOT NULL</span>,        <span class="c">-- 1=纯文本 2=图文 3=视频 4=转发</span>
+  text          <span class="b">VARCHAR</span>(2000) <span class="b">NOT NULL</span> <span class="b">DEFAULT</span> <span class="y">''</span>,
+  media_json    <span class="b">JSON</span>,                     <span class="c">-- 图片/视频地址、宽高、时长</span>
+  origin_id     <span class="b">BIGINT</span> <span class="b">DEFAULT</span> <span class="b">NULL</span>,      <span class="c">-- 被转发的原内容 ID</span>
+  status        <span class="b">TINYINT</span> <span class="b">DEFAULT</span> 1,        <span class="c">-- 0=待审核 1=正常 2=已删除 3=仅自己可见</span>
+  create_time   <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,          <span class="c">-- 毫秒时间戳，与 id 高 41 位一致</span>
+  <span class="b">PRIMARY KEY</span> (id),
+  <span class="b">KEY</span> idx_user_time (user_id, create_time <span class="b">DESC</span>)
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c">-- 关注关系：粉丝侧和关注侧各一份索引，两种查询都会用</span>
+<span class="b">CREATE TABLE</span> follow (
+  id           <span class="b">BIGINT</span> <span class="b">NOT NULL</span> <span class="b">AUTO_INCREMENT</span>,
+  follower_id  <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,   <span class="c">-- 谁关注了（粉丝）</span>
+  followee_id  <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,   <span class="c">-- 被关注的人（大 V）</span>
+  status       <span class="b">TINYINT</span> <span class="b">DEFAULT</span> 1,  <span class="c">-- 1=关注 2=拉黑 3=特别关注</span>
+  create_time  <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,
+  <span class="b">PRIMARY KEY</span> (id),
+  <span class="b">UNIQUE KEY</span> uk_f2e (follower_id, followee_id),
+  <span class="b">KEY</span> idx_e_time (followee_id, create_time <span class="b">DESC</span>)  <span class="c">-- 查"大 V 的新粉丝"</span>
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c">-- 用户内容索引表：写扩散时"向粉丝 timeline 投递"只投 ID</span>
+<span class="b">CREATE TABLE</span> user_post_index (
+  user_id       <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,
+  content_id    <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,
+  create_time   <span class="b">BIGINT</span> <span class="b">NOT NULL</span>,
+  <span class="b">PRIMARY KEY</span> (user_id, content_id),
+  <span class="b">KEY</span> idx_time (user_id, create_time <span class="b">DESC</span>)
+) <span class="b">ENGINE</span>=InnoDB;</pre>
+  <h3>1.2 时间线在 Redis 里的样子</h3>
+  <pre><span class="c"># 每个粉丝一个 ZSet：member=content_id, score=create_time(毫秒)</span>
+<span class="b">ZADD</span> timeline:1001 1718000000000 content:90001 1718000000001 content:90002
+<span class="b">ZREVRANGEBYSCORE</span> timeline:1001 +inf 1718000000000 <span class="b">LIMIT</span> 0 20   <span class="c"># 最新 20 条</span>
+
+<span class="c"># 容量换算（必须先算这个再动手）</span>
+<span class="c"># 1 亿 DAU × 平均关注 200 人 × 每人每天发 0.5 条</span>
+<span class="c"># = 100,000,000 × 200 × 0.5 = 100 亿条/天 写入（如果纯写扩散）</span>
+<span class="c"># 单机 Redis 约 10w QPS 写 → 100亿 / 86400秒 ≈ 116万/秒，需要 12+ 台机器</span></pre>
+  <div class="callout warn">
+    <b>时间线是有损存储：</b>Redis 的 ZSet 不可能无限长。行业惯例是<b>每个用户只保留最近 500~1000 条</b>，更早的走"回拉"（模块 6 讲）。所以 Timeline 是"热点缓存"，不是"全量数据"——<b>内容表才是真相，Timeline 只是索引。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>三种分发模式：推 / 拉 / 推拉结合</h2></div>
+  <p class="lead">这是 Feed 面试的第一道题。核心区别只有一个：<b>内容分发发生在"发的时候"还是"读的时候"。</b></p>
+  <h3>2.1 模式对比</h3>
+  <table>
+    <tr><th style="width:110px">维度</th><th>推模式（写扩散）</th><th>拉模式（读扩散）</th><th>推拉结合</th></tr>
+    <tr><td><b>分发时机</b></td><td>发布时，写给所有粉丝</td><td>读取时，聚合所有关注对象</td><td>普通用户推、大 V 拉</td></tr>
+    <tr><td><b>读性能</b></td><td>O(1)，直接读自己的 timeline</td><td>O(N)，N=关注数，每次读都要聚合</td><td>普通用户 O(1)，大 V 视情况</td></tr>
+    <tr><td><b>写性能</b></td><td>大 V 发一条 = 千万次写入</td><td>发布只写 1 次，极轻</td><td>大 V 写轻、普通用户写 N 次</td></tr>
+    <tr><td><b>存储</b></td><td>粉丝人均一份（冗余 ×N）</td><td>内容只存一份</td><td>混合</td></tr>
+    <tr><td><b>实时性</b></td><td>准实时（推送链路有延迟）</td><td>完全实时（读时算）</td><td>普通用户准实时</td></tr>
+    <tr><td><b>典型用户</b></td><td>普通用户（粉丝 &lt; 1000）</td><td>大 V（粉丝 &gt; 100 万）</td><td>生产系统标配</td></tr>
+    <tr><td><b>代表</b></td><td>朋友圈、Twitter 普通用户</td><td>Twitter 大 V、微博大 V</td><td>微博、抖音关注流</td></tr>
+  </table>
+  <h3>2.2 推模式（写扩散）的流程</h3>
+  <div class="steps">
+    <div class="step"><div class="txt">用户 A 发布内容 → 写入 <b>content 表</b>，拿到雪花 ID（自带毫秒时间戳，全局有序）</div></div>
+    <div class="step"><div class="txt">查询 A 的<b>粉丝列表</b>（粉丝 &lt; 阈值时直接查 follow 表；超阈值走缓存/分页拉取）</div></div>
+    <div class="step"><div class="txt">把 <span class="k">content_id + create_time</span> 写入<b>每个粉丝的 timeline ZSet</b>（ZADD）</div></div>
+    <div class="step"><div class="txt">粉丝读 Feed 时：<span class="k">ZREVRANGEBYSCORE timeline:{follower_id} +inf {cursor} LIMIT 0 20</span>，拿到 ID 列表后批量查内容（mget）</div></div>
+  </div>
+  <pre><span class="c"># 扇出计算：A 有 500 粉丝，发 1 条内容 = 500 次 ZADD</span>
+<span class="c"># 若 A 每秒发 1 条，持续 1 小时：500 × 3600 = 180万次 ZADD，Redis 可承受</span>
+<span class="c"># 若 A 有 1000万 粉丝，发 1 条 = 1000万次 ZADD ≈ 1000万 QPS</span>
+<span class="c"># 单机 Redis 写上限约 10万/秒 → 需要 100 台机器同时写，还不算网络</span>
+<span class="c"># 结论：粉丝数超过阈值（通常 1万~10万）的大 V 绝不能走写扩散</span></pre>
+  <h3>2.3 拉模式（读扩散）的流程</h3>
+  <pre><span class="c"># 读时聚合：用户 B 关注了 200 人</span>
+<span class="c"># 1. 查 B 的关注列表：[A1, A2, ..., A200]</span>
+<span class="c"># 2. 对每个关注对象，取其 user_post_index 里最新的几条</span>
+<span class="c">#    SELECT content_id FROM user_post_index WHERE user_id IN (...) ORDER BY create_time DESC</span>
+<span class="c"># 3. 内存里做 200 路归并（merge sort），取前 20 条</span>
+
+<span class="c"># 读耗时估算：200 个用户 × 2ms（各查一次索引）= 400ms（串行）</span>
+<span class="c"># 优化为并发查询（go routine / 线程池）：max(2ms) + 归并开销 ≈ 20ms</span>
+<span class="c"># 但关注 5000 人时，5000 路归并 + 5000 次查询，并发也救不回来</span>
+<span class="c"># 结论：纯拉模式只适合关注数 &lt; 500 的中小 V，且必须加聚合缓存</span></pre>
+  <h3>2.4 大 V 的专门处理（推拉结合的核心）</h3>
+  <p><b>判定标准：粉丝数 &gt; 阈值（通常取 1 万）即视为大 V，切换为拉模式。</b>大 V 的内容不进任何人的 timeline 推送链路，而是在用户刷新时实时拉取合并。工程上有三个细节决定成败：</p>
+  <ul>
+    <li><b>大 V 的"最近内容"要单独缓存：</b>大 V 发的内容只写一份 <span class="k">zvip:{vv_id}</span>，所有人共享读取。1000 万粉丝读同一条内容，实际只查 1 份缓存</li>
+    <li><b>合并时的去重与截断：</b>普通用户 timeline 里已经推送过的内容 ID 用 Set 去重（大 V 也可能因特殊关注被推送）；归并后按 score 截断到 page size</li>
+    <li><b>大 V 内容要有独立过期：</b>大 V 的 <span class="k">zvip</span> 缓存设短 TTL（如 30 秒），保证热点突发时不会全量穿透到 DB</li>
+  </ul>
+  <div class="callout ok">
+    <b>推拉结合的行业标准答案：</b>普通用户（粉丝 &lt; 1 万）走<b>推</b>——发布时写扩散到粉丝 timeline；大 V（粉丝 ≥ 1 万）走<b>拉</b>——发布时只写自己的内容索引，用户读时按需聚合。<b>关注关系变更（新关注/取关）时，把新关注的大 V 的近期内容补拉到自己的 timeline，并清理已取关者的内容。</b>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>读扩散 vs 写扩散的工程权衡</h2></div>
+  <p class="lead">模块 2 讲了机制，这里讲<b>决策矩阵</b>——什么时候可以偏离标准答案。</p>
+  <table>
+    <tr><th style="width:200px">场景特征</th><th style="width:120px">推荐模式</th><th>理由</th></tr>
+    <tr><td>强关系、粉丝数低（&lt;500）</td><td><b>写扩散</b></td><td>扇出小，读 O(1)，实时性好。朋友圈、钉钉动态</td></tr>
+    <tr><td>弱关系、粉丝悬殊</td><td><b>推拉结合</b></td><td>微博、Twitter 的标准架构</td></tr>
+    <tr><td>关注数极多（&gt;2000）</td><td><b>读扩散</b></td><td>归并成本可控，且避免给大 V 造成写压力</td></tr>
+    <tr><td>读多写少（QPS 读:写 &gt; 100:1）</td><td><b>写扩散</b></td><td>写时多花一次扇出，读时全部 O(1)，总体最优</td></tr>
+    <tr><td>写多读少（全员高频发）</td><td><b>读扩散</b></td><td>写扩散会让扇出总量爆炸（N×M），读扩散只写 N 次</td></tr>
+    <tr><td>时效性要求高（秒级可见）</td><td><b>读扩散</b></td><td>写扩散有异步队列延迟；读扩散读到的是实时索引</td></tr>
+    <tr><td>存储成本敏感</td><td><b>读扩散</b></td><td>写扩散有 N 倍冗余；读扩散内容只存一份</td></tr>
+  </table>
+  <h3>3.1 扇出总量的量化公式</h3>
+  <pre><span class="c">写扩散总写入量 = Σ(每个用户的粉丝数) = 总关注边数 × 内容发布率</span>
+<span class="c">读扩散总读取量 = Σ(每个用户的关注数) × 刷新率</span>
+
+<span class="c">算例（日活型产品）：</span>
+<span class="c">- 1 亿 DAU，平均每人关注 200，平均每人关注者 200（对称）</span>
+<span class="c">- 总关注边数 = 1亿 × 200 = 200亿条</span>
+<span class="c">- 平均发布率 = 0.5 条/人/天</span>
+
+<span class="c">写扩散：200亿边 × 0.5条 = 100亿次/天 写入 timeline ≈ 116万 QPS</span>
+<span class="c">  → 按单机 Redis 10w 写 QPS，需 12 台；考虑峰值 3 倍 → 36 台</span>
+<span class="c">读扩散：1亿 DAU × 每天刷新 10 次 × 200 路归并</span>
+<span class="c">  = 2000亿次/天 索引查询 ≈ 2300万 QPS（读），归并 CPU 开销巨大</span>
+<span class="c">  → 需要聚合缓存兜底，纯读扩散不可行</span>
+
+<span class="c">推拉结合：假设 1% 是大 V（粉丝&gt;1万），99% 普通用户</span>
+<span class="c">  普通用户粉丝平均 200 × 0.99亿人 × 0.5条 ≈ 99亿次/天 推送（≈115万 QPS）</span>
+<span class="c">  大 V 内容走读：1亿人刷新时按需拉取，读缓存命中率 &gt;99%</span>
+<span class="c">  结论：写量降 1%，读压力靠缓存扛，这是微博/抖音的实际路线</span></pre>
+  <div class="callout warn">
+    <b>写扩散最大的坑不是量，是"删"：</b>用户删除内容时，写扩散模式下要把<b>所有粉丝 timeline 里的这条 ID 删掉</b>——又是一次全量扇出。解法：timeline 里只存 ID，读时用内容表的 status 过滤（已删的不返回）。<b>永远不要在写扩散模式下做"删除扇出"。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>分页与游标：为什么坚决不用 offset</h2></div>
+  <p class="lead">Feed 分页是深分页问题的经典现场。<b>offset 分页在 Feed 场景是错的</b>，原因有三：数据实时新增、性能断崖、结果重复/遗漏。</p>
+  <h3>4.1 offset 为什么不行</h3>
+  <pre><span class="c"># 错误示范：MySQL offset 分页</span>
+SELECT * FROM content ORDER BY create_time DESC LIMIT 10000, 20;
+<span class="c"># offset=10000 时 MySQL 要扫描并丢弃前 10000 行，数据量大时耗时线性增长</span>
+<span class="c"># 第 1 页：5ms → 第 500 页：200ms → 第 5000 页：2s+</span>
+
+<span class="c"># 更致命的问题：Feed 是活的</span>
+<span class="c"># 用户看第 1 屏时 top=100 条，10 分钟后刷新出 3 条新内容</span>
+<span class="c"># 用户翻到第 2 页（offset=20），拿到的是原第 21~40 条</span>
+<span class="c"># 但此时 top 20 已变成 [新1,新2,新3,旧1...旧17]</span>
+<span class="c"># → 用户第 2 页会看到 旧1~旧3 的重复！新内容把 offset 顶偏了</span></pre>
+  <h3>4.2 游标分页的正确姿势</h3>
+  <pre><span class="c"># 游标 = 上一页最后一条的 (score, id) 二元组</span>
+<span class="c"># 请求：GET /feed?cursor={last_score}_{last_id}&size=20</span>
+
+<span class="c">-- MySQL 实现（利用 (create_time, id) 联合索引）</span>
+SELECT * FROM content
+<span class="b">WHERE</span> (create_time, id) &lt; (1718000000000, 90001)
+<span class="b">ORDER BY</span> create_time <span class="b">DESC</span>, id <span class="b">DESC</span>
+<span class="b">LIMIT</span> 20;
+<span class="c">-- 索引 (create_time, id) 直接定位到游标位置，O(logN)+20，与翻到多深无关</span>
+
+<span class="c"># Redis 实现（ZSet 天然支持）</span>
+<span class="b">ZREVRANGEBYSCORE</span> timeline:1001 (1718000000001 -inf <span class="b">LIMIT</span> 0 20
+<span class="c"># 左括号 ( 表示开区间，恰好排除上一页最后一条，不会重复</span>
+
+<span class="c"># 为什么 score 相同要带 id 做 tiebreaker？</span>
+<span class="c"># 同一毫秒发多条内容时，只按 score 翻页会漏数据或重复</span>
+<span class="c"># (score, id) 二元组保证全序，雪花 ID 自带毫秒+序列号，天然唯一</span></pre>
+  <h3>4.3 三种 Feed 翻页语义对比</h3>
+  <table>
+    <tr><th style="width:130px">语义</th><th style="width:200px">触发场景</th><th>实现</th></tr>
+    <tr><td><b>加载更多</b>（向下）</td><td>用户主动下拉</td><td>游标分页，游标 = 上一页末条 (score,id)</td></tr>
+    <tr><td><b>下拉刷新</b>（向上）</td><td>用户下拉回顶部</td><td>查"比当前最新还新的"：score &gt; 当前最新 score</td></tr>
+    <tr><td><b>回拉补洞</b></td><td>timeline 只存 1000 条，翻到底了</td><td>翻页到 ZSet 边界时，回源到 user_post_index / 大 V 的 zvip 补齐，再拼上游标</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>深分页 + 游标也不是万能的：</b>用户连续翻 10 万条（极端场景）时，游标里的 score 会非常老，MySQL 走索引仍然快，但<b>Redis ZSet 用 ZREVRANGEBYSCORE 翻老数据时要 skip 的元素太多</b>（Redis 6.2 之后才支持 BYSCORE + LIMIT 内部优化，之前是 O(skip+n)）。解法：timeline 分层——<b>最近的 1000 条在 Redis，更老的直接查 MySQL 的 user_post_index</b>，翻页游标自然过渡。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>未读计数与多端同步</h2></div>
+  <p class="lead">未读（红点）和多端同步是 Feed 的"体验层"需求，但工程上比主链路更难做对——它们涉及<b>计数一致性</b>和<b>跨端状态对齐</b>。</p>
+  <h3>5.1 未读计数的三种实现</h3>
+  <table>
+    <tr><th style="width:150px">方案</th><th>实现</th><th>适用</th></tr>
+    <tr><td><b>全局计数器</b></td><td>每个用户一个计数 key：<span class="k">INCR unread:{uid}</span>，打开 Feed 时清零</td><td>简单，但"打开"的定义模糊（看一眼算读过吗）</td></tr>
+    <tr><td><b>游标水位线</b></td><td>记录用户"已读到的最新 content_id"，未读数 = timeline 中 score &gt; 水位的条数</td><td>与翻页强一致，<b>推荐</b></td></tr>
+    <tr><td><b>时间水位线</b></td><td>记录最后消费时间戳，未读 = create_time &gt; 水位的内容数</td><td>简单但时钟不一致时丢数据</td></tr>
+  </table>
+  <pre><span class="c"># 水位线方案（业界主流，Instagram/微博同思路）</span>
+<span class="c"># 1. 用户读到某条内容 → 记录水位：SET read_mark:{uid} {content_id}</span>
+<span class="c"># 2. 未读数 = ZCOUNT timeline:{uid} ({watermark_score} +inf</span>
+<span class="c">#    （ZSet 的 member 就是 content_id，score 就是 create_time，天然可算）</span>
+
+<span class="c"># 关键细节：水位必须存"已读的最大 score"，而不是"读过的 ID 集合"</span>
+<span class="c"># 存 ID 集合的代价：用户翻 1000 条 = 1000 个 ID，集合无限膨胀</span>
+<span class="c"># 存水位的问题：用户可能跳着读（先看第 50 条，水位就被顶到 50）</span>
+<span class="c"># → 妥协：水位取"连续已读的边界"，发现跳读时只推进到连续段的末尾</span></pre>
+  <h3>5.2 多端同步</h3>
+  <p>手机、平板、Web 同时登录时，核心问题是：<b>一个端上的"已读"状态，如何同步到其他端，且不冲突。</b></p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>读扩散推送（服务端 push）：</b>timeline 更新时，通过长连接（WebSocket / MQTT）向在线端推送增量 ID 列表，端上本地合并。这是"实时新内容提示"的基础</div></div>
+    <div class="step"><div class="txt"><b>读状态同步：</b>客户端本地维护 read_mark，定期或在关键动作（退出应用、切后台）时上报服务端；服务端以<b>最大水位</b>为准合并（幂等，取 max）</div></div>
+    <div class="step"><div class="txt"><b>版本号防冲突：</b>每次读状态变更带单调递增的 version，服务端拒绝 version 小于当前记录的更新，避免旧设备回滚全局状态</div></div>
+    <div class="step"><div class="txt"><b>全量对齐兜底：</b>端上发现本地 timeline 与服务端版本差距过大时（如离线 2 小时），丢弃本地状态，用游标从服务端重新拉取</div></div>
+  </div>
+  <div class="callout warn">
+    <b>未读计数最容易崩的地方：</b>大 V 发一条内容，1000 万粉丝的未读数全部 +1。如果每个粉丝的未读 key 都是 INCR，就是 1000 万次 Redis 写。解法：<b>未读不做实时 INCR，改为读时计算</b>（ZCOUNT 水位以上的条数）——水位以上通常不超过几十条，ZCOUNT 是 O(logN)，读一次的成本远低于维护 N 个计数器。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>推荐排序介入点与回拉补洞</h2></div>
+  <p class="lead">纯时间序的 Feed 已经很少见——插入率、互动量、时效性都会干预排序。<b>关键在于：排序介入点放在哪一层，决定了成本和效果。</b></p>
+  <h3>6.1 三个介入点</h3>
+  <table>
+    <tr><th style="width:140px">介入点</th><th style="width:220px">做法</th><th>代价与效果</th></tr>
+    <tr><td><b>时间线层</b><br>（最轻）</td><td>发布时给 score 加权重：<span class="k">score = create_time + boost</span>，boost 由作者等级/内容质量决定</td><td>零读成本，但 boost 规则静态，无法个性化</td></tr>
+    <tr><td><b>合并层</b><br>（主流）</td><td>拉取 N 屏候选（如 200 条），用模型重排取前 20</td><td>读时多花 10~30ms 推理，可个性化，<b>业界主流</b></td></tr>
+    <tr><td><b>召回层</b><br>（最重）</td><td>不读 timeline，直接从推荐系统拉候选（兴趣向量 + 协同过滤）</td><td>变成推荐流，Feed 只作为一路召回源</td></tr>
+  </table>
+  <pre><span class="c"># 合并层重排的标准流程</span>
+<span class="c"># 1. 从 timeline 拉 200 条候选（10 屏）</span>
+<span class="c"># 2. 粗排过滤：已读过滤、低质过滤、作者拉黑过滤（O(N)，微秒级）</span>
+<span class="c"># 3. 精排模型：输入 (用户画像, 作者特征, 内容特征, 上下文) → 预估点击率</span>
+<span class="c"># 4. 取 top 20 返回，剩余 180 条丢弃或缓存</span>
+
+<span class="c"># 工程细节：粗排过滤必须在精排之前，否则浪费 90% 的推理算力</span>
+<span class="c"># 精排结果要带分数缓存 30~60 秒，同一用户连续翻页不重复推理</span></pre>
+  <h3>6.2 回拉补洞机制</h3>
+  <p>Timeline 只存最近 1000 条，用户翻到底部时数据出现"空洞"（关注的人 3 天前发的内容不在 ZSet 里）。回拉就是<b>读时按需补齐</b>：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>检测空洞：</b>游标翻到 ZSet 末尾（返回条数 &lt; page size），或返回内容中相邻两条的时间差 &gt; 阈值（如 1 小时），判定需要回拉</div></div>
+    <div class="step"><div class="txt"><b>回拉关注列表：</b>取用户的关注对象（200 人），并发查各人的 user_post_index（MySQL）或 zvip 缓存（大 V），时间范围 = (游标 score, 游标 score - 补洞窗口)</div></div>
+    <div class="step"><div class="txt"><b>合并排序：</b>回拉结果与 timeline 尾部结果归并，按 (score, id) 排序后取一页，返回的游标推进到新的 (score, id)</div></div>
+    <div class="step"><div class="txt"><b>防抖：</b>回拉成本高（200 次索引查询），同一用户的回拉结果缓存 5 分钟；连续翻页时不重复回拉同一窗口</div></div>
+  </div>
+  <div class="callout ok">
+    <b>回拉的本质：</b>写扩散是"空间换时间"（每个粉丝一份），回拉是"时间不够时用计算补"。1000 条 ZSet 覆盖普通用户 1~2 周的消费量，<b>只有"考古式"翻页（看一个月前的内容）才会触发回拉</b>，占比 &lt; 1%，所以高成本可接受。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>热点与容量估算</h2></div>
+  <p class="lead">Feed 的热点分两类：<b>内容热点</b>（一条爆款被千万人同时读）和<b>事件热点</b>（突发事件导致流量毛刺）。容量估算要按峰值 3 倍设计。</p>
+  <h3>7.1 热点内容与突发热点</h3>
+  <table>
+    <tr><th style="width:130px">热点类型</th><th style="width:230px">现象</th><th>对策</th></tr>
+    <tr><td><b>爆款内容</b></td><td>单条内容 QPS 达 10万+，全部走同一个 content_id 缓存 key</td><td>多级缓存：本地缓存（Caffeine，1~5s TTL）+ Redis；CDN 缓存图片/视频</td></tr>
+    <tr><td><b>大 V 直播/发文</b></td><td>发布瞬间 1000 万粉丝同时刷新，timeline 读取 QPS 尖刺</td><td>读写分离（读从库）；请求合并（singleflight，相同请求只查一次）</td></tr>
+    <tr><td><b>突发事件</b></td><td>社会热点导致全站流量 ×3，大 V 粉丝集中刷新</td><td>降级开关：关闭精排模型只按时间序；关闭非核心功能（未读数、推荐）</td></tr>
+    <tr><td><b>缓存击穿</b></td><td>大 V 内容缓存过期，千万请求穿透到 DB</td><td>逻辑过期：key 永不过期，值内嵌过期时间，异步重建</td></tr>
+  </table>
+  <h3>7.2 容量估算完整算例</h3>
+  <pre><span class="c">===== 输入参数（中型社交产品，上线第 2 年）=====</span>
+<span class="c">总用户     = 5000万，DAU = 1000万（20%）</span>
+<span class="c">人均关注   = 200（其中大 V 20 人，普通用户 180 人）</span>
+<span class="c">人均粉丝   = 200（分布极度不均：头部 1% 用户占 50% 边）</span>
+<span class="c">发布率     = 0.5 条/人/天 → 总发布量 = 1000万 × 0.5 = 500万条/天</span>
+<span class="c">刷新行为   = DAU 每天打开 App 10 次，每次下拉刷新 3 次 → 30 次/人/天</span>
+
+<span class="c">===== 写扩散链路（普通用户）=====</span>
+<span class="c">普通用户发布（粉丝&lt;1万）的内容量 = 500万 × 99% = 495万条/天</span>
+<span class="c">扇出写入 = 495万条 × 平均粉丝 180 = 89.1亿次 ZADD/天</span>
+<span class="c">QPS = 89.1亿 / 86400 = 10,300 次/秒（均值），峰值按 3 倍 = 31,000 QPS</span>
+<span class="c">Redis 集群：单机 8万 写 QPS（保守值）→ 31,000/80,000 &lt; 1 台</span>
+<span class="c">但大 V 突发 + 重试 + 冷启动 → 预留 6 个分片（N=6），每片一主一从</span>
+
+<span class="c">===== 读链路 =====</span>
+<span class="c">Feed 读 QPS = 1000万 DAU × 30 次/天 / 86400 = 3,472 次/秒（均值）</span>
+<span class="c">峰值（晚间 8-10 点集中 40%）= 3,472 × 3 = 10,400 QPS</span>
+<span class="c">每次 Feed 读 = 1 次 ZREVRANGEBYSCORE + 1 次批量 mget 内容</span>
+<span class="c">内容读取 P99 &lt; 20ms（多级缓存命中时）</span>
+
+<span class="c">===== 存储 =====</span>
+<span class="c">timeline ZSet：1000万 DAU × 1000 条 × (8B member + 8B score + 16B 结构开销)</span>
+<span class="c">  ≈ 1000万 × 1000 × 32B = 320 GB（仅 Redis 内存，实际 ~2 倍 → 640GB）</span>
+<span class="c">内容表：500万条/天 × 365 天 × 1KB（含索引）= 182GB/年 → 3 年 550GB</span>
+<span class="c">MySQL 内容表按 content_id 分 32 库 × 32 表（每表约 500万 行/年）</span>
+
+<span class="c">===== 网络带宽 =====</span>
+<span class="c">每次 Feed 响应 = 20 条 × (ID + 摘要 + 图片 URL) ≈ 8KB</span>
+<span class="c">3,472 QPS × 8KB = 27.8 MB/s（均值），峰值 83 MB/s → 千兆网卡 ×2 或万兆</span>
+<span class="c">图片/视频走 CDN，不回源到 Feed 服务</span></pre>
+  <div class="callout warn">
+    <b>容量规划的三个反直觉点：</b>① <b>timeline 的 Redis 内存比内容表大 3 倍以上</b>——冗余存储的代价必须在预算内；② <b>读峰值和写峰值不同时发生</b>——发布高峰在白天，读取高峰在晚间，容量不能简单相加；③ <b>大 V 粉丝数是长尾分布的</b>——1% 用户占 50% 关注边，容量必须按头部设计，按均值设计会被头部打穿。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 offset 做 Feed 分页</div><div class="pd">深分页性能断崖 + 新内容插入导致重复/遗漏。必须用 (score, id) 游标分页，且翻页游标要能无缝过渡到回拉。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">大 V 走了写扩散，扇出风暴打爆集群</div><div class="pd">千万粉丝的大 V 发一条 = 千万次 ZADD，Redis 集群瞬间饱和。大 V 必须切换拉模式，阈值通常取 1 万粉丝。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">删除内容时做全量扇出删除</div><div class="pd">把粉丝 timeline 里的 ID 全部删一遍，又是一次扇出风暴。正确做法：timeline 只存 ID，读时用内容表 status 过滤。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">未读计数用 INCR 实时维护</div><div class="pd">大 V 发文导致千万粉丝未读数同时 +1，Redis 写打满。改为读时 ZCOUNT 水位线计算，写时零成本。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">回拉时把用户所有关注对象的近期内容全量拉取</div><div class="pd">关注 200 人 = 200 次索引查询，回拉一次 P99 直接破秒。必须限制时间窗口（如只看 24 小时）、并发查询、结果缓存 5 分钟。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">timeline 无上限，ZSet 无限增长</div><div class="pd">老用户 timeline 到几十万条，ZREVRANGEBYSCORE 翻页变慢、内存爆炸。必须 LTRIM/ZREMRANGEBYRANK 裁到 1000 条，配回拉兜底。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">精排模型在每次翻页时都跑一遍</div><div class="pd">用户连续翻 10 页 = 10 次模型推理，GPU 成本和延迟都不可接受。候选集排序结果要缓存 30~60 秒，翻页直接消费缓存。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">内容 ID 不用雪花号，用数据库自增</div><div class="pd">自增 ID 泄露业务量、且跨库分表时无法直接从 ID 推时间序。必须用雪花 ID，让 ID 高 41 位就是毫秒时间戳，时间线和游标全部复用它。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">关注/取关时不补拉或清理 timeline</div><div class="pd">新关注一个大 V，他的历史内容不在自己 timeline 里，翻页时才暴露空洞；取关后内容残留。关注变更要触发"补拉近期 + 清理存量"。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">多端已读状态直接覆盖，旧设备回滚全局</div><div class="pd">平板离线 2 小时后上线，用本地旧水位覆盖了手机的新水位。已读状态必须带单调 version，服务端只接受更大 version 的更新。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一个有 2000 万粉丝的大 V 发布了一条内容，系统应该采用哪种方式让粉丝看到？</div>
+      <button class="opt">写扩散：把内容 ID 推送到每个粉丝的 timeline ZSet</button>
+      <button class="opt">拉模式：只写自己的内容索引，粉丝读 Feed 时按需聚合拉取</button>
+      <button class="opt">两种都行，看 Redis 集群规模</button>
+      <div class="ans">正确答案：<b>拉模式</b>。写扩散需要 2000 万次 ZADD，约 200 秒才能写完（单机 10w QPS），期间粉丝看不到，且会把 Redis 写满。大 V 内容只写一份索引，读时按需聚合，是微博/Twitter 的标准做法。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. Feed 分页坚决不用 offset 的核心原因是什么？</div>
+      <button class="opt">offset 语法在 Redis 里不支持</button>
+      <button class="opt">深分页有性能断崖，且新内容插入会让 offset 顶偏，导致重复或遗漏</button>
+      <button class="opt">offset 不能按时间排序</button>
+      <div class="ans">正确答案：<b>性能 + 正确性双重问题</b>。offset=10000 时 MySQL 要扫描丢弃前 10000 行；更致命的是 Feed 实时新增，第 2 页的 offset 会被新内容顶偏，用户看到重复内容。游标 (score, id) 同时解决两个问题。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 用户删除自己 3 天前发的一条内容，写扩散模式下最合理的做法是？</div>
+      <button class="opt">只把内容表 status 改为已删除，读时过滤，不做扇出删除</button>
+      <button class="opt">遍历所有粉丝的 timeline，删除该内容 ID</button>
+      <button class="opt">直接清空该用户所有粉丝的 timeline 缓存</button>
+      <div class="ans">正确答案：<b>只改 status，读时过滤</b>。timeline 里只存 ID，读的时候用内容表 status 过滤已删内容。做删除扇出等于再打一次集群，而且粉丝可能还没读到就删了索引，逻辑上也不对。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于未读计数，以下哪种方案在大 V 发文时最稳？</div>
+      <button class="opt">每个粉丝一个计数器 key，大 V 发文时全部 INCR</button>
+      <button class="opt">记录用户已读水位，未读数 = 水位以上的 timeline 条数，读时计算</button>
+      <button class="opt">客户端本地计数，不同步服务端</button>
+      <div class="ans">正确答案：<b>水位线 + 读时计算</b>。INCR 方案在大 V 发文时要写千万个计数器；读时 ZCOUNT 是 O(logN)，且天然与翻页一致。客户端本地计数无法多端同步。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 用户的 timeline ZSet 只保留了最近 1000 条，当他翻到底部还想继续看，应该？</div>
+      <button class="opt">返回空列表，提示没有更多了</button>
+      <button class="opt">把 ZSet 扩容到 10000 条</button>
+      <button class="opt">触发回拉：查关注对象的 user_post_index / 大 V 缓存，按游标时间窗补齐后合并返回</button>
+      <div class="ans">正确答案：<b>回拉补洞</b>。timeline 是有损缓存（只存热点），真相在内容索引表里。翻到底部时按游标的时间窗回源查询，控制窗口大小和并发，并对回拉结果做短缓存防抖。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 某产品 1 亿 DAU、人均关注 200、人均日发布 0.5 条，若纯写扩散，每天的 timeline 写入量约为多少？</div>
+      <button class="opt">约 100 亿次（1亿 × 200 × 0.5）</button>
+      <button class="opt">约 5000 万次（只算发布量）</button>
+      <button class="opt">约 200 亿次（1亿 × 200）</button>
+      <div class="ans">正确答案：<b>约 100 亿次/天</b>。每次发布要扇出到全部粉丝：1亿 DAU × 0.5 条 = 5000 万条发布，每条 × 200 粉丝 = 100 亿次 timeline 写入，均值约 11.6 万 QPS，峰值 3 倍需要 Redis 集群分片承载。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>关键命令与 SQL</h3>
+  <div class="cmds">
+    <div class="crow"><code>ZADD timeline:{uid} {ts} {cid}</code><span class="desc">写扩散：把内容 ID 写入粉丝 timeline</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZREVRANGEBYSCORE timeline:{uid} +inf ({cursor} LIMIT 0 20</code><span class="desc">游标翻页（开区间排除上页末条）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZCOUNT timeline:{uid} ({watermark} +inf</code><span class="desc">读时计算未读数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ZREMRANGEBYRANK timeline:{uid} 0 -1001</code><span class="desc">裁剪 timeline 到 1000 条</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM content WHERE (create_time,id) &lt; (?,?) ORDER BY create_time DESC, id DESC LIMIT 20</code><span class="desc">MySQL 游标分页</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /feed?cursor={score}_{id}&amp;size=20</code><span class="desc">Feed API 游标协议</span><button class="copy">复制</button></div>
+  </div>
+  <h3>核心参数速查</h3>
+  <table>
+    <tr><th style="width:210px">参数</th><th>推荐值 / 说明</th></tr>
+    <tr><td class="f">timeline 保留条数</td><td>500~1000 条/用户，覆盖 1~2 周消费，超出走回拉</td></tr>
+    <tr><td class="f">大 V 阈值（粉丝数）</td><td>1 万。低于此值写扩散，高于此值切拉模式</td></tr>
+    <tr><td class="f">Feed 页大小</td><td>20 条/页；重排候选取 200 条（10 屏）</td></tr>
+    <tr><td class="f">重排结果缓存 TTL</td><td>30~60 秒，翻页不重复推理</td></tr>
+    <tr><td class="f">大 V 内容缓存 TTL</td><td>zvip 缓存 30 秒 + 本地缓存 1~5 秒两级</td></tr>
+    <tr><td class="f">回拉时间窗口</td><td>游标前 24 小时，结果缓存 5 分钟</td></tr>
+    <tr><td class="f">峰值系数</td><td>容量按均值 3 倍设计，晚间高峰集中 40% 流量</td></tr>
+  </table>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Feed / Timeline</b></td><td>信息流，按时间排序的内容列表，本质是内容+关注关系算出的视图</td></tr>
+    <tr><td><b>推模式（写扩散）</b></td><td>发布时把内容 ID 写入所有粉丝的 timeline，读时 O(1)</td></tr>
+    <tr><td><b>拉模式（读扩散）</b></td><td>发布时只写一份，读时聚合所有关注对象的内容，写轻读重</td></tr>
+    <tr><td><b>推拉结合</b></td><td>普通用户推、大 V 拉的混合架构，业界主流</td></tr>
+    <tr><td><b>扇出 / Fan-out</b></td><td>一条内容分发到的粉丝数量，扇出量 = Σ粉丝数</td></tr>
+    <tr><td><b>大 V</b></td><td>粉丝数超阈值（通常 1 万）的用户，必须走拉模式</td></tr>
+    <tr><td><b>游标分页</b></td><td>用上一页末条的 (score, id) 定位下一页，深分页不退化</td></tr>
+    <tr><td><b>回拉 / 补洞</b></td><td>timeline 只存热点，翻到底时回源查索引补齐历史内容</td></tr>
+    <tr><td><b>水位线</b></td><td>用户已读到的最大 score，未读数 = 水位以上的条数</td></tr>
+    <tr><td><b>读扩散推送</b></td><td>timeline 更新时长连接推送增量 ID 到在线端，与"读扩散"是两回事</td></tr>
+    <tr><td><b>重排 / 精排</b></td><td>拉取多屏候选后，用模型预估点击率重排取前 N</td></tr>
+    <tr><td><b>singleflight</b></td><td>请求合并：相同 key 的并发请求只查一次，防缓存击穿</td></tr>
+    <tr><td><b>逻辑过期</b></td><td>缓存 key 永不过期，值内嵌过期时间，过期后异步重建</td></tr>
+    <tr><td><b>雪花 ID</b></td><td>分布式 ID，高 41 位是毫秒时间戳，全局有序且自带时间语义</td></tr>
+    <tr><td><b>ZSet</b></td><td>Redis 有序集合，member=content_id, score=create_time，timeline 的载体</td></tr>
+    <tr><td><b>内容索引表</b></td><td>user_id → content_id 的倒排表，读扩散和回拉的数据源</td></tr>
+    <tr><td><b>拉黑/过滤</b></td><td>读时过滤不看的内容，粗排在精排之前，省 90% 推理算力</td></tr>
+    <tr><td><b>降级开关</b></td><td>突发流量时关精排、关未读、关推荐，只保主链路</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 Redis + MySQL 实现一个最小 Feed：① 建 follow/content/timeline 三张结构；② 写扩散发布 + 游标翻页；③ 给某个用户加 1 万假粉丝，观测 ZADD 耗时，然后切拉模式对比；④ 在 timeline 里 LTRIM 到 1000 条，实现回拉补洞；⑤ 用 ZCOUNT 实现未读。跑通这五步，Feed 的骨架就全在你手里了。<br><br>
+    <b>之后值得深入：</b>基于 Flink 的实时内容理解与质量分、推荐系统召回层与 Feed 的融合、长连接推送网关（百万级连接管理）、以及 Feed 的 A/B 实验平台。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Feed 系统设计 · 上线前务必检查：大 V 阈值、游标分页、timeline 裁剪</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（三种模式）和模块 4（游标分页）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边画扇出图。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边画一张关注关系图：A→B→C→D，标注每条边的扇出方向。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

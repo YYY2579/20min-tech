@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 Linux 系统调优</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · DevOps 篇 · 高密度版</span>
+    <h1>二十分钟学透 Linux 系统调优</h1>
+    <p class="sub">调优不是抄 sysctl 大全，是<b>先建立观测框架，再逐个证伪</b>。这篇以 USE 方法论为主线，覆盖 CPU/内存/磁盘/网络四大资源的真实参数与稳妥值，以及"一次只改一个"的工程纪律。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 维 USE 模型</span>
+      <span class="chip"><b>25+</b> 个真实内核参数</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一台 Linux 虚拟机跟着敲：vmstat 1、iostat -xz 1 先跑起来</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>工具先行：没观测就没调优</h2></div>
+  <pre><span class="c"># 安装观测套件（sysstat 提供 sar/iostat/pidstat/mpstat）</span>
+apt install sysstat procps iproute2 linux-tools-common numactl fio ethtool
+
+<span class="c"># 60 秒健康快检（Brendan Gregg 的经典十条，按顺序敲）</span>
+uptime                    <span class="c"># 负载均值：1/5/15 分钟，对比 CPU 核数判断过载趋势</span>
+dmesg -T | tail -25       <span class="c"># OOM、ECC 错误、磁盘 I/O error 都在这里</span>
+vmstat 1                  <span class="c"># r 列（等 CPU 的进程）持续大于核数 = CPU 饱和</span>
+mpstat -P ALL 1           <span class="c"># 每颗核心的 %usr/%sys/%iowait/%soft，定位单核瓶颈</span>
+pidstat 1                 <span class="c"># 哪个进程在烧 CPU</span>
+iostat -xz 1              <span class="c"># %util、await、avgqu-sz：磁盘饱和度与延迟</span>
+free -m                   <span class="c"># available 才是真实可用，别只看 free</span>
+sar -n DEV 1              <span class="c"># 网卡吞吐与错包</span>
+ss -s                     <span class="c"># socket 汇总：TIME_WAIT 堆积、recv-q 积压</span>
+top                       <span class="c"># 总览，重点看 wa 与 st（被偷走的时间，虚拟机）</span>
+
+<span class="c"># 当前生效的内核参数（读比写重要，调优前先存档现状）</span>
+sysctl -a &gt; /root/sysctl-before.txt
+sysctl -a --pattern 'net.ipv4.tcp' | sort</pre>
+  <div class="callout warn">
+    <b>铁律：改任何参数之前，先把当前值全部导出存档。</b>出了问题才知道改回了什么；团队复盘时，"我改了哪 3 个参数"必须能一句话说清。参数文件放 <span class="k">/etc/sysctl.d/99-tuning.conf</span>，<b>不要直接编辑 /etc/sysctl.conf</b>，否则升级时被覆盖。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>性能观测方法论：USE 方法</h2></div>
+  <p class="lead">USE（Utilization / Saturation / Errors，Brendan Gregg 提出）是排查性能问题的<b>检查清单</b>：对每个资源问三个问题，答不上来就说明观测有盲区。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th style="width:270px">含义</th><th>典型症状</th></tr>
+    <tr><td><b>U 利用率</b></td><td>资源被使用的时间比例（CPU %、磁盘 %util）</td><td>CPU 90% util，但延迟正常 = 饱和的前兆</td></tr>
+    <tr><td><b>S 饱和度</b></td><td>工作排不上队的程度（run queue、await、backlog）</td><td><b>饱和才是用户可感知卡顿的直接原因</b></td></tr>
+    <tr><td><b>E 错误</b></td><td>错误事件计数（drop、retrans、CRC、OOM）</td><td>错误常被忽略，但它们是根因（网卡丢包、磁盘坏道）</td></tr>
+  </table>
+  <h4>把 USE 套到四大资源上</h4>
+  <table>
+    <tr><th style="width:110px">资源</th><th style="width:230px">U（利用率）</th><th>S（饱和度）</th><th>E（错误）</th></tr>
+    <tr><td><b>CPU</b></td><td>%usr/%sys/%iowait</td><td>run queue（vmstat r）、调度延迟</td><td>context switch 异常、迁移风暴</td></tr>
+    <tr><td><b>内存</b></td><td>used/available 比例</td><td>swap in/out（si/so）、major page fault</td><td><b>OOM kill 计数</b></td></tr>
+    <tr><td><b>磁盘</b></td><td>%util</td><td>avgqu-sz、await 排队</td><td>I/O error、重试、smart 错误</td></tr>
+    <tr><td><b>网络</b></td><td>带宽使用率</td><td>recv-q/send-q 积压、syn backlog 满</td><td>drop、retransmit、CRC error</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>USE 的正确用法：</b>从<b>错误（E）</b>开始查——错误最便宜也最能一锤定音；再看<b>饱和度（S）</b>——它直接对应用户体验；利用率（U）放最后，因为高 util 不一定是问题（满载但无排队 = 健康的流水线）。<b>顺序反过来的人，最容易把"CPU 高"当成本质问题。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>CPU 调优：调度、亲和性与中断</h2></div>
+  <h4>调度器与进程优先级</h4>
+  <pre><span class="c"># CFS（完全公平调度器）是现代 Linux 默认，两个相关参数</span>
+kernel.sched_latency_ns       <span class="c"># 默认 24000000（24ms）：一个调度周期内所有任务各跑一次的目标</span>
+kernel.sched_min_granularity_ns  <span class="c"># 默认 3000000（3ms）：单次运行的最短时间，防过度切换</span>
+<span class="c"># 交互多的桌面/开发机可微调，生产服务器保持默认即可——收益小、风险大</span>
+
+<span class="c"># 优先级工具链（-20 最高优先，19 最低）</span>
+nice -n 10 ./batch-job          <span class="c"># 启动时降优先级，别和在线服务抢 CPU</span>
+renice 5 -p 12345               <span class="c"># 运行中改</span>
+chrt -f 50 ./realtime-task      <span class="c"># SCHED_FIFO 实时策略（慎用，能饿死普通任务）</span>
+
+<span class="c"># 把进程绑到指定核心（缓存亲和性、NUMA 局部性）</span>
+taskset -c 2,3 ./app            <span class="c"># 启动绑定</span>
+taskset -pc 2,3 12345           <span class="c"># 运行中绑定</span>
+<span class="c"># 系统服务固定绑核（nginx worker、redis、DPDK 应用常用）</span>
+systemctl set-property app.service CPUAffinity=2-5</pre>
+  <h4>中断亲和性：别让中断挤爆 CPU0</h4>
+  <pre><span class="c"># 看当前中断分布（网卡队列中断、定时器）</span>
+cat /proc/interrupts
+watch -n1 'cat /proc/interrupts | head -20'
+
+<span class="c"># 网卡多队列中断手动分发到不同核心（irqbalance 是自动方案）</span>
+echo 2 &gt; /proc/irq/32/smp_affinity      <span class="c"># 32 号中断只走 CPU1（位掩码：1=CPU0，2=CPU1，3=CPU0+1）</span>
+echo 4 &gt; /proc/irq/33/smp_affinity      <span class="c"># 33 号中断走 CPU2</span>
+
+<span class="c"># 软中断（网络收包 softirq）观察</span>
+cat /proc/softirqs | grep NET_RX
+
+<span class="c"># 自动化：装 irqbalance 守护进程，默认按负载自动均衡</span>
+apt install irqbalance &amp;&amp; systemctl enable --now irqbalance
+<span class="c"># 做了手动绑核/隔离核心的场景要停用它：systemctl stop irqbalance</span></pre>
+  <h4>核心隔离：给关键进程留"自留地"</h4>
+  <pre><span class="c"># 内核启动参数（/etc/default/grub 的 GRUB_CMDLINE_LINUX，改完 update-grub）</span>
+isolcpus=2,3 nohz_full=2,3 rcu_nocbs=2,3
+<span class="c"># isolcpus=2,3        从调度器隔离 CPU2/3，普通任务不会上去</span>
+<span class="c"># nohz_full=2,3        这两个核停止周期性 tick 中断（自适应 tick）</span>
+<span class="c"># rcu_nocbs=2,3        RCU 回调不在隔离核上执行</span>
+<span class="c"># 然后 taskset -c 2,3 把延迟敏感进程（DPDK、行情、交易）钉上去</span>
+<span class="c"># 代价：这两个核不能被普通进程用到，核心数要预留，普通业务机别碰</span>
+
+<span class="c"># CPU 频率调节（ Governors：performance / powersave / schedutil / ondemand ）</span>
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+echo performance &gt; /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   <span class="c"># 延迟敏感场景锁最高频</span></pre>
+  <div class="callout danger">
+    <b>isolcpus 不是"高性能开关"：</b>它隔离了核，也就<b>放弃了这些核上的自动负载均衡</b>。调度错了（关键进程没绑上去，普通进程也上不去）会造成"一半核闲着、服务在剩下一半核上排队"。<b>只有明确知道自己要隔离什么进程时才用</b>，且必须配合绑核验证。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>内存调优：swappiness、overcommit 与 OOM</h2></div>
+  <h4>vm.swappiness 的真实语义</h4>
+  <p><b>它控制"换出匿名页（进程堆内存）的倾向"，不是"用 swap 的程度"。</b>值越大越倾向把冷的匿名页换出、保留文件缓存（page cache）。</p>
+  <table>
+    <tr><th style="width:130px">取值</th><th>行为</th></tr>
+    <tr><td class="f">0</td><td>除非接近 OOM 否则不换出。<b>不等于"禁用 swap"</b>，紧急时仍会换</td></tr>
+    <tr><td class="f">10</td><td><b>数据库/Redis 类延迟敏感服务的推荐值</b>，尽量用内存、少换出</td></tr>
+    <tr><td class="f">60（默认）</td><td>平衡策略，桌面/混合负载合理</td></tr>
+    <tr><td class="f">100</td><td>激进换出，最大化 page cache。几乎不适合服务端</td></tr>
+  </table>
+  <pre><span class="c"># 设置（重启永久生效）</span>
+sysctl -w vm.swappiness=10
+echo <span class="g">"vm.swappiness = 10"</span> &gt;&gt; /etc/sysctl.d/99-tuning.conf
+
+<span class="c"># 观测 swap 行为（si/so 不为 0 就是在换页）</span>
+vmstat 1 | awk <span class="g">'NR&gt;2 {print "si="$7" so="$8}'</span>
+sar -W 1                        <span class="c"># pswpin/pswpout 每秒换页统计</span></pre>
+  <h4>overcommit 与 OOM Killer</h4>
+  <pre><span class="c"># 内存超配策略：进程申请的内存总和可以超过物理内存吗？</span>
+vm.overcommit_memory = 0        <span class="c"># 默认：启发式判断，明显过分的申请才拒</span>
+vm.overcommit_memory = 1        <span class="c"># 永远允许（有 swap 兜底的虚机常见，但 OOM 风险大）</span>
+vm.overcommit_memory = 2        <span class="c"># 严格模式：不允许超过 RAM+swap×ratio，fork 多的服务会被拒</span>
+vm.overcommit_ratio = 50        <span class="c"># 配合 mode 2 使用：允许的超配比例</span>
+<span class="c"># 建议：绝大多数场景保持默认 0。JVM/数据库这类吃内存大户别动这个参数</span>
+
+<span class="c"># OOM 保护：给关键进程调低"被杀分数"（-1000 = 几乎免死）</span>
+grep -E <span class="g">'oom_score|Killed'</span> /var/log/kern.log
+echo -1000 &gt; /proc/$(pgrep -f <span class="g">'redis-server'</span>)/oom_score_adj
+<span class="c"># systemd 服务写法（重启也生效）：</span>
+<span class="c"># OOMScoreAdjust=-500</span>
+
+<span class="c"># 保留空闲内存下限，防止突发分配直接把内存抽干</span>
+vm.min_free_kbytes = 131072     <span class="c"># 16GB 机器量级参考，太小则突发分配失败，太大则浪费内存</span>
+
+<span class="c"># 透明大页 THP：数据库/Redis 官方建议关闭或 madvise</span>
+cat /sys/kernel/mm/transparent_hugepage/enabled
+echo madvise &gt; /sys/kernel/mm/transparent_hugepage/enabled   <span class="c"># 只对显式申请的程序生效</span>
+<span class="c"># Redis 场景直接 never；JVM 用 -XX:+UseTransparentHugePages 自己管理更稳</span></pre>
+  <div class="callout warn">
+    <b>"swappiness=0 最好"是流传最广的误读。</b>0 只是把换出推迟到 OOM 边缘，<b>该换的时候照样换，且换的时候更凶</b>（一次性大量换出造成延迟尖峰）。延迟敏感服务用 10，配合足够内存 + 监控 si/so，比盲目归零理性得多。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>磁盘 IO 调优：调度器、RAID 与挂载</h2></div>
+  <h4>I/O 调度器选择</h4>
+  <table>
+    <tr><th style="width:150px">调度器</th><th>适用场景</th></tr>
+    <tr><td class="f">none</td><td><b>SSD/NVMe 首选</b>。闪存没有寻道时间，合并排序反而添延迟</td></tr>
+    <tr><td class="f">mq-deadline</td><td>SATA HDD 稳妥默认，保证读请求不被写饿死</td></tr>
+    <tr><td class="f">kyber</td><td>面向延迟目标的调度器，可按读写设延迟上限</td></tr>
+    <tr><td class="f">bfq</td><td>桌面/多进程公平场景，吞吐不是最优但响应好</td></tr>
+  </table>
+  <pre><span class="c"># 查看与切换（nvme 设备通常只有 none）</span>
+cat /sys/block/sda/queue/scheduler
+echo none &gt; /sys/block/sda/queue/scheduler        <span class="c"># SSD 用 none</span>
+echo mq-deadline &gt; /sys/block/sdb/queue/scheduler <span class="c"># HDD 用 mq-deadline</span>
+
+<span class="c"># 预读：顺序读加大（如 8MB），随机读保持默认 128KB</span>
+blockdev --getra /dev/sda
+blockdev --setra 4096 /dev/sda        <span class="c"># 单位是 512B 扇区：4096×512 = 2MB</span>
+
+<span class="c"># 队列深度（NCQ）：HDD 设 31，SSD 可提高</span>
+echo 31 &gt; /sys/block/sda/queue/nr_requests
+
+<span class="c"># 脏页回写：写密集型服务调大背景阈值，减少同步刷盘卡顿</span>
+vm.dirty_background_ratio = 5         <span class="c"># 默认 10，后台开始回写的脏页比例</span>
+vm.dirty_ratio = 20                   <span class="c"># 默认 20，同步阻塞写入的硬上限，谨慎调大</span>
+<span class="c"># 或按绝对值设（大内存机器更直观）：</span>
+<span class="c"># vm.dirty_background_bytes = 268435456（256MB）</span>
+<span class="c"># vm.dirty_bytes = 1073741824（1GB）</span></pre>
+  <h4>RAID 级别怎么选</h4>
+  <table>
+    <tr><th style="width:90px">级别</th><th style="width:150px">磁盘利用率</th><th style="width:120px">容错</th><th>适用</th></tr>
+    <tr><td><b>RAID 0</b></td><td>100%</td><td>无</td><td>纯性能、可重建数据（缓存、临时盘）</td></tr>
+    <tr><td><b>RAID 1</b></td><td>50%</td><td>1 块盘坏</td><td>系统盘、小容量高可靠</td></tr>
+    <tr><td><b>RAID 5</b></td><td>(n-1)/n</td><td>1 块盘坏</td><td>读多写少。<b>大盘重建风险高，慎用</b></td></tr>
+    <tr><td><b>RAID 6</b></td><td>(n-2)/n</td><td>2 块盘坏</td><td>大容量数据盘主流选择</td></tr>
+    <tr><td><b>RAID 10</b></td><td>50%</td><td>每镜像组 1 块</td><td><b>数据库/随机写密集首选</b>，无校验计算开销</td></tr>
+  </table>
+  <h4>挂载参数</h4>
+  <pre><span class="c"># /etc/fstab —— noatime 是性价比最高的一条</span>
+UUID=xxx /data ext4 defaults,noatime,nodiratime 0 2
+UUID=yyy /logs xfs  defaults,noatime             0 2
+
+<span class="c"># noatime：读文件不再更新 inode 访问时间</span>
+<span class="c">#   效果：日志/图片类随机读场景，写 IO 可降 30%~50%（原来每次 read 变 read+元数据写）</span>
+<span class="c">#   代价：atime 信息不准。99% 的服务端场景不需要 atime</span>
+
+<span class="c"># 其他常用组合：</span>
+<span class="c">#   data=writeback     崩溃可能丢数据但快（有 BBU/掉电保护时可用）</span>
+<span class="c">#   barrier=0          同上有保护时考虑，默认别关</span>
+<span class="c">#   discard/noatime + SSD 的 TRIM：现在 ext4/xfs 默认在线 discard，无需 mount 参数</span>
+
+<span class="c"># 验证基准：fio 压测（顺序/随机、读/写分开测）</span>
+fio -name=randread -rw=randread -bs=4k -iodepth=32 -size=4G -runtime=60 -ioengine=libaio -direct=1
+fio -name=randwrite -rw=randwrite -bs=4k -iodepth=32 -size=4G -runtime=60 -ioengine=libaio -direct=1</pre>
+  <div class="callout ok">
+    <b>磁盘调优的优先级：</b>① <b>应用层少写</b>（合并写、批量落库）→ ② <b>挂载 noatime</b> → ③ <b>调度器与队列深度</b> → ④ RAID 级别重估 → ⑤ 才是硬件（NVMe、缓存卡）。<b>跳过低层级直接买硬件的团队，往往在为应用层的写放大买单。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>网络调优：内核参数与 bypass</h2></div>
+  <h4>连接堆积三件套：backlog 全链路</h4>
+  <p>一条 TCP 连接的 backlog 由三段组成：<b>网卡队列 → 内核半连接/全连接队列 → 应用 accept 队列</b>，任何一段满都会丢包或延迟。</p>
+  <pre><span class="c"># 1. 应用 accept 队列上限（受内核 somaxconn 封顶）</span>
+net.core.somaxconn = 4096            <span class="c"># 默认 128（老内核）/4096（新内核），高并发网关调到 4096+</span>
+<span class="c"># 注意：nginx 的 listen 80 backlog=511 也要一起改，否则内核调大了应用端还是 511</span>
+
+<span class="c"># 2. 半连接队列（SYN 洪水、握手积压）</span>
+net.ipv4.tcp_max_syn_backlog = 4096   <span class="c"># 默认 1024/2048，突发连接场景调大</span>
+net.ipv4.tcp_syncookies = 1           <span class="c"># 默认 1，半连接满时用 cookie 防 SYN flood，保持开启</span>
+
+<span class="c"># 3. 网卡收包队列（数据包在内核里排队等协议栈处理）</span>
+net.core.netdev_max_backlog = 5000    <span class="c"># 默认 1000，万兆网卡/小包高 PPS 必调</span>
+ethtool -g eth0                      <span class="c"># 同时确认网卡硬件 ring buffer（rx/tx 队列深度）拉满</span>
+ethtool -G eth0 rx 4096 tx 4096
+
+<span class="c"># 观测 backlog 溢出（丢包就在这里体现）</span>
+nstat -az | grep -E <span class="g">'TcpExtListenOverflows|TcpExtListenDrops|TcpExtTCPBacklogDrop'</span>
+ss -lnt | awk <span class="g">'{print $1}'</span> | sort | uniq -c   <span class="c"># Recv-Q 列堆积 = 应用 accept 不过来</span></pre>
+  <h4>TIME_WAIT 与端口</h4>
+  <pre><span class="c"># TIME_WAIT 堆积：高并发短连接的标配问题</span>
+net.ipv4.tcp_tw_reuse = 1             <span class="c"># 允许复用 TIME_WAIT socket 作为【出向】连接，安全且有效</span>
+<span class="c"># tcp_tw_recycle 在 4.12 已被移除，网上老教程还在教它——见到就绕道</span>
+net.ipv4.tcp_fin_timeout = 30         <span class="c"># FIN_WAIT_2 超时，默认 60，可降到 30</span>
+net.ipv4.ip_local_port_range = 10240 65535   <span class="c"># 出向连接可用端口范围，默认 32768 60999</span>
+<span class="c"># 治本还是上长连接池（HTTP keep-alive / 连接池），内核参数只是扩天花板</span>
+
+<span class="c"># 查看 TIME_WAIT 总量与分布</span>
+ss -s
+ss -tan state time-wait | wc -l</pre>
+  <h4>缓冲区与 keepalive</h4>
+  <pre><span class="c"># TCP 缓冲区自动调节（默认开），min/default/max 三档（字节）</span>
+net.ipv4.tcp_rmem = 4096 262144 16777216     <span class="c"># 收缓冲：4KB / 256KB / 16MB</span>
+net.ipv4.tcp_wmem = 4096 262144 16777216     <span class="c"># 发缓冲同款</span>
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+<span class="c"># 大带宽长肥管道（跨国/10G+带宽×高延迟）必须调大，否则带宽上不去</span>
+<span class="c"># 内网低延迟小包场景保持默认，调大反而浪费内存</span>
+
+<span class="c"># keepalive：及时发现半死连接</span>
+net.ipv4.tcp_keepalive_time = 600     <span class="c"># 默认 7200 秒，空闲 10 分钟后开始探测</span>
+net.ipv4.tcp_keepalive_intvl = 30     <span class="c"># 探测间隔</span>
+net.ipv4.tcp_keepalive_probes = 3     <span class="c"># 3 次无响应判死</span>
+
+<span class="c"># 观测重传率（健康网络 retrans 比例应低于 0.1%）</span>
+sar -n ETCP 1 | grep -v retrans
+nstat -az | grep TcpRetransSegs</pre>
+  <h4>conntrack：NAT/防火墙机器的隐形炸弹</h4>
+  <pre><span class="c"># 容器/K8s 节点、网关机器必看</span>
+net.netfilter.nf_conntrack_max = 262144      <span class="c"># 跟踪表上限，默认常为 65536（偏小）</span>
+net.netfilter.nf_conntrack_buckets = 65536   <span class="c"># 哈希桶数，建议 = max/4</span>
+<span class="c"># 满了的现象：dmesg 报 "nf_conntrack: table full, dropping packet" → 随机丢连接</span>
+dmesg | grep conntrack
+<span class="c"># 短期应急：调大 max；长期：减少 NAT 跳数、用 IPVS/直接路由模式、按需调小超时</span>
+net.netfilter.nf_conntrack_tcp_timeout_established = 86400</pre>
+  <h4>内核 bypass（简述）</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>DPDK</div><div class="cd">用户态收发包，绕过内核协议栈，绑定大页 + 独占核。<b>PPS 千万级</b>，SDN/网关常用，开发成本高</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>XDP / AF_XDP</div><div class="cd">内核内/内核旁路的可编程包处理，eBPF 加持。<b>防火墙、负载均衡、DDoS 防御</b>的新一代选择</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>busy poll</div><div class="cd"><span class="k">net.core.busy_read=50</span> 让 socket 读自旋等数据，<b>延迟换 CPU</b>，只适合极端低延迟场景</div></div>
+  </div>
+  <div class="callout">
+    <b>网络调优的层次：</b>内核参数解决"排队太长"；架构解决"连接太多"（长连接、连接池、LB 横向扩展）；bypass 解决"内核协议栈本身是瓶颈"。<b>90% 的团队到不了第三层，把前两层做扎实就够。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>ulimit 与 systemd 资源限制</h2></div>
+  <h4>ulimit 与 limits.conf</h4>
+  <pre><span class="c"># 查看当前 shell 的限制</span>
+ulimit -a
+ulimit -n                  <span class="c"># open files：默认常为 1024，高并发服务远远不够</span>
+ulimit -u                  <span class="c"># max user processes：默认常为 4096 或 unlimited</span>
+
+<span class="c"># 永久生效：/etc/security/limits.conf（注意：只对 PAM 登录的会话生效）</span>
+*  soft  nofile  65535
+*  hard  nofile  65535
+*  soft  nproc   65535
+*  hard  nproc   65535
+<span class="c"># 按用户/组收紧比全局放开更安全：</span>
+<span class="c"># redis soft nofile 128000</span>
+
+<span class="c"># 系统级总量</span>
+fs.file-max = 2097152
+fs.nr_open = 1048576       <span class="c"># 单进程打开文件数硬上限，调大 nofile 的前置条件</span>
+
+<span class="c"># 检查某进程当前实际限制</span>
+cat /proc/$(pgrep -f nginx)/limits | grep -E <span class="g">'open files|processes'</span></pre>
+  <h4>systemd 才是服务的实际控制者</h4>
+  <pre><span class="c"># 经典陷阱：limits.conf 改了，systemd 服务不生效！</span>
+<span class="c"># 因为 systemd 服务不经过 PAM 登录会话，limits.conf 对它无效</span>
+<span class="c"># 正确做法：用 drop-in 覆盖单元文件</span>
+systemctl edit nginx.service
+<span class="c"># 在弹出的编辑器里写：</span>
+[Service]
+LimitNOFILE=131070
+LimitNPROC=8192
+TasksMax=4096
+MemoryMax=4G
+CPUQuota=200%
+IOWeight=500
+OOMScoreAdjust=-500
+Restart=on-failure
+RestartSec=5
+<span class="c"># 验证：systemctl daemon-reload &amp;&amp; systemctl restart nginx</span>
+systemctl show nginx -p LimitNOFILE -p TasksMax</pre>
+  <h4>systemd 资源限制速查</h4>
+  <table>
+    <tr><th style="width:180px">指令</th><th>控制对象</th></tr>
+    <tr><td class="f">LimitNOFILE=</td><td>打开文件数（socket 也算文件，高并发服务必调）</td></tr>
+    <tr><td class="f">LimitNPROC=</td><td>进程/线程总数（线程也占坑，多线程服务常撞这个）</td></tr>
+    <tr><td class="f">TasksMax=</td><td>cgroup 级任务数上限，默认 15% 内核 threads.max</td></tr>
+    <tr><td class="f">MemoryMax=</td><td>cgroup 内存硬顶，超了触发 cgroup OOM</td></tr>
+    <tr><td class="f">MemoryHigh=</td><td>软顶：超了回收并限流，不到杀的程度</td></tr>
+    <tr><td class="f">CPUQuota=</td><td>CPU 时间配额，200% = 2 个核</td></tr>
+    <tr><td class="f">IOWeight=</td><td>cgroup v2 IO 相对权重（10~1000）</td></tr>
+    <tr><td class="f">OOMScoreAdjust=</td><td>被系统 OOM Killer 选中的倾向，负值更安全</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>"too many open files" 排查口诀：</b>先 <span class="k">lsof -p PID | wc -l</span> 看是不是连接泄漏（最常见），再 <span class="k">cat /proc/PID/limits</span> 确认限制值，最后才是调大。<b>不查泄漏就调 limit，只是把爆炸时间推迟。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>调优流程：测量 → 假设 → 验证 → 固化</h2></div>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>测量（建立基线）：</b>记录调优前的 P99 延迟、吞吐、错误率、资源利用率。<b>没有基线就没有"变好了"</b></div></div>
+    <div class="step"><div class="txt"><b>定位瓶颈：</b>用 USE 检查清单找到饱和/错误点，反对"感觉是网络问题"式猜测</div></div>
+    <div class="step"><div class="txt"><b>提出假设：</b>"TCP backlog 满导致重传"→ 假设可证伪，有观测指标支撑</div></div>
+    <div class="step"><div class="txt"><b>一次只改一个参数：</b>同时改 5 个，好了不知道为什么好，坏了不知道回滚哪个</div></div>
+    <div class="step"><div class="txt"><b>压测验证：</b>用 wrk/fio/sysbench 复现负载，对比基线数据，<b>记录前后数值</b></div></div>
+    <div class="step"><div class="txt"><b>固化：</b>写进 /etc/sysctl.d/、grub、fstab、systemd drop-in，<b>全部纳入配置管理（Ansible/Puppet）</b></div></div>
+    <div class="step"><div class="txt"><b>长期监控：</b>调优不是一次性的，把指标接监控，回归立即发现</div></div>
+  </div>
+  <div class="callout warn">
+    <b>四条纪律：</b>① <b>不抄陌生参数</b>——每个参数都能说出"解决什么饱和/错误"再改；② <b>默认值往往是权衡的最优解</b>，改它要有数据；③ <b>内核版本差异</b>——4.x/5.x/6.x 默认值不同，云厂商镜像还有自己的定制，先 <span class="k">sysctl -a</span> 看现状；④ <b>改完留文档</b>：参数、原值、新值、原因、验证结果、日期、负责人。三个月后你会感谢自己。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>场景案例：真实组合拳</h2></div>
+  <h4>案例 1：Nginx 高并发网关（10 万长连接 + 突发短连接）</h4>
+  <pre><span class="c"># /etc/sysctl.d/99-tuning.conf</span>
+net.core.somaxconn = 65535
+net.ipv4.tcp_max_syn_backlog = 65535
+net.core.netdev_max_backlog = 10000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.ip_local_port_range = 10240 65535
+net.ipv4.tcp_keepalive_time = 600
+fs.file-max = 1048576
+
+<span class="c"># nginx.conf 配套（不改应用端，内核白调）</span>
+worker_rlimit_nofile 65535;
+events { worker_connections 65535; use epoll; multi_accept on; }
+<span class="c"># listen 443 ssl backlog=65535;   ← backlog 要和 somaxconn 匹配</span>
+<span class="c"># systemd drop-in: LimitNOFILE=65535</span>
+<span class="c"># 结果参考：TIME_WAIT 从 6 万降到 1 万以内，accept 队列溢出归零</span></pre>
+  <h4>案例 2：Redis/数据库主机（延迟敏感）</h4>
+  <pre><span class="c"># 核心原则：让数据待内存，别被换出去；别让后台任务抢延迟</span>
+vm.swappiness = 10
+vm.overcommit_memory = 1        <span class="c"># 有 BGSAVE fork 需求的场景常见（配合足够内存）</span>
+vm.min_free_kbytes = 1048576    <span class="c"># 64GB 机器量级，按物理内存 1%~1.5% 取</span>
+net.core.somaxconn = 4096
+<span class="c"># THP 关掉（Redis 官方建议）：</span>
+echo never &gt; /sys/kernel/mm/transparent_hugepage/enabled
+<span class="c"># 关 NUMA 自动迁移，减少延迟抖动（配合绑核使用时）</span>
+kernel.numa_balancing = 0
+<span class="c"># 磁盘：SSD 用 none 调度器 + noatime 挂载，AOF 落盘延迟从 8ms 降到 2ms 级</span></pre>
+  <h4>案例 3：K8s 节点 / NAT 网关（连接数爆炸）</h4>
+  <pre><span class="c"># 症状：dmesg 报 conntrack table full，随机连接超时</span>
+net.netfilter.nf_conntrack_max = 1048576
+net.netfilter.nf_conntrack_tcp_timeout_established = 600
+net.netfilter.nf_conntrack_buckets = 262144
+net.ipv4.tcp_tw_reuse = 1
+<span class="c"># 根治手段：Service 走 IPVS/直接路由减少 NAT 层数，</span>
+<span class="c"># 或升级到 eBPF 替代 kube-proxy iptables 模式（Cilium 等方案）</span>
+<span class="c"># 参数只是把爆炸阈值抬高 16 倍，架构才能治本</span></pre>
+  <h4>案例 4：日志/备份写入型主机（吞吐优先）</h4>
+  <pre>vm.dirty_background_ratio = 10
+vm.dirty_ratio = 40              <span class="c"># 大内存机器放宽同步回写，减少 write 卡顿</span>
+vm.dirty_expire_centisecs = 3000
+<span class="c"># 挂载 noatime + data=writeback（有 BBU/掉电保护前提下）</span>
+<span class="c"># 调度器 mq-deadline；预读调大适配顺序写：blockdev --setra 8192 /dev/sdb</span>
+<span class="c"># fio 验收：顺序写 IOPS 提升 15%+，await 波动收敛</span></pre>
+  <div class="callout ok">
+    <b>案例的共同结构：</b>先有症状数据（溢出计数、si/so、await）→ 改一个方向 → 验收指标 → 固化 + 监控。<b>抄参数表谁都会，带着假设改参数才是调优。</b>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">排坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">照抄网上 sysctl 大全一把梭</div><div class="pd">30 个参数一次性上线，性能没变，云厂商镜像升级后行为诡异。每个参数必须能对应一个观测到的问题，否则不动。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为 vm.swappiness=0 是"禁用 swap"</div><div class="pd">0 只是推迟换出，OOM 边缘一次性大量换出反而造成延迟尖峰。延迟敏感服务用 10，并监控 si/so。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">忘加 noatime，读操作也在写盘</div><div class="pd">随机读场景每次 read 附带 inode 元数据写，IO 凭空多三成。fstab 加 noatime 一行解决，代价几乎为零。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">还在教/用 tcp_tw_recycle</div><div class="pd">该参数在 4.12 内核已被移除，且历史上在 NAT 环境下会随机掐断连接。用 tcp_tw_reuse=1 + 连接池。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">conntrack 表打满，丢包丢得莫名其妙</div><div class="pd">容器/NAT 机器默认 65536 条很快打满，dmesg 报 table full。调大 max/buckets，同时按需缩短 established 超时。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">改了 limits.conf，服务 limits 没变</div><div class="pd">systemd 服务不走 PAM 会话，limits.conf 对它无效。必须用 systemctl edit 加 LimitNOFILE，改完 systemctl show 验证。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">THP 默认 always，数据库延迟周期性抖动</div><div class="pd">内核 compaction 造成毫秒级卡顿，Redis/MongoDB 官方都建议关。设 madvise 或 never，重启验证。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">网卡中断全挤在 CPU0</div><div class="pd">单核 softirq 打满，其他核闲着，PPS 上不去。装 irqbalance，或按队列手动绑核分散中断。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">overcommit_memory=2 一设，fork 全失败</div><div class="pd">严格模式下 JVM/Redis 这类预留大内存的进程直接无法启动。默认 0 是权衡解，改它先压测。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">调完不记录、不监控，出问题无法回退</div><div class="pd">"好像三个月前改过点什么"。参数文件 + 注释 + 变更记录 + 监控告警，四件套缺一不可。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. USE 方法中的 S（Saturation）指的是？</div>
+      <button class="opt">资源被使用的时间比例</button>
+      <button class="opt">工作排不上队的程度，如 run queue 长度、磁盘 await</button>
+      <button class="opt">硬件故障率</button>
+      <div class="ans">正确答案：<b>饱和度 = 排队程度</b>。利用率高但无排队是健康的；一旦出现排队（CPU run queue、磁盘 avgqu-sz、网络 backlog），用户可感知的卡顿就开始了。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于 vm.swappiness，正确的说法是？</div>
+      <button class="opt">设为 0 等于完全禁用 swap</button>
+      <button class="opt">值越大系统越多地把进程匿名页换出到磁盘</button>
+      <button class="opt">它控制换出匿名页的倾向，0 只是推迟换出；数据库类服务推荐 10 而非 0</button>
+      <div class="ans">正确答案：<b>倾向控制，0≠禁用</b>。swappiness 权衡的是"换出冷匿名页"与"保留 page cache"。0 在接近 OOM 时仍会换出且换得更凶；数据库/Redis 推荐 10，并配合 si/so 监控。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 挂载参数 noatime 的作用与代价是？</div>
+      <button class="opt">读文件不再更新 inode 访问时间，随机读的写 IO 大幅下降；代价是 atime 信息不准确</button>
+      <button class="opt">禁止所有写操作，把文件系统变成只读</button>
+      <button class="opt">让目录项不缓存，提升遍历性能</button>
+      <div class="ans">正确答案：<b>去掉 atime 更新</b>。原来每次 read 会附带一次元数据写，日志/图片类随机读场景 IO 可降 30%+。服务端几乎不需要 atime，这是性价比最高的一条挂载参数。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. net.ipv4.tcp_tw_reuse = 1 的安全含义是？</div>
+      <button class="opt">复用任意 TIME_WAIT socket，包括入向连接，可能串数据</button>
+      <button class="opt">只对出向连接复用 TIME_WAIT socket，依赖 TCP 时间戳机制，安全</button>
+      <button class="opt">直接清空 TIME_WAIT 状态的所有连接</button>
+      <div class="ans">正确答案：<b>仅出向 + 依赖时间戳</b>。它复用本机作为客户端的 TIME_WAIT socket（timestamp 机制保证序列号不回绕），对入向服务端口无效。彻底解决 TIME_WAIT 堆积仍要靠连接池/长连接。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. dmesg 出现 "nf_conntrack: table full, dropping packet"，后果是？</div>
+      <button class="opt">只是日志噪音，连接不受影响</button>
+      <button class="opt">系统会自动扩容，无需处理</button>
+      <button class="opt">新连接被随机丢弃，表现为间歇性连接超时</button>
+      <div class="ans">正确答案：<b>随机丢连接</b>。conntrack 表满后新连接无法建立跟踪项，报文被丢弃。应急调大 nf_conntrack_max 与 buckets，根治要减少 NAT 层数或用 IPVS/eBPF 替代 iptables。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 给 systemd 服务调大文件描述符限制，正确做法是？</div>
+      <button class="opt">systemctl edit 服务，加 LimitNOFILE=131070，然后 daemon-reload 重启</button>
+      <button class="opt">在 /etc/security/limits.conf 写 * hard nofile 131070</button>
+      <button class="opt">export ULIMIT=131070 写到 /etc/profile</button>
+      <div class="ans">正确答案：<b>systemd drop-in</b>。systemd 服务不经过 PAM 登录会话，limits.conf 与 profile 对它无效。改完用 systemctl show 服务 -p LimitNOFILE 验证生效。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>uptime / vmstat 1 / mpstat -P ALL 1</code><span class="desc">负载、CPU 饱和度与单核分布，60 秒排查前三件套</span><button class="copy">复制</button></div>
+    <div class="crow"><code>iostat -xz 1</code><span class="desc">磁盘 %util / await / avgqu-sz，定位 IO 饱和</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pidstat -urd 1</code><span class="desc">按进程看 CPU/内存/磁盘消耗，找出元凶进程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sar -n ETCP 1</code><span class="desc">TCP 重传率，健康值应低于 0.1%</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -s / ss -tan state time-wait | wc -l</code><span class="desc">socket 汇总与 TIME_WAIT 计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nstat -az | grep -E 'Overflows|Drops|Backlog'</code><span class="desc">listen 队列溢出与丢包计数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/PID/limits</code><span class="desc">进程实际生效的 nofile/nproc 限制</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lsof -p PID | wc -l</code><span class="desc">进程持有的 fd 数量，排查连接泄漏</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/interrupts / /proc/softirqs</code><span class="desc">中断与软中断分布，定位 CPU0 瓶颈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ethtool -S eth0 / -g eth0</code><span class="desc">网卡错误/丢包计数与 ring buffer 队列</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dmesg -T | grep -iE 'oom|error|conntrack'</code><span class="desc">OOM、硬件错误、conntrack 打满的第一现场</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sysctl -a &gt; before.txt &amp;&amp; sysctl -p</code><span class="desc">存档现状 + 从 /etc/sysctl.d 重载生效</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键参数速查（常见稳妥值，务必实测）</h3>
+  <pre><span class="c"># /etc/sysctl.d/99-tuning.conf —— 按场景取用，不要全上</span>
+<span class="c"># ---- 网络：高并发服务 ----</span>
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 4096
+net.core.netdev_max_backlog = 5000
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.ip_local_port_range = 10240 65535
+
+<span class="c"># ---- 内存：数据库/Redis 类延迟敏感 ----</span>
+vm.swappiness = 10
+vm.min_free_kbytes = 1048576        <span class="c"># 64GB 机器量级，按 1%~1.5% 物理内存取</span>
+kernel.numa_balancing = 0           <span class="c"># 配合绑核使用，减少迁移抖动</span>
+
+<span class="c"># ---- 内存：fork 密集型（保留默认通常最好）----</span>
+vm.overcommit_memory = 0
+vm.overcommit_ratio = 50
+
+<span class="c"># ---- 磁盘：写密集型吞吐优先 ----</span>
+vm.dirty_background_ratio = 5
+vm.dirty_ratio = 20
+
+<span class="c"># ---- 容器/NAT 网关节点 ----</span>
+net.netfilter.nf_conntrack_max = 262144
+net.netfilter.nf_conntrack_buckets = 65536
+
+<span class="c"># ---- 文件描述符 ----</span>
+fs.file-max = 2097152
+fs.nr_open = 1048576</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>USE 方法</b></td><td>Utilization/Saturation/Errors，对每个资源逐项过问的排查清单</td></tr>
+    <tr><td><b>饱和度</b></td><td>工作排队程度（run queue、await、backlog），直接决定用户体验</td></tr>
+    <tr><td><b>CFS</b></td><td>Linux 默认的完全公平调度器，按虚拟运行时间分配 CPU</td></tr>
+    <tr><td><b>nice</b></td><td>进程优先级偏移（-20 最高~19 最低），renice 可运行中调整</td></tr>
+    <tr><td><b>CPU 亲和性</b></td><td>把进程/中断绑定到指定核心，提高缓存命中与可预测性</td></tr>
+    <tr><td><b>IRQ affinity</b></td><td>硬件中断的 CPU 绑定位掩码，分散中断避免单核打满</td></tr>
+    <tr><td><b>isolcpus</b></td><td>内核启动参数，隔离核心给指定进程专用，需配合绑核</td></tr>
+    <tr><td><b>swappiness</b></td><td>换出匿名页倾向的参数，0≠禁用 swap，延迟敏感推荐 10</td></tr>
+    <tr><td><b>overcommit</b></td><td>是否允许进程申请内存总量超过物理内存的超配策略</td></tr>
+    <tr><td><b>OOM Killer</b></td><td>内存耗尽时内核按分数杀进程的机制，oom_score_adj 可调分</td></tr>
+    <tr><td><b>THP</b></td><td>透明大页，默认开启可能造成数据库/Redis 延迟抖动</td></tr>
+    <tr><td><b>min_free_kbytes</b></td><td>内核保留的空闲内存下限，防突发分配把内存抽干</td></tr>
+    <tr><td><b>I/O 调度器</b></td><td>合并排序块层请求的算法（none/mq-deadline/kyber/bfq）</td></tr>
+    <tr><td><b>noatime</b></td><td>挂载选项，读文件不更新访问时间，大幅降低随机读的写放大</td></tr>
+    <tr><td><b>RAID 10</b></td><td>条带化镜像，随机写密集与数据库的首选，无校验开销</td></tr>
+    <tr><td><b>backlog</b></td><td>连接排队三段：网卡队列→内核队列→应用 accept 队列</td></tr>
+    <tr><td><b>TIME_WAIT</b></td><td>连接主动关闭后的等待态，高并发短连接会大量堆积</td></tr>
+    <tr><td><b>conntrack</b></td><td>内核连接跟踪表，NAT/容器节点满了会随机丢连接</td></tr>
+    <tr><td><b>ulimit / LimitNOFILE</b></td><td>进程级文件描述符限制；systemd 服务必须用 LimitNOFILE</td></tr>
+    <tr><td><b>DPDK / XDP</b></td><td>用户态/内核态可编程包处理，绕过传统协议栈的高性能网络方案</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>完成这五件事 —— ① 在测试机上跑一遍"60 秒十条命令"，写下基线数据；② 给 nginx 或 redis 配一套 somaxconn + backlog + LimitNOFILE 组合，压测前后对比；③ 用 fio 分别测 SSD 的 none 与 mq-deadline 调度器差异；④ 关掉 THP 并观察 Redis 延迟 P99 变化；⑤ 把全部改动写成一个带注释的 99-tuning.conf 和 systemd drop-in，纳入 Ansible。<br><br>
+    <b>之后值得单独学：</b>eBPF（BCC/bpftrace 可观测性革命）、perf 火焰图定位热点函数、cgroup v2 的完整资源控制体系、以及 CPU 缓存一致性/MESI 对多线程程序的影响。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 Linux 系统调优 · 上线前务必检查：基线数据、一次一参数、参数文件已入配置管理</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（USE 方法）和模块 7（调优流程）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在终端里敲命令。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一台 Linux 虚拟机跟着敲：vmstat 1、iostat -xz 1 先跑起来';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

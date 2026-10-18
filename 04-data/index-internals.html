@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透索引原理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 12 期 · 高密度版</span>
+    <h1>二十分钟学透索引原理</h1>
+    <p class="sub">索引不是"建了就快"。这篇用<b>真实数字</b>把 B+ 树算清楚，讲透回表、覆盖、最左前缀、ICP 这些机制，最后落到索引失效的八种写法和优化器选索引的逻辑。目标：看到一个执行计划能反推出该怎么建索引。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 层 B+ 树 = 千万行</span>
+      <span class="chip"><b>8</b> 种失效场景</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起 MySQL 8.0 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <pre><span class="c"># 一条命令起 MySQL 8.0</span>
+docker run -d -p 3306:3306 --name mysql8 -e MYSQL_ROOT_PASSWORD=root mysql:8.0
+docker exec -it mysql8 mysql -uroot -proot
+
+<span class="c"># 全文使用的测试表（订单表，1000 万行规模）</span>
+<span class="b">CREATE TABLE</span> t_order (
+  order_id    <span class="y">BIGINT</span>      <span class="b">NOT NULL</span>,
+  user_id     <span class="y">BIGINT</span>      <span class="b">NOT NULL</span>,
+  amount      <span class="y">DECIMAL</span>(10,2) <span class="b">NOT NULL</span>,
+  status      <span class="y">TINYINT</span>     <span class="b">NOT NULL</span>,
+  phone       <span class="y">VARCHAR</span>(16)  <span class="b">NOT NULL</span>,
+  user_name   <span class="y">VARCHAR</span>(64)  <span class="b">NOT NULL</span>,
+  create_time <span class="y">DATETIME</span>    <span class="b">NOT NULL</span>,
+  <span class="b">PRIMARY KEY</span> (order_id),
+  <span class="b">KEY</span> idx_user (user_id),
+  <span class="b">KEY</span> idx_name_phone (user_name, phone),
+  <span class="b">KEY</span> idx_time (create_time)
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c"># 灌 1000 万行（照第 10 期的存储过程改一下）</span>
+<span class="c"># 三个核心命令，全文反复用：</span>
+<span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;   <span class="c">-- 看执行计划</span>
+<span class="b">SHOW INDEX FROM</span> t_order;                            <span class="c">-- 看索引与 cardinality</span>
+<span class="b">ANALYZE TABLE</span> t_order;                              <span class="c">-- 更新统计信息</span></pre>
+  <div class="callout warn">
+    <b>一个前置认知：</b>MySQL 的索引是<b>引擎层</b>概念（InnoDB 的 B+ 树），不是 Server 层。所以"索引失效"的真相分两种：① 优化器认为<b>走索引不划算</b>（选择率太高），主动选全表扫描；② SQL 写法让索引列<b>无法比较</b>（函数、转换、前缀通配），物理上就用不上。排查时先分清是哪一种。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>B+ 树结构与容量计算</h2></div>
+  <p class="lead">InnoDB 的所有索引都是一棵 B+ 树。<b>把"千万级表只要 2~3 次 IO"这句话算出来</b>，是理解索引一切行为的地基。</p>
+  <h4>三个必背常量</h4>
+  <table>
+    <tr><th style="width:220px">参数</th><th style="width:150px">值</th><th>含义</th></tr>
+    <tr><td><b>数据页大小</b></td><td class="f">16 KB（16384 B）</td><td>InnoDB 磁盘分配的最小单位，一个页 = 一个 B+ 树节点</td></tr>
+    <tr><td><b>页内目录项</b></td><td class="f">≈ 1170 条</td><td>非叶子节点每条 = 8B 主键 + 6B 页指针，16384 / 14 ≈ 1170</td></tr>
+    <tr><td><b>叶子行数</b></td><td class="f">行大小决定</td><td>1KB/行 → 16 行/页；500B/行 → 32 行/页</td></tr>
+  </table>
+  <h4>三层 B+ 树到底能撑多少行（完整计算）</h4>
+  <pre><span class="c"># 前提：bigint 主键（8B）、行大小 1KB（一页 16 行）</span>
+
+<span class="c"># 第 1 层（叶子）：每页 16 行</span>
+2 层树容量 = 1170 个叶子页 × 16 行 = <span class="g">18,720 行</span>
+
+<span class="c"># 第 2 层：根节点指向 1170 个页，每个页又是叶子</span>
+3 层树容量 = 1170 × 1170 × 16 = <span class="g">约 2190 万行</span>
+
+<span class="c"># 第 3 层：</span>
+4 层树容量 = 1170 × 1170 × 1170 × 16 = <span class="g">约 256 亿行</span>（现实中不存在）
+
+<span class="c"># 换成 500B 行大小（一页 32 行）：</span>
+3 层树容量 = 1170 × 1170 × 32 = <span class="g">约 4380 万行</span>
+
+<span class="c"># 所以"3 层 B+ 树支撑千万行"的准确表述：</span>
+<span class="c">#   1KB 行 → 3 层 ≈ 2200 万行；500B 行 → 3 层 ≈ 4400 万行</span>
+<span class="c">#   1000 万行、1KB 行的表，索引高度正好 3 层</span></pre>
+  <h4>高度与 IO 次数的换算</h4>
+  <pre><span class="c"># 一次主键点查的磁盘 IO = 树高 - 1（根节点常驻 buffer pool，不读盘）</span>
+树高 3 → 最多 3 次页定位，其中根页命中内存，实际随机 IO = <span class="g">2 次</span>
+
+<span class="c"># 时间换算（NVMe SSD 随机读 20~100μs）：</span>
+2 次 IO × 50μs = 0.1ms；加 buffer pool 命中（命中率 99%）后平均 &lt; 0.01ms
+
+<span class="c"># 结论（面试标准答案）：</span>
+<span class="c">#   千万级表的主键点查，索引层面只需要 2 次随机 IO，是微秒~毫秒级；</span>
+<span class="c">#   慢的不是 B+ 树深度，是回表、是扫了多少行、是排序用了磁盘。</span></pre>
+  <div class="callout">
+    <b>结构要点（决定后面所有行为）：</b>① 只有叶子节点存数据，非叶子只存"目录"（键值 + 页号），所以非叶子能存上千条目，树才矮；② 叶子节点间用<b>双向链表</b>串联，所以范围扫描（BETWEEN）只需定位起点后顺序翻页，不用回溯父节点；③ 页内记录按主键有序，页内查找用"稀疏目录 + 二分"，不是逐行扫。
+  </div>
+  <div class="callout danger">
+    <b>B+ 树是"往矮里长"的，不是"往高里长"。</b>树高每 +1，容量 ×1170，但 IO +1。真正让查询从毫秒变秒的三件事：树高从 3 变 4（表大到千万级以上 + 行很宽）、<b>随机 IO 变成顺序全表扫描</b>（优化器弃索引）、<b>排序缓冲区放不下</b>（filesort 落盘）。建索引、写 SQL 都是在和这三件事作斗争。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>聚簇索引 vs 二级索引</h2></div>
+  <p class="lead">InnoDB 的表又叫"索引组织表"：<b>数据本身就是按主键组织的 B+ 树</b>。这一点是 InnoDB 和 MyISAM 的分水岭。</p>
+  <table>
+    <tr><th style="width:120px">对比项</th><th style="width:250px">InnoDB（聚簇）</th><th>MyISAM（非聚簇）</th></tr>
+    <tr><td><b>主键索引</b></td><td>叶子节点存<b>整行数据</b>，找到索引即找到行</td><td>叶子节点存<b>行地址（偏移量）</b>，还要去数据文件取</td></tr>
+    <tr><td><b>二级索引</b></td><td>叶子节点存<b>主键值</b> → 拿主键回聚簇索引查（<b>回表</b>）</td><td>叶子节点存<b>行地址</b> → 直接定位数据，无回表</td></tr>
+    <tr><td><b>数据与索引</b></td><td>同一个 .ibd 文件，物理按主键排列</td><td>.MYD 数据 + .MYI 索引，两个文件</td></tr>
+    <tr><td><b>必须主键</b></td><td><b>是</b>。无显式主键则选第一个非空唯一索引，否则生成 6 字节隐藏 row_id</td><td>否</td></tr>
+    <tr><td><b>COUNT(*)</b></td><td>扫描某个索引统计（无 WHERE 时选最小索引）</td><td>直接读计数器，O(1)</td></tr>
+    <tr><td><b>插入性能</b></td><td>自增主键顺序追加快；随机主键（UUID）页分裂严重</td><td>行插入位置不影响索引结构</td></tr>
+  </table>
+  <pre><span class="c">-- 回表的完整路径（二级索引叶子存的是主键值）</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;
+
+<span class="c">-- 执行过程：</span>
+<span class="c">-- 1. 在 idx_user(user_id) 这棵二级 B+ 树里定位 user_id=888</span>
+<span class="c">-- 2. 叶子节点拿到主键值，比如 order_id = 5001234</span>
+<span class="c">-- 3. 拿 order_id 去聚簇索引再查一次（这一次就是"回表"）</span>
+<span class="c">-- 4. 取出整行</span>
+<span class="c">-- 代价：匹配 N 行 = 2N 次 B+ 树查找（N 次二级 + N 次聚簇）</span>
+
+<span class="c">-- EXPLAIN 佐证：type=ref，Extra 没有 Using index</span>
++----+---------+--------+-------+---------------+----------+---------+-------+------+----------+-------------+
+| id | table   | type   | key   | key_len | ref         | rows | filtered | Extra       |
++----+---------+--------+-------+---------------+----------+---------+-------+------+----------+-------------+
+|  1 | t_order | ref    | idx_user | 9     | const       |   42 |   100.00 | Using where |
++----+---------+--------+-------+---------------+----------+---------+-------+------+----------+-------------+</pre>
+  <div class="callout warn">
+    <b>推论一：主键越小，二级索引越小。</b>二级索引每片叶子都存一份主键值：int（4B）比 bigint（8B）省一半，UUID（36B 字符串）让索引膨胀近 9 倍，还带来随机插入的页分裂。<b>能自增 int 就别用 UUID。</b><br>
+    <b>推论二：没有主键的 InnoDB 表，每行都背着 6 字节隐藏 row_id</b>，且二级索引实际按它回表——这就是为什么"必须给表显式定义主键"是 InnoDB 铁律。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>回表、覆盖索引与延迟关联</h2></div>
+  <p class="lead">回表是二级索引查询的默认动作，<b>覆盖索引是把回表消掉的手段</b>。判断标准只有一个：执行计划 Extra 里有没有 <span class="k">Using index</span>。</p>
+  <pre><span class="c">-- 场景：idx_user(user_id)，查"用户 888 的所有订单金额"</span>
+
+<span class="c">-- 写法 A：select * → 必然回表</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;
+<span class="c">-- Extra: Using where           ← 没有 Using index，说明回表了</span>
+
+<span class="c">-- 写法 B：只查索引里有的列 → 覆盖索引，零回表</span>
+<span class="b">SELECT</span> order_id, user_id <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;
+<span class="c">-- Extra: Using index           ← 只访问 idx_user 就拿到全部结果</span>
+
+<span class="c">-- 写法 C：需要 amount（不在 idx_user 里）→ 回表，除非建覆盖索引</span>
+<span class="b">CREATE INDEX</span> idx_user_amount <span class="b">ON</span> t_order(user_id, amount);
+<span class="b">SELECT</span> order_id, user_id, amount <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888;
+<span class="c">-- Extra: Using index           ← 三列全在新索引里，零回表</span></pre>
+  <h4>延迟关联：既要回表又要分页时的标准解法</h4>
+  <pre><span class="c">-- 反例：深分页 + 回表，limit 100000,10 要回表 100010 次</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">ORDER BY</span> create_time <span class="b">LIMIT</span> 100000, 10;
+
+<span class="c">-- 正解：先用覆盖索引拿到 10 个主键（零回表），再回表取整行</span>
+<span class="b">SELECT</span> o.*
+<span class="b">FROM</span> t_order o
+<span class="b">JOIN</span> (
+  <span class="b">SELECT</span> order_id <span class="b">FROM</span> t_order
+  <span class="b">ORDER BY</span> create_time
+  <span class="b">LIMIT</span> 100000, 10          <span class="c">-- 覆盖索引扫描，只翻叶子页链表</span>
+) t <span class="b">ON</span> o.order_id = t.order_id;   <span class="c">-- 只回表 10 次</span>
+
+<span class="c">-- 效果：100010 次回表 → 10 次回表，P99 从几百 ms 降到几 ms</span>
+<span class="c">-- 前提：create_time 上有索引（idx_time），子查询走 Using index</span></pre>
+  <div class="callout ok">
+    <b>覆盖索引的三个实战要点：</b>① <b>EXPLAIN 出现 <span class="k">Using index</span> 就是覆盖</b>，没有就是回表；② 索引列顺序按"等值条件列在前、排序列/范围列在后"设计，让 (user_id, create_time) 这类组合同时服务过滤和排序；③ 覆盖索引是<b>有成本的</b>——每个索引都是一棵要维护的 B+ 树，写放大和页分裂都翻倍。<b>只为高频查询建覆盖索引，别把每列都塞进去。</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>联合索引与最左前缀</h2></div>
+  <p class="lead">联合索引 (a, b, c) 不是"三个单列索引"，排序规则是先按 a、再按 b、再按 c。<b>匹配必须从最左列开始，中间不能断。</b></p>
+  <pre><span class="c">-- 索引：KEY idx_name_phone (user_name, phone)</span>
+<span class="c">-- 逻辑排序效果（想象 Excel 按两列排序）：</span>
+<span class="c">-- (张三, 138..) &lt; (张三, 139..) &lt; (李四, 137..) &lt; (王五, 136..)</span>
+<span class="c">-- 即：name 相同才轮到 phone 有序，name 不同时 phone 完全无序</span></pre>
+  <h4>匹配规则全表</h4>
+  <table>
+    <tr><th style="width:300px">查询条件</th><th style="width:140px">用到的索引列</th><th>原因</th></tr>
+    <tr><td class="f">user_name = '张三'</td><td>user_name</td><td>最左前缀命中</td></tr>
+    <tr><td class="f">user_name = '张三' AND phone = '138...'</td><td>user_name, phone</td><td>两列等值，全命中</td></tr>
+    <tr><td class="f">user_name LIKE '张%' AND phone = '138...'</td><td>user_name, phone</td><td>name 是前缀范围，phone 仍可二分定位</td></tr>
+    <tr><td class="f">phone = '138...'</td><td><b>无</b></td><td>缺最左列 name，整棵索引用不上</td></tr>
+    <tr><td class="f">user_name = '张三' AND phone LIKE '%138'</td><td>只用 user_name</td><td>phone 前缀通配无法二分，只能过滤（ICP 可用）</td></tr>
+    <tr><td class="f">user_name &gt; '张' AND phone = '138...'</td><td>只用 user_name</td><td><b>范围列之后的列无法定位</b>，只能过滤</td></tr>
+    <tr><td class="f">user_name BETWEEN '张' AND '李' AND phone='138'</td><td>只用 user_name</td><td>同上：范围断开后续匹配</td></tr>
+  </table>
+  <pre><span class="c">-- 三条设计原则：</span>
+<span class="c">-- 1. 把选择性最高的等值列放最左（区分度：user_id 百万级 &gt; status 4 个值）</span>
+<span class="c">-- 2. 范围列放最后（BETWEEN / &gt; / &lt; / LIKE 前缀 之后的列只能过滤）</span>
+<span class="c">-- 3. 排序列若想消掉 filesort，顺序必须与 ORDER BY 完全一致：</span>
+<span class="c">--    KEY(user_id, create_time) 才能优化</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> user_id = 888 <span class="b">ORDER BY</span> create_time <span class="b">DESC LIMIT</span> 10;
+<span class="c">-- 走索引有序扫描，Extra 无 Using filesort；缺 create_time 或顺序错都会排序</span>
+
+<span class="c">-- MySQL 8.0.19+ 的 index skip scan：</span>
+<span class="c">-- 优化器会自动"跳"过前导列（仅当前导列区分度极低时），</span>
+<span class="c">-- 让 (user_name, phone) 支持纯 phone 查询。可用 optimizer_switch='skip_scan=off' 关闭</span></pre>
+  <div class="callout warn">
+    <b>最左前缀最常犯的错：以为 (a,b) 索引能服务 "WHERE b = ?"。</b>不能。虽然物理上 b 在页内也有序，但不同 a 值下的 b 段互不相邻，全库扫描 b 只能全表。解决办法：① 建 (b) 单列索引；② 如果查询总是 (b,c) 形态，直接建 (b,c)；③ 8.0 以上可以指望 skip scan，但别把它当设计依据。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>索引下推 ICP</h2></div>
+  <p class="lead">ICP（Index Condition Pushdown）把 WHERE 中<b>能用索引列判断的条件下推到存储引擎层</b>，在回表之前就过滤掉不匹配的行。MySQL 5.6 引入，默认开启。</p>
+  <pre><span class="c">-- 索引：KEY(zipcode, address)，行很宽（含大字段）</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> user_addr
+<span class="b">WHERE</span> zipcode = <span class="y">'100000'</span> <span class="b">AND</span> address <span class="b">LIKE</span> <span class="y">'%朝阳%'</span>;
+
+<span class="c">-- 没有 ICP：</span>
+<span class="c">--   引擎层按 zipcode 范围取出所有行 → 全部回表 → Server 层再过滤 address</span>
+<span class="c">--   回表次数 = zipcode='100000' 的行数（可能几万行）</span>
+
+<span class="c">-- 有 ICP：</span>
+<span class="c">--   address 是索引的一部分，引擎层在页内直接判断 LIKE，不满足不取出</span>
+<span class="c">--   回表次数 = 同时满足两个条件的行数（可能几百行）</span>
+<span class="c">--   EXPLAIN Extra: Using index condition</span></pre>
+  <table>
+    <tr><th style="width:150px">Extra 值</th><th>含义</th></tr>
+    <tr><td class="f">Using index condition</td><td>ICP 生效：索引列条件下推到引擎层过滤，减少回表</td></tr>
+    <tr><td class="f">Using index</td><td>覆盖索引：所有列都在索引里，零回表（比 ICP 更强）</td></tr>
+    <tr><td class="f">Using where</td><td>Server 层还有过滤条件（非索引列），或回表后过滤</td></tr>
+    <tr><td class="f">Using MRR</td><td>多范围读取：二级索引结果按主键排序后批量回表，把随机 IO 变顺序</td></tr>
+  </table>
+  <pre><span class="c"># ICP 相关开关（默认全开，排查时可逐个关）</span>
+<span class="b">SET</span> optimizer_switch = <span class="y">'index_condition_pushdown=off'</span>;
+<span class="b">SET</span> optimizer_switch = <span class="y">'mrr=on,mrr_cost_based=off'</span>;   <span class="c">-- 强制走 MRR</span>
+<span class="b">SET GLOBAL</span> innodb_adaptive_hash_index = <span class="y">ON</span>;
+
+<span class="c"># 适用范围：InnoDB 和 MyISAM 的 range / ref / eq_ref / index 访问都支持；</span>
+<span class="c"># 全表扫描（type=ALL）和聚簇索引扩展（secondary index 的 extended secondary）有关，</span>
+<span class="c"># 分区表、子查询等场景有限制。对"回表成本高"的宽表收益最大。</span></pre>
+  <div class="callout">
+    <b>ICP 与覆盖索引的关系：</b>覆盖索引是"连引擎层都不用出"，ICP 是"少出引擎层"。二者叠加时优先覆盖；不能覆盖时，ICP 把回表次数从"索引匹配数"降到"索引 + 条件下推后的匹配数"，<b>对大结果集 + 宽表的场景经常有 10 倍以上差距</b>。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>哈希索引与自适应哈希索引</h2></div>
+  <p class="lead">哈希索引是 O(1) 等值查找，但 InnoDB <b>没有显式哈希索引</b>，只有自动的 AHI。理解边界才能不踩坑。</p>
+  <table>
+    <tr><th style="width:170px">类型</th><th style="width:220px">是否可控</th><th>说明</th></tr>
+    <tr><td><b>InnoDB 显式哈希</b></td><td><b>不支持</b></td><td>InnoDB 的 CREATE INDEX 只有 BTREE 一种形态（含全文、空间索引）</td></tr>
+    <tr><td><b>自适应哈希 AHI</b></td><td>全局开关，不可按索引定制</td><td>InnoDB 自动监测"热点页"，为频繁等值访问的页在内存建哈希索引</td></tr>
+    <tr><td><b>MEMORY 引擎哈希</b></td><td>支持</td><td class="f">CREATE INDEX ... USING HASH —— 但数据只在内存，重启即失</td></tr>
+    <tr><td><b>自定义哈希列</b></td><td>手动实现</td><td>加一列 crc = CRC32(email)，索引建在 crc 上，模拟等值哈希（《高性能 MySQL》经典技巧）</td></tr>
+  </table>
+  <pre><span class="c">-- 自适应哈希索引的真实配置（MySQL 8.0）</span>
+innodb_adaptive_hash_index = ON          <span class="c">-- 默认开；写多读少、或 latch 争用高时可关</span>
+innodb_adaptive_hash_index_parts = 8     <span class="c">-- 8.0.18+：分区减少锁竞争</span>
+
+<span class="c">-- 查看 AHI 状态</span>
+<span class="b">SHOW ENGINE INNODB STATUS</span>\G
+<span class="c">-- 看 SEMAPHORES 段：大量 OS waits / spin rounds 说明 AHI 争用严重</span>
+<span class="c">-- 看 INSERT BUFFER AND ADAPTIVE HASH INDEX 段的 hash searches/s 趋势</span>
+
+<span class="c">-- 关闭 AHI 的正确姿势（重启生效于全局）：</span>
+<span class="b">SET GLOBAL</span> innodb_adaptive_hash_index = OFF;   <span class="c">-- 需重启实例才完全释放内存结构</span></pre>
+  <h4>哈希 vs B+ 树的能力边界</h4>
+  <table>
+    <tr><th style="width:130px">能力</th><th style="width:120px">哈希索引</th><th>B+ 树</th></tr>
+    <tr><td><b>等值查询</b></td><td>O(1)，理想</td><td>O(log n)，树高 3 也是常数级</td></tr>
+    <tr><td><b>范围查询</b></td><td><b>不支持</b></td><td>叶子链表顺序扫描，天然支持</td></tr>
+    <tr><td><b>排序</b></td><td><b>不支持</b></td><td>索引本身有序</td></tr>
+    <tr><td><b>最左前缀</b></td><td>只能用全部列</td><td>支持部分列匹配</td></tr>
+    <tr><td><b>内存占用</b></td><td>额外哈希表</td><td>即数据本身</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>AHI 的两个真相：</b>① 它<b>只对等值查询加速</b>（WHERE pk = ? / 唯一索引等值），对范围、排序、JOIN 无效，别指望它救范围查询；② 它<b>不是免费的</b>——高并发点查时 AHI 的 latch 可能成为瓶颈（8.0 用分区缓解）。<b>纯点查负载且 buffer pool 命中率已很高时，AHI 收益边际，写密集场景建议直接关掉。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>索引失效的八种场景</h2></div>
+  <p class="lead">每种都给了"反例 → 现象 → 正解"。判断标准：EXPLAIN 的 type 变成 <span class="k">ALL</span>、key 变 NULL、rows 暴涨。</p>
+  <pre><span class="c">-- 1. 对索引列用函数</span>
+<span class="c">-- ✗ WHERE DATE(create_time) = '2026-10-16'          → type=ALL，扫全表</span>
+<span class="c">-- ✓ WHERE create_time &gt;= '2026-10-16' AND create_time &lt; '2026-10-17'</span>
+<span class="c">--    范围命中 idx_time，Extra 无 filesort</span>
+
+<span class="c">-- 2. 隐式类型转换（字符串列传数字）</span>
+<span class="c">-- ✗ WHERE phone = 13800000000        → 列是 VARCHAR，数字让列被转换，type=ALL</span>
+<span class="c">-- ✓ WHERE phone = '13800000000'      → 引号保住字符串类型，type=ref</span>
+<span class="c">--    注意：MySQL 8.0.21+ 对这类转换会告警，但不会自动改对</span>
+
+<span class="c">-- 3. OR 连接非索引列</span>
+<span class="c">-- ✗ WHERE user_id = 888 OR amount = 100   → amount 无索引，整体 type=ALL</span>
+<span class="c">-- ✓ 拆 UNION all：</span>
+<span class="b">SELECT</span> ... <span class="b">WHERE</span> user_id = 888
+<span class="b">UNION ALL</span>
+<span class="b">SELECT</span> ... <span class="b">WHERE</span> amount = 100;   <span class="c">-- 各走各的索引</span>
+
+<span class="c">-- 4. != / &lt;&gt; / NOT IN / NOT EXISTS</span>
+<span class="c">-- ✗ WHERE status != 0    → 大多数场景优化器选全表（排除多行时索引无意义）</span>
+<span class="c">-- ✓ 改成 IN 正集合：WHERE status IN (1,2,3)</span>
+
+<span class="c">-- 5. LIKE 前缀通配</span>
+<span class="c">-- ✗ WHERE user_name LIKE '%张三'    → 前缀不定，type=ALL</span>
+<span class="c">-- ✓ WHERE user_name LIKE '张三%'    → 前缀确定，type=range</span>
+<span class="c">-- 后缀通配的检索需求：上全文索引（模块 8），别硬凹 B+ 树</span>
+
+<span class="c">-- 6. 联合索引跳过最左列 / 中间断</span>
+<span class="c">-- ✗ 索引(user_name, phone)，WHERE phone = '138...'          → 无索引</span>
+<span class="c">-- ✗ WHERE user_name &gt; '张' AND phone = '138...'  → 范围列后断开，phone 失效</span>
+
+<span class="c">-- 7. 字符集/排序规则不一致（JOIN 场景）</span>
+<span class="c">-- ✗ a.phone utf8mb4 与 b.phone utf8，JOIN 时整列隐式转换 → 索引失效</span>
+<span class="c">-- ✓ 建表时统一 utf8mb4_general_ci，JOIN 列字符集校对规则一致</span>
+
+<span class="c">-- 8. 大数据类型选择性假象（如对 TEXT 前缀建索引但查询没前缀长度）</span>
+<span class="c">-- ✗ 索引(content(100))，WHERE content = '很长...' 全串比较 → 不走前缀索引</span>
+<span class="c">-- ✓ 用前缀索引就查前缀：WHERE LEFT(content,100) = '...' 或覆盖其他列</span></pre>
+  <h4>EXPLAIN 佐证（隐式转换的典型输出）</h4>
+  <pre><span class="c">-- phone 上有索引 idx_phone，但传入数字：</span>
+mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> phone = 13800000000;
++----+-------------+---------+------------+------+---------------+------+---------+------+----------+-------------+
+| id | select_type | table   | partitions | type | possible_keys | key  | key_len | ref  | rows     | filtered | Extra       |
++----+-------------+---------+------------+------+---------------+------+---------+------+----------+----------+-------------+
+|  1 | SIMPLE      | t_order | NULL       | <span class="r">ALL</span>  | idx_phone     | <span class="r">NULL</span> | NULL    | NULL | 9982317  |    10.00 | Using where |
++----+-------------+---------+------------+------+---------------+------+---------+------+----------+----------+-------------+
+<span class="c">-- type=ALL、key=NULL、rows=998 万：索引彻底没用上</span>
+
+<span class="c">-- 加上引号：</span>
+mysql&gt; <span class="b">EXPLAIN</span> <span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">WHERE</span> phone = <span class="y">'13800000000'</span>;
++----+-------------+---------+------------+------+---------------+----------+---------+-------+------+----------+-------+
+| id | select_type | table   | partitions | type | possible_keys | key      | key_len | ref   | rows | filtered | Extra |
++----+-------------+---------+------------+------+---------------+----------+---------+-------+------+----------+-------+
+|  1 | SIMPLE      | t_order | NULL       | <span class="g">ref</span>  | idx_phone     | idx_phone| 66      | const |    2 |   100.00 | NULL  |
++----+-------------+---------+------------+------+---------------+----------+---------+-------+------+----------+-------+</pre>
+  <div class="callout danger">
+    <b>最容易骗过代码评审的一条：</b>"我知道隐式转换不好，但我们 ORM 生成的 SQL 参数是对象类型。"——<b>ORM 拼出来的 SQL 一样会中招</b>。凡是 WHERE 里出现数字字面量匹配字符串列，先去 EXPLAIN 看一眼 type。<b>另一个隐蔽的：WHERE create_time = DATE(NOW())</b>，等于对索引列套函数，直接 ALL。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>索引选择、cardinality 与全文索引</h2></div>
+  <h4>cardinality：优化器选索引的依据</h4>
+  <pre><span class="c">-- 看索引统计信息</span>
+mysql&gt; <span class="b">SHOW INDEX FROM</span> t_order;
++---------+------------+--------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+
+| Table   | Non_unique | Key_name     | Seq_in_index | Column_name | Collation | Cardinality| Sub_part| Packed| Null | Index_type| Comment |
++---------+------------+--------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+
+| t_order | 0          | PRIMARY      | 1            | order_id    | A         | <span class="g">9973128</span>   | NULL     | NULL  | NO   | BTREE     |         |
+| t_order | 1          | idx_user     | 1            | user_id     | A         | <span class="g">998416</span>    | NULL     | NULL  | NO   | BTREE     |         |
+| t_order | 1          | idx_time     | 1            | create_time | A         | <span class="g">9985217</span>   | NULL     | NULL  | NO   | BTREE     |         |
++---------+------------+--------------+--------------+-------------+-----------+-------------+----------+--------+------+------------+---------+
+<span class="c">-- Cardinality = 该列不同值的估计数。order_id ≈ 997 万（几乎唯一，选择性 100%）</span>
+<span class="c">-- user_id ≈ 99.8 万（100 万用户，选择性 ~10%），create_time ≈ 997 万（秒级几乎唯一）</span></pre>
+  <pre><span class="c">-- 优化器的决策逻辑（简化版）：</span>
+估算匹配行数 = 总行数 × (1 / cardinality)
+<span class="c">-- user_id=888：1000 万 × (1/99.8 万) ≈ 10 行 → 走索引（回表 10 次便宜）</span>
+<span class="c">-- status=1（4 个值）：1000 万 × (1/4) = 250 万行 → 走索引要回表 250 万次，</span>
+<span class="c">--   随机 IO 比顺序全表扫描贵 → 优化器主动选全表（这是"正确的失效"）</span>
+
+<span class="c">-- 统计信息不准的修复：</span>
+<span class="b">ANALYZE TABLE</span> t_order;                    <span class="c">-- 重新采样（默认 20 个页）</span>
+<span class="b">SET GLOBAL</span> innodb_stats_persistent_sample_pages = 50;  <span class="c">-- 提高采样精度</span>
+<span class="b">SHOW STATUS LIKE</span> <span class="y">'handler_read%'</span>;           <span class="c">-- 验证实际读了多少行</span>
+
+<span class="c">-- 确认优化器选错时的兜底（谨慎）：</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_order <span class="b">FORCE INDEX</span>(idx_user) <span class="b">WHERE</span> user_id = 888;</pre>
+  <h4>倒排索引与全文索引基础</h4>
+  <pre><span class="c">-- 正排索引：文档 → 词项列表</span>
+doc1 → [mysql, index, btree]
+doc2 → [postgres, index]
+
+<span class="c">-- 倒排索引：词项 → 文档列表（posting list）</span>
+mysql    → [doc1]
+postgres → [doc2]
+index    → [doc1, doc2]        <span class="c">-- 检索 "index" 直接命中两个文档，无需遍历</span>
+<span class="c">-- 本质：用预处理换查询速度，空间换时间。B+ 树做不到"词在任意位置"的匹配</span>
+
+<span class="c">-- InnoDB 全文索引（MySQL 5.6+ 内置）</span>
+<span class="b">CREATE FULLTEXT INDEX</span> ft_content <span class="b">ON</span> t_article(content);
+
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_article
+<span class="b">WHERE</span> <span class="b">MATCH</span>(content) <span class="b">AGAINST</span>(<span class="y">'数据库 索引'</span> <span class="b">IN NATURAL LANGUAGE MODE</span>);
+
+<span class="b">SELECT</span> * <span class="b">FROM</span> t_article
+<span class="b">WHERE</span> <span class="b">MATCH</span>(content) <span class="b">AGAINST</span>(<span class="y">'+mysql -oracle'</span> <span class="b">IN BOOLEAN MODE</span>);  <span class="c">-- 布尔模式</span>
+
+<span class="c">-- 中文必须用 ngram 解析器（默认按空格分词，中文整篇是一个词）</span>
+<span class="b">CREATE TABLE</span> t_article (
+  id <span class="y">BIGINT</span> <span class="b">PRIMARY KEY</span>,
+  content <span class="y">TEXT</span>,
+  <span class="b">FULLTEXT KEY</span> ft_content (content) <span class="b">WITH PARSER</span> ngram
+) <span class="b">ENGINE</span>=InnoDB;
+
+<span class="c">-- ngram 参数（默认中文 2 字一词）</span>
+innodb_ft_min_token_size = 2     <span class="c">-- 配合 ngram_token_size 使用</span>
+ngram_token_size = 2             <span class="c">-- "数据库原理" → 数据/据库/库原/原理/.....（滑窗）</span></pre>
+  <div class="callout ok">
+    <b>InnoDB 全文索引的边界：</b>① 只对 InnoDB/MyISAM 的 CHAR/VARCHAR/TEXT 生效，且<b>修改文本会触发 FTS 辅助表同步</b>，写入有额外开销；② 相关性排序能力很基础（词频 × IDF 的简化版），<b>要相关度打分、同义词、分词插件就上 Elasticsearch</b>；③ 停止词和最小词长会过滤短词（"的"这类会被丢掉），检索不到别奇怪。B+ 树索引解决"精确/范围/排序"，全文索引解决"包含关系"，二者互补。
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">深坑</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">WHERE 条件对索引列套函数</div><div class="pd">DATE(create_time)='2026-10-16'、LEFT(phone,3)='138' 都让索引失效，type=ALL。改成范围条件或表达式索引（MySQL 8.0 函数索引）。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">字符串列查数字，隐式转换</div><div class="pd">phone = 13800000000（列是 VARCHAR）触发全列转换，EXPLAIN type=ALL、rows=998 万。加引号即可，但 ORM 生成的参数类型要一起检查。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">select * 把覆盖索引打成回表</div><div class="pd">明明建了 (user_id, amount) 覆盖索引，一句 select * 全部回表。按需取列，或用延迟关联（子查询拿主键再 JOIN）。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">联合索引列顺序拍脑袋</div><div class="pd">(status, create_time) 查 status + 时间范围还行，但查 (create_time) 单独条件时完全用不上。等值列在前、范围列在后、高区分度在前。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">LIKE '%关键词' 当前缀用</div><div class="pd">前缀通配让 B+ 树无法二分，直接全表。'关键词%' 才能走 range。模糊检索需求应该建全文索引或上 ES。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">深翻页 limit 100000,10 配 order by</div><div class="pd">要么 filesort 十万行、要么回表十万次。用书签法（WHERE create_time &lt; 上一页末条 LIMIT 10）或延迟关联。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">索引建太多，写入雪崩</div><div class="pd">一张表 12 个索引，每次 INSERT 要维护 12 棵 B+ 树，页分裂和 double write 全涨，写入 QPS 直接腰斩。单表索引建议 ≤ 5 个，先删从未用过的。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">统计信息过期，优化器选错索引</div><div class="pd">大批量导入后没 ANALYZE TABLE，cardinality 还是旧值，优化器选了个区分度极低的索引，慢查询爆发。导入后必须刷新统计。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">在低区分度列上建单列索引</div><div class="pd">status（4 个值）、gender（2 个值）、is_deleted 建索引几乎不用——除非数据极度倾斜且查稀有值。这类列只能做联合索引的辅助过滤。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用 UUID/随机字符串做主键</div><div class="pd">随机主键导致聚簇索引页分裂（写入放大）、二级索引膨胀近 9 倍、buffer pool 命中率下降。用自增或雪花（趋势递增）。</div></div></div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 1000 万行、行大小 1KB 的 InnoDB 表，索引树高 3 层。一次主键点查最多涉及几次磁盘 IO？</div>
+      <button class="opt">3 次，每层各一次</button>
+      <button class="opt">1 次，因为 buffer pool 全缓存</button>
+      <button class="opt">2 次随机 IO，根节点常驻内存不读盘</button>
+      <div class="ans">正确答案：<b>2 次</b>。树高 3 意味着最多定位 3 个页，但根节点 99% 以上的查询都会命中 buffer pool（缓存），实际随机 IO 是 2 次。这也是"三层 B+ 树支撑千万行"的完整含义：容量 1170×1170×16 ≈ 2190 万行，代价 2 次 IO。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 哪个现象说明查询走了覆盖索引？</div>
+      <button class="opt">EXPLAIN 的 type = ref</button>
+      <button class="opt">EXPLAIN 的 Extra 出现 Using index</button>
+      <button class="opt">EXPLAIN 的 rows 很小</button>
+      <div class="ans">正确答案：<b>Extra 里的 Using index</b>。它表示所有需要的列都在索引里，无需回表。type=ref 只说明用了二级索引等值匹配，仍可能回表；rows 小也可能来自全表扫描的估算。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 索引为 KEY(user_name, phone)，哪条 SQL 能用上这个索引？</div>
+      <button class="opt">WHERE user_name = '张三' AND phone = '13800000000'</button>
+      <button class="opt">WHERE phone = '13800000000' AND user_name = '张三'</button>
+      <button class="opt">WHERE phone = '13800000000'</button>
+      <div class="ans">正确答案：<b>第一个</b>。注意 B 选项 WHERE 子句里条件的书写顺序不影响，实际还是只有 phone 等值——缺最左列 user_name，索引整体失效。最左前缀看的是<b>哪些列被等值匹配</b>，不是书写顺序。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于索引下推 ICP，正确的说法是？</div>
+      <button class="opt">它把条件下推到 Server 层执行</button>
+      <button class="opt">它能消除所有回表</button>
+      <button class="opt">它把索引相关条件下推到存储引擎层，在回表前过滤，减少回表次数</button>
+      <div class="ans">正确答案：<b>下推到引擎层、减少回表</b>。ICP 让引擎在页内就用索引列判断条件，不满足的行不取出。它减少而非消除回表；彻底零回表是覆盖索引（Using index）的能力。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 下列哪种写法一定让索引失效（假设列上都有索引）？</div>
+      <button class="opt">WHERE DATE(create_time) = '2026-10-16'</button>
+      <button class="opt">WHERE user_id IN (1, 2, 3)</button>
+      <button class="opt">WHERE user_name LIKE '张%'</button>
+      <div class="ans">正确答案：<b>对索引列套函数</b>。索引存的是 create_time 原值，套上 DATE() 后无法二分定位，只能全表扫描。IN 多个值会走 range，LIKE '张%' 前缀确定也走 range，都是有效用法。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. SHOW INDEX 里的 Cardinality 表示什么？</div>
+      <button class="opt">索引占用的磁盘页数</button>
+      <button class="opt">该索引列不同值的估计数量，优化器据此估算选择率</button>
+      <button class="opt">索引被查询命中的次数</button>
+      <div class="ans">正确答案：<b>不同值的估计数</b>。优化器用它估算匹配行数（总行数 / cardinality），选择率高时主动弃索引走全表——这是"合理的失效"，不是 bug。采样估算会过期，大批量导入后要 ANALYZE TABLE 刷新。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s14">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>EXPLAIN SELECT ...</code><span class="desc">看执行计划：type/key/rows/Extra 四要素</span><button class="copy">复制</button></div>
+    <div class="crow"><code>EXPLAIN ANALYZE SELECT ...</code><span class="desc">8.0+ 实际执行：真实行数、真实耗时、循环次数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW INDEX FROM t_order</code><span class="desc">看索引列、顺序与 Cardinality</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ANALYZE TABLE t_order</code><span class="desc">刷新统计信息，导入后必做</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CREATE INDEX idx ON t(a, b)</code><span class="desc">联合索引：等值列在前、范围列在后</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CREATE FULLTEXT INDEX ft ON t(content) WITH PARSER ngram</code><span class="desc">中文全文索引，MATCH ... AGAINST 检索</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM t FORCE INDEX(idx)</code><span class="desc">强制走索引（排查用，别进生产代码）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW STATUS LIKE 'Handler_read%'</code><span class="desc">验证实际扫描行数，识别假索引命中</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>EXPLAIN 关键值速查</h3>
+  <pre><span class="c"># type（性能从好到坏）</span>
+system &gt; const &gt; eq_ref &gt; ref &gt; fulltext &gt; ref_or_null &gt; index_merge
+      &gt; unique_subquery &gt; index_subquery &gt; range &gt; index &gt; <span class="r">ALL</span>
+<span class="c"># 经验线：至少要到 range；出现 ALL 且 rows 很大就必须优化</span>
+
+<span class="c"># Extra（按价值排序）</span>
+Using index            <span class="c"># 覆盖索引，零回表，最优</span>
+Using index condition  <span class="c"># ICP 生效，回表前先过滤</span>
+Using MRR              <span class="c"># 多范围读取，随机 IO 变顺序</span>
+Using where            <span class="c"># Server 层过滤（可能需要关注）</span>
+Using filesort         <span class="c"># 内存/磁盘排序，大结果集是瓶颈</span>
+Using temporary        <span class="c"># 用了临时表，GROUP BY 常见</span>
+Using join buffer      <span class="c"># 无索引 JOIN，走块嵌套循环</span>
+
+<span class="c"># 常用优化器开关</span>
+<span class="b">SET</span> optimizer_switch = <span class="y">'index_condition_pushdown=off'</span>;   <span class="c"># 关 ICP</span>
+<span class="b">SET</span> optimizer_switch = <span class="y">'skip_scan=off'</span>;                <span class="c"># 关索引跳跃扫描（8.0.19+）</span>
+<span class="b">SET GLOBAL</span> innodb_adaptive_hash_index = OFF;             <span class="c"># 关自适应哈希</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>B+ 树</b></td><td>多路平衡查找树，非叶子只存目录，叶子存数据且链表相连</td></tr>
+    <tr><td><b>数据页</b></td><td>InnoDB 磁盘管理单位，16KB，一个页即一个 B+ 树节点</td></tr>
+    <tr><td><b>树高 / 阶</b></td><td>根到叶子的层数；3 层 ≈ 2200 万行（1KB 行）</td></tr>
+    <tr><td><b>聚簇索引</b></td><td>InnoDB 主键索引，叶子存整行，数据按主键物理排列</td></tr>
+    <tr><td><b>二级索引</b></td><td>非聚簇索引，叶子存主键值，查询需回表</td></tr>
+    <tr><td><b>回表</b></td><td>二级索引查到主键后，再去聚簇索引取整行的过程</td></tr>
+    <tr><td><b>覆盖索引</b></td><td>查询列全在索引里，零回表，EXPLAIN 显 Using index</td></tr>
+    <tr><td><b>延迟关联</b></td><td>先用覆盖索引拿主键再回表取整行，深分页标配</td></tr>
+    <tr><td><b>联合索引</b></td><td>多列组成的 B+ 树，排序按列序依次进行</td></tr>
+    <tr><td><b>最左前缀</b></td><td>联合索引必须从最左列开始连续匹配，范围列会截断后续</td></tr>
+    <tr><td><b>ICP</b></td><td>索引下推：索引条件下推到引擎层过滤，减少回表</td></tr>
+    <tr><td><b>MRR</b></td><td>多范围读取：二级索引结果按主键排序后批量回表</td></tr>
+    <tr><td><b>自适应哈希 AHI</b></td><td>InnoDB 自动为热点页建的哈希索引，只加速等值查询</td></tr>
+    <tr><td><b>Cardinality</b></td><td>索引列不同值的估计数，优化器选索引的核心依据</td></tr>
+    <tr><td><b>选择率</b></td><td>匹配行数 / 总行数，过高时优化器主动弃索引</td></tr>
+    <tr><td><b>索引合并</b></td><td>多个单列索引取并集/交集使用，EXPLAIN 显 index_merge</td></tr>
+    <tr><td><b>索引跳跃扫描</b></td><td>MySQL 8.0.19+ 跳过低区分度前导列直接匹配后续列</td></tr>
+    <tr><td><b>页分裂</b></td><td>随机插入导致页写满拆页，UUID 主键写入慢的根因</td></tr>
+    <tr><td><b>倒排索引</b></td><td>词项 → 文档列表，全文检索的基础结构</td></tr>
+    <tr><td><b>ngram</b></td><td>中文分词解析器，按 n 字滑窗切词（默认 2）</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 t_order 完成这五件事 —— ① 灌 1000 万行后 <span class="k">SHOW INDEX</span> 看 Cardinality，再 EXPLAIN 四种查询（主键点查、user_id 等值、时间范围、函数包裹）对比 type 与 rows；② 建 (user_id, create_time) 联合索引，验证 ORDER BY create_time 的 filesort 是否消失；③ 用延迟关联改写深分页，对比改写前后耗时；④ 关掉 ICP 前后对比回表次数；⑤ 建一张含中文 content 的表，配 ngram 全文索引，用 MATCH ... AGAINST 做三种模式检索。<br><br>
+    <b>之后值得单独学：</b>EXPLAIN ANALYZE 的树状执行计划（真实行数 vs 预估行数的偏差诊断）、直方图统计（MySQL 8.0 histogram 解决范围估算偏差）、以及 MySQL 与 PostgreSQL 优化器行为差异（见下一期《查询优化器》）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透索引原理 · EXPLAIN 的 Extra 比 type 更诚实</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（B+ 树计算）、模块 4（最左前缀）和模块 7（失效场景）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 mysql 客户端里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起 MySQL 8.0 跟着敲：docker run -d -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root mysql:8.0';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

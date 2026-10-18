@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透缓存架构设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 第 5 期 · 高密度版</span>
+    <h1>二十分钟学透缓存架构设计</h1>
+    <p class="sub">Redis 命令谁都会背，缓存<b>架构</b>才是分水岭：多级缓存怎么分层、四种模式怎么选、一致性怎么兜、大 key 热 key 怎么治。这篇讲系统层面的缓存设计。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">缓存 <b>3</b> 层 <b>4</b> 模式</span>
+      <span class="chip">三大问题全对策</span>
+      <span class="chip"><b>10</b> 个架构坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议对照你负责的系统：画出它的缓存分层图，标记每层的 TTL 和失效方式。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>缓存分类与分层架构</h2></div>
+  <p class="lead">缓存的本质是“<b>用更快的读换一致性代价</b>”。选哪层缓存，是在延迟、成本、一致性之间选位置。</p>
+  <table>
+    <tr><th style="width:150px">层级</th><th style="width:170px">延迟量级</th><th style="width:150px">容量</th><th>一致性/成本特征</th></tr>
+    <tr><td><b>浏览器/CDN</b></td><td>~10ms（边缘）</td><td>无限大</td><td>一致性最弱，靠 TTL + 主动刷新；成本最低</td></tr>
+    <tr><td><b>Nginx 本地缓存</b></td><td>~1ms</td><td>磁盘受限</td><td>proxy_cache，静态资源/接口缓存</td></tr>
+    <tr><td><b>应用本地缓存</b></td><td>~0.1ms（堆内）</td><td>堆内存（GB 级）</td><td>无网络开销；多实例不一致；进程重启即丢</td></tr>
+    <tr><td><b>分布式缓存</b></td><td>~1ms（同机房）</td><td>集群（TB 级）</td><td>集中一致控制点；要运维 Redis 集群</td></tr>
+    <tr><td><b>数据库缓存</b></td><td>~10ms（内存命中）</td><td>Buffer Pool</td><td>InnoDB Buffer Pool 本身就是缓存，别忽略它</td></tr>
+  </table>
+  <h4>多级缓存的典型形态</h4>
+  <pre><span class="c"># 典型电商读链路（命中率逐层递减，延迟逐层递增的反向）</span>
+用户请求
+  → CDN（静态图片/详情页壳）            命中率 ~40%，省掉最多流量
+  → Nginx 本地缓存（秒杀页/配置）       命中率 ~30%
+  → 应用本地缓存 Caffeine（商品基础信息） 命中率 ~20%，微秒级返回
+  → Redis 集群（库存/价格/详情）          命中率 ~9%
+  → MySQL（最终真相）                   命中率 ~1%，并回填上面所有层
+
+<span class="c"># 各层 TTL 设计（外层短、内层长，逐层兜底）</span>
+CDN:      60s + 主动 purge（发布商品时刷新）
+Nginx:    30s
+Caffeine: 5~10s（短！本地缓存 TTL 是最后一道一致性的补偿）
+Redis:    30min~24h（基础数据可长，库存/价格要短或主动失效）</pre>
+  <div class="callout ok">
+    <b>分层的核心思想：越靠前的层容量越小、一致性越弱、失效要越快。</b>本地缓存 TTL 长 = 长达几分钟的脏数据，任何“更新后立刻生效”的需求都会被打脸。<b>本地缓存只放“偶尔旧一会儿没关系”的数据。</b>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>四种缓存模式对比</h2></div>
+  <table>
+    <tr><th style="width:160px">模式</th><th style="width:230px">读流程</th><th style="width:230px">写流程</th><th>一致性</th></tr>
+    <tr><td><b>Cache Aside</b><br>（旁路缓存）</td><td>先读缓存，miss 则读 DB 并回填</td><td>更新 DB，<b>删除</b>缓存</td><td>最终一致，<b>业界默认选择</b></td></tr>
+    <tr><td><b>Read Through</b></td><td>缓存自己读 DB（对应用透明）</td><td>同 Cache Aside 或配合 Write 模式</td><td>同 Cache Aside</td></tr>
+    <tr><td><b>Write Through</b></td><td>同 Read Through</td><td>先写缓存，<b>缓存同步写 DB</b></td><td>强一致，写延迟高</td></tr>
+    <tr><td><b>Write Behind</b><br>（Write Back）</td><td>同 Read Through</td><td>只写缓存，<b>异步批量刷 DB</b></td><td>弱一致，丢数据风险</td></tr>
+  </table>
+  <h4>Cache Aside 的标准实现</h4>
+  <pre><span class="c">// 读：miss 才查库，回填要设 TTL</span>
+<span class="b">public</span> ProductVO getProduct(Long id) {
+    String key = <span class="y">"product:"</span> + id;
+    String json = redis.get(key);
+    <span class="b">if</span> (json != <span class="b">null</span>) {
+        <span class="b">if</span> (<span class="y">"__NULL__"</span>.equals(json)) <span class="b">return null</span>;   <span class="c">// 空值标记，防穿透</span>
+        <span class="b">return</span> deserialize(json);
+    }
+    ProductVO vo = productDao.load(id);            <span class="c">// 查库</span>
+    <span class="b">if</span> (vo != <span class="b">null</span>) {
+        redis.setex(key, ttlWithJitter(3600), serialize(vo));  <span class="c">// TTL 加随机抖动</span>
+    } <span class="b">else</span> {
+        redis.setex(key, 60, <span class="y">"__NULL__"</span>);                 <span class="c">// 短 TTL 空值</span>
+    }
+    <span class="b">return</span> vo;
+}
+
+<span class="c">// 写：更新 DB 后删缓存（不是更新缓存）</span>
+<span class="b">@Transactional</span>
+<span class="b">public void</span> updateProduct(ProductVO vo) {
+    productDao.update(vo);
+    redis.del(<span class="y">"product:"</span> + vo.getId());    <span class="c">// 删除而非覆盖，见下方说明</span>
+}</pre>
+  <div class="callout warn">
+    <b>为什么删缓存而不是更新缓存？</b>① 更新是写操作，可能失败、可能被覆盖；删除是幂等的，失败重试就行。② 并发下“更新缓存”会写脏：线程 A 写库 v2、线程 B 写库 v3、B 先更新缓存 v3、A 再更新缓存 v2 → 缓存长期脏。删除方案最坏情况只是下次 miss 读一次库。<b>懒加载（lazy load）比急加载（write-through）更适合读多写少。</b>
+  </div>
+  <h4>Write Behind 的适用与风险</h4>
+  <pre><span class="c"># Write Behind 适合：写极密集且允许丢的场景</span>
+<span class="c"># - 点赞数、阅读量、在线人数：先写 Redis 计数器，每 5s 批量刷 DB</span>
+<span class="c"># - 风险：Redis 宕机丢最近 5s 数据 → 计数回退，用户投诉"我点的赞没了"</span>
+<span class="c"># 缓解：刷盘间隔 ≤ 业务可容忍丢失窗口 + Redis AOF everysec（最多丢 1s）</span>
+
+<span class="c"># Write Through 适合：缓存即主存储（Redis 当 DB 用的系统）</span>
+<span class="c"># - 每次写穿透到 DB，读永远命中缓存，一致性最好，写 RT 翻倍</span></pre>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>穿透、击穿、雪崩：成因与对策</h2></div>
+  <p class="lead">这三个是缓存架构的基础题，但工程上要按“<b>发生频率 × 伤害</b>”排序治理。</p>
+  <table>
+    <tr><th style="width:110px">问题</th><th style="width:200px">根因</th><th style="width:200px">对策</th><th>优先级</th></tr>
+    <tr><td><b>穿透</b></td><td>查不存在的数据，缓存永远 miss</td><td>空值缓存 / 布隆过滤器 / 接口层参数校验</td><td>中（攻击面）</td></tr>
+    <tr><td><b>击穿</b></td><td>单个热 key 过期，并发直插 DB</td><td>互斥锁回填 / 逻辑过期 / 热点永不过期</td><td>高（热点必发生）</td></tr>
+    <tr><td><b>雪崩</b></td><td>大批 key 同时过期，或 Redis 整体故障</td><td>随机 TTL / 多级缓存 / 高可用 / 限流降级</td><td>最高（事故级）</td></tr>
+  </table>
+  <h4>布隆过滤器的正确用法</h4>
+  <pre><span class="c"># 布隆过滤器：说"不存在"一定准确，说"存在"可能误判（假阳性率可调）</span>
+<span class="c"># 因此它只能拦"肯定不存在"的流量，拦不掉之后的所有 miss</span>
+
+<span class="c"># 容量规划：n = 预期元素数，p = 可接受误判率</span>
+<span class="c"># 位数组大小 m = -n·ln(p) / (ln2)² ；哈希函数个数 k = (m/n)·ln2</span>
+<span class="c"># 例：1 亿商品 ID，误判率 1% → m ≈ 9.6 亿 bit ≈ 120MB，k ≈ 7 个哈希</span>
+
+<span class="c"># 三种落地方式</span>
+<span class="c"># ① Redisson 的 RBloomFilter（Redis 4.0+ 已内置 Bloom 类型，支持 BF.ADD/BF.EXISTS）</span>
+<span class="b">BF.ADD</span> product:filter <span class="y">"sku-10001"</span>
+<span class="b">BF.EXISTS</span> product:filter <span class="y">"sku-10001"</span>     <span class="c"># 0 = 一定不存在</span>
+<span class="c"># ② 本地布隆（Guava BloomFilter）：零网络成本，但重启要重建、多实例各一份</span>
+<span class="c"># ③ 启动时全量加载 + binlog 增量维护（见模块 3）</span>
+
+<span class="c"># 坑：删除元素不支持（计数布隆才行）；元素少时误判率比理论值高</span>
+<span class="c"># 坑：Redis 集群下 BF 是单 key，不能跨节点扩容 —— 大集合只能本地布隆</span></pre>
+  <h4>击穿：互斥锁回填的完整实现</h4>
+  <pre><span class="c">// 互斥锁：只放一个请求去查库，其他等待后重试（保护 DB，牺牲少许延迟）</span>
+<span class="b">public</span> ProductVO getWithMutex(Long id) {
+    String key = <span class="y">"product:"</span> + id;
+    String json = redis.get(key);
+    <span class="b">if</span> (json != <span class="b">null</span>) <span class="b">return</span> deserialize(json);
+
+    String lockKey = <span class="y">"lock:product:"</span> + id;
+    String token = UUID.randomUUID().toString();
+    <span class="b">try</span> {
+        <span class="b">for</span> (<span class="b">int</span> i = 0; i &lt; 3; i++) {               <span class="c">// 最多重试 3 次</span>
+            <span class="b">if</span> (redis.set(lockKey, token, NX, EX, 10)) {   <span class="c">// 拿到锁</span>
+                json = redis.get(key);                  <span class="c">// 双重检查：可能别人已回填</span>
+                <span class="b">if</span> (json != <span class="b">null</span>) <span class="b">return</span> deserialize(json);
+                ProductVO vo = productDao.load(id);    <span class="c">// 查库（慢，但只有一个线程做）</span>
+                redis.setex(key, ttlJitter(3600), serialize(vo));
+                <span class="b">return</span> vo;
+            }
+            Thread.sleep(50);                           <span class="c">// 没拿到锁，短暂退避</span>
+        }
+        <span class="b">return</span> productDao.load(id);               <span class="c">// 兜底：直接查库，别让请求失败</span>
+    } <span class="b">finally</span> {
+        unlock(lockKey, token);                         <span class="c">// Lua 校验 value 后删除</span>
+    }
+}
+<span class="c">// 注意：锁 TTL 要大于查库耗时；查库超时会连带锁失效 → 需要看门狗续期</span></pre>
+  <h4>逻辑过期：热点永不过期的变体</h4>
+  <pre><span class="c">// 逻辑过期：key 物理 TTL 不设，value 里包一个逻辑过期时间字段</span>
+{
+  <span class="y">"data"</span>: { <span class="y">"id"</span>: 88, <span class="y">"name"</span>: <span class="y">"爆款T恤"</span>, <span class="y">"price"</span>: 99 },
+  <span class="y">"expireAt"</span>: 1729166400000
+}
+
+<span class="c">// 读到时判断 expireAt：</span>
+<span class="c">// 未过期 → 直接返回</span>
+<span class="c">// 已过期 → 尝试拿互斥锁 → 拿到则异步重建数据，当前请求先返回旧值</span>
+<span class="c">//         → 拿不到锁说明别人正在重建，直接返回旧值</span>
+
+<span class="c">// 优点：热点 key 永不过期，绝对零击穿；请求永不阻塞</span>
+<span class="c">// 缺点：会返回旧数据（业务可接受才行）；需要异步重建线程池</span></pre>
+  <div class="callout danger">
+    <b>雪崩治理的优先级：</b>① Redis 高可用（主从 + 哨兵/Cluster，别单点）；② 多级缓存（Redis 挂了本地缓存兜底）；③ 随机 TTL（<span class="k">EXPIRE = base + random(0, 600)</span>，杜绝同秒失效）；④ DB 前限流熔断（挂了时直接返回兜底页，别把库打穿）；⑤ 预热（大促前把热点数据提前灌入，避免开闸瞬间集体 miss）。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>一致性策略：延迟双删与 binlog 订阅</h2></div>
+  <h4>方案对比</h4>
+  <table>
+    <tr><th style="width:220px">方案</th><th style="width:250px">机制</th><th>残留脏数据窗口</th></tr>
+    <tr><td>先更新 DB，再删缓存</td><td>Cache Aside 标准流</td><td>极小概率：删缓存前一刻的读请求把旧值写回了缓存</td></tr>
+    <tr><td>先删缓存，再更新 DB</td><td>删除后有请求读库写回旧值</td><td>较大：更新 DB 前的所有读都会污染</td></tr>
+    <tr><td>延迟双删</td><td>删缓存 → 更新 DB → 延迟 N 毫秒再删一次</td><td>用延迟覆盖极小概率（N &gt; 一次读库耗时）</td></tr>
+    <tr><td>binlog 订阅失效</td><td>Canal/Debezium 订阅变更，异步删缓存</td><td>毫秒级延迟，业务代码零侵入</td></tr>
+  </table>
+  <h4>延迟双删的实现要点</h4>
+  <pre><span class="b">public void</span> updateWithDoubleDelete(ProductVO vo) {
+    redis.del(<span class="y">"product:"</span> + vo.getId());          <span class="c">// ① 先删</span>
+    productDao.update(vo);                        <span class="c">// ② 更新 DB</span>
+    <span class="c">// ③ 延迟再删：异步等一会儿，覆盖"删缓存与更新之间的旧读回填"</span>
+    delayExecutor.schedule(() -&gt; redis.del(<span class="y">"product:"</span> + vo.getId()),
+        500, TimeUnit.MILLISECONDS);              <span class="c">// 500ms &gt; 读库+写缓存全流程</span>
+}
+<span class="c">// 局限：延迟时间是猜的（太短漏删、太长浪费）；第二次删之前仍可能脏；</span>
+<span class="c">// 只缓解概率，不根治。一致性要求高就上 binlog 方案</span></pre>
+  <h4>binlog 订阅：最干净的方案</h4>
+  <pre><span class="c"># 架构：MySQL → Canal/Debezium → MQ → 缓存失效服务 → 删 Redis</span>
+<span class="c"># 关键：失效的依据是"数据库真实变更"，不是业务代码自觉</span>
+
+<span class="c"># Canal 配置（canal.properties 核心项）</span>
+canal.instance.master.address = 10.0.1.10:3306
+canal.instance.dbUsername = canal
+canal.instance.dbPassword = <span class="y">******</span>
+canal.mq.topic = db.binlog.product          <span class="c"># 变更发到 MQ</span>
+
+<span class="c"># 消费者：解析 binlog，删对应缓存 key</span>
+<span class="b">public void</span> onBinlog(CanalEntry.Entry entry) {
+    <span class="b">if</span> (entry.getHeader().getTableName().equals(<span class="y">"product"</span>)) {
+        <span class="b">for</span> (RowData row : entry.getRowChange().getRowDatasList()) {
+            Long id = row.getAfterColumns(0).getValue();
+            redis.del(<span class="y">"product:"</span> + id);            <span class="c">// 只删，不写缓存</span>
+            metrics.counter(<span class="y">"cache.invalidate.binlog"</span>).increment();
+        }
+    }
+}
+
+<span class="c"># 代价：Canal/Debezium 集群运维；binlog 到删缓存有 100ms~1s 延迟；</span>
+<span class="c"># 好处：改代码忘删缓存也不会脏；分库分表时按 canal 的库表路由删对应 key</span>
+<span class="c"># 适用：一致性要求高 + 团队能养一套 CDC。普通系统 Cache Aside + TTL 已够</span></pre>
+  <div class="callout ok">
+    <b>务实结论：</b>① 默认 <b>Cache Aside（先更库后删缓存）+ TTL</b>，TTL 是最终兜底；② 删缓存失败要重试（本地队列 + 指数退避，或 binlog 补偿）；③ 一致性敏感数据（价格、库存）TTL 设短（分钟级）+ 发布时主动删；④ <b>余额类数据不要缓存</b>，直接读库。追求强一致 + 缓存，逻辑上就是矛盾的。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>大 key / 热 key 治理</h2></div>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:240px">定义（经验阈值）</th><th>危害</th></tr>
+    <tr><td><b>大 key</b></td><td>String &gt; 10KB；Hash/ZSet/List &gt; 5000 元素或 &gt; 10MB</td><td>DEL/过期时阻塞（异步删也占带宽）；主从同步单 key 阻塞；网络序列化慢</td></tr>
+    <tr><td><b>热 key</b></td><td>单 key QPS &gt; 5000，或占单节点流量 &gt; 30%</td><td>单节点 CPU 打满，集群倾斜；该节点故障时缓存雪崩加倍</td></tr>
+  </table>
+  <h4>大 key 的发现与拆分</h4>
+  <pre><span class="c"># 发现（用 SCAN 不用 KEYS）</span>
+redis-cli --bigkeys                          <span class="c"># 抽样统计各类型最大 key</span>
+redis-cli --memkeys                          <span class="c"># 按内存排序</span>
+redis-cli --hotkeys                          <span class="c"># LFU 模式下找热 key</span>
+
+<span class="c"># 修复：拆分而非删除重建</span>
+<span class="c"># ✗ 反模式：一个 hash 存 100 万用户 -> product:all:users</span>
+<span class="c"># ✓ 拆成 product:users:{shard} 100 个，按 id % 100 路由</span>
+<span class="c">#   - 每个 key 1 万字段，读写都分散</span>
+<span class="c">#   - 批量操作用 pipeline 按 shard 分组执行</span>
+
+<span class="c"># 删除大 key：UNLINK 异步删；或 scan + 分批 DEL 控制节奏</span>
+<span class="b">UNLINK</span> big:hash:100w                     <span class="c"># 不阻塞主线程</span>
+
+<span class="c"># 预防：写入侧拦截（客户端代理层或封装 RedisTemplate）</span>
+<span class="c"># - 单 value &gt; 32KB 告警拒绝；集合 &gt; 1 万元数告警</span>
+<span class="c"># - 上线前用规范 + 压测数据卡住，别等线上发现</span></pre>
+  <h4>热 key 的四种解法</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>本地缓存兜底（首选）。</b>Caffeine 缓存热 key，TTL 1~5s。90% 请求在应用内消化，Redis 节点压力骤降。代价：秒级不一致。</div></div>
+    <div class="step"><div class="txt"><b>key 复制散列。</b><span class="k">hotkey#1</span> ~ <span class="k">hotkey#100</span> 多副本分布到不同节点，读随机选一个；写时全写 + 短 TTL。适合读远多于写的配置类数据。</div></div>
+    <div class="step"><div class="txt"><b>value 拆分。</b>热 key 的 value 拆成多个子 key（大 list 按段、hash 按字段组），请求打散到不同 slot。</div></div>
+    <div class="step"><div class="txt"><b>迁移到本地/静态化。</b>极热的配置、商品基础数据直接下发到客户端本地或推送到 CDN，根本不进 Redis。</div></div>
+  </div>
+  <pre><span class="c"># 热 key 检测三板斧</span>
+<span class="c"># 1. redis-cli --hotkeys（需 maxmemory-policy 为 allkeys-lfu，且是采样估计）</span>
+<span class="c"># 2. MONITOR 抓实时命令流（只用于短时排查，会拖慢实例）</span>
+<span class="c"># 3. 客户端埋点：代理层/RedisTemplate 封装统计 key 维度 QPS（生产推荐，最准）</span>
+<span class="c"># 4. 集群层：Proxy（Codis/twemproxy）或 Redis 7 的 CLIENT TRACKING + 慢查询分析</span></pre>
+  <div class="callout warn">
+    <b>热 key 治理的顺序：先本地缓存（最简单有效），再复制散列，最后才考虑改架构。</b>见过为治理一个热 key 把整个缓存层重构的——而那个 key 加个 3 秒本地缓存就解决了。<b>先测量（key 级 QPS 监控），再治理，没有监控的热 key 治理都是玄学。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>缓存与数据库双写：组合策略</h2></div>
+  <h4>多级缓存下的失效传播</h4>
+  <pre><span class="c"># 问题：更新了 DB 和 Redis，本地缓存（Caffeine）还是旧的！</span>
+<span class="c"># 更新流：</span>
+DB 更新 → 删 Redis → 通知所有应用实例删本地缓存 → 完成
+
+<span class="c"># 通知两种方式：</span>
+<span class="c"># ① Redis Pub/Sub：发布 db-changed 消息，各实例订阅后清本地缓存</span>
+<span class="c">#   缺点：Pub/Sub 不持久化，实例不在线就漏消息（靠本地 TTL 兜底，要短）</span>
+<span class="c"># ② MQ 广播（推荐）：变更事件发 MQ，所有实例消费后清本地缓存</span>
+<span class="c">#   优点：持久化 + 重试，实例重启后补收；天然支持灰度</span>
+
+<span class="c"># Caffeine + MQ 组合的标准形态</span>
+<span class="b">@Bean</span>
+<span class="b">public</span> Cache&lt;Long, ProductVO&gt; productCache() {
+    <span class="b">return</span> Caffeine.newBuilder()
+        .maximumSize(100_000)               <span class="c">// 必须设上限！防 OOM</span>
+        .expireAfterWrite(Duration.ofSeconds(5))   <span class="c">// 短 TTL：本地一致性的最后防线</span>
+        .recordStats()                      <span class="c">// 命中率监控</span>
+        .build();
+}
+
+<span class="b">@RabbitListener</span>(queues = <span class="y">"cache.invalidate.product"</span>)
+<span class="b">public void</span> onInvalidate(Long productId) {
+    productCache.invalidate(productId);     <span class="c">// 收到广播，清本地</span>
+}
+<span class="c"># 读路径：本地缓存 → Redis → DB，每层 miss 回填上层</span>
+<span class="c"># TTL 梯度：本地 5s &lt; Redis 30min，本地短是设计核心（不一致窗口 = 本地 TTL）</span></pre>
+  <h4>Redis 集群下的缓存设计要点</h4>
+  <table>
+    <tr><th style="width:200px">要点</th><th>做法</th></tr>
+    <tr><td>多 key 操作</td><td>Cluster 只有同 slot 才能 MGET/MSET/Lua。用 hash tag <span class="k">{user1}:a {user1}:b</span> 强制同槽，或拆成单 key pipeline</td></tr>
+    <tr><td>批量查询</td><td>按节点分组 pipeline，避免 N 次往返；大集合用 SSCAN/HSCAN 游标</td></tr>
+    <tr><td>热点与集群</td><td>热 key 复制后打散多节点；大 key 拆分本身就是天然的负载均衡</td></tr>
+    <tr><td>过期抖动</td><td>批量写入设相同 TTL → 同批同秒过期 → 击穿叠加。TTL = base + random(0, 30%)</td></tr>
+    <tr><td>客户端缓存</td><td>Redis 6+ client-side caching + tracking，服务端失效通知（需要客户端支持）</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>多级缓存的最大风险不是慢，是“不知道旧数据在哪一层”。</b>线上排查“用户改了价格为什么还看到旧价”，要逐层确认：本地缓存清了吗？Redis 删了吗？CDN purge 了吗？<b>治理手段：每一层都有监控指标（命中率、命中量）、每一次失效都有日志/事件、灰度环境能一键清全链路缓存。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>预热、降级与典型事故复盘</h2></div>
+  <h4>缓存预热</h4>
+  <ul>
+    <li><b>大促前全量预热：</b>离线任务把热点商品灌入 Redis（限量：只灌 TOP N 商品，全量灌会把 Redis 打爆且大部分不命中）</li>
+    <li><b>本地缓存预热：</b>启动时加载高频配置（黑名单、类目树），WarmUp 用限速加载防启动风暴</li>
+    <li><b>实时预热：</b>运营发布商品/改价时，主动触发对应 key 回填，而不是等自然 miss</li>
+  </ul>
+  <h4>缓存降级预案（Redis 故障时）</h4>
+  <table>
+    <tr><th style="width:150px">级别</th><th style="width:250px">动作</th><th>触发条件</th></tr>
+    <tr><td>L1 本地兜底</td><td>读直接走本地缓存（容忍旧数据）</td><td>Redis P99 &gt; 50ms 或错误率 &gt; 1%</td></tr>
+    <tr><td>L2 限流读库</td><td>本地未命中直连 DB，入口限流到 DB 能扛的 QPS</td><td>Redis 完全不可用</td></tr>
+    <tr><td>L3 服务降级</td><td>非核心功能关闭（推荐、榜单），保核心链路</td><td>DB 压力 &gt; 70%</td></tr>
+    <tr><td>L4 兜底页</td><td>静态兜底数据/默认值，保证不 500</td><td>全链路过载</td></tr>
+  </table>
+  <h4>三个经典事故复盘</h4>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>序列化不兼容</div><div class="cd">缓存里存 Java 序列化对象，类加了个字段，反序列化直接抛 <span class="k">InvalidClassException</span>，所有读 miss 打穿 DB。<b>处方：用 JSON/Protobuf，字段只加不减；类改动先发版缓存格式兼容版本。</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>大 value 撑爆带宽</div><div class="cd">某接口把 5000 商品的详情拼成一个 8MB JSON 塞 Redis，单 key 拉高节点内存和带宽，主从同步卡住。<b>处方：value 拆多个 key + pipeline；设置 32KB 写入告警。</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>过期抖动</div><div class="cd">批量导入 10 万商品统一 TTL 1 小时，整点集体过期，DB 瞬时 10 万 QPS。<b>处方：TTL 加 ±20% 随机；批量导入错峰；热点 key 提前续期。</b></div></div>
+  </div>
+  <div class="callout warn">
+    <b>序列化兼容性是缓存架构的隐形炸弹：</b>缓存里躺着的旧格式数据，会在你升级反序列化库、改字段名、换 JDK 的那天集中爆炸。<b>处方：① 只用自描述格式（JSON/Protobuf/MessagePack）；② 绝不用 Java 原生序列化/PDX 二进制做跨版本缓存；③ 升级时新旧格式共存一个版本周期。</b>
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>十个架构坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用“更新缓存”代替“删缓存”</div><div class="pd">并发写会留脏值（A 写 v2、B 写 v3、缓存被 A 覆盖成 v2）。一律先更库后删缓存，删除是幂等的。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">不设 TTL，把缓存当数据库</div><div class="pd">内存只增不减迟早 OOM；且数据永远旧。缓存数据必须 TTL，TTL 是一致性的最终兜底。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">批量写入统一 TTL</div><div class="pd">同批 key 同秒过期，集体击穿 DB。TTL = base + random(0, 30% base)，错峰失效。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">本地缓存 TTL 设太长</div><div class="pd">Caffeine 设 30 分钟，MQ 失效消息漏一条就旧半小时。本地缓存 TTL ≤ 10s，当 Redis 的减震层而不是数据源。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">多级缓存只删了 Redis</div><div class="pd">本地缓存/CDN 还是旧数据，用户看到“改了没生效”。全链路失效要有事件广播 + 逐层 purge。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">大 key 直接 DEL</div><div class="pd">同步删除阻塞主线程秒级，期间所有请求排队。UNLINK 异步删，或分批删。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">热 key 无本地兜底</div><div class="pd">单 key 10 万 QPS 打一个节点，该节点 CPU 100% 拖慢全集群。热 key 加本地缓存 + 复制散列。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">缓存 Java 序列化对象</div><div class="pd">类一升级反序列化崩，全线 miss 打穿 DB。用 JSON/Protobuf，升级时新旧格式共存过渡。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">缓存不设上限（Caffeine/Guava）</div><div class="pd">maximumSize 不设，本地缓存无限增长直到 OOM。必须设 maximumSize + weight 策略。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">没有缓存命中率监控</div><div class="pd">命中率从 95% 跌到 60% 没人发现，DB 压力悄悄翻倍。命中率、大 key 数、热 key 数、内存水位必须全部上监控。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 更新商品价格时，缓存侧最稳妥的做法是？</div>
+      <button class="opt">更新数据库的同时更新 Redis 缓存值</button>
+      <button class="opt">更新数据库后删除 Redis 缓存，让下次读自然回填</button>
+      <button class="opt">只更新 Redis，数据库异步同步</button>
+      <div class="ans">正确答案：<b>先更新数据库，再删缓存</b>。删缓存是幂等的（失败可重试），而“更新缓存”在并发下会写脏（两个写线程交错覆盖）。异步同步 DB 会丢数据，不适合价格这类关键数据。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一批 10 万商品在同一时刻被设置相同的 1 小时 TTL，最可能发生什么？</div>
+      <button class="opt">什么也不会发生，Redis 会均匀淘汰</button>
+      <button class="opt">Redis 内存被占满触发 OOM</button>
+      <button class="opt">1 小时后集体过期，瞬时大量请求打到数据库（击穿叠加雪崩）</button>
+      <div class="ans">正确答案：<b>集体过期打穿 DB</b>。这就是“过期抖动”。解法：TTL 加随机值（1 小时 ± 10 分钟）、批量导入错峰、热点 key 提前续期。缓存雪崩的典型形态之一。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于布隆过滤器防缓存穿透，哪个说法准确？</div>
+      <button class="opt">它说"不存在"一定准确，说"存在"可能误判，所以只能拦肯定不存在的流量</button>
+      <button class="opt">它 100% 准确，可以直接替代缓存空值方案</button>
+      <button class="opt">它说"存在"一定准确，说"不存在"可能误判</button>
+      <div class="ans">正确答案：<b>说"不存在"一定准，说"存在"可能误判（假阳性）</b>。所以它拦掉的是"肯定不存在"的恶意流量，但误判放过的请求仍会 miss，通常还要配合缓存空值。它也无法删除元素、容量要预先规划。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 秒杀商品 key 在 10 万 QPS 下单节点 CPU 打满，最优先的治理手段是？</div>
+      <button class="opt">立刻把这个 key 迁移到独立的 Redis 实例</button>
+      <button class="opt">加本地缓存（Caffeine，TTL 1~3s）吸收大部分读，必要时 key 复制散列</button>
+      <button class="opt">把 TTL 从 30 分钟改短，让它多 miss 几次分摊压力</button>
+      <div class="ans">正确答案：<b>本地缓存兜底</b>。秒杀是典型读远多于写，本地缓存吸收 90%+ 读请求，成本最低见效最快。key 复制是补充手段。缩短 TTL 反而制造更多回源，是反向操作。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 多级缓存（本地 + Redis + CDN）架构下，数据更新后只删了 Redis，会导致？</div>
+      <button class="opt">没有影响，其他层会自然过期</button>
+      <button class="opt">只有 CDN 会旧，本地缓存会同步失效</button>
+      <button class="opt">本地缓存和 CDN 继续返回旧数据，直到各自 TTL 到期，用户看到"改了不生效"</button>
+      <div class="ans">正确答案：<b>旧数据持续到各层 TTL 到期</b>。各层缓存独立生效，删 Redis 不会传播到本地和 CDN。必须通过 MQ 广播 + CDN purge 做全链路失效，并把本地 TTL 压到秒级缩小不一致窗口。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 缓存里存储 Java 原生序列化的对象，最大的风险是？</div>
+      <button class="opt">类结构变更（加字段/改类名）后反序列化失败，引发大规模缓存 miss 打穿 DB</button>
+      <button class="opt">序列化后体积太大，Redis 存不下</button>
+      <button class="opt">序列化速度太慢，影响写性能</button>
+      <div class="ans">正确答案：<b>版本兼容噩梦</b>。缓存在 TTL 内会长期驻留旧格式字节，类一升级全部 <span class="k">InvalidClassException</span>。JSON/Protobuf 这类自描述格式加字段向后兼容，是缓存序列化的底线要求。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>缓存设计决策速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>读多写少 + 最终一致</code><span class="desc">Cache Aside：先更库后删缓存 + TTL 兜底</span><button class="copy">复制</button></div>
+    <div class="crow"><code>一致性要求高</code><span class="desc">binlog 订阅失效（Canal/Debezium）+ 短 TTL；或别缓存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>写密集计数</code><span class="desc">Write Behind：Redis 计数 + 定时批量刷库 + 对账</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Redis 即数据库</code><span class="desc">Write Through：写穿透到 DB，读全命中</span><button class="copy">复制</button></div>
+    <div class="crow"><code>读热点 + 可容忍秒级旧</code><span class="desc">多级缓存：本地 5s + Redis 30min，MQ 广播失效</span><button class="copy">复制</button></div>
+    <div class="crow"><code>静态内容/详情页</code><span class="desc">CDN + Nginx 缓存，发布时主动 purge</span><button class="copy">复制</button></div>
+    <div class="crow"><code>不存在查询多</code><span class="desc">布隆过滤器 + 空值缓存（短 TTL）双保险</span><button class="copy">复制</button></div>
+    <div class="crow"><code>余额/库存台账</code><span class="desc">不要缓存，直连 DB；库存可 Redis 预扣 + 流水落库</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>TTL 与容量速查</h3>
+  <table>
+    <tr><th style="width:200px">数据类型</th><th style="width:170px">建议 TTL</th><th>说明</th></tr>
+    <tr><td>商品基础信息</td><td>1~6h + 随机 30%</td><td>发布/改价时主动删</td></tr>
+    <tr><td>库存/价格</td><td>1~5min 或不缓存</td><td>一致性敏感，宁短勿长</td></tr>
+    <tr><td>用户会话 Session</td><td>30min 滑动</td><td>每次访问续期</td></tr>
+    <tr><td>配置/字典/类目</td><td>24h + 本地缓存 10min</td><td>变更走广播全链路清</td></tr>
+    <tr><td>排行榜/计数</td><td>不设 TTL，定时重建</td><td>ZSet 持久化，重启从 DB 恢复</td></tr>
+    <tr><td>空值标记</td><td>30~60s</td><td>防穿透，短 TTL 防脏空值</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Cache Aside</b></td><td>旁路缓存：读 miss 查库回填，写先更库后删缓存</td></tr>
+    <tr><td><b>Read Through</b></td><td>缓存层封装 DB 读，对应用透明的加载模式</td></tr>
+    <tr><td><b>Write Through</b></td><td>写穿透：先写缓存，缓存同步写 DB</td></tr>
+    <tr><td><b>Write Behind</b></td><td>回写：只写缓存，异步批量刷 DB，可能丢数据</td></tr>
+    <tr><td><b>缓存穿透</b></td><td>查询不存在的数据，缓存永不命中直击 DB</td></tr>
+    <tr><td><b>缓存击穿</b></td><td>单个热 key 过期瞬间并发直达 DB</td></tr>
+    <tr><td><b>缓存雪崩</b></td><td>大批 key 同时过期或缓存整体故障导致 DB 过载</td></tr>
+    <tr><td><b>布隆过滤器</b></td><td>位数组 + 多哈希，说不存在一定准、存在可能误判</td></tr>
+    <tr><td><b>逻辑过期</b></td><td>key 不设 TTL，value 内带过期字段，过期后异步重建</td></tr>
+    <tr><td><b>延迟双删</b></td><td>删缓存→更库→延迟再删，缓解删除与更新间的脏读</td></tr>
+    <tr><td><b>binlog 订阅</b></td><td>Canal/Debezium 读 MySQL 变更日志异步失效缓存</td></tr>
+    <tr><td><b>大 key</b></td><td>单个 value 过大（&gt;10MB 或集合 &gt;5000 元素）的 key</td></tr>
+    <tr><td><b>热 key</b></td><td>访问量集中的 key，把单节点 CPU 打满</td></tr>
+    <tr><td><b>多级缓存</b></td><td>本地 + 分布式 + CDN 分层，越靠前 TTL 越短</td></tr>
+    <tr><td><b>Caffeine</b></td><td>Java 本地缓存库，W-TinyLFU 淘汰算法，需设 maximumSize</td></tr>
+    <tr><td><b>过期抖动</b></td><td>批量同 TTL 导致集体失效的瞬时压力现象</td></tr>
+    <tr><td><b>缓存预热</b></td><td>大促/发布前主动灌入热点数据，避免冷启动 miss</td></tr>
+    <tr><td><b>缓存降级</b></td><td>缓存故障时的分级兜底：本地 → 限流读库 → 兜底页</td></tr>
+    <tr><td><b>hash tag</b></td><td>Cluster 模式下用 {} 强制 key 同槽，支持多 key 操作</td></tr>
+    <tr><td><b>序列化兼容</b></td><td>缓存数据格式要向前向后兼容，用 JSON/Protobuf 不用二进制</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 画出你系统的完整缓存链路（CDN→Nginx→本地→Redis→DB），标出每层 TTL 和失效方式；② 用 redis-cli --bigkeys / --hotkeys 扫一遍，列出治理清单；③ 给核心接口加命中率监控和大 value 写入告警；④ 写一次“删 Redis + MQ 广播清本地”的全链路失效，用压测验证一致性窗口。<br><br>
+    <b>之后值得单独学：</b>Redis 7 的函数与客户端缓存、Caffeine 的 W-TinyLFU 调参、Canal 高可用部署、以及大促全链路压测中的缓存专项（命中率退化曲线）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透缓存架构 · 删比更好、TTL 是底线、分层越靠前越短、监控先于治理</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 1（四模式）和模块 3（一致性）是面试+事故双高频，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对照你系统的缓存分层。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议对照你负责的系统：画出它的缓存分层图，标记每层的 TTL 和失效方式。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

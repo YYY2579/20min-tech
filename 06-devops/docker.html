@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>十分钟理解并学会 Docker</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:15px; line-height:1.7; -webkit-font-smoothing:antialiased;
+}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{
+  display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;
+  color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px;
+}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+
+.timerbox{
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  margin-top:24px;padding:16px 20px;background:var(--bg);
+  border:1px solid var(--line);border-radius:var(--radius);
+}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{
+  border:1px solid var(--line);background:var(--card);color:var(--ink);
+  padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{
+  counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;
+  background:var(--accent);color:#fff;font-size:13px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;
+}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 2 期</span>
+    <h1>十分钟理解并学会 Docker</h1>
+    <p class="sub">上一期是"看"网络，这一期是"造"环境。目标：十分钟后你能自己写 Dockerfile、构建镜像、跑起容器，<b>并且知道为什么这么做</b>。</p>
+    <div class="timerbox">
+      <div id="clock">10:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">这一期光看没用 —— 每节都开个终端敲一遍，比读完十遍管用。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">0-1 分钟</span><h2>它到底在解决什么问题</h2></div>
+  <p class="lead">你一定说过这句话，或者听别人说过：</p>
+  <div class="callout danger">
+    <b>"在我电脑上能跑啊。"</b><br>
+    问题出在：代码之外还依赖一堆东西 —— 运行时版本、系统库、环境变量、目录结构、系统配置。这些东西没法跟代码一起提交，于是换个机器就崩。
+  </div>
+  <p>Docker 的做法极其直接：<b>把应用和它的一整套运行环境打包成一个标准件</b>。这个标准件到哪都长得一样，跑起来的行为也一样。这就是"容器化"。</p>
+
+  <h3>它和虚拟机到底差在哪</h3>
+  <table>
+    <tr><th style="width:110px">维度</th><th style="width:230px">虚拟机</th><th>Docker 容器</th></tr>
+    <tr><td><b>隔离层</b></td><td>每个应用带一个完整 Guest OS</td><td>共享宿主内核，只隔离进程</td></tr>
+    <tr><td><b>启动速度</b></td><td>几十秒到几分钟</td><td>毫秒到几秒</td></tr>
+    <tr><td><b>体积</b></td><td>GB 级</td><td>MB 级</td></tr>
+    <tr><td><b>一台机器能跑几个</b></td><td>几个到十几个</td><td>几十个很轻松</td></tr>
+    <tr><td><b>隔离强度</b></td><td>强（硬件级）</td><td>较弱（进程级），但足够日常用</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>一句话记住差异：</b>虚拟机是"造一台新电脑"，Docker 是"给进程套个独立的小房间"。前者重但隔离彻底，后者轻但共享内核 —— 这也是为什么 Docker 只能跑 Linux 容器（Windows 容器除外，且需要对应内核支持）。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">1-3 分钟</span><h2>三个概念，一次说清</h2></div>
+  <p class="lead">Docker 的名词不多，但新手最容易把它们搅在一起。用面向对象来类比，一秒就通。</p>
+  <table>
+    <tr><th style="width:120px">概念</th><th style="width:180px">类比</th><th>说明</th></tr>
+    <tr><td><b>镜像 Image</b></td><td>类 / 模板 / 光盘</td><td>只读的。里面装好了代码 + 运行时 + 依赖 + 配置</td></tr>
+    <tr><td><b>容器 Container</b></td><td>对象 / 实例 / 跑起来的程序</td><td>镜像跑起来的实例。同一个镜像可以跑出 10 个互不干扰的容器</td></tr>
+    <tr><td><b>仓库 Registry</b></td><td>应用商店 / npm</td><td>存镜像的地方。Docker Hub 是官方的公共仓库</td></tr>
+    <tr><td><b>Dockerfile</b></td><td>配方 / 源码</td><td>一份文本文件，描述怎么把镜像一层层造出来</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>把它们串起来：</b>写 <span class="k">Dockerfile</span> → <span class="k">docker build</span> 造出<b>镜像</b> → <span class="k">docker push</span> 推到<b>仓库</b> → 别人 <span class="k">docker pull</span> 拉下来 → <span class="k">docker run</span> 跑成<b>容器</b>。整条链路就这五步。
+  </div>
+  <div class="callout">
+    <b>为什么镜像能"到处跑"？</b>因为它自带运行时。你的镜像里可能装了 Node 20，那么宿主机有没有 Node、装的是几版，完全无所谓 —— 容器里用的是镜像里那套。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">3-5 分钟</span><h2>装好，跑起来</h2></div>
+  <h3>第 0 步：装 Docker</h3>
+  <p>Windows / Mac 直接装 <b>Docker Desktop</b>（自带 Docker Engine + 命令行 + 图形界面）。Windows 需要开启 WSL2 后端。Linux 用包管理器装 <span class="k">docker-ce</span>。</p>
+  <p>装完在终端验证：</p>
+  <pre>docker --version
+docker run hello-world   <span class="c"># 拉取并运行一个测试镜像</span></pre>
+  <p>看到 "Hello from Docker!" 就说明装好了。</p>
+
+  <h3>第 1 步：跑一个真实服务（30 秒）</h3>
+  <pre>docker run -d -p 8080:80 --name web nginx</pre>
+  <p>然后浏览器打开 <span class="k">http://localhost:8080</span> —— 你会看到 nginx 的欢迎页。你刚刚在 3 秒内跑起了一个 Web 服务器，没装任何东西。</p>
+  <div class="callout warn">
+    <b>这条命令每个参数都得懂，它是 Docker 的日常：</b><br>
+    <span class="k">-d</span> 后台运行（detached），不加的话终端会被占住<br>
+    <span class="k">-p 8080:80</span> 端口映射，<b>格式是 宿主机端口 : 容器端口</b>，顺序千万别反<br>
+    <span class="k">--name web</span> 给容器起个名字，不然只能用随机 ID 操作它<br>
+    <span class="k">nginx</span> 要用的镜像名，本地没有就自动从 Docker Hub 拉
+  </div>
+
+  <h3>第 2 步：观察它</h3>
+  <pre>docker ps                    <span class="c"># 看正在运行的容器</span>
+docker logs -f web           <span class="c"># 实时看它的日志，Ctrl+C 退出</span>
+docker exec -it web bash     <span class="c"># 进到容器里面看看，exit 退出</span>
+docker stats                 <span class="c"># 看 CPU / 内存占用</span></pre>
+  <div class="callout">
+    <b>小提示：</b>如果 <span class="k">bash</span> 报错说找不到，换成 <span class="k">sh</span>。alpine 这类精简镜像里通常只有 sh，没有 bash。
+  </div>
+
+  <h3>第 3 步：清理</h3>
+  <pre>docker stop web &amp;&amp; docker rm web
+docker rmi nginx             <span class="c"># 删镜像</span></pre>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">5-7 分钟</span><h2>命令速查：20 条覆盖 95% 场景</h2></div>
+  <p class="lead">不用背。收藏这一页，用的时候复制。点右侧按钮直接复制。</p>
+
+  <h3>容器（日常用得最多）</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker ps</code><span class="desc">看运行中的容器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker ps -a</code><span class="desc">看所有容器，包括已停止的（排查"容器哪去了"必用）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker logs -f 容器名</code><span class="desc">实时看日志，容器起不来先看这个</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker exec -it 容器名 sh</code><span class="desc">进容器内部，最常用的调试手段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker stop 容器名 &amp;&amp; docker rm 容器名</code><span class="desc">停止并删除容器</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker inspect 容器名</code><span class="desc">看容器的完整配置（IP、挂载、环境变量）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker cp 容器名:/app/log.txt ./</code><span class="desc">从容器里把文件拷出来</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>镜像</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker images</code><span class="desc">列出本地镜像</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker pull node:20-alpine</code><span class="desc">拉取镜像，alpine 版体积小很多</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker build -t myapp:v1 .</code><span class="desc">用当前目录的 Dockerfile 构建镜像，注意最后那个点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker build --no-cache -t myapp:v1 .</code><span class="desc">不用缓存强制重建，怀疑缓存问题时用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker history 镜像名</code><span class="desc">看镜像每一层多大，排查镜像臃肿</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker rmi 镜像名</code><span class="desc">删镜像</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>数据卷与网络</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker run -v /宿主机/路径:/容器/路径 镜像名</code><span class="desc">目录挂载，数据落在宿主机上不会丢</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker volume ls</code><span class="desc">看所有数据卷</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker network create mynet</code><span class="desc">建一个自定义网络，容器间可直接用名字互访</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker run --network mynet --name db mysql</code><span class="desc">把容器接入指定网络</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>清理（磁盘爆了就用）</h3>
+  <div class="cmds">
+    <div class="crow"><code>docker system df</code><span class="desc">看 Docker 占了多少磁盘</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker system prune -a</code><span class="desc">清掉所有未使用的镜像、容器、网络 —— 谨慎，会删东西</span><button class="copy">复制</button></div>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">7-9 分钟</span><h2>Dockerfile 与分层缓存</h2></div>
+  <p class="lead">这是拉开水平的一节。会写 Dockerfile 只是入门，懂分层才是内行。</p>
+
+  <h3>一份标准 Dockerfile</h3>
+  <pre><span class="c"># 1. 基础镜像</span>
+<span class="b">FROM</span> node:20-alpine
+
+<span class="c"># 2. 设置工作目录（后续指令都在这里执行）</span>
+<span class="b">WORKDIR</span> /app
+
+<span class="c"># 3. 先只拷依赖清单 —— 关键！</span>
+<span class="b">COPY</span> package*.json ./
+
+<span class="c"># 4. 装依赖（这一步最慢，所以要让它尽量命中缓存）</span>
+<span class="b">RUN</span> npm install --production
+
+<span class="c"># 5. 再拷业务代码</span>
+<span class="b">COPY</span> . .
+
+<span class="b">EXPOSE</span> 3000
+<span class="b">CMD</span> ["node", "index.js"]</pre>
+
+  <h3>为什么 COPY 要分两次？</h3>
+  <p>因为镜像<b>每条指令生成一层，每层都有缓存</b>。缓存的规则是：<b>从第一条变化的指令开始，之后所有层全部作废重建。</b></p>
+  <table>
+    <tr><th style="width:180px">Dockerfile 写法</th><th>改一行业务代码后，构建时要做什么</th></tr>
+    <tr><td class="f">COPY . . 放在 npm install 之前</td><td>代码变了 → 这一层失效 → <b>npm install 重新跑一遍</b>（几分钟）</td></tr>
+    <tr><td class="f">COPY . . 放在 npm install 之后</td><td>代码变了 → 只重建最后两层 → <b>依赖缓存命中</b>（几秒）</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>铁律：变化越频繁的放越下面。</b>基础镜像 → 依赖清单 → 装依赖 → 业务代码。这个顺序能让你的构建从几分钟降到几秒。
+  </div>
+
+  <h3>构建与运行</h3>
+  <pre>docker build -t myapp:v1 .
+docker run -d -p 3000:3000 --name app myapp:v1</pre>
+
+  <h3>别忘了 .dockerignore</h3>
+  <p>和 .gitignore 一个道理。把 <span class="k">node_modules</span>、<span class="k">.git</span>、<span class="k">dist</span> 排掉，否则它们会被 COPY 进镜像 —— 镜像瞬间胖几百 MB，而且缓存频繁失效。</p>
+  <pre><span class="c"># .dockerignore</span>
+node_modules
+.git
+*.log
+.env
+dist</pre>
+
+  <h3>进阶一眼：多阶段构建</h3>
+  <p>编译型项目（Go、Java、前端）可以让最终镜像只保留产物，体积能小十倍：</p>
+  <pre><span class="b">FROM</span> node:20 <span class="b">AS</span> builder
+<span class="b">WORKDIR</span> /app
+<span class="b">COPY</span> . .
+<span class="b">RUN</span> npm install &amp;&amp; npm run build
+
+<span class="b">FROM</span> nginx:alpine
+<span class="b">COPY</span> --from=builder /app/dist /usr/share/nginx/html</pre>
+  <p>第二个 FROM 会丢掉第一个阶段的所有中间产物，最终镜像里只有编译好的静态文件。</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">9-10 分钟</span><h2>数据、网络，和六个必踩的坑</h2></div>
+
+  <h3>数据持久化</h3>
+  <p>容器删了，里面的数据就没了 —— 因为写入发生在<b>可写层</b>，它随容器一起销毁。要留住数据只有一条路：挂出来。</p>
+  <pre><span class="c"># 绑定挂载：宿主机目录映射进容器，适合开发</span>
+docker run -v $(pwd)/data:/var/lib/mysql mysql
+
+<span class="c"># 命名卷：由 Docker 管理，适合生产</span>
+docker run -v mydata:/var/lib/mysql mysql</pre>
+
+  <h3>网络</h3>
+  <p>容器之间默认不通。<b>接到同一个自定义网络里，就能直接用容器名当主机名互访</b> —— 这是微服务部署的基础。</p>
+  <pre>docker network create mynet
+docker run -d --network mynet --name db  mysql
+docker run -d --network mynet --name api myapi
+<span class="c"># 现在 api 容器里可以直接连 db:3306，不用写 IP</span></pre>
+  <p>至于多容器编排（一次起一堆、管理依赖关系），那是 <b>Docker Compose</b> 的活 —— 一个 <span class="k">docker compose up -d</span> 搞定，值得单独学一节。</p>
+
+  <h3>六个必踩的坑</h3>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">容器刚启动就退出了</div><div class="pd">容器的生命周期 = 主进程的生命周期。主进程结束，容器就停。先看 <span class="k">docker logs</span>，八成是配置错或端口被占。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">-p 端口写反了</div><div class="pd"><span class="k">-p 8080:80</span> 是 <b>宿主机 : 容器</b>。写反了浏览器就是打不开，而且不会有任何报错。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">删了容器，数据全没了</div><div class="pd">没挂卷。数据库这类有状态服务，必须挂卷或用命名卷。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">exec 进去装的东西，重启就消失</div><div class="pd">容器的可写层是临时的。任何要长期存在的改动，都必须写进 Dockerfile 重新构建。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">改了代码，构建出来却没变</div><div class="pd">缓存。要么 <span class="k">--no-cache</span> 强制重建，要么检查 .dockerignore 是不是把该拷的文件排除了。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">镜像莫名其妙几个 G</div><div class="pd">基础镜像用了完整版（如 <span class="k">node:20</span> 而不是 <span class="k">node:20-alpine</span>），或者把 node_modules、.git 拷了进去。</div></div></div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">自测</span><h2>四道题，检验是不是真懂了</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. <span class="k">docker run -d -p 8080:80 nginx</span> 里的 8080 是什么？</div>
+      <button class="opt">容器内部 nginx 监听的端口</button>
+      <button class="opt">你宿主机上的端口，浏览器访问这个</button>
+      <button class="opt">容器在 Docker 网络里的 IP 编号</button>
+      <div class="ans">正确答案：<b>宿主机端口</b>。格式永远是 <b>宿主机 : 容器</b>。所以是访问 localhost:8080 转发到容器的 80 端口。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 镜像和容器的关系，最贴切的类比是？</div>
+      <button class="opt">文件和文件夹</button>
+      <button class="opt">类与对象（同一个镜像能跑出多个容器）</button>
+      <button class="opt">浏览器和网页</button>
+      <div class="ans">正确答案：<b>类与对象</b>。镜像是只读模板，容器是它跑起来的实例，一个镜像可以同时跑出十个互不干扰的容器。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. Docker 比虚拟机轻那么多的根本原因是？</div>
+      <button class="opt">所有容器共享宿主机内核，不需要各自的 Guest OS</button>
+      <button class="opt">Docker 用了更高效的压缩算法</button>
+      <button class="opt">容器的磁盘是写时复制的</button>
+      <div class="ans">正确答案：<b>共享宿主机内核</b>。虚拟机每个实例都要跑一整套操作系统，容器只是被隔离的进程，共用同一个内核。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 你只改了一行业务代码，重新 build 时会发生什么？</div>
+      <button class="opt">整个镜像从头重建，包括 npm install</button>
+      <button class="opt">什么都不用重建，Docker 会自动更新</button>
+      <button class="opt">从 COPY . . 那一层开始失效，之前的依赖层命中缓存</button>
+      <div class="ans">正确答案：<b>从 COPY . . 开始失效</b>。这正是把 COPY . . 放在最后的原因 —— 改代码不用重装依赖，构建从几分钟降到几秒。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">附录</span><h2>随身速查卡</h2></div>
+  <h3>Dockerfile 常用指令</h3>
+  <table>
+    <tr><th style="width:150px">指令</th><th>作用</th></tr>
+    <tr><td class="f">FROM</td><td>指定基础镜像，必须是第一条指令</td></tr>
+    <tr><td class="f">WORKDIR</td><td>设置工作目录，之后的指令都在此目录执行（会生成一层，但几乎不占空间）</td></tr>
+    <tr><td class="f">COPY</td><td>从构建上下文拷文件进镜像，最常用</td></tr>
+    <tr><td class="f">ADD</td><td>类似 COPY，还能解压 tar、支持 URL —— 除非需要解压，否则用 COPY</td></tr>
+    <tr><td class="f">RUN</td><td>构建时执行命令，每条 RUN 生成一层，合并写能减小体积</td></tr>
+    <tr><td class="f">ENV / ARG</td><td>ENV 是运行时的环境变量；ARG 只在构建阶段有效</td></tr>
+    <tr><td class="f">EXPOSE</td><td>声明容器监听哪个端口（只是文档作用，真正映射靠 -p）</td></tr>
+    <tr><td class="f">VOLUME</td><td>声明匿名数据卷</td></tr>
+    <tr><td class="f">CMD</td><td>容器启动时的默认命令，会被 docker run 后面的参数覆盖</td></tr>
+    <tr><td class="f">ENTRYPOINT</td><td>容器启动时的固定命令，不会被覆盖，常和 CMD 搭配</td></tr>
+  </table>
+
+  <h3>三个"看状态"的命令，记住就够用</h3>
+  <table>
+    <tr><th style="width:190px">命令</th><th>回答什么问题</th></tr>
+    <tr><td class="f">docker ps -a</td><td>我的容器都去哪了？为什么它不见了？</td></tr>
+    <tr><td class="f">docker logs 容器名</td><td>它为什么起不来 / 为什么报错？</td></tr>
+    <tr><td class="f">docker exec -it 容器名 sh</td><td>它里面到底长什么样？</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>拿你手头任意一个项目，写一份 Dockerfile 把它跑起来。遇到问题依次用 <span class="k">docker logs</span> → <span class="k">docker exec</span> → 改 Dockerfile 重构建。跑通一个，你就真的会了。然后再学 <b>Docker Compose</b>（多容器编排）和 <b>多阶段构建</b>（减小镜像）。
+  </div>
+</section>
+
+</main>
+
+<footer>十分钟理解并学会 Docker · 学完记得 docker system prune 一下，不然磁盘会哭</footer>
+
+<script>
+var total=600,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;
+  clock.textContent=fmt(Math.max(left,0));
+  if(left<=120&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。Docker 是练出来的 —— 现在去把你自己项目的 Dockerfile 写出来，那才算真的学会。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边开终端敲，比纯读快一倍。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='这一期光看没用 —— 每节都开个终端敲一遍，比读完十遍管用。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

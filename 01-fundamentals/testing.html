@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透测试设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 工程基础</span>
+    <h1>二十分钟学透测试设计</h1>
+    <p class="sub">写测试不难，难在<b>写出能在改代码时救你一命的测试</b>。这篇讲的是比例怎么分、边界怎么定、mock 到哪停、以及为什么覆盖率 100% 依然会出事故。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>4</b> 种设计方法</span>
+      <span class="chip"><b>7:2:1</b> 金字塔比例</span>
+      <span class="chip"><b>10</b> 个常见坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议打开你项目里最烂的一个测试文件，边看边改</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先承认一件事：测试是资产，也是负债</h2></div>
+  <p class="lead">测试能防止回归，但它本身也是需要维护的代码。一套设计糟糕的测试，改一行业务代码要改二十个测试文件 —— 这种测试不但没有保护你，还在收税。</p>
+  <table>
+    <tr><th style="width:170px">维度</th><th>好的测试</th><th>坏的测试</th></tr>
+    <tr><td><b>改业务代码时</b></td><td>只有真正改变行为的测试会失败</td><td>重构一下内部结构，几十个测试全红</td></tr>
+    <tr><td><b>失败时</b></td><td>看名字就知道哪条规则坏了</td><td>只知道"assertion failed"，得打断点查</td></tr>
+    <tr><td><b>运行时间</b></td><td>单元测试全量几秒到几十秒</td><td>跑一次十分钟，没人愿意在本地跑</td></tr>
+    <tr><td><b>稳定性</b></td><td>同样的代码永远同样结果</td><td>重跑一次就过了（flaky）</td></tr>
+  </table>
+  <pre><span class="c"># 一条判断标准：测试的名字能不能当需求读</span>
+<span class="g">✓</span> 满 300 元减 50，满 300 元时实付 250
+<span class="g">✓</span> 优惠券过期后下单，返回 COUPON_EXPIRED
+<span class="r">✗</span> test_calc_1
+<span class="r">✗</span> test_order_works</pre>
+  <div class="callout">
+    <b>这份文档的前提：</b>测试的目的不是"证明代码是对的"（做不到），而是<b>在代码被改动时，快速告诉你哪条既定行为被破坏了</b>。所有设计取舍都围绕这一条。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>测试金字塔：比例错了，后面全错</h2></div>
+  <p class="lead">金字塔不是"三种测试都要写"的意思，它说的是<b>成本和反馈速度的分布</b>。越往下越快越便宜，越往上越慢越贵。</p>
+  <table>
+    <tr><th style="width:120px">层级</th><th style="width:150px">测什么</th><th style="width:110px">单次耗时</th><th style="width:90px">建议比例</th><th>失败时说明什么</th></tr>
+    <tr><td><b>单元测试</b></td><td>单个函数 / 类的逻辑分支</td><td>毫秒级</td><td><b>约 70%</b></td><td>某段逻辑写错了，定位到行</td></tr>
+    <tr><td><b>集成测试</b></td><td>模块之间、与真实依赖的协作</td><td>百毫秒 ~ 秒级</td><td><b>约 20%</b></td><td>接口契约、SQL、序列化、事务出问题</td></tr>
+    <tr><td><b>端到端 E2E</b></td><td>从用户入口到最终结果</td><td>秒级 ~ 分钟级</td><td><b>约 10%</b></td><td>整体链路断了，但很难定位到具体位置</td></tr>
+  </table>
+  <p>数字不必精确，重要的是<b>数量级关系</b>。一个常见的中型服务：单元测试 800 个跑 15 秒，集成测试 120 个跑 3 分钟，E2E 20 个跑 12 分钟。这个结构是健康的 —— 开发者本地只跑单元测试就能获得大部分信心。</p>
+
+  <h3>为什么倒金字塔是灾难</h3>
+  <p>倒金字塔指大量 E2E、少量单元测试。它在项目早期看起来很"高效"（一个测试覆盖一整条链路），但会在三个地方崩掉：</p>
+  <table>
+    <tr><th style="width:150px">问题</th><th>具体表现</th></tr>
+    <tr><td><b>反馈太慢</b></td><td>改一行代码要等 20 分钟才知道有没有破坏东西，开发者干脆不跑，等到 CI 挂了再回来看</td></tr>
+    <tr><td><b>定位太难</b></td><td>一个 E2E 失败可能是 30 个环节里任何一个，排查成本远超修复成本</td></tr>
+    <tr><td><b>极度脆弱</b></td><td>改个按钮文案、调个接口字段，几十个 E2E 全红。最后大家的共识变成"红了就重跑"</td></tr>
+    <tr><td><b>无法覆盖分支</b></td><td>E2E 只走主流程，异常分支（超时、重试、权限不足）几乎测不到</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>一个常被忽略的成本：E2E 的失败要人工判断"是真 bug 还是环境问题"。</b>假设 20 个 E2E 有 5% 的 flaky 率，每天跑 10 次，你每天要做 10 次人工判断。一个月后没人再看 E2E 结果了 —— 这时候它已经等于不存在。
+  </div>
+
+  <h3>测试该跟着什么走</h3>
+  <p>判断一个逻辑该写在哪一层，问一个问题：<b>它的失败原因可能来自几个地方？</b></p>
+  <table>
+    <tr><th style="width:230px">逻辑</th><th>合适的层级</th><th>理由</th></tr>
+    <tr><td>折扣计算、税费公式</td><td>单元测试</td><td>纯函数，输入输出明确，分支多</td></tr>
+    <tr><td>SQL 是否正确（含 JOIN、分页）</td><td>集成测试</td><td>只有真实数据库能验证语法和语义</td></tr>
+    <tr><td>JSON 序列化的字段名</td><td>集成测试 / 契约测试</td><td>单元测试用 mock 会掩盖真实序列化行为</td></tr>
+    <tr><td>登录 → 下单 → 支付</td><td>E2E，1~2 条</td><td>价值在于验证"链路是通的"，不在覆盖分支</td></tr>
+    <tr><td>事务回滚</td><td>集成测试</td><td>需要真实事务管理器，mock 无法模拟</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一条经验法则：</b>把 80% 的断言写在纯逻辑上，把 20% 的断言写在"接线是否正确"上。前者便宜且稳定，后者才是真正容易出错的地方 —— 但它的数量必须少，否则维护成本爆炸。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>单元测试的边界：测行为，不测实现</h2></div>
+  <p class="lead">这是单元测试唯一重要的原则。搞错这一条，其他技巧都是白费。</p>
+
+  <h3>什么是"行为"，什么是"实现"</h3>
+  <p><b>行为</b>是调用者能观察到的契约：返回值、抛出的异常、对外发出的调用、持久化的副作用。<b>实现</b>是达成行为的方式：内部用了哪个辅助函数、循环怎么写、缓存放在哪一层。</p>
+  <pre><span class="c"># 被测代码</span>
+class PriceService:
+    def total(self, items, coupon):
+        subtotal = sum(i.price * i.qty for i in items)
+        <span class="b">return</span> self._apply_coupon(subtotal, coupon)
+
+    <span class="b">def</span> _apply_coupon(self, amount, coupon):
+        <span class="b">if</span> coupon <span class="b">and</span> amount &gt;= coupon.threshold:
+            <span class="b">return</span> amount - coupon.discount
+        <span class="b">return</span> amount
+
+<span class="c"># ✗ 测实现：断言内部调用了 _apply_coupon</span>
+<span class="b">def</span> test_total(mocker):
+    spy = mocker.spy(svc, <span class="y">"_apply_coupon"</span>)
+    svc.total(items, coupon)
+    spy.assert_called_once()          <span class="r"># 重构改名就红，毫无价值</span>
+
+<span class="c"># ✓ 测行为：断言最终金额</span>
+<span class="b">def</span> test_total_applies_coupon_when_threshold_met():
+    assert svc.total([Item(price=100, qty=3)], Coupon(threshold=300, discount=50)) == 250</pre>
+  <table>
+    <tr><th style="width:210px">断言对象</th><th style="width:80px">类型</th><th>说明</th></tr>
+    <tr><td>返回值 / 抛出的异常</td><td><b>行为</b></td><td>最稳定的断言，优先用它</td></tr>
+    <tr><td>写入数据库 / 发出的消息</td><td><b>行为</b></td><td>对外可见的副作用，可以断言</td></tr>
+    <tr><td>调用了某个外部依赖</td><td><b>行为</b></td><td>仅限<b>跨进程边界</b>的依赖（支付、短信）</td></tr>
+    <tr><td>内部方法被调用几次</td><td>实现</td><td>重构就会红，不要断言</td></tr>
+    <tr><td>私有字段的值</td><td>实现</td><td>同上</td></tr>
+    <tr><td>日志打印了什么</td><td>多半是实现</td><td>除非日志本身是产品需求（审计日志）</td></tr>
+  </table>
+
+  <h3>什么是好断言</h3>
+  <ul>
+    <li><b>具体</b>：断言 <span class="k">== 250</span>，而不是 <span class="k">!= 0</span> 或 <span class="k">is not None</span>。模糊断言等于没断言。</li>
+    <li><b>完整</b>：验证整个返回对象的关键字段，而不是只挑一个。否则字段错位、默认值丢失都测不出来。</li>
+    <li><b>有失败信息</b>：断言库大多支持附加说明，写明"期望什么、为什么"。失败时不用回去读代码。</li>
+    <li><b>断言原因而不是现象</b>：<span class="k">assert result == []</span> 要配一句注释说明"为什么这里应该是空"。</li>
+  </ul>
+  <pre><span class="c"># 浮点数不要用 ==</span>
+assert result == pytest.approx(0.3, abs=1e-9)      <span class="c"># Python</span>
+assertEquals(0.3, result, 1e-9);                   <span class="c"># JUnit</span>
+expect(result).toBeCloseTo(0.3, 9);                <span class="c"># Jest</span>
+
+<span class="c"># 集合类断言要明确是否关心顺序</span>
+assert result == [1, 2, 3]                          <span class="c"># 关心顺序</span>
+assert sorted(result) == [1, 2, 3]                  <span class="c"># 不关心</span>
+assert set(result) == {1, 2, 3}                     <span class="c"># 不关心且去重</span></pre>
+
+  <h3>一个测试只验证一件事</h3>
+  <p>注意：<b>"一件事"指的是一个行为，不是一行断言</b>。验证"下单成功"可以断言订单状态、库存扣减、消息发出 —— 这三条共同构成一个行为。而"下单成功 + 优惠券过期报错"是两件事，必须拆开。</p>
+  <pre><span class="c"># ✗ 一个测试塞了三个场景</span>
+<span class="b">def</span> test_order():
+    assert create_order(valid).status == <span class="y">"OK"</span>
+    assert create_order(expired_coupon).code == <span class="y">"COUPON_EXPIRED"</span>
+    assert create_order(no_stock).code == <span class="y">"OUT_OF_STOCK"</span>
+<span class="c"># 第一条失败后，后面两条根本不执行。你一次只能修一个问题。</span>
+
+<span class="c"># ✓ 拆成三个，名字即文档</span>
+<span class="b">def</span> test_create_order_succeeds_with_valid_coupon(): ...
+<span class="b">def</span> test_create_order_rejects_expired_coupon(): ...
+<span class="b">def</span> test_create_order_rejects_when_stock_insufficient(): ...</pre>
+  <div class="callout">
+    <b>为什么必须拆：</b>① 失败时能立刻知道坏的是哪条规则；② 一个场景的前置条件不会污染另一个；③ 未来只想删掉某个场景时，不用动其他测试。<b>代价只是多写几行，收益是长期的。</b>
+  </div>
+
+  <h3>AAA 结构</h3>
+  <p>Arrange（准备）、Act（执行）、Assert（断言）。中间用空行隔开，读的人一眼能看出被测动作是哪一行。</p>
+  <pre><span class="b">def</span> test_refund_exceeding_paid_amount_is_rejected():
+    <span class="c"># Arrange</span>
+    order = an_order(paid=100, status=<span class="y">"PAID"</span>)
+    service = RefundService(repo=FakeOrderRepo([order]))
+
+    <span class="c"># Act</span>
+    result = service.refund(order.id, amount=150)
+
+    <span class="c"># Assert</span>
+    assert result.ok <span class="b">is</span> False
+    assert result.code == <span class="y">"REFUND_EXCEEDS_PAID"</span>
+    assert repo.get(order.id).status == <span class="y">"PAID"</span>   <span class="c"># 状态未被修改</span></pre>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>测试设计方法：从"随便想几个"到"系统覆盖"</h2></div>
+  <p class="lead">凭直觉写用例，通常只覆盖了正常路径。下面四种方法能把用例从"想到哪写到哪"变成"可以论证覆盖完整"。</p>
+
+  <h3>方法一：等价类划分</h3>
+  <p>把输入空间切成若干类，<b>每一类里任取一个值，效果相同</b>。于是每类只需一个用例。</p>
+  <p><b>例子：</b>优惠券满 300 减 50。输入是订单金额，规则分三段：</p>
+  <table>
+    <tr><th style="width:150px">等价类</th><th style="width:180px">范围</th><th>代表值</th><th>期望</th></tr>
+    <tr><td>无效（负数）</td><td class="f">amount &lt; 0</td><td>−1</td><td>拒绝</td></tr>
+    <tr><td>有效但不够门槛</td><td class="f">0 ≤ amount &lt; 300</td><td>150</td><td>原价</td></tr>
+    <tr><td>有效且达门槛</td><td class="f">amount ≥ 300</td><td>500</td><td>减 50</td></tr>
+  </table>
+  <p>三个用例覆盖了整个输入域。<b>如果只写"金额 500"一个用例，前两类的行为完全未知。</b></p>
+
+  <h3>方法二：边界值分析</h3>
+  <p>bug 几乎总是长在边界上（<span class="k">&lt;</span> 写成 <span class="k">&lt;=</span>、循环差一位）。所以对每个边界，取<b>边界值本身、边界两侧各一个</b>。</p>
+  <table>
+    <tr><th style="width:180px">边界</th><th>要测的值</th><th>为什么</th></tr>
+    <tr><td class="f">amount ≥ 300</td><td>299 / 300 / 301</td><td>299 和 300 是"减不减"的分界，301 确认没有上界错误</td></tr>
+    <tr><td class="f">1 ≤ qty ≤ 99</td><td>0 / 1 / 99 / 100</td><td>两端各测"刚好合法"和"刚好非法"</td></tr>
+    <tr><td class="f">字符串长度 ≤ 20</td><td>19 / 20 / 21</td><td>20 与 21 之间是经典的 off-by-one</td></tr>
+    <tr><td class="f">时间窗口 00:00–23:59</td><td>23:59:59 / 00:00:00</td><td>跨天、时区、夏令时都藏在这里</td></tr>
+  </table>
+  <pre><span class="c"># pytest 参数化，一次写清边界</span>
+<span class="b">@pytest.mark.parametrize</span>(<span class="y">"amount,expected"</span>, [
+    (299, 299),      <span class="c"># 门槛下一分</span>
+    (300, 250),      <span class="c"># 刚好达门槛</span>
+    (301, 251),      <span class="c"># 门槛上一分</span>
+    (0,   0),        <span class="c"># 下界</span>
+])
+<span class="b">def</span> test_coupon_threshold(amount, expected):
+    assert apply_coupon(amount, COUPON_300_50) == expected</pre>
+
+  <h3>方法三：判定表</h3>
+  <p>当多个条件<b>组合</b>决定结果时，逐个条件测会漏掉组合。判定表把所有组合列出来，再合并等价的行。</p>
+  <p><b>例子：</b>是否包邮，取决于三个条件：会员、金额满 99、偏远地区。</p>
+  <table>
+    <tr><th style="width:110px">会员</th><th style="width:110px">满 99</th><th style="width:110px">偏远</th><th>结果</th></tr>
+    <tr><td>是</td><td>—</td><td>否</td><td>包邮</td></tr>
+    <tr><td>是</td><td>—</td><td>是</td><td>不包邮（偏远加价）</td></tr>
+    <tr><td>否</td><td>是</td><td>否</td><td>包邮</td></tr>
+    <tr><td>否</td><td>是</td><td>是</td><td>不包邮</td></tr>
+    <tr><td>否</td><td>否</td><td>否</td><td>不包邮</td></tr>
+    <tr><td>否</td><td>否</td><td>是</td><td>不包邮</td></tr>
+  </table>
+  <p>8 种组合合并成 6 行（"是"会员时金额不影响结果，用 <span class="k">—</span> 表示无关）。<b>如果只写"会员包邮"和"满 99 包邮"两个用例，就会漏掉"会员 + 偏远"这个组合</b> —— 而这恰恰是最容易写错的分支顺序问题。</p>
+
+  <h3>方法四：状态迁移</h3>
+  <p>有状态的对象（订单、支付单、工单），bug 集中在<b>非法迁移</b>和<b>重复迁移</b>上。先画出状态机，再对每条边和每个非法迁移各写一个用例。</p>
+  <pre><span class="c"># 订单状态机</span>
+CREATED --pay--&gt; PAID --ship--&gt; SHIPPED --confirm--&gt; DONE
+   |                |
+ cancel          refund
+   |                |
+CANCELED        REFUNDED
+
+<span class="c"># 要测的三类</span>
+1. 合法迁移：CREATED --pay--&gt; PAID
+2. 非法迁移：CANCELED --pay--&gt; ? 必须拒绝
+3. 重复迁移：PAID --pay--&gt; ? 必须幂等或拒绝</pre>
+  <table>
+    <tr><th style="width:170px">用例类型</th><th>数量估算</th><th>价值</th></tr>
+    <tr><td>每条边的正向迁移</td><td>边数（上例 6 条）</td><td>保证主流程可用</td></tr>
+    <tr><td>非法迁移（终态出发）</td><td>终态数 × 事件数</td><td><b>最容易漏，也最容易出事故</b></td></tr>
+    <tr><td>重复事件（幂等）</td><td>关键事件数</td><td>网络重试、用户重复点击的真实场景</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>四种方法怎么配合用：</b>先用等价类把输入域切块，再用边界值补上每块的两端，条件有组合就用判定表，对象有状态就用状态迁移。四步下来，用例数量通常比"凭感觉写"多 2~3 倍，但每一条都能说清"为什么需要它"。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Mock 的边界：什么时候必须，什么时候有毒</h2></div>
+  <p class="lead">Mock 的本质是<b>用一个可控的假对象替换真实依赖</b>。它的价值在于隔离不确定性和慢速依赖；它的代价是<b>你测的不再是真实系统</b>。</p>
+
+  <h3>先分清 mock 和 stub</h3>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:230px">作用</th><th>断言什么</th></tr>
+    <tr><td><b>Stub（桩）</b></td><td>提供预设的返回值，让被测代码能跑下去</td><td>不针对它断言，只关心被测代码的输出</td></tr>
+    <tr><td><b>Mock（模拟对象）</b></td><td>除了返回值，还记录"被怎么调用"</td><td>断言它<b>是否被调用、调用几次、参数是什么</b></td></tr>
+    <tr><td><b>Fake（伪实现）</b></td><td>一个能真正工作的简化实现，如内存版 Repository</td><td>不额外断言，但行为接近真实</td></tr>
+    <tr><td><b>Spy（间谍）</b></td><td>包住真实对象，记录调用但真的执行</td><td>既看真实结果，也看调用记录</td></tr>
+  </table>
+  <pre><span class="c"># Stub：只为让流程跑通</span>
+sms = StubSmsSender()                  <span class="c"># send() 直接返回成功</span>
+service = RegisterService(sms)
+service.register(<span class="y">"13800000000"</span>)
+assert repo.find_by_phone(<span class="y">"13800000000"</span>) <span class="b">is not</span> None
+
+<span class="c"># Mock：要验证"确实发了短信，且发给谁"</span>
+sms = Mock()
+service.register(<span class="y">"13800000000"</span>)
+sms.send.assert_called_once_with(<span class="y">"13800000000"</span>, ANY)</pre>
+
+  <h3>必须 mock 的三种情况</h3>
+  <table>
+    <tr><th style="width:200px">情况</th><th>理由</th></tr>
+    <tr><td><b>不可控的外部系统</b></td><td>支付、短信、第三方 API。你无法让它们返回 500，也无法让它们慢 30 秒</td></tr>
+    <tr><td><b>有真实副作用</b></td><td>发邮件、扣款、发 MQ。测试不能真的给用户发短信</td></tr>
+    <tr><td><b>非确定性</b></td><td>当前时间、随机数、UUID。不控制它们，断言就无法固定</td></tr>
+  </table>
+  <p>除此之外，<b>自己项目内部的类尽量不要 mock</b>。想 mock 一个内部类，通常说明这个类的边界设计有问题，或者这个测试本该是集成测试。</p>
+
+  <h3>过度 mock 的四种症状</h3>
+  <ul>
+    <li><b>测试全绿但线上炸</b>：mock 的返回值和真实实现不一致。你测的是"我以为它会返回什么"。</li>
+    <li><b>重构即全红</b>：改一个方法签名，20 个测试文件要跟着改。这说明测试耦合了实现结构。</li>
+    <li><b>测试里全是 when(...).thenReturn(...)</b>：一个测试配了 8 个 stub，说明被测单元依赖太多，应该先拆设计。</li>
+    <li><b>没人看得懂测试在验什么</b>：mock 的编排本身占了 30 行，真正的断言只有 1 行。</li>
+  </ul>
+  <pre><span class="c"># ✗ 过度 mock：连自己的 Value Object 都 mock</span>
+when(user.getId()).thenReturn(1L)
+when(user.getName()).thenReturn(<span class="y">"张三"</span>)
+when(user.getLevel()).thenReturn(Level.GOLD)
+when(coupon.isValid()).thenReturn(true)
+when(coupon.getDiscount()).thenReturn(50)
+<span class="c"># 这时候"用户"和"优惠券"已经不是对象了，是一堆设定好的返回值</span>
+
+<span class="c"># ✓ 用真实对象构造，只 mock 外部依赖</span>
+User user = <span class="b">new</span> User(1L, <span class="y">"张三"</span>, Level.GOLD);
+Coupon coupon = Coupon.fixed(50, LocalDate.now().plusDays(1));
+when(paymentClient.charge(any())).thenReturn(ChargeResult.ok());</pre>
+  <div class="callout danger">
+    <b>最危险的 mock 是 mock 掉"你想验证的东西"。</b>比如要验证"库存不足时不下单"，却 mock 了库存服务的返回值 —— 那你验证的只是"if 分支能走通"，而不是"库存服务真的会返回不足"。<b>被 mock 的边界，就是测试的盲区边界。</b>
+  </div>
+  <div class="callout warn">
+    <b>Mock 与真实实现的漂移是慢性毒药。</b>接口加了必填参数、返回值多了个字段、异常类型改了 —— mock 完全不知道，测试依然全绿。对策：对关键外部依赖额外写<b>契约测试</b>（用真实的 schema / 录制回放验证），让 mock 的假设定期被真实世界校验一次。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>集成测试：让真实依赖上场</h2></div>
+  <p class="lead">集成测试要回答的问题是：<b>这些零件拼在一起，还工作吗？</b>单元测试全绿、集成测试全红，是非常常见的情况 —— 因为单元测试里的每个 mock 都"太配合"了。</p>
+
+  <h3>数据库怎么处理</h3>
+  <table>
+    <tr><th style="width:170px">方案</th><th style="width:230px">优点</th><th>缺点</th></tr>
+    <tr><td><b>内存数据库</b>（H2 / SQLite）</td><td>快，无需外部依赖</td><td><b>SQL 方言不同</b>，生产能跑的语句这里报错，反之亦然。索引、锁、事务隔离行为都不一样</td></tr>
+    <tr><td><b>真实数据库容器</b></td><td>行为完全一致，包括方言、约束、隔离级别</td><td>启动慢（几秒），需要 Docker</td></tr>
+    <tr><td><b>共享测试库</b></td><td>简单，团队都在用</td><td><b>测试互相污染</b>，并行跑必炸，数据状态不可控</td></tr>
+    <tr><td><b>录制回放</b></td><td>无需真实依赖，快</td><td>只覆盖录过的路径，SQL 改了不知道</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>用 H2 替代 PostgreSQL 是经典陷阱。</b>H2 的 <span class="k">GROUP BY</span> 宽松、不支持部分索引、JSON 类型行为不同、<span class="k">ON CONFLICT</span> 语法缺失。结果就是：本地全绿，预发环境一片红。要么用同款数据库容器，要么接受"这类测试不覆盖 SQL 正确性"。
+  </div>
+
+  <h3>testcontainers 的思路</h3>
+  <p>核心思想：<b>测试启动时用 Docker 拉一个真实的依赖实例，测试结束自动销毁</b>。每个测试套件拿到独立的容器和独立的端口，天然隔离，也不需要团队共享一个"测试数据库"。</p>
+  <pre><span class="c"># Java + JUnit 5</span>
+<span class="b">@Container</span>
+<span class="b">static</span> PostgreSQLContainer&lt;?&gt; pg = <span class="b">new</span> PostgreSQLContainer&lt;&gt;(<span class="y">"postgres:16-alpine"</span>);
+
+<span class="b">@DynamicPropertySource</span>
+<span class="b">static void</span> props(DynamicPropertyRegistry r) {
+    r.add(<span class="y">"spring.datasource.url"</span>, pg::getJdbcUrl);
+    r.add(<span class="y">"spring.datasource.username"</span>, pg::getUsername);
+    r.add(<span class="y">"spring.datasource.password"</span>, pg::getPassword);
+}
+
+<span class="c"># Python</span>
+<span class="b">from</span> testcontainers.postgres <span class="b">import</span> PostgresContainer
+<span class="b">with</span> PostgresContainer(<span class="y">"postgres:16-alpine"</span>) <span class="b">as</span> pg:
+    engine = create_engine(pg.get_connection_url())
+    run_migrations(engine)
+    <span class="c"># 跑测试</span>
+
+<span class="c"># Go</span>
+req := testcontainers.ContainerRequest{
+    Image:        <span class="y">"postgres:16-alpine"</span>,
+    ExposedPorts: []string{<span class="y">"5432/tcp"</span>},
+    WaitingFor:   wait.ForListeningPort(<span class="y">"5432/tcp"</span>),
+}</pre>
+  <p>关键成本数字：容器冷启动约 3~8 秒，镜像已在本地时约 1~2 秒。所以做法是<b>整个测试进程共用一个容器</b>，每个测试用例只清数据，不要每个用例起一个容器。</p>
+
+  <h3>测试隔离的三层</h3>
+  <table>
+    <tr><th style="width:150px">层级</th><th style="width:230px">做法</th><th>代价</th></tr>
+    <tr><td><b>事务回滚</b></td><td>每个测试包在事务里，结束回滚</td><td>最快，但<b>测不到真实提交行为</b>（如唯一约束在提交时才校验的场景）</td></tr>
+    <tr><td><b>清表</b></td><td>每个测试前 TRUNCATE 相关表</td><td>快，可靠。注意外键顺序和自增序列</td></tr>
+    <tr><td><b>独立 schema / 库</b></td><td>每个 worker 一个 schema</td><td>支持并行，实现复杂一些</td></tr>
+  </table>
+  <pre><span class="c"># 事务回滚的典型写法（pytest）</span>
+<span class="b">@pytest.fixture</span>
+<span class="b">def</span> db_session(engine):
+    conn = engine.connect()
+    tx = conn.begin()
+    session = Session(bind=conn)
+    <span class="b">yield</span> session
+    session.close()
+    tx.rollback()          <span class="c"># 一切改动消失，测试之间零污染</span>
+    conn.close()</pre>
+  <div class="callout ok">
+    <b>并行跑集成测试的前提是"每个 worker 有独立的数据空间"。</b>做法：用 worker id 拼 schema 名或库名（<span class="k">test_db_${PYTEST_XDIST_WORKER}</span>）。共享一个库再靠"清表"来隔离，在并行下必然互相删数据。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>测试数据管理：别让 fixture 变成沼泽</h2></div>
+  <p class="lead">测试数据是最容易被忽视的成本中心。一个 500 行的 <span class="k">conftest.py</span>，加上一堆互相依赖的 fixture，维护成本会超过业务代码。</p>
+
+  <h3>三种造数据的方式</h3>
+  <table>
+    <tr><th style="width:150px">方式</th><th style="width:230px">特点</th><th>什么时候用</th></tr>
+    <tr><td><b>固定 fixture</b></td><td>一份写死的 JSON / SQL，所有测试共用</td><td>只读的参考数据：国家列表、配置项</td></tr>
+    <tr><td><b>工厂函数</b></td><td>代码构造对象，字段有合理默认值，按需覆盖</td><td><b>绝大多数场景</b>。可读、可控、类型安全</td></tr>
+    <tr><td><b>共享 fixture 链</b></td><td>fixture 依赖 fixture，层层叠加</td><td>慎用。超过两层就该拆</td></tr>
+  </table>
+  <pre><span class="c"># 工厂函数：默认值合理，只写测试关心的字段</span>
+<span class="b">def</span> an_order(**kw):
+    defaults = dict(
+        id=next_id(), user_id=1, amount=100,
+        status=<span class="y">"CREATED"</span>, created_at=datetime(2026, 1, 1),
+    )
+    <span class="b">return</span> Order(**{**defaults, **kw})
+
+<span class="c"># 测试里一眼能看出"这个用例特殊在哪"</span>
+order = an_order(amount=299)              <span class="c"># 只关心金额</span>
+order = an_order(status=<span class="y">"PAID"</span>)            <span class="c"># 只关心状态</span></pre>
+  <div class="callout">
+    <b>工厂函数最重要的设计是"默认值必须合法"。</b>如果默认值造出来的是一个非法对象，每个测试都要先补三个字段才能用，那工厂就失去意义了。<b>默认值 = 一个最普通的、能走通主流程的实例。</b>
+  </div>
+
+  <h3>每个测试独立数据</h3>
+  <p>共享数据是 flaky 的头号来源。两个测试都读写 <span class="k">user_id=1</span>，谁先跑谁后跑结果就不同。</p>
+  <table>
+    <tr><th style="width:200px">反模式</th><th>后果</th></tr>
+    <tr><td>所有测试用同一个 user_id</td><td>一个测试改了余额，另一个测试的断言就挂了</td></tr>
+    <tr><td>测试依赖"上一条测试插入的数据"</td><td>单独跑这个测试就失败，只能全量跑</td></tr>
+    <tr><td>全局自增 ID 跨测试复用</td><td>断言里写死 id=1，换个执行顺序就变 id=7</td></tr>
+    <tr><td>测试之间通过数据库传递状态</td><td>并行执行直接爆炸</td></tr>
+  </table>
+  <pre><span class="c"># 唯一性用随机后缀，而不是写死</span>
+email = f<span class="y">"user-{uuid4().hex[:8]}@test.local"</span>
+
+<span class="c"># 断言不要依赖具体 ID，用返回的对象或业务键</span>
+created = api.create_user(email=email)
+assert api.get_user(created[<span class="y">"id"</span>])[<span class="y">"email"</span>] == email
+<span class="c"># 而不是 assert created["id"] == 1</span></pre>
+
+  <h3>清理策略</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>首选：事务回滚</b>。最快、最彻底，但只适用于不验证提交语义的测试。</div></div>
+    <div class="step"><div class="txt"><b>次选：每个测试前清空</b>。比"测试后清理"更可靠 —— 因为测试失败时清理代码可能不执行，而"前置清理"保证下一次是干净的。</div></div>
+    <div class="step"><div class="txt"><b>兜底：整库重建</b>。CI 上每个 job 起一个全新容器，跑完即销毁。这是最贵但最不会出错的方案。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>别在测试里连生产库或共享的开发库。</b>一次误跑的 <span class="k">DELETE</span> 就能清掉同事三天的调试数据。测试连接串必须指向本地容器或专门的测试实例，并且建议在测试启动时校验库名包含 <span class="k">test</span>，否则直接 abort。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Flaky 测试治理：不稳定的测试等于没有测试</h2></div>
+  <p class="lead">Flaky（间歇性失败）是测试体系最致命的病。它的真正危害不是"多跑一次就过"，而是<b>团队从此不再相信红色</b> —— 真 bug 出现时，大家的第一反应是"重跑一下"。</p>
+  <table>
+    <tr><th style="width:130px">成因</th><th style="width:250px">典型表现</th><th>定位方法</th></tr>
+    <tr><td><b>时间</b></td><td>依赖 <span class="k">now()</span>、跨天/跨月失败、时区差异</td><td>把系统时间固定住再跑；在 23:59 附近跑一次</td></tr>
+    <tr><td><b>执行顺序</b></td><td>单独跑通过，全量跑失败</td><td>随机打乱顺序跑 20 次；看是否与某个测试共存时必挂</td></tr>
+    <tr><td><b>并发</b></td><td>并行执行时偶发失败，串行正常</td><td>固定单线程跑一遍；再提高并行度复现</td></tr>
+    <tr><td><b>外部依赖</b></td><td>网络抖动、第三方限流、容器启动慢</td><td>看失败时间点是否与依赖的延迟尖刺对齐</td></tr>
+  </table>
+
+  <h3>成因一：时间</h3>
+  <pre><span class="c"># ✗ 直接用当前时间，跨天必挂</span>
+coupon = Coupon(expires_at=datetime.now() + timedelta(hours=1))
+assert coupon.is_valid()
+
+<span class="c"># ✓ 注入时钟，测试里给固定值</span>
+<span class="b">class</span> Coupon:
+    <span class="b">def</span> __init__(self, expires_at, clock=datetime.now):
+        self.expires_at, self.clock = expires_at, clock
+    <span class="b">def</span> is_valid(self):
+        <span class="b">return</span> self.clock() &lt; self.expires_at
+
+<span class="c"># 测试里</span>
+fixed = <span class="b">lambda</span>: datetime(2026, 1, 1, 12, 0, 0)
+assert Coupon(datetime(2026, 1, 1, 13, 0), clock=fixed).is_valid()
+
+<span class="c"># 或者用 freezegun 冻结时间（Python）</span>
+<span class="b">@freeze_time</span>(<span class="y">"2026-01-01 12:00:00"</span>)
+<span class="b">def</span> test_coupon_valid(): ...
+
+<span class="c"># Java：注入 Clock，测试用 Clock.fixed(...)</span>
+<span class="c"># JS：jest.useFakeTimers() + jest.setSystemTime(...)</span></pre>
+
+  <h3>成因二：执行顺序</h3>
+  <p>根因永远是<b>共享可变状态</b>：全局变量、单例、静态字段、数据库里的残留数据、被 monkey-patch 的函数没还原。</p>
+  <pre><span class="c"># 定位：随机顺序跑 20 次，找出"总是成对出现"的测试</span>
+pytest -p no:randomly          <span class="c"># 先确认串行固定顺序是否稳定</span>
+pytest -p randomly --randomly-seed=12345
+<span class="b">for</span> i <span class="b">in</span> $(seq 1 20); <span class="b">do</span> pytest -q || echo <span class="y">"FAIL seed=$i"</span>; <span class="b">done</span>
+
+<span class="c"># JUnit：@TestMethodOrder 或直接随机化</span>
+<span class="c"># Jest：--randomize（新版本支持）</span></pre>
+  <table>
+    <tr><th style="width:220px">常见污染源</th><th>修法</th></tr>
+    <tr><td>模块级全局变量被修改</td><td>每个测试前重置，或用 fixture 的 setup/teardown</td></tr>
+    <tr><td>monkey-patch 后没还原</td><td>用上下文管理器 / fixture 自动还原，别手写赋值</td></tr>
+    <tr><td>数据库残留数据</td><td>每个测试前清表（见模块 6）</td></tr>
+    <tr><td>单例的缓存</td><td>暴露 reset 方法，测试 teardown 调用</td></tr>
+    <tr><td>环境变量被改</td><td>用 <span class="k">monkeypatch.setenv</span>（自动还原）而不是 <span class="k">os.environ[...] = ...</span></td></tr>
+  </table>
+
+  <h3>成因三：并发</h3>
+  <p>并行执行时，测试之间争抢同一份资源：同一个数据库行、同一个端口、同一个临时目录、同一个外部账号的配额。</p>
+  <ul>
+    <li><b>端口冲突</b>：不要写死 8080。用 <span class="k">port=0</span> 让系统分配，再从 socket 读回实际端口。</li>
+    <li><b>临时目录冲突</b>：用框架提供的独立临时目录（<span class="k">tmp_path</span> / <span class="k">@TempDir</span>），不要用 <span class="k">/tmp/test.db</span>。</li>
+    <li><b>数据竞争</b>：每个 worker 独立 schema / 独立账号。</li>
+    <li><b>限流配额</b>：共享一个测试账号调第三方 API，并发一高就被限流。用 mock 或按 worker 分配账号。</li>
+  </ul>
+
+  <h3>成因四：外部依赖</h3>
+  <p>真实网络是不可靠的。集成测试里连真实第三方，等于把对方的可用性变成你的构建成功率。</p>
+  <div class="callout">
+    <b>处理原则：</b>跨进程边界的依赖，在<b>单元测试里一律 mock</b>；集成测试里只对"自己拥有的"依赖用真实实例（自己的数据库、自己的缓存）；第三方的行为用<b>契约测试 + 录制回放</b>验证，而不是每次构建都真连。
+  </div>
+
+  <h3>治理流程：隔离 → 定位 → 修复 → 防复发</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>立刻隔离</b>：打上 <span class="k">@flaky</span> 标记移出主流水线，但<b>必须建 issue 并设截止时间</b>。直接删掉或无限重试都是掩盖。</div></div>
+    <div class="step"><div class="txt"><b>量化</b>：记录失败率。跑 100 次统计失败次数，低于 1% 的也值得修 —— 因为它会一直消耗信任。</div></div>
+    <div class="step"><div class="txt"><b>复现</b>：按四大成因逐项排除。固定时间、固定顺序、单线程、断网，四个变量分别控制一次。</div></div>
+    <div class="step"><div class="txt"><b>防复发</b>：把"随机顺序跑"和"重复跑 N 次"加进 CI 的定时任务（ nightly ），让新引入的 flaky 当天就暴露。</div></div>
+  </div>
+  <div class="callout danger">
+    <b>自动重试是最坏的处理方式。</b>它把"偶发失败"变成"偶发通过"，问题被永久掩盖。更糟的是，重试会让真实的并发 bug 在线上以更低频率出现 —— 那时候你没有重试按钮。<b>重试只能作为临时止血，必须配一条带 deadline 的修复项。</b>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>覆盖率的陷阱</h2></div>
+  <p class="lead">覆盖率是<b>发现"哪里完全没测"</b>的工具，不是"测试好不好"的指标。把它当 KPI，团队会写出大量"执行但不验证"的测试。</p>
+
+  <h3>行覆盖 vs 分支覆盖</h3>
+  <pre><span class="c"># 一段简单代码</span>
+<span class="b">def</span> discount(level, amount):
+    <span class="b">if</span> level == <span class="y">"GOLD"</span>:
+        <span class="b">return</span> amount * 0.8
+    <span class="b">return</span> amount
+
+<span class="c"># 只写一个测试</span>
+assert discount(<span class="y">"GOLD"</span>, 100) == 80
+<span class="c"># 行覆盖率：100%（每一行都执行过了）</span>
+<span class="c"># 分支覆盖率：50%（if 的 false 分支从未走过）</span></pre>
+  <table>
+    <tr><th style="width:150px">指标</th><th style="width:230px">统计什么</th><th>盲区</th></tr>
+    <tr><td><b>行覆盖</b></td><td>哪些代码行被执行过</td><td>只走一个分支就 100%，另一条路径完全没测</td></tr>
+    <tr><td><b>分支覆盖</b></td><td>每个 if / case 的真假两侧是否都走过</td><td>仍然不管"断言对不对"，也不管组合条件</td></tr>
+    <tr><td><b>条件覆盖</b></td><td>复合条件里每个子表达式</td><td>组合爆炸，实际很少严格统计</td></tr>
+    <tr><td><b>路径覆盖</b></td><td>所有可能的执行路径</td><td>循环存在时路径无限，理论上不可达</td></tr>
+  </table>
+  <p>工程上够用的是<b>分支覆盖</b>。它比行覆盖只多一点成本，但能挡掉"只测了 happy path"这个最大的漏洞。</p>
+
+  <h3>为什么 100% 覆盖不等于没 bug</h3>
+  <table>
+    <tr><th style="width:200px">覆盖率测不到的东西</th><th>例子</th></tr>
+    <tr><td><b>断言是否正确</b></td><td>执行了所有代码，但一行断言都没写，覆盖率照样 100%</td></tr>
+    <tr><td><b>需求是否正确</b></td><td>代码完全按错误的需求实现，测试也按错误需求写，全绿</td></tr>
+    <tr><td><b>并发问题</b></td><td>单线程测试 100% 覆盖，竞态一个都没触发</td></tr>
+    <tr><td><b>性能与资源</b></td><td>功能全对，但内存泄漏、N+1 查询</td></tr>
+    <tr><td><b>集成问题</b></td><td>单元测试全覆盖，但 SQL 在真实库上语法错误</td></tr>
+    <tr><td><b>边界与异常</b></td><td>覆盖率不区分"走通"和"走通得对不对"</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>用覆盖率做 KPI 会导致一个可预测的后果：</b>开发者写大量"调用一下、不断言"的测试，或者把断言写成 <span class="k">assert result is not None</span>。覆盖率上去了，缺陷率不变，维护成本翻倍。<b>指标一旦成为目标，就不再是好指标。</b>
+  </div>
+
+  <h3>覆盖率的正确用法</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>看"未覆盖的部分"，而不是总百分比</b>。报告里那些红色的行，往往就是没人想过的情况。</div></div>
+    <div class="step"><div class="txt"><b>设下限而不是目标</b>。比如"核心模块不低于 70%，不允许下降"，防止新代码把整体拉低。</div></div>
+    <div class="step"><div class="txt"><b>按模块分级</b>。支付、权限、金额计算要求高；配置加载、DTO 转换可以低。</div></div>
+    <div class="step"><div class="txt"><b>结合变更覆盖（diff coverage）</b>：只看本次改动的行有没有被测到。这比全量覆盖率有效得多。</div></div>
+  </div>
+  <pre><span class="c"># 只看本次改动行的覆盖（diff coverage）</span>
+coverage run -m pytest &amp;&amp; coverage xml
+diff-cover coverage.xml --compare-branch=origin/main --fail-under=80
+
+<span class="c"># 分支覆盖（Python）</span>
+coverage run --branch -m pytest
+coverage report -m --skip-covered
+
+<span class="c"># Java（JaCoCo）关注 branch 而不是 line</span>
+mvn test jacoco:report
+<span class="c"># 报告里看 "Branch Coverage" 列</span>
+
+<span class="c"># JS（Istanbul / c8）</span>
+npx c8 --branches 80 --reporter=text npm test</pre>
+  <div class="callout ok">
+    <b>一个可用的判断标准：</b>如果覆盖率从 65% 涨到 80%，缺陷率明显下降，说明之前的缺口是真的；如果从 80% 涨到 95% 但缺陷率不变，说明剩下的 15% 是 getter、异常兜底、日志分支 —— 继续投入的回报已经很低。<b>覆盖率有边际收益递减，别追最后那几个点。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个测试设计中的典型错误</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只测正常路径</div><div class="pd">边界、空值、超时、权限不足全都没测。线上事故几乎全部发生在这些分支上。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">断言太弱：assert result is not None</div><div class="pd">只要不抛异常就通过，等于什么都没验证。断言要具体到值、状态、错误码。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">一个测试验证五件事</div><div class="pd">第一条失败后后面全不执行，一次只能修一个问题；失败信息也无法定位是哪条规则坏了。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">断言内部方法被调用</div><div class="pd">重构（改名、拆分、换实现）就全红。测行为不测实现，这是单元测试的第一原则。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 H2 代替生产用的 PostgreSQL</div><div class="pd">方言、约束、事务隔离都不同，本地全绿、预发全红。要么用同款容器，要么不测 SQL。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">测试之间共享数据</div><div class="pd">谁先跑谁后跑结果不同，单独跑还过不了。每个测试必须构造自己的数据。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">测试里直接用 datetime.now()</div><div class="pd">跨天、跨月、闰秒、时区都会导致偶发失败。注入时钟，测试里给固定值。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">flaky 测试加个自动重试就完事</div><div class="pd">把"偶发失败"变成"偶发通过"，真实 bug 被永久掩盖，团队从此不再相信红色。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把覆盖率当 KPI</div><div class="pd">会催生大量"调用但不断言"的测试。覆盖率涨了，缺陷率不变，维护成本翻倍。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">测试里连共享开发库或生产库</div><div class="pd">一次误跑的 DELETE 就能清掉别人的数据。测试连接串必须指向本地容器，并在启动时校验库名。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个团队有 300 个 E2E 测试、20 个单元测试，每次 CI 要跑 40 分钟，红了就重跑。主要问题是什么？</div>
+      <button class="opt">E2E 测试写得不够多，应该再加</button>
+      <button class="opt">应该把所有 E2E 改成手动测试</button>
+      <button class="opt">倒金字塔：反馈慢、定位难、脆弱，团队已经不再相信红色</button>
+      <div class="ans">正确答案：<b>倒金字塔</b>。应该把大部分断言下沉到单元测试（毫秒级、定位准），E2E 只保留少量关键链路。"红了就重跑"是信任已经崩塌的信号。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 优惠券门槛是"满 300 减 50"，用边界值分析至少要测哪几个金额？</div>
+      <button class="opt">100、300、500</button>
+      <button class="opt">299、300、301</button>
+      <button class="opt">0、150、300</button>
+      <div class="ans">正确答案：<b>299 / 300 / 301</b>。边界值取"边界两侧各一个 + 边界本身"，专门抓 <span class="k">&lt;</span> 写成 <span class="k">&lt;=</span> 这类 off-by-one。0/150/300 是等价类划分的思路。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 下面哪种情况<b>不应该</b> mock？</div>
+      <button class="opt">自己项目里的领域对象（如 User、Order）</button>
+      <button class="opt">第三方支付接口</button>
+      <button class="opt">发送短信的客户端</button>
+      <div class="ans">正确答案：<b>领域对象</b>。它们是纯数据 + 纯逻辑，用真实对象构造更简单也更可信。mock 它们只会让测试充满 when().thenReturn()，且重构即全红。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 单元测试用 H2 跑，本地全绿，预发环境报 SQL 语法错误。最可能的原因是？</div>
+      <button class="opt">预发环境的数据库版本太旧</button>
+      <button class="opt">测试写得不够多</button>
+      <button class="opt">H2 和 PostgreSQL 的 SQL 方言不同，测试没验证真实数据库行为</button>
+      <div class="ans">正确答案：<b>方言差异</b>。H2 对 GROUP BY、JSON 类型、ON CONFLICT 等语法支持不同。这类断言应该放在用真实数据库容器的集成测试里。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 一个测试单独跑通过，全量跑就失败。最可能是哪类 flaky 成因？</div>
+      <button class="opt">时间（依赖 now()）</button>
+      <button class="opt">执行顺序（共享可变状态未清理）</button>
+      <button class="opt">外部依赖抖动</button>
+      <div class="ans">正确答案：<b>执行顺序</b>。单独跑通过说明逻辑本身没问题，全量跑才失败说明被别的测试污染了：全局变量、单例缓存、数据库残留、没还原的 monkey-patch。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于覆盖率，哪个说法是对的？</div>
+      <button class="opt">应该看未覆盖的部分和本次改动的覆盖，而不是追求总百分比</button>
+      <button class="opt">分支覆盖率 100% 就说明没有 bug 了</button>
+      <button class="opt">覆盖率越高越好，应该设为团队 KPI</button>
+      <div class="ans">正确答案：<b>看未覆盖部分 + diff coverage</b>。覆盖率不检查断言是否正确、需求是否正确、并发是否安全。设成 KPI 只会催生"执行但不断言"的假测试。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>常用命令速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>pytest -q --maxfail=1</code><span class="desc">快速跑，第一个失败就停</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pytest -k "coupon and not slow"</code><span class="desc">按名字筛选用例</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pytest --lf --ff</code><span class="desc">只跑上次失败的，失败优先</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pytest -n auto</code><span class="desc">pytest-xdist 并行跑（需数据隔离）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>coverage run --branch -m pytest</code><span class="desc">带分支统计跑测试</span><button class="copy">复制</button></div>
+    <div class="crow"><code>diff-cover coverage.xml --fail-under=80</code><span class="desc">只看本次改动行的覆盖率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mvn test -Dtest=OrderServiceTest#shouldReject</code><span class="desc">Maven 只跑单个方法</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mvn test jacoco:report</code><span class="desc">生成 Java 覆盖率报告</span><button class="copy">复制</button></div>
+    <div class="crow"><code>npx jest --coverage --runInBand</code><span class="desc">JS 覆盖率 + 串行执行（排查顺序问题）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>go test ./... -race -count=1</code><span class="desc">开竞态检测，禁用缓存</span><button class="copy">复制</button></div>
+    <div class="crow"><code>go test -run TestX -count=100</code><span class="desc">重复跑 100 次抓 flaky</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker run --rm -p 5432:5432 postgres:16-alpine</code><span class="desc">起一个真实数据库做集成测试</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>断言与替身速查</h3>
+  <pre><span class="c"># Python / pytest</span>
+<span class="b">with</span> pytest.raises(ValueError, match=<span class="y">"amount must be positive"</span>):
+    refund(-1)
+assert result == pytest.approx(0.3, abs=1e-9)
+<span class="b">@pytest.mark.parametrize</span>(<span class="y">"a,b,expected"</span>, [(1,2,3),(2,2,4)])
+<span class="b">def</span> test_add(a,b,expected): assert add(a,b) == expected
+
+<span class="c"># Java / JUnit 5 + Mockito</span>
+assertThrows(IllegalStateException.class, () -&gt; order.pay());
+verify(paymentClient, times(1)).charge(argThat(r -&gt; r.getAmount() == 250));
+verifyNoMoreInteractions(paymentClient);
+
+<span class="c"># JS / Jest</span>
+expect(fn).toHaveBeenCalledWith(expect.objectContaining({amount: 250}));
+await expect(api.get(<span class="y">"/x"</span>)).rejects.toThrow(<span class="y">"404"</span>);
+
+<span class="c"># Go / testify</span>
+require.NoError(t, err)          <span class="c">// 失败立即终止</span>
+assert.Equal(t, 250, got.Total)  <span class="c">// 失败继续执行</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>测试金字塔</b></td><td>单元 / 集成 / E2E 的数量应呈 7:2:1 的塔形分布</td></tr>
+    <tr><td><b>倒金字塔</b></td><td>E2E 过多、单元过少，反馈慢且脆弱，是反模式</td></tr>
+    <tr><td><b>等价类划分</b></td><td>把输入切块，每块取一个代表值，块内效果相同</td></tr>
+    <tr><td><b>边界值分析</b></td><td>专测边界本身和两侧，因为 bug 集中在这里</td></tr>
+    <tr><td><b>判定表</b></td><td>列举多个条件的组合与结果，防止漏掉组合分支</td></tr>
+    <tr><td><b>状态迁移测试</b></td><td>对状态机的每条边、每个非法迁移各写用例</td></tr>
+    <tr><td><b>Stub（桩）</b></td><td>只提供预设返回值，不对它做断言</td></tr>
+    <tr><td><b>Mock</b></td><td>记录调用情况，可断言"是否被调用、参数是什么"</td></tr>
+    <tr><td><b>Fake</b></td><td>能真正工作的简化实现，如内存版 Repository</td></tr>
+    <tr><td><b>Spy</b></td><td>包住真实对象，记录调用但真的执行</td></tr>
+    <tr><td><b>契约测试</b></td><td>验证服务之间接口约定是否一致，防 mock 与真实实现漂移</td></tr>
+    <tr><td><b>testcontainers</b></td><td>测试时用 Docker 起真实依赖，跑完销毁</td></tr>
+    <tr><td><b>fixture</b></td><td>测试的前置数据或环境准备，可复用</td></tr>
+    <tr><td><b>工厂函数</b></td><td>用代码构造测试对象，字段有合理默认值</td></tr>
+    <tr><td><b>Flaky 测试</b></td><td>同一份代码时过时不过，结果不确定</td></tr>
+    <tr><td><b>行覆盖</b></td><td>统计被执行过的代码行占比</td></tr>
+    <tr><td><b>分支覆盖</b></td><td>统计每个判断的真假两侧是否都走到</td></tr>
+    <tr><td><b>diff coverage</b></td><td>只看本次改动新增/修改行的覆盖情况</td></tr>
+    <tr><td><b>AAA 结构</b></td><td>Arrange 准备、Act 执行、Assert 断言</td></tr>
+    <tr><td><b>幂等测试</b></td><td>重复执行同一操作，结果与执行一次相同</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 挑一个你项目里最长的测试文件，找出所有断言内部调用的地方并删掉，看还剩几条真正在验证行为；② 给一个"满 300 减 50"的规则补齐 299/300/301 三个用例；③ 把某个连真实数据库的集成测试改成 testcontainers；④ 用 <span class="k">-count=100</span> 或 <span class="k">--lf</span> 找出你项目里的 flaky 测试，按四大成因定位一个。<br><br>
+    <b>之后值得单独学：</b>契约测试（Pact）、变异测试（mutation testing，用"故意改坏代码看测试会不会红"来评估测试质量）、属性测试（property-based testing，用生成器代替手写用例）、以及测试环境的流量录制回放。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透测试设计 · 判断一条测试好不好：改实现它不该红，改行为它必须红</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（测行为不测实现）和模块 8（覆盖率陷阱）值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边改一个你项目里的测试。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议打开你项目里最烂的一个测试文件，边看边改';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

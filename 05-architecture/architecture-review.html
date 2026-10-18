@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学会架构评审</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 12 期 · 高密度版</span>
+    <h1>二十分钟学会架构评审</h1>
+    <p class="sub">这篇教的是<b>怎么判断别人的技术方案对不对</b>。写方案是执行能力，评审方案是判断能力 —— 后者才是往架构岗走的门槛。核心不是挑刺，是在方案上线前把风险找出来。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>40+</b> 评审问题</span>
+      <span class="chip"><b>10</b> 条反模式</span>
+      <span class="chip"><b>9</b> 个评审者坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议打开你团队最近一份技术方案，边读边按附录的清单过一遍。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先建立一个正确的心态</h2></div>
+  <p class="lead">架构评审（Architecture Review，指在方案落地前，由一组有经验的人对设计文档做风险审查的过程）最容易走偏成两件事：一是<b>变成挑刺大会</b>，谁说得狠谁显得厉害；二是<b>变成走过场</b>，大家点头通过，出了事再复盘。这两种都错。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>评审的目标是降低不确定性，不是证明谁聪明。</b>方案里有"事实错误"要指出来，但更多的是"取舍不同"——同样一个问题有多个合理答案，评审要做的是把取舍摆到台面上，确认作者是<b>知情地</b>做了选择，而不是没意识到。</div></div>
+    <div class="step"><div class="txt"><b>评审的是方案，不是人。</b>所有问题都对着"这个设计"说，不对着"你怎么连这都没想到"说。语言上多用"这里如果 X 会怎样"，少用"这明显不对"。</div></div>
+    <div class="step"><div class="txt"><b>评审要有产出。</b>一场没有留下"待办清单 + 负责人 + 截止时间"的评审等于没开。附录给了一份可直接用的清单模板。</div></div>
+    <div class="step"><div class="txt"><b>评审的深度和方案的影响面成正比。</b>改一个内部工具接口，口头对齐即可；动支付主链路或数据模型，必须走完整流程。别对所有方案用同一把尺子。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>一句话预热：</b>评审者最值钱的能力不是"我懂多少技术"，而是"我知道哪里会出事"。这篇文档把"哪里会出事"拆成了 8 个维度：目标、量级、容量、可用性、数据、可观测性、成本、反模式。每个维度都给了可直接问的问题。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>评审到底在评审什么</h2></div>
+  <p class="lead">新手评审者拿到一份方案，会本能地去挑技术细节的错。老手会先做一件事：<b>把方案里的论断分成三类</b>，因为三类问题的处理方式完全不同。</p>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:260px">特征</th><th>评审者的正确动作</th></tr>
+    <tr><td><b>事实错误</b></td><td>客观错了。例如"Redis 单线程所以不会有并发问题"、"MySQL 主从是强一致的"、"HTTP 默认有超时"</td><td><b>必须当场指出并纠正。</b>这类问题没有商量余地，它是知识缺口，讲清楚原理即可</td></tr>
+    <tr><td><b>取舍不同</b></td><td>有多个合理答案。例如选 MySQL 还是 PostgreSQL、用同步还是异步、要不要分库分表</td><td><b>不要说你错了。</b>要问：你为什么这么选？约束条件是什么？另一个选项的代价你评估过吗？</td></tr>
+    <tr><td><b>信息缺失</b></td><td>方案没说清，无法判断对错。例如没说 QPS 量级、没说一致性要求、没说失败路径</td><td><b>这是最高频的问题。</b>把缺失的信息一条条问出来，往往问着问着作者自己就发现问题了</td></tr>
+  </table>
+  <h4>风险的量化公式</h4>
+  <p>评审的本质是在做风险排序。风险不是一个模糊的词，它可以粗略量化：</p>
+  <pre><span class="c"># 风险 ≈ 发生概率 × 影响面 × 不可逆程度</span>
+
+<span class="b">发生概率</span>：这个故障在一年内会发生的可能性有多大？
+          （比如"磁盘写满"在日志不清理的机器上几乎是必然）
+
+<span class="b">影响面</span>：发生时会波及多少用户 / 多少业务？
+          （比如"某个内部报表挂了" vs "支付全链路挂了"）
+
+<span class="b">不可逆程度</span>：能不能快速回滚？会不会永久丢数据？
+          （比如"多删了一列"和"删库"的不可逆程度天差地别）
+
+<span class="c"># 评审的时间应该按这个乘积分配，而不是平均分配</span></pre>
+  <div class="callout danger">
+    <b>最容易被忽视的一类：不可逆的破坏性操作。</b>很多方案对"性能"、"可用性"讨论得很细，却对"这个操作一旦执行能不能撤销"只字不提。<br>
+    <b>评审时必须单独问：</b>这个变更能不能灰度？能不能回滚？回滚需要多久？有没有可能丢数据？尤其是<b>数据迁移、schema 变更、删表删列、批量刷数据</b>这四类操作，必须逐个确认回滚方案。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>拿到方案先问的 5 个问题</h2></div>
+  <p class="lead">不管方案多长，先问这五个问题。它们能在 5 分钟内帮你判断这份方案"有没有想清楚"，也决定了后面评审要花多少力气。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>1 · 量级多大</div><div class="cd">QPS 多少？峰值多少？数据量多大？用户多少？<b>没有量级就没有架构。</b>十万 QPS 和一百 QPS 的方案完全不同。如果作者答不上来，说明方案还没到能评审的阶段</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>2 · 单点在哪</div><div class="cd">哪个组件挂了会导致整体不可用？有没有备份？切换要多久？<b>单点（SPOF，Single Point of Failure，单点故障）是可用性的头号敌人</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>3 · 挂了怎么办</div><div class="cd">依赖的下游超时了怎么办？数据库主库挂了怎么办？缓存全失效了怎么办？<b>方案里有没有"失败路径"的设计</b></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>4 · 一致性要求</div><div class="cd">数据能丢吗？能短暂不一致吗？能接受最终一致吗？<b>一致性要求决定了技术选型的下限</b>，必须先明确</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>5 · 成本多少</div><div class="cd">机器、带宽、存储、人力各花多少？<b>人力成本最常被漏掉</b>——多引入一个中间件，就要有人长期维护它</div></div>
+  </div>
+  <h4>这五个问题的追问话术</h4>
+  <table>
+    <tr><th style="width:150px">问题</th><th>继续追问</th></tr>
+    <tr><td><b>量级</b></td><td>这个 QPS 是日均还是峰值？峰值系数取了多少？数据量是当前还是三年后？增长曲线是什么形状（线性还是指数）？</td></tr>
+    <tr><td><b>单点</b></td><td>这个组件本身有高可用吗？它依赖的东西有高可用吗？故障切换是自动还是手动？切换期间的请求怎么办？</td></tr>
+    <tr><td><b>失败</b></td><td>下游超时设了多少？超时后是重试、降级还是报错？重试会不会放大流量？有没有熔断？</td></tr>
+    <tr><td><b>一致性</b></td><td>能接受丢多少数据（RPO）？能接受中断多久（RTO）？读到自己刚写的数据是硬需求吗？</td></tr>
+    <tr><td><b>成本</b></td><td>这套东西谁来运维？新增了几个需要 7×24 值班的组件？有没有更简单的替代方案？</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>为什么这五个问题最有效：</b>它们不涉及具体技术选型，所以不会引起作者防御心理；但它们直接对应了架构的四个根本约束 —— <b>规模、可用、一致、成本</b>。一份答不上这五问的方案，细节写得再漂亮也是空中楼阁。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>容量与性能评审</h2></div>
+  <p class="lead">这是评审里最容易"看起来有数据、其实全是错的"的部分。三个高频错误：<b>用均值、用不真实的压测数据、把峰值当均值规划</b>。</p>
+  <h4>QPS 估算的标准方法</h4>
+  <pre><span class="c"># 从业务量反推 QPS，而不是拍脑袋</span>
+
+<span class="b">第一步</span>：日均请求数 = 日活用户数 × 人均请求次数
+<span class="b">第二步</span>：平均 QPS = 日均请求数 / 86400（一天的秒数）
+<span class="b">第三步</span>：峰值 QPS = 平均 QPS × 峰值系数
+
+<span class="c"># 举例：100 万日活，人均 20 次请求</span>
+日均请求 = 1,000,000 × 20 = 20,000,000
+平均 QPS = 20,000,000 / 86400 ≈ <span class="g">231</span>
+峰值系数取 5 → 峰值 QPS ≈ <span class="y">1,157</span>
+
+<span class="c"># 注意：峰值系数不是常数</span>
+<span class="c"># 普通业务 3~5；有早晚高峰的业务 5~10；</span>
+<span class="c"># 秒杀 / 抢购 / 春晚红包可以到几十甚至上百倍</span></pre>
+  <table>
+    <tr><th style="width:180px">评审点</th><th>要问的问题 / 常见错误</th></tr>
+    <tr><td><b>峰值系数</b></td><td>作者用的系数是多少？依据是什么？<b>错误做法：直接拿平均 QPS 去做容量规划。</b>结果就是高峰期必崩</td></tr>
+    <tr><td><b>读写比</b></td><td>读多写少还是写多读少？这决定了要不要缓存、要不要读写分离</td></tr>
+    <tr><td><b>单请求成本</b></td><td>一个请求打几次数据库？调几个下游？<b>QPS 要乘以"每请求的下游调用数"才是下游的真实压力</b></td></tr>
+    <tr><td><b>热点分布</b></td><td>流量是均匀的还是有热点？<b>均匀假设往往不成立</b>，一个爆款商品的流量可能占全站 30%</td></tr>
+  </table>
+  <h4>延迟指标：只看 P99，别看均值</h4>
+  <div class="callout danger">
+    <b>为什么均值毫无意义：</b>假设 100 个请求，99 个耗时 10ms，1 个耗时 3000ms。均值是 <span class="k">(99×10 + 3000) / 100 ≈ 40ms</span>，看起来很美。但那个 3000ms 的请求就是一个真实用户卡了三秒。<br>
+    <b>用户体感由尾延迟决定，不是均值。</b>所以性能指标必须看分位数：<b>P50（中位数）、P95、P99、P999</b>。P99 = 1000ms 意味着 1% 的请求超过 1 秒 —— 在日均百万请求下，这就是每天一万个卡顿的用户。
+  </div>
+  <table>
+    <tr><th style="width:150px">指标</th><th>含义</th><th>怎么用</th></tr>
+    <tr><td class="f">P50</td><td>一半请求比它快</td><td>看"典型用户"的体感</td></tr>
+    <tr><td class="f">P99</td><td>99% 请求比它快</td><td><b>性能验收的主指标。</b>通常要求 P99 小于某个阈值</td></tr>
+    <tr><td class="f">P999</td><td>99.9% 请求比它快</td><td>看极端情况，反映 GC、锁竞争、慢查询</td></tr>
+    <tr><td class="f">均值</td><td>算术平均</td><td><b>几乎不要用于性能判断</b>，会被长尾拉偏</td></tr>
+  </table>
+  <h4>压测数据要真实</h4>
+  <ul>
+    <li><b>数据量要真实：</b>在空表上压测，索引全在内存里，结果毫无参考价值。要用接近生产的数据量（比如 5000 万行）压。</li>
+    <li><b>请求分布要真实：</b>按生产实际的读写比、参数分布、热点比例来压，别只用同一个 ID 循环。</li>
+    <li><b>网络要真实：</b>压测机和被测服务在同一台机器上，省掉了网络往返，结果会偏乐观。跨机房、跨可用区要单独测。</li>
+    <li><b>要压到极限：</b>只压到 50% 负载没意义。要找到拐点 —— 从哪个 QPS 开始延迟陡增、错误率上升。</li>
+  </ul>
+  <div class="callout warn">
+    <b>容量评审的黄金问题：</b>"这套系统在单节点故障、流量翻三倍的情况下，还能不能撑住？" 如果答案是不能，就要问清楚降级方案是什么，以及降级后哪些功能会受影响。容量规划不是算"能撑多少"，而是算"撑不住的时候会发生什么"。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>可用性评审</h2></div>
+  <p class="lead">可用性评审的核心动作只有一个：<b>逐层列出所有单点，然后问每一层的故障处理方案</b>。单点不可能全部消除，但必须每一个都有明确的态度（消除 / 冗余 / 接受并降级）。</p>
+  <h4>单点清单：从外到内逐层扫</h4>
+  <table>
+    <tr><th style="width:150px">层次</th><th>常见单点</th><th>典型问题</th></tr>
+    <tr><td><b>入口层</b></td><td>DNS、CDN、负载均衡（LB）、WAF</td><td>LB 是单台还是集群？DNS 挂了有没有备用解析？证书什么时候到期？</td></tr>
+    <tr><td><b>网关层</b></td><td>API 网关、鉴权服务</td><td>网关挂了所有流量都进不来，它自己有没有多实例？</td></tr>
+    <tr><td><b>应用层</b></td><td>无状态应用实例</td><td>实例挂一个会不会影响？有没有健康检查摘除？</td></tr>
+    <tr><td><b>缓存层</b></td><td>Redis 主节点</td><td>主挂了多久恢复？恢复期间打库会不会把库打穿？</td></tr>
+    <tr><td><b>数据层</b></td><td>MySQL 主库、分片</td><td>主库挂了切换要多久？切换时会不会丢数据？</td></tr>
+    <tr><td><b>中间件</b></td><td>MQ、注册中心、配置中心</td><td>注册中心挂了服务还能互相发现吗？配置中心挂了能启动吗？</td></tr>
+    <tr><td><b>外部依赖</b></td><td>第三方支付、短信、地图</td><td>第三方挂了怎么办？有没有兜底？超时设多少？</td></tr>
+    <tr><td><b>基础设施</b></td><td>机房、可用区、电力、时钟</td><td>单机房部署吗？有没有跨可用区？NTP（网络时间协议，用于同步机器时钟）靠谱吗？</td></tr>
+  </table>
+  <h4>故障域隔离</h4>
+  <p>故障域（Failure Domain，指一个故障能同时影响的资源范围）隔离的意思是：<b>让一次故障的影响范围尽可能小</b>。评审时要问：</p>
+  <ul>
+    <li><b>物理隔离：</b>多个可用区部署，还是全挤在一个机柜里？</li>
+    <li><b>逻辑隔离：</b>多租户共用一套资源吗？一个大客户把资源占满，会不会影响其他客户？</li>
+    <li><b>依赖隔离：</b>核心业务和边缘业务共用同一个数据库 / 缓存吗？边缘业务拖垮共享资源怎么办？</li>
+    <li><b>线程隔离：</b>调用不同下游用同一个线程池吗？一个下游变慢会不会把线程池占满，拖垮所有调用？</li>
+  </ul>
+  <h4>降级预案</h4>
+  <div class="callout">
+    <b>降级（Degradation）指在资源不足或依赖故障时，主动关闭非核心功能，保住核心链路。</b>评审时要问：这个系统的核心功能是哪一个？故障时哪些功能可以砍掉？砍掉的开关在哪，谁能一键触发？<br>
+    典型降级：<b>关掉个性化推荐返回默认列表、关掉实时库存展示、把同步调用改成异步、返回缓存里的旧数据、直接返回兜底文案。</b>
+  </div>
+  <h4>优雅停机</h4>
+  <p>发布、扩缩容时进程会被 kill。评审时要确认：<b>收到停止信号（SIGTERM）后，进程会不会先把正在处理的请求做完、从注册中心摘除、再把连接关掉？</b>如果直接 <span class="k">kill -9</span>，正在处理的请求全部失败，用户看到 502。</p>
+  <h4>依赖超时与熔断</h4>
+  <pre><span class="c"># 超时（Timeout）：没有超时的外部调用是定时炸弹</span>
+<span class="r">✗ 错误</span>：调用下游不设超时，下游卡住时自己的线程/连接全被占满
+<span class="g">✓ 正确</span>：每个外部调用都要设连接超时和读取超时，且超时值要有依据
+
+<span class="c"># 熔断（Circuit Breaker）：下游持续失败时，快速失败而不是继续打</span>
+<span class="c"># 三态：</span>
+关闭（正常放行）→ 失败率超阈值 → <span class="y">打开（直接拒绝，不打下游）</span>
+    → 等待一段时间 → <span class="b">半开（放少量请求试探）</span>
+    → 成功则关闭，失败则继续打开
+
+<span class="c"># 重试（Retry）：重试必须有上限、有退避、只重试幂等的操作</span>
+<span class="r">✗ 无限重试</span>：下游越慢越重试，流量翻倍，把下游彻底打死
+<span class="g">✓ 有限重试 + 指数退避 + 抖动</span>：重试 2~3 次，间隔 100ms/200ms/400ms 加随机</pre>
+  <div class="callout danger">
+    <b>重试放大陷阱（Retry Storm）：</b>假设 A 调 B、B 调 C，每层都重试 3 次。C 抖了一下，B 的重试把流量放大 3 倍，A 的重试再放大 3 倍 —— C 承受的是 9 倍流量，本来只是抖动，结果被打死。<b>评审时要问：重试链路是不是每层都在重试？应该只在最靠近用户的一层重试，或者用统一的超时预算。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>数据评审</h2></div>
+  <p class="lead">数据是架构里最不能出错的资产 —— 机器挂了可以重启，数据丢了不可逆。数据评审围绕五件事：<b>一致性、增长、备份、变更、删除</b>。</p>
+  <h4>1. 一致性要求是否明确</h4>
+  <table>
+    <tr><th style="width:150px">一致性级别</th><th>含义</th><th>典型场景</th></tr>
+    <tr><td><b>强一致</b></td><td>任何时刻读到的都是最新写入的值</td><td>账户余额、库存扣减、订单状态。<b>代价最高，需要分布式事务或单点串行</b></td></tr>
+    <tr><td><b>最终一致</b></td><td>写入后一段时间内收敛到一致，中间可能读到旧值</td><td>缓存刷新、搜索结果、Feed 流、统计报表</td></tr>
+    <tr><td><b>弱一致</b></td><td>不保证收敛，只保证"最终会"</td><td>点赞数、浏览量这类可以丢一点的数据</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>评审必问：</b>这份方案里，哪些数据是强一致需求？<b>很多事故的根源是把强一致需求当成了最终一致</b>（比如用缓存做库存，结果超卖），或者反过来，给非核心数据上了分布式事务，把系统复杂度抬到天上，收益却为零。一致性要求要<b>按字段</b>明确，不是按系统。
+  </div>
+  <h4>2. 数据量增长曲线</h4>
+  <ul>
+    <li><b>当前多少行？日增多少？三年后多少？</b> 线性增长和指数增长的处理方式完全不同。</li>
+    <li><b>单表多大就撑不住了？</b> 经验值：MySQL 单表超过 2000 万行，查询性能开始明显下降（前提是有合适索引）。</li>
+    <li><b>增长最快的表是哪个？</b> 通常是日志、流水、消息这类只增不减的表，它们才是分库分表的第一目标。</li>
+    <li><b>有没有归档策略？</b> 三年以上的历史数据是留着、归档到冷存储、还是直接删？</li>
+  </ul>
+  <h4>3. 备份与恢复演练</h4>
+  <pre><span class="c"># 两个关键指标，必须能明确回答</span>
+<span class="b">RPO</span>（Recovery Point Objective，恢复点目标）：
+    最多能容忍丢多少数据？比如 RPO = 5 分钟，意味着可以丢最近 5 分钟的数据
+
+<span class="b">RTO</span>（Recovery Time Objective，恢复时间目标）：
+    最多能容忍中断多久？比如 RTO = 30 分钟，意味着半小时内要恢复服务
+
+<span class="c"># 评审必问：</span>
+<span class="y">1.</span> 备份频率是多少？是全量还是增量？
+<span class="y">2.</span> 备份存在哪？和主库在同一个机房吗？（同机房等于没备份）
+<span class="y">3.</span> 最近一次"真实恢复演练"是什么时候？恢复耗时多久？
+<span class="r">4.</span> 备份文件加密了吗？能校验完整性吗？（备份损坏 = 没有备份）</pre>
+  <div class="callout danger">
+    <b>最经典的数据事故：备份存在但恢复不了。</b>很多团队每天备份，但从没演练过恢复，真出事时发现备份文件损坏、版本不兼容、或者恢复要花 8 小时（远超 RTO）。<b>评审时"有没有备份"不是问题，"有没有演练过恢复"才是。</b>没有演练过的备份等于没有备份。
+  </div>
+  <h4>4. Schema 变更方案</h4>
+  <table>
+    <tr><th style="width:170px">变更类型</th><th>风险</th><th>评审要问</th></tr>
+    <tr><td><b>加字段</b></td><td>低（多数情况秒级）</td><td>有没有默认值？大表加字段会不会锁表？</td></tr>
+    <tr><td><b>改字段类型</b></td><td>高（可能锁表 + 数据转换）</td><td>用在线 DDL 工具（如 gh-ost、pt-online-schema-change）吗？</td></tr>
+    <tr><td><b>删字段 / 删表</b></td><td><b>极高（不可逆）</b></td><td>确认过没有代码在用吗？有没有先改名观察一段时间？</td></tr>
+    <tr><td><b>加索引</b></td><td>中（大表建索引会锁写）</td><td>是在线建索引吗？会不会影响写入？</td></tr>
+    <tr><td><b>数据迁移</b></td><td>极高</td><td>双写还是停机？怎么校验迁移前后一致？能不能回滚？</td></tr>
+  </table>
+  <h4>5. 删除策略</h4>
+  <ul>
+    <li><b>软删还是硬删？</b> 软删（用 <span class="k">is_deleted</span> 标记）保留数据可追溯，但表会越来越大，且所有查询都要带过滤条件。</li>
+    <li><b>硬删的代价是什么？</b> 数据不可恢复，且删除大表会占用大量 IO、产生大量 binlog。</li>
+    <li><b>合规要求呢？</b> 用户注销后必须删除个人数据（GDPR、《个人信息保护法》等要求），但"删除"要覆盖主库、从库、备份、缓存、日志、数仓 —— 评审时要问清楚范围。</li>
+    <li><b>级联删除吗？</b> 删一个用户，他的订单、消息、文件都要一起删吗？外键约束（Foreign Key）会不会导致删除失败或误删？</li>
+  </ul>
+  <div class="callout ok">
+    <b>数据评审的一句话总结：</b>把每一次"数据会变化"的操作，都问一遍"变了之后能不能变回来"。能变回来的，风险可控；变不回来的，必须有额外的谨慎（灰度、双写、先观察、再删除）。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>可观测性评审</h2></div>
+  <p class="lead">可观测性（Observability，指通过系统的外部输出——指标、日志、链路——推断系统内部状态的能力）经常被当成"上线后再说"的事，但它是评审里性价比最高的一块：<b>没有可观测性，出了故障你连"哪里坏了"都不知道</b>，恢复时间会被无限拉长。</p>
+  <h4>黄金四信号（Four Golden Signals）</h4>
+  <p>Google SRE 提出的四个必看指标，评审时逐条确认方案是否覆盖：</p>
+  <table>
+    <tr><th style="width:150px">信号</th><th>英文</th><th>看什么</th></tr>
+    <tr><td><b>延迟</b></td><td>Latency</td><td>请求耗时。<b>要区分成功请求和失败请求的延迟</b>（失败的快速返回会拉低平均延迟，掩盖问题）</td></tr>
+    <tr><td><b>流量</b></td><td>Traffic</td><td>QPS、并发数、请求量，反映系统负载</td></tr>
+    <tr><td><b>错误</b></td><td>Errors</td><td>错误率、错误码分布。<b>要区分"显式错误"（5xx）和"隐式错误"（200 但内容是错的）</b></td></tr>
+    <tr><td><b>饱和度</b></td><td>Saturation</td><td>资源有多满：CPU、内存、连接池、队列长度、磁盘 IO。<b>饱和度是故障的先行指标</b></td></tr>
+  </table>
+  <h4>告警要指向用户影响，不要指向机器状态</h4>
+  <div class="callout danger">
+    <b>反面案例：</b>"CPU 超过 80% 就告警"。CPU 80% 时用户可能完全没感觉，这是<b>噪音告警</b>，久而久之所有人都麻木了（告警疲劳）。<br>
+    <b>正确做法：</b>告警要基于 SLO（Service Level Objective，服务等级目标，比如"P99 延迟 &lt; 200ms，可用性 &gt; 99.9%"）。告警触发条件是"错误预算被快速消耗"—— 也就是"用户正在受影响"。<br>
+    <b>评审必问：</b>这条告警响了，值班的人知道要做什么吗？如果不知道，它就不该是告警，应该是仪表盘上的一个指标。
+  </div>
+  <table>
+    <tr><th style="width:150px">评审点</th><th>要问的问题</th></tr>
+    <tr><td><b>trace_id</b></td><td>有没有全链路追踪 ID？一个请求从入口到各个下游能不能串起来？<b>没有 trace_id，跨服务排查等于大海捞针</b></td></tr>
+    <tr><td><b>日志结构化</b></td><td>日志是纯文本还是 JSON？<b>纯文本日志无法高效检索和聚合</b>。有没有统一的字段（时间、级别、trace_id、用户 ID、耗时）？</td></tr>
+    <tr><td><b>日志级别</b></td><td>生产环境是 INFO 还是 DEBUG？<b>DEBUG 日志在高 QPS 下会拖垮磁盘 IO</b>。错误日志里有没有打全栈信息？</td></tr>
+    <tr><td><b>敏感信息</b></td><td>日志里会不会打印手机号、身份证、密码、Token？<b>这是安全合规红线</b></td></tr>
+    <tr><td><b>采样</b></td><td>高 QPS 下全量打日志不现实，采样策略是什么？错误请求是不是 100% 保留？</td></tr>
+    <tr><td><b>仪表盘</b></td><td>有没有一个能一眼看出"系统是否健康"的总览面板？值班的人第一时间看什么？</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>评审必问的"灵魂三问"：</b>① 这个系统半夜挂了，值班的人<b>怎么知道</b>？② 知道了之后，<b>怎么定位</b>到是哪个环节？③ 定位之后，<b>怎么确认</b>修复生效了？如果三个问题都有清晰答案，可观测性基本合格。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>成本评审</h2></div>
+  <p class="lead">成本是最容易被忽略的评审维度，因为技术评审容易只关注"能不能实现"。但一个技术上完美、成本上不可持续的方案，一样是失败的设计。成本分四块，第四块最常被漏。</p>
+  <table>
+    <tr><th style="width:130px">成本类型</th><th>包含什么</th><th>评审要问</th></tr>
+    <tr><td><b>机器成本</b></td><td>服务器、容器、数据库实例、缓存实例</td><td>需要多少台？规格多大？能不能用更小的规格 + 更好的算法实现？弹性伸缩能省多少？</td></tr>
+    <tr><td><b>带宽成本</b></td><td>公网流量、跨机房流量、CDN</td><td>返回的数据能不能压缩？能不能减少往返次数？<b>跨可用区流量是要单独计费的</b></td></tr>
+    <tr><td><b>存储成本</b></td><td>数据库存储、对象存储、日志存储、备份存储</td><td>冷热数据分层了吗？日志保留多久？<b>日志和备份的存储成本经常超过业务数据本身</b></td></tr>
+    <tr><td><b>人力成本</b></td><td>开发、运维、值班、排障</td><td><b>多引入一个中间件，就要有人长期维护、升级、排障</b>。这个组件的收益值不值得这份人力？</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>人力成本为什么最该被重视：</b>机器成本是一次性的、可预测的；人力成本是持续的、隐性的、会累积的。每引入一个新技术（新消息队列、新数据库、新网关），团队就多了一份"认知负担 + 运维负担 + 半夜被叫醒的概率"。<br>
+    <b>评审必问：</b>这个新组件，团队里<b>有几个人真正懂它</b>？出了问题谁能解决？如果没有第二个人懂，那它就是一个"人形单点"—— 那个人离职或休假，系统就成了黑盒。这比机器单点更危险。
+  </div>
+  <h4>成本评审的经典提问</h4>
+  <ul>
+    <li><b>有没有更简单的方案？</b> 能用数据库解决的事，非要引入 Kafka 吗？能用单体解决的事，非要拆微服务吗？</li>
+    <li><b>复杂度换来了什么？</b> 每个新组件都要能回答"它解决了什么、不引入它会怎样"。</li>
+    <li><b>三年后的总成本是多少？</b> 不只看当下的机器费，还要看数据增长、流量增长带来的成本曲线。</li>
+    <li><b>有没有被锁死？</b> 用了某云厂商的专有服务，将来能不能迁走？迁移成本多大？</li>
+  </ul>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十条"看起来对但有问题"的反模式</h2></div>
+  <p class="lead">反模式（Anti-pattern，指看起来合理、实际会导致问题的常见做法）是评审的高频命中区。这十条的共同特点是：<b>方案里写着很自然，但边界条件下一碰就碎</b>。</p>
+  <table>
+    <tr><th style="width:30px">#</th><th style="width:190px">反模式</th><th>为什么错 / 正确做法</th></tr>
+    <tr><td>1</td><td><b>用平均值评估性能</b></td><td>均值会被长尾掩盖，用户体感由 P99 决定。<b>改用分位数（P95/P99/P999）做性能指标</b></td></tr>
+    <tr><td>2</td><td><b>liveness 探针检查外部依赖</b></td><td>存活探针（liveness probe，判断容器是否要重启）如果去 ping 数据库，数据库抖动会导致所有实例被判定为"不健康"然后集体重启，<b>雪崩</b>。存活探针只该检查进程自身；依赖检查放 readiness（就绪探针）</td></tr>
+    <tr><td>3</td><td><b>要求缓存与数据库强一致</b></td><td>并发下强一致代价极高。缓存应追求"最终一致 + 极短不一致窗口 + TTL 兜底"。<b>真正需要强一致的字段不要走缓存</b></td></tr>
+    <tr><td>4</td><td><b>无限重试</b></td><td>下游越慢越重试，流量被放大，把本来只是抖动的下游彻底打死（重试风暴）。<b>必须有限次数 + 指数退避 + 抖动，且只重试幂等操作</b></td></tr>
+    <tr><td>5</td><td><b>没有超时的外部调用</b></td><td>下游卡住时，自己的线程/连接池会被占满，故障从下游传导到自己。<b>每个外部调用都要设连接超时和读取超时</b></td></tr>
+    <tr><td>6</td><td><b>全量加载到内存</b></td><td><span class="k">SELECT *</span> 捞出几百万行塞进 List，内存瞬间打满 OOM。<b>必须分页 / 流式处理 / 分批</b></td></tr>
+    <tr><td>7</td><td><b>同步调用链过长</b></td><td>A→B→C→D 同步串行，延迟累加、任一环故障全链路失败、线程占用时间 = 所有下游耗时之和。<b>能异步就异步，能并行就并行，能缓存就缓存</b></td></tr>
+    <tr><td>8</td><td><b>单点没有备份</b></td><td>某个组件只有一份，挂了就全挂。评审要逐层扫单点，<b>至少保证核心链路没有单点</b></td></tr>
+    <tr><td>9</td><td><b>把 Secret 当加密</b></td><td>把密码、密钥明文写进配置文件或代码里提交到仓库，以为"没人看得到"。<b>必须用密钥管理服务（KMS / Vault）+ 环境变量注入 + 定期轮换</b></td></tr>
+    <tr><td>10</td><td><b>容量按均值规划</b></td><td>用平均 QPS 算容量，高峰必崩。<b>容量必须按峰值规划，且留出故障冗余（N+1 或 N+2）</b></td></tr>
+  </table>
+  <div class="callout warn">
+    <b>反模式的通用识别方法：</b>问一句"<b>如果这个假设不成立会怎样</b>"。反模式本质上都是<b>依赖了一个不成立的假设</b>：假设流量是均匀的、假设下游不会慢、假设不会并发、假设数据不会增长、假设机器不会挂。评审时把方案里的隐含假设逐条拎出来，反模式自然现形。
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>评审者自己容易犯的九个错</h2></div>
+  <p class="lead">评审是双向的。被评审的方案会犯错，评审者自己也会。这九条是评审者最常犯的问题。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看架构图，不看数据流</div><div class="pd">架构图画得漂亮不代表设计对。真正的问题往往藏在"一个请求到底经过了哪些组件、读写了几次库、调了几次下游"的数据流里。评审时要求作者把关键链路的时序讲一遍。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">不问失败路径</div><div class="pd">大多数方案只描述"正常流程"，对"下游超时怎么办、数据库挂了怎么办、消息丢了怎么办"只字不提。评审的核心价值恰恰在失败路径上，必须主动追问。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">被术语唬住</div><div class="pd">听到"我们用 CQRS + Event Sourcing + 领域驱动"就点头。术语不是正确性的证据。要问："这个模式解决了你的什么具体问题？不引入它行不行？"</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">只提问题，不给方案</div><div class="pd">指出"这里会超时"很容易，难的是给出"加 500ms 超时 + 熔断 + 降级返回兜底"的可执行建议。评审要产出可落地的改进，不只是列一堆问号。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用自己的场景去套别人的方案</div><div class="pd">"我们当年用 Kafka 就好了"——但对方的量级可能只有你的千分之一。评审要基于<b>对方给出的约束</b>，而不是自己的经验惯性。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">追求完美，阻塞进度</div><div class="pd">把所有问题都标成"必须解决"，导致方案永远上不了线。评审要做风险分级：阻塞项、建议项、可忽略项。不是所有问题都值得现在解决。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">没有记录和跟进</div><div class="pd">会上讨论得很热闹，散会后没有任何记录。问题和待办要落到文档，明确负责人和截止时间，下次评审先看上次的待办有没有闭环。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">只审技术，不审运维</div><div class="pd">"上线后怎么部署、怎么扩容、怎么回滚、怎么值班、谁来修"这些问题同样重要。一个无法运维的方案，技术上再优雅也是失败的。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把评审当成审批</div><div class="pd">评审不是"批准/否决"的投票，而是共同降低风险的协作。目标是让方案变得更好，不是分出谁对谁错。姿态错了，作者会防御，真问题就藏起来了。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 评审时，作者选择用 PostgreSQL 而不是团队熟悉的 MySQL，两者都能满足需求。你作为评审者应该？</div>
+      <button class="opt">直接指出"团队不熟，必须改回 MySQL"</button>
+      <button class="opt">沉默，这是作者的技术选型自由</button>
+      <button class="opt">问清楚约束条件和选择理由，确认作者是否知情地做了这个取舍</button>
+      <div class="ans">正确答案：<b>问清约束条件和理由</b>。这属于"取舍不同"而非"事实错误"。评审者的职责是把取舍摆到台面上，确认作者评估过引入陌生技术带来的运维/人力成本，而不是替他做决定。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 一份方案说"系统平均响应时间 40ms，性能良好"。这个结论最大的问题是什么？</div>
+      <button class="opt">40ms 太慢了，应该优化到 10ms</button>
+      <button class="opt">均值会被长尾掩盖，用户体感由 P99 等尾延迟决定，必须看分位数</button>
+      <button class="opt">没问题，均值是标准指标</button>
+      <div class="ans">正确答案：<b>均值掩盖长尾</b>。99 个请求 10ms、1 个请求 3000ms，均值也才 40ms，但那 1% 的请求是真实卡顿的用户。性能验收必须看 P95/P99/P999。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 服务 A 调 B，B 调 C。C 抖了一下变慢，每层都配置了"失败重试 3 次"。最可能发生什么？</div>
+      <button class="opt">C 承受的流量被放大到接近 9 倍，本来只是抖动，结果被打死（重试风暴）</button>
+      <button class="opt">没什么影响，重试能提高成功率</button>
+      <button class="opt">A 会自动降级，保护 C</button>
+      <div class="ans">正确答案：<b>重试放大到约 9 倍</b>。B 的重试放大 3 倍，A 的重试再放大 3 倍。重试必须有限次数 + 指数退避 + 抖动，且最好只在最靠近用户的一层重试，配合统一超时预算。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于 Kubernetes 的存活探针（liveness probe），下面哪种配置是危险的？</div>
+      <button class="opt">只检查进程自身的 HTTP 端点是否响应</button>
+      <button class="opt">只检查本地端口是否监听</button>
+      <button class="opt">在存活探针里去 ping 数据库，数据库不通就返回失败</button>
+      <div class="ans">正确答案：<b>在存活探针里检查外部依赖</b>。数据库抖动会让所有实例被判定为不健康并集体重启，造成雪崩。存活探针只该判断进程自身；依赖检查应放在就绪探针（readiness）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 一个方案要新增一个自研的分布式任务调度中间件。成本评审时，最容易被忽略的是？</div>
+      <button class="opt">机器成本</button>
+      <button class="opt">人力成本 —— 谁长期维护、升级、排障，有几个人真正懂它</button>
+      <button class="opt">带宽成本</button>
+      <div class="ans">正确答案：<b>人力成本</b>。机器成本是一次性可预测的，人力成本是持续隐性累积的。如果只有一个人懂这个组件，他就是"人形单点"，比机器单点更危险。评审要问"有几个人真正懂它"。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 数据评审时，作者说"我们每天都有备份，数据是安全的"。最该追问的是？</div>
+      <button class="opt">最近一次真实的恢复演练是什么时候？恢复耗时多久？备份文件校验过完整性吗？</button>
+      <button class="opt">备份文件多大</button>
+      <button class="opt">备份用的什么工具</button>
+      <div class="ans">正确答案：<b>追问恢复演练</b>。"有备份"和"能恢复"是两回事。没演练过的备份可能损坏、版本不兼容、或恢复耗时远超 RTO。评审要确认 RPO/RTO 是否被真实演练验证过。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>评审清单模板与术语表</h2></div>
+  <h3>可直接用的架构评审清单</h3>
+  <p class="lead">复制这份清单，按章节逐条过。每条标注状态：<b>通过 / 有问题 / 待补充</b>，并记录负责人和截止时间。</p>
+  <pre><span class="c"># ===== 0. 方案基本信息 =====</span>
+[ ] 方案名称、作者、评审日期、影响范围（哪个业务/哪些用户）
+[ ] 涉及的系统、服务、数据表清单
+[ ] 上线时间点、是否可灰度、是否有回滚方案
+
+<span class="c"># ===== 1. 目标与约束 =====</span>
+[ ] 要解决的核心问题是什么？现有方案的痛点是什么？
+[ ] 量级：日均请求 / 峰值 QPS / 数据量 / 用户数
+[ ] 一致性要求（强一致 / 最终一致 / 弱一致），按字段明确
+[ ] 明确的非目标（这个方案不解决什么）
+
+<span class="c"># ===== 2. 容量与性能 =====</span>
+[ ] QPS 估算是怎么算出来的？峰值系数取多少？
+[ ] 每请求的下游调用次数是多少？下游真实压力多大？
+[ ] 性能指标是否用 P99/P999 而非均值？
+[ ] 压测数据是否接近生产（数据量、分布、网络）？
+[ ] 容量是否按峰值 + 冗余（N+1）规划？
+
+<span class="c"># ===== 3. 可用性 =====</span>
+[ ] 逐层单点清单（入口/网关/应用/缓存/数据/中间件/外部/基础设施）
+[ ] 每个单点的处理：消除 / 冗余 / 接受并降级
+[ ] 故障域是否隔离（可用区、租户、线程池）？
+[ ] 降级预案：核心功能是什么？砍掉哪些？开关在哪？
+[ ] 优雅停机：SIGTERM 后是否先处理完在途请求？
+[ ] 每个外部调用是否有超时？超时值依据？
+[ ] 是否有熔断？重试是否有限次数 + 退避 + 抖动？
+
+<span class="c"># ===== 4. 数据 =====</span>
+[ ] 一致性要求是否按字段明确？
+[ ] 数据量当前 / 日增 / 三年后？增长曲线形状？
+[ ] RPO / RTO 是多少？最近一次恢复演练是什么时候？
+[ ] 备份是否异地？是否加密？是否校验完整性？
+[ ] schema 变更方案？在线 DDL？能否回滚？
+[ ] 删除策略：软删/硬删？合规范围？级联关系？
+
+<span class="c"># ===== 5. 可观测性 =====</span>
+[ ] 黄金四信号（延迟/流量/错误/饱和度）是否覆盖？
+[ ] 告警是否基于 SLO / 用户影响，而非机器状态？
+[ ] 是否有全链路 trace_id？
+[ ] 日志是否结构化（JSON）？级别是否合理？
+[ ] 日志里是否有敏感信息（手机号/身份证/密码/Token）？
+[ ] 有没有健康总览仪表盘？
+
+<span class="c"># ===== 6. 成本 =====</span>
+[ ] 机器 / 带宽 / 存储 / 人力成本各多少？
+[ ] 有没有更简单的替代方案？
+[ ] 新组件有几个人真正懂？谁是单点？
+[ ] 是否有厂商锁定风险？
+
+<span class="c"># ===== 7. 安全 =====</span>
+[ ] 密钥是否用 KMS/Vault 管理？是否定期轮换？
+[ ] 权限是否最小化？是否有多租户越权风险？
+[ ] 是否有输入校验、防注入、防重放？
+
+<span class="c"># ===== 8. 评审结论 =====</span>
+[ ] 阻塞项（必须解决才能上线）：______ 负责人/截止：______
+[ ] 建议项（可以后续迭代）：______ 负责人/截止：______
+[ ] 可忽略项（记录但暂不处理）：______
+[ ] 下次复评时间：______</pre>
+
+  <h3>评审常用问题速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>这个量级是怎么算出来的？</code><span class="desc">验证 QPS/容量估算依据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>这里的单点是什么？挂了怎么办？</code><span class="desc">可用性核心追问</span><button class="copy">复制</button></div>
+    <div class="crow"><code>下游超时设了多少？超时后怎么处理？</code><span class="desc">失败路径</span><button class="copy">复制</button></div>
+    <div class="crow"><code>这段数据能丢吗？能短暂不一致吗？</code><span class="desc">一致性要求</span><button class="copy">复制</button></div>
+    <div class="crow"><code>最近一次恢复演练是什么时候？</code><span class="desc">验证备份是否可用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>这个变更能回滚吗？回滚要多久？</code><span class="desc">不可逆性确认</span><button class="copy">复制</button></div>
+    <div class="crow"><code>半夜挂了，值班的人怎么知道、怎么定位？</code><span class="desc">可观测性灵魂三问</span><button class="copy">复制</button></div>
+    <div class="crow"><code>这个新组件有几个人真正懂？</code><span class="desc">人力单点 / 成本</span><button class="copy">复制</button></div>
+    <div class="crow"><code>有没有更简单的方案？</code><span class="desc">复杂度必要性</span><button class="copy">复制</button></div>
+    <div class="crow"><code>这个假设不成立会怎样？</code><span class="desc">识别反模式</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>架构评审</b></td><td>在方案落地前，由有经验的人对设计做风险审查的过程</td></tr>
+    <tr><td><b>SPOF 单点</b></td><td>Single Point of Failure，某个组件挂了会导致整体不可用</td></tr>
+    <tr><td><b>峰值系数</b></td><td>峰值 QPS 与平均 QPS 的比值，用于容量规划，普通业务 3~5，大促可达数十倍</td></tr>
+    <tr><td><b>P99 / P999</b></td><td>99% / 99.9% 的请求快于该值，用于衡量尾延迟</td></tr>
+    <tr><td><b>尾延迟</b></td><td>最慢那一小部分请求的延迟，决定用户体感</td></tr>
+    <tr><td><b>故障域</b></td><td>一次故障能同时影响的资源范围，隔离故障域可缩小影响面</td></tr>
+    <tr><td><b>降级</b></td><td>资源不足时主动关闭非核心功能，保住核心链路</td></tr>
+    <tr><td><b>熔断</b></td><td>下游持续失败时快速失败，避免继续打；三态为关闭/打开/半开</td></tr>
+    <tr><td><b>重试风暴</b></td><td>多层重试导致流量成倍放大，把抖动的下游打死</td></tr>
+    <tr><td><b>优雅停机</b></td><td>收到停止信号后先处理完在途请求再退出</td></tr>
+    <tr><td><b>RPO</b></td><td>Recovery Point Objective，最多容忍丢多少数据</td></tr>
+    <tr><td><b>RTO</b></td><td>Recovery Time Objective，最多容忍中断多久</td></tr>
+    <tr><td><b>在线 DDL</b></td><td>不锁表地修改表结构（如 gh-ost、pt-online-schema-change）</td></tr>
+    <tr><td><b>最终一致</b></td><td>写入后一段时间内收敛到一致，中间可能读到旧值</td></tr>
+    <tr><td><b>可观测性</b></td><td>通过指标/日志/链路等外部输出推断系统内部状态的能力</td></tr>
+    <tr><td><b>黄金四信号</b></td><td>延迟、流量、错误、饱和度，Google SRE 提出的必看指标</td></tr>
+    <tr><td><b>SLO</b></td><td>Service Level Objective，服务等级目标，如"P99 &lt; 200ms"</td></tr>
+    <tr><td><b>错误预算</b></td><td>允许的不可用额度（如 99.9% 即每月约 43 分钟），用尽则冻结发布</td></tr>
+    <tr><td><b>trace_id</b></td><td>贯穿一次请求全链路的唯一标识，用于跨服务追踪</td></tr>
+    <tr><td><b>反模式</b></td><td>看起来合理、实际会导致问题的常见做法</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 找一份你们团队最近的技术方案，用附录的清单完整过一遍，写下 5 个你最想追问的问题；② 复盘一次你们过去半年的事故，看看如果评审时多问了哪个问题就能提前发现；③ 下次评审时刻意练习"只提问、不评判"，观察作者的反应；④ 给自己负责的系统做一次"失败路径推演"—— 把每个依赖都设成"超时/挂掉"，看系统会怎样。<br><br>
+    <b>之后值得单独学：</b>Google SRE 的错误预算与 SLO 实践、混沌工程（Chaos Engineering，主动注入故障来验证系统韧性）、容量规划与压测方法论、以及分布式一致性（CAP、Raft、Paxos）的工程取舍。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学会架构评审 · 评审前先问五件事：量级、单点、失败、一致、成本</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（容量）、模块 4（可用性）、模块 8（反模式）是评审的三大主战场。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边读边把问题记到清单里。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议打开你团队最近一份技术方案，边读边按附录的清单过一遍。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

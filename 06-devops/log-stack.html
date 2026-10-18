@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 日志栈（EFK / Loki）</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 第 4 期 · 日志篇</span>
+    <h1>二十分钟学透 日志栈（EFK / Loki）</h1>
+    <p class="sub">日志系统的一半成本在<b>存</b>，另一半在<b>查</b>。ELK 能全文检索但贵，Loki 便宜但不建全文索引。这篇讲采集对比、ES 索引生命周期、KQL、LogQL、结构化日志规范，以及索引爆炸、GC 压力这些真实事故。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>3</b> 种采集器对比</span>
+      <span class="chip">ELK <b>vs</b> Loki</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边看边敲：用 docker-compose 起 ES + Kibana，或单机 Grafana Loki 试 LogQL</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>两条技术路线，一个最小环境</h2></div>
+  <pre><span class="c"># 路线 A：ELK（Elasticsearch + Kibana，重量级，全文检索）</span>
+docker run -d -p 9200:9200 -e "discovery.type=single-node" \
+  -e "xpack.security.enabled=false" elasticsearch:8.14.0
+docker run -d -p 5601:5601 -e ELASTICSEARCH_HOSTS=http://host:9200 kibana:8.14.0
+
+<span class="c"># 路线 B：Loki（轻量，标签索引，配 Grafana）</span>
+docker run -d -p 3100:3100 grafana/loki:3.1.0 -config.file=/etc/loki/local-config.yaml
+<span class="c"># Grafana 里加 Loki 数据源：http://loki:3100</span>
+<span class="c"># promtail 把容器日志推上来，或用 docker logging driver 直接推 Loki</span>
+
+<span class="c"># 验证</span>
+curl localhost:9200/_cluster/health     <span class="c"># ELK：看集群健康</span>
+curl localhost:3100/ready                <span class="c"># Loki：看是否就绪</span>
+curl -G localhost:3100/loki/api/v1/query_range \
+  --data-urlencode 'query={job="app"}' --data-urlencode 'limit=5'</pre>
+  <div class="callout">
+    <b>选型先验：</b>日志量 &lt; 50GB/天、查询以标签+时间为主 → <b>Loki</b>；需要全文检索、复杂聚合（用户行为分析、审计）→ <b>ELK</b>。两者可以共存：结构化日志进 Loki 便宜查询，关键审计日志进 ES 全文检索。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>日志采集架构：Filebeat / Fluentd / Logstash</h2></div>
+  <p class="lead">采集器负责"读日志文件 → 解析 → 加工 → 发到存储"。三个主流选择，定位完全不同。</p>
+  <table>
+    <tr><th style="width:110px">采集器</th><th style="width:90px">实现语言</th><th style="width:120px">资源占用</th><th>特点</th></tr>
+    <tr><td><b>Filebeat</b></td><td>Go</td><td>低（~50MB）</td><td>Elastic 出品，轻量、backpressure 机制成熟；<b>解析能力弱</b>，靠 Processor 和 Ingest Pipeline 补</td></tr>
+    <tr><td><b>Fluentd / Fluent Bit</b></td><td>Ruby / C</td><td>中 / 低</td><td>插件生态 1000+，路由灵活，K8s 事实标准之一；Fluent Bit 是 C 重写，嵌入式友好</td></tr>
+    <tr><td><b>Logstash</b></td><td>JVM</td><td>高（&gt;500MB）</td><td>filter 能力最强（grok/mutate/geoip），<b>吞吐高但重</b>；通常不部署在每台机器上</td></tr>
+  </table>
+  <h3>经典链路</h3>
+  <pre><span class="c"># 链路一（ELK 直连，中小规模）：Filebeat → Elasticsearch → Kibana</span>
+<span class="c"># 链路二（ELK + 缓冲，生产主流）：Filebeat → Kafka → Logstash → ES → Kibana</span>
+<span class="c"># 链路三（Loki）：promtail/agent → Loki ← Grafana 查询</span>
+
+<span class="c"># 为什么中间要加 Kafka？</span>
+<span class="c"># ① ES 重启/扩容时，日志峰值不会丢（Filebeat 背压会拖慢采集）</span>
+<span class="c"># ② 突发流量削峰，ES 按自己的节奏消费</span>
+<span class="c"># ③ 一份日志喂多个消费者（ES + 安全审计 + 计费）</span></pre>
+  <h3>Filebeat 配置示例</h3>
+  <pre><span class="c"># /etc/filebeat/filebeat.yml</span>
+filebeat.inputs:
+  - type: filestream
+    id: app-logs
+    paths:
+      - /var/log/app/*.log
+    parsers:
+      - multiline:                    <span class="c"># 多行合并：Java 堆栈是一行一条的噩梦</span>
+          pattern: '^\d{4}-\d{2}-\d{2}'   <span class="c"># 新行特征：以日期开头</span>
+          negate: true
+          match: after
+    fields:
+      service: api
+      env: prod
+
+processors:
+  - drop_fields:                      <span class="c"># 丢噪音字段，降存储</span>
+      fields: ["agent.ephemeral_id", "agent.hostname"]
+      ignore_missing: true
+
+output.kafka:                         <span class="c"># 生产：发 Kafka 缓冲</span>
+  hosts: ["kafka1:9092", "kafka2:9092"]
+  topic: "app-logs"
+  partition.round_robin:
+    reachable_only: true
+  required_acks: 1
+
+<span class="c"># 小规模也可以直连 ES：output.elasticsearch: hosts: ["es:9200"]</span>
+<span class="c"># 关键参数：queue.mem.events: 4096（内存队列，背压起点）</span>
+<span class="c">#          max_procs: 2（Filebeat 单机吃满 CPU 时限制线程数）</span></pre>
+  <h3>Logstash 管道示例</h3>
+  <pre><span class="c"># /etc/logstash/conf.d/app.conf —— filter 是 Logstash 的主场</span>
+input {
+  kafka {
+    bootstrap_servers =&gt; "kafka1:9092"
+    topics =&gt; ["app-logs"]
+    codec =&gt; json
+  }
+}
+filter {
+  if [level] == "ERROR" {
+    mutate { add_tag =&gt; ["error"] }        <span class="c"># 打标签，Kibana 里好筛</span>
+  }
+  grok {
+    match =&gt; { "message" =&gt; "%{TIMESTAMP_ISO8601:ts} %{LOGLEVEL:level} %{GREEDYDATA:msg}" }
+    tag_on_failure =&gt; ["_grokparsefailure"]  <span class="c"># 解析失败打标，别静默丢</span>
+  }
+  date {
+    match =&gt; ["ts", "ISO8601"]               <span class="c"># 用日志里的时间，不用采集时间！</span>
+    target =&gt; "@timestamp"
+  }
+  mutate {
+    remove_field =&gt; ["ts", "host", "message"]   <span class="c"># 清冗余字段</span>
+  }
+}
+output {
+  elasticsearch {
+    hosts =&gt; ["http://es1:9200"]
+    index =&gt; "app-logs-%{+YYYY.MM.dd}"       <span class="c"># 按天建索引（ILM 会接管 rollover）</span>
+  }
+}</pre>
+  <div class="callout warn">
+    <b>多行合并是日志采集的第一大坑。</b>Java 异常堆栈几十行、Python traceback、SQL 语句换行 —— 不合并的话，一条错误被拆成 50 条独立日志，堆栈上下文全丢。<b>在采集端合并（Filebeat multiline / Fluentd multiline parser）</b>，不要让存储端猜。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Elasticsearch 日志存储与 ILM</h2></div>
+  <p class="lead">日志数据的特点是<b>写多读少、时间相关、只关心近期</b>。ES 的索引生命周期管理（ILM）就是为这个设计的。</p>
+  <h3>索引设计三要素</h3>
+  <table>
+    <tr><th style="width:150px">概念</th><th>说明</th></tr>
+    <tr><td><b>Index</b></td><td>逻辑命名空间，日志按天分：<span class="k">app-logs-2026.10.17</span>。删除旧日志 = 删整个索引，秒级</td></tr>
+    <tr><td><b>Shard</b></td><td>索引分片。<b>单 shard 控制在 30~50GB</b>：太小则分片过多拖慢集群，太大则恢复慢</td></tr>
+    <tr><td><b>Mapping</b></td><td>字段类型定义。<b>text</b> 全文检索（分词），<b>keyword</b> 精确匹配/聚合。日志的 msg 用 text，level/service 用 keyword</td></tr>
+  </table>
+  <pre><span class="c"># 索引模板：新索引自动按此创建（关键！不配则 dynamic mapping 灾难）</span>
+PUT _index_template/app-logs
+{
+  "index_patterns": ["app-logs-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 2,              <span class="c"># 按天 50GB/2 分片</span>
+      "number_of_replicas": 1,
+      "refresh_interval": "30s",          <span class="c"># 日志不需要实时！30s 足够，默认 1s 浪费</span>
+      "codec": "best_compression"         <span class="c"># LZ4→DEFLATE，CPU 换空间</span>
+    },
+    "mappings": {
+      "dynamic": false,                   <span class="c"># 关掉动态映射，防字段爆炸</span>
+      "properties": {
+        "@timestamp":  { "type": "date" },
+        "level":       { "type": "keyword" },       <span class="c"># 精确匹配 + 聚合</span>
+        "service":     { "type": "keyword" },
+        "trace_id":    { "type": "keyword" },
+        "msg":         { "type": "text", "analyzer": "standard" },  <span class="c"># 全文检索</span>
+        "duration_ms": { "type": "long" }
+      }
+    }
+  }
+}</pre>
+  <h3>ILM：Hot → Warm → Cold → Delete</h3>
+  <pre><span class="c"># ILM 策略：按天 rollover，热数据快存储，冷数据便宜存储，到期删除</span>
+PUT _ilm/policy/app-logs
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_age": "1d",               <span class="c"># 一天滚一个新索引</span>
+            "max_size": "50gb"
+          },
+          "set_priority": { "unbounce": 100 }   <span class="c"># 热索引优先留在内存</span>
+        }
+      },
+      "warm": {
+        "min_age": "3d",                   <span class="c"># 3 天后转温</span>
+        "actions": {
+          "shrink": { "number_of_shards": 1 },  <span class="c"># 缩分片，降开销</span>
+          "forcemerge": { "max_num_segments": 1 },  <span class="c"># 合并段，查询提速</span>
+          "readonly": { }
+        }
+      },
+      "cold": {
+        "min_age": "7d",                   <span class="c"># 7 天后转冷（可挂廉价磁盘/快照）</span>
+        "actions": {
+          "searchable_snapshot": { "snapshot_repository": "s3-repo" }
+        }
+      },
+      "delete": {
+        "min_age": "30d",                  <span class="c"># 30 天删除</span>
+        "actions": { "delete": { } }
+      }
+    }
+  }
+}
+
+<span class="c"># 索引模板里挂上 ILM：</span>
+"settings": { "index.lifecycle.name": "app-logs", "index.lifecycle.rollover_alias": "app-logs" }
+<span class="c"># 写入用别名 app-logs，ES 自动 rollover 到 app-logs-000001</span></pre>
+  <div class="callout danger">
+    <b>索引命名灾难：</b>不配模板 + <span class="k">"dynamic": true</span>（默认），日志里出现一个新字段就自动建 mapping。<b>一万条日志带一万个不同字段名 → mapping 爆炸 → 集群元数据膨胀、查询全表变慢、GC 压力陡增。</b>必须 <span class="k">dynamic: strict/false</span> + 显式列字段，不匹配的字段直接拒收或忽略。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>Kibana KQL 检索</h2></div>
+  <p class="lead">KQL（Kibana Query Language）是 Kibana Discover 的默认查询语法：<b>结构化、无通配符性能陷阱、够用的表达力</b>。Lucene 语法也仍支持。</p>
+  <pre><span class="c"># KQL 基础语法</span>
+level: ERROR                          <span class="c"># 字段等值（keyword 字段精确匹配）</span>
+level: ERROR and service: payment     <span class="c"># and / or / not，可加括号</span>
+not level: DEBUG                     <span class="c"># 取反</span>
+msg: timeout*                        <span class="c"># 通配符 *（任意多）?（单个）—— text 字段分词后匹配</span>
+trace_id: "abc123"                   <span class="c"># 带特殊字符的值加引号</span>
+level: (ERROR or WARN)               <span class="c"># 分组</span>
+
+<span class="c"># 存在性查询</span>
+trace_id: *                          <span class="c"># 字段存在的日志（有 trace_id 的）</span>
+
+<span class="c"># 范围查询（KQL 原生支持）</span>
+duration_ms >= 1000 and duration_ms &lt; 5000
+@timestamp &gt;= "2026-10-17 00:00:00"   <span class="c"># 时间字段范围，注意时区</span>
+
+<span class="c"># 实战组合：支付服务的错误，且耗时超过 1 秒</span>
+service: payment and level: ERROR and duration_ms >= 1000
+
+<span class="c"># 实战：查询 trace_id 贯穿的整条链路日志</span>
+trace_id: "4bf92f3577b34da6a3ce929d0e0e4736"
+<span class="c"># → 按 @timestamp 排序，就能看到请求在网关、订单、库存服务间的完整流转</span>
+
+<span class="c"># Lucene 语法（仍可用，写regex 时方便）</span>
+msg: /timeout.*retry/                <span class="c"># 正则</span>
+level:ERROR AND service:payment      <span class="c"># 大写 AND/OR/NOT 也行</span></pre>
+  <table>
+    <tr><th style="width:150px">技巧</th><th>说明</th></tr>
+    <tr><td><b>保存检索</b></td><td>Discover 里 Save query，团队共享常用过滤（如"只看 ERROR"）</td></tr>
+    <tr><td><b>列选择</b></td><td>只展示 level/service/trace_id/msg 四列，默认全列是噪音</td></tr>
+    <tr><td><b>时间过滤器</b></td><td>右上角时间范围 + KQL 组合，KQL 里也可以写 @timestamp 范围</td></tr>
+    <tr><td><b>字段过滤器 +</b></td><td>点字段值旁的放大镜，自动追加到查询栏，比手打快</td></tr>
+    <tr><td><b>相邻文档跳转</b></td><td>点单条日志的展开按钮，看同一文件前后的上下文</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>KQL vs Lucene 的三个坑：</b>① KQL 的 <span class="k">field: value</span> 对 <b>text 字段是分词后匹配</b>，对 keyword 是精确匹配 —— msg: ERROR 可能匹配不到 "ERROR_CODE"；② 通配符开头的查询（<span class="k">*timeout</span>）性能差，ES 要扫大量词项；③ KQL 的 <span class="k">and</b> 优先级高于 <span class="k">or</span>，复杂条件一律加括号。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Loki 架构与 LogQL</h2></div>
+  <p class="lead">Loki 的核心设计取舍：<b>不建全文索引，只索引标签；日志内容按块压缩存对象存储</b>。查询时先按标签定位流，再在压缩块里线性扫描内容。</p>
+  <h3>架构组件</h3>
+  <table>
+    <tr><th style="width:150px">组件</th><th>职责</th></tr>
+    <tr><td><b>Promtail / Grafana Agent</b></td><td>采集端：读日志文件、打标签、推给 Loki</td></tr>
+    <tr><td><b>Distributor</b></td><td>入口：校验、按标签哈希分发给 ingester</td></tr>
+    <tr><td><b>Ingester</b></td><td>接收写入，内存中组 chunk，刷盘后传对象存储</td></tr>
+    <tr><td><b>Querier / Query-frontend</b></td><td>查询执行与队列调度，大查询切片并行</td></tr>
+    <tr><td><b>Compactor</b></td><td>压缩合并 chunk，加速查询</td></tr>
+    <tr><td><b>对象存储（S3/GCS）</b></td><td>chunk 的最终归宿，便宜且可无限扩展</td></tr>
+  </table>
+  <pre><span class="c"># Loki 配置核心（loki.yml，单机模式简化版）</span>
+auth_enabled: false                   <span class="c"># 单租户关闭；多租户模式强制开启</span>
+
+server:
+  http_listen_port: 3100
+
+ingester:
+  lifecycler:
+    ring:
+      kvstore: { store: inmemory }     <span class="c"># 单机用内存，集群用 consul/etcd</span>
+  chunk_idle_period: 5m                <span class="c"># 块闲置 5 分钟就刷盘</span>
+  max_chunk_age: 1h                    <span class="c"># 块最多活 1 小时</span>
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb                     <span class="c"># TSDB 模式，比 boltdb 查询快</span>
+      object_store: s3                <span class="c"># 块存 S3</span>
+      schema: v13
+      index:
+        prefix: loki_
+        period: 24h
+
+limits_config:
+  retention_period: 720h              <span class="c"># 30 天保留</span>
+  ingestion_rate_mb: 10               <span class="c"># 每租户每秒 10MB 上限，防打爆</span>
+  max_query_length: 721h              <span class="c"># 单次查询最大跨度</span></pre>
+  <h3>LogQL：查询分两层</h3>
+  <pre><span class="c"># 第一层：Log selector（标签匹配，决定扫哪些流）—— 必须写</span>
+{job="api", env="prod"}               <span class="c"># = 精确，!= 不等，=~ 正则，!~ 反向正则</span>
+{job=~"api|worker", env="prod"}       <span class="c"># 正则匹配多个 job</span>
+
+<span class="c"># 第二层：Log pipeline（过滤 + 解析 + 格式化）—— 链式 |</span>
+{job="api"} |= "error"                <span class="c"># 行过滤：包含 error（不区分大小写）</span>
+{job="api"} != "debug"                <span class="c"># 行过滤：不含 debug</span>
+{job="api"} |~ "timeout.*retry"       <span class="c"># 行过滤：正则</span>
+
+<span class="c"># JSON 日志解析（强烈推荐结构化日志）</span>
+{job="api"} |= "error" | json | level="ERROR" | duration_ms >= 1000
+<span class="c"># 解析后可直接用字段过滤，比字符串 grep 快且准</span>
+
+<span class="c"># logfmt 解析（key=value 格式）</span>
+{job="api"} | logfmt | level="error" | line_format "{{.msg}}"
+
+<span class="c"># 指标查询：从日志算指标！LogQL 的杀手锏</span>
+sum by (level) (rate({job="api"} | json [5m]))        <span class="c"># 每秒各级别日志条数</span>
+sum(rate({job="api"} |= "error"[5m])) / sum(rate({job="api"}[5m]))  <span class="c"># 错误率</span>
+topk(5, sum by (path) (count_over_time({job="api"} | json [1h])))   <span class="c"># Top 接口日志量</span>
+
+<span class="c"># 与 Prometheus 的衔接：Loki 指标可直接在 Grafana 里画</span>
+<span class="c"># → 同一张仪表盘上：指标面板用 Prometheus，日志量面板用 Loki LogQL</span></pre>
+  <div class="callout warn">
+    <b>Loki 的性能边界：</b>没有全文索引，<b>内容过滤是全块扫描</b>。查询 {job="api"} 再 grep 一个罕见关键词，可能要解压扫描几十 GB。<b>优化手段：</b>① 标签选择器尽量精确（加 env/instance）；② 时间范围别拉一个月；③ 高频查询用 metric queries 预聚合；④ chunk_target_size 调大减少块数量。<b>Loki 不是"便宜的 ES"，它是"能算指标的日志系统"。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>Loki vs ELK：成本与能力对比</h2></div>
+  <table>
+    <tr><th style="width:120px">维度</th><th>ELK (Elasticsearch)</th><th>Loki</th></tr>
+    <tr><td><b>索引方式</b></td><td>全文倒排索引，任何字段可搜</td><td>只索引标签，内容靠块扫描</td></tr>
+    <tr><td><b>存储成本</b></td><td>高：索引 + 原文 + 副本，约原始量 1.5~2 倍</td><td>低：压缩块 + 标签索引，约原始量 10~20%</td></tr>
+    <tr><td><b>计算成本</b></td><td>高：JVM 集群，大聚合吃内存</td><td>低：Go 实现，单机能跑</td></tr>
+    <tr><td><b>全文检索</b></td><td><b>强项</b>，任意词毫秒级</td><td>弱项，线性扫描</td></tr>
+    <tr><td><b>聚合分析</b></td><td><b>强项</b>，ES aggregation 丰富</td><td>弱：只能 count_over_time/rate 类指标</td></tr>
+    <tr><td><b>日志算指标</b></td><td>弱（要另写 pipeline）</td><td><b>强项</b>，LogQL 直接出指标</td></tr>
+    <tr><td><b>K8s 友好度</b></td><td>中</td><td><b>高</b>，与 Prometheus 标签体系天然一致</td></tr>
+    <tr><td><b>运维复杂度</b></td><td>高：分片、副本、GC 调优</td><td>中：组件少，无状态 + 对象存储</td></tr>
+    <tr><td><b>查询语言</b></td><td>KQL / Lucene / DSL</td><td>LogQL（类 PromQL）</td></tr>
+    <tr><td><b>典型规模</b></td><td>TB 级、多团队全文检索</td><td>百 GB 级、运维监控为主</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>混合架构（越来越多团队的选择）：</b>① 应用日志 → Loki（便宜、能算指标、和 Grafana 指标面板联动）；② 审计/安全日志 → Elasticsearch（全文检索 + 复杂分析）；③ 采集端 Filebeat/promtail 同时发两份。<b>别追求"一个系统解决所有日志问题"</b>，两类日志的查询模式和成本结构根本不同。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>结构化日志规范与脱敏</h2></div>
+  <p class="lead">日志系统的上限，在应用写日志的那一刻就决定了。<b>纯文本日志是上一代的事，JSON 结构化日志是现代日志栈的前提。</b></p>
+  <h3>JSON 日志规范</h3>
+  <pre><span class="c"># 差的日志：纯文本，没法过滤没法聚合</span>
+2026-10-17 10:23:45 ERROR order create failed user=12345
+
+<span class="c"># 好的日志：一行一个 JSON 对象</span>
+{"ts":"2026-10-17T10:23:45.123Z","level":"ERROR","service":"order-api",
+ "msg":"order create failed","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736",
+ "span_id":"00f067aa0ba902b7","user_id":12345,"order_id":98765,
+ "duration_ms":1523,"error_code":"STOCK_LOCKED"}
+
+<span class="c"># 字段规范（全公司统一，跨服务才能查）</span>
+<span class="c"># ts        ISO8601 UTC，带毫秒 —— 别用本地时间！</span>
+<span class="c"># level     DEBUG/INFO/WARN/ERROR 四级，大写</span>
+<span class="c"># service   服务名，与 K8s label 一致</span>
+<span class="c"># msg       人类可读的简述，别把异常堆栈放这里</span>
+<span class="c"># trace_id / span_id  W3C Trace Context，贯穿全链路</span>
+<span class="c"># 业务字段   user_id/order_id 等用下划线命名，值为字符串或数字</span>
+<span class="c"># exception 异常类名 + stack 单独放，别塞进 msg</span></pre>
+  <h3>trace_id 贯穿：日志与链路的粘合剂</h3>
+  <pre><span class="c"># 一次请求的完整视图（排障的黄金路径）：</span>
+<span class="c"># ① Grafana 指标面板发现 payment 错误率升高</span>
+<span class="c"># ② 点曲线 → Data link 跳到 Loki，查询 {service="payment"} | json | level="ERROR"</span>
+<span class="c"># ③ 从错误日志里拿到 trace_id</span>
+<span class="c"># ④ 用 trace_id 查 Loki 全链路日志（KQL: trace_id: "xxx"）</span>
+<span class="c"># ⑤ 或直接跳 Tempo 看调用链：哪个下游超时一目了然</span>
+
+<span class="c"># 代码里怎么传（各语言的标准做法）：</span>
+<span class="c"># Java:    MDC.put("traceId", context.traceId()) —— logback pattern %X{traceId}</span>
+<span class="c"># Python:  contextvars + logging Filter 注入</span>
+<span class="c"># Go:     context.WithValue + slog.Handler 包装</span>
+<span class="c"># 关键：HTTP 入口生成 trace_id，通过 header (traceparent) 传给下游</span></pre>
+  <h3>日志脱敏</h3>
+  <pre><span class="c"># 原则：敏感数据不出应用。在日志输出前脱敏，别指望下游</span>
+
+<span class="c"># 应用层（首选）：日志框架里脱敏</span>
+<span class="c"># Java logback + MaskingConverter / Python logging.Filter 正则替换</span>
+
+<span class="c"># 采集层兜底：Filebeat script processor / Logstash ruby filter</span>
+filter {
+  ruby {
+    code =&gt; "
+      event.set('msg', event.get('msg').to_s
+        .gsub(/(1[3-9]\d{9})/, '138****8888')          <span class="c"># 手机号</span>
+        .gsub(/(\d{6})\d{8}(\d{4})/, '\1********\2'))  <span class="c"># 身份证</span>
+    "
+  }
+}
+
+<span class="c"># 必须脱敏的字段：手机号、身份证、银行卡、密码、token、密钥</span>
+<span class="c"># 例外：trace_id / user_id 这类不可逆 ID 不算敏感，放心记</span>
+
+<span class="c"># 日志级别使用规范：</span>
+<span class="c"># ERROR —— 需要人处理的故障，配告警</span>
+<span class="c"># WARN  —— 异常但自愈/降级，不配告警</span>
+<span class="c"># INFO  —— 关键业务节点（下单、支付回调），可采样</span>
+<span class="c"># DEBUG —— 排查细节，生产默认关闭，动态开关</span></pre>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">坑库</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">动态映射导致字段爆炸，集群被拖垮</div><div class="pd">日志字段不固定（每次请求都带新的动态字段），ES 自动建 mapping，索引元数据膨胀、查询变慢、GC 压力陡增。<b>索引模板必须设 dynamic: strict/false + 显式字段列表</b>。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">shard 太小或太大，集群整体性能崩</div><div class="pd">按天一个索引却设 20 个 shard，每天 1GB 数据 → 200 个 shard 全是小文件，合并和查询开销爆炸。<b>单 shard 目标 30~50GB</b>，日增量小就用月索引 + ILM rollover。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">用了采集时间而不是日志时间，排障对不上</div><div class="pd">网络抖动让日志延迟 10 分钟入库，@timestamp 变成"入库时间"，错误日志排到了错误的时间段。<b>Logstash date filter 必须用日志里的时间戳</b>，解析失败打 tag 监控。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">时间戳时区混乱：UTC 与本地时间混用</div><div class="pd">应用写本地时间（UTC+8），ES 存 UTC，Kibana 显示再转一遍，最后差 8 小时，查"刚才的日志"什么都看不到。<b>规范：应用一律输出 ISO8601 UTC 带时区标识（Z）</b>，Kibana 显示层再转用户时区。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">ES 大聚合和深分页触发 GC，集群假死</div><div class="pd">Kibana 对时间范围 30 天的索引做 terms 聚合、或 from+size 翻到第 10000 页 —— JVM 老年代暴涨，长 GC，节点失联。<b>聚合加时间分片、深分页用 search_after、聚合字段用 keyword</b>。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">Loki 标签基数失控</div><div class="pd">把 pod_name、path、user_id 当 Loki 标签，每个组合一条流，ingester 内存爆炸。<b>Loki 标签只放低基数维度</b>（job/env/instance/service），高基数信息留给 LogQL 解析器。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">ILM rollover 卡住，索引无限增长</div><div class="pd">rollover 条件写 max_size: 50gb 但写入别名配错，或 shrink 失败阻塞生命周期，索引一直涨到几百 GB。<b>监控 ilm_explain 和索引大小，rollover 别名必须在索引模板里配对</b>。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">多行日志不合并，一条异常拆成 50 条</div><div class="pd">Java 堆栈每行一条独立日志，上下文全丢，按 ERROR 统计数量虚高 50 倍。<b>采集端配 multiline 规则</b>（以时间戳开头的行是新日志起点）。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">日志量突增（大促/攻击）打爆采集和存储</div><div class="pd">DEBUG 级别被意外打开、重试风暴刷屏，ES 磁盘一天写满。<b>三道防线：采集端限流（ingestion_rate_mb）、存储端限流、应用端日志采样 + 动态级别开关</b>。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">KQL 与 Lucene 语法混用，查询结果和预期不符</div><div class="pd">KQL 的 <span class="k">and</span> 优先级高于 <span class="k">or</span>、text 字段分词匹配、keyword 字段精确匹配 —— 同一个 <span class="k">msg: ERROR</span> 在不同字段类型下结果不同。<b>先确认字段类型，复杂条件加括号，团队统一用 KQL</b>。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一个 200 节点的 Java 集群，每台部署轻量采集器，解析后发到 Kafka，再进 ES。最合适的采集器组合是？</div>
+      <button class="opt">每台机器部署 Logstash，解析能力最强</button>
+      <button class="opt">每台部署 Filebeat（轻量采集 + 多行合并），集群外单独部署 Logstash 做重解析</button>
+      <button class="opt">不部署采集器，让应用直接写 ES</button>
+      <div class="ans">正确答案：<b>Filebeat + 集中式 Logstash</b>。Filebeat 是 Go 实现、单机 ~50MB，200 台部署无压力；JVM 的 Logstash 每台 500MB+，部署 200 台纯浪费。重解析放集群外的 Logstash 消费 Kafka，资源集中、规则统一。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于 Loki 的索引设计，正确的是？</div>
+      <button class="opt">Loki 对日志全文建立倒排索引，检索能力和 ES 一样</button>
+      <button class="opt">Loki 只索引标签（低基数），日志内容压缩后按块存储，内容过滤靠扫描</button>
+      <button class="opt">Loki 不索引任何东西，每次查询都全量扫描所有历史日志</button>
+      <div class="ans">正确答案：<b>只索引标签 + 块存储内容</b>。这是 Loki 低成本的核心：索引体积小、存储压缩率高。代价是内容过滤慢，所以标签选择器要精确、时间范围别太大。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. ES 日志索引最该防的"映射爆炸"问题是？</div>
+      <button class="opt">dynamic mapping 开启时，日志里不断出现新字段名，导致索引 mapping 无限膨胀</button>
+      <button class="opt">shard 数量太多导致副本同步慢</button>
+      <button class="opt">索引名带了日期导致查询要查多个索引</button>
+      <div class="ans">正确答案：<b>dynamic mapping 字段爆炸</b>。解法是索引模板里 <span class="k">dynamic: false/strict</span> + 显式字段列表。shard 多是性能问题（可调），按天索引本就是日志场景的正确设计。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 应用日志里的时间戳应该怎么处理？</div>
+      <button class="opt">直接用采集器的入库时间作为 @timestamp，最准确</button>
+      <button class="opt">应用输出 ISO8601 UTC 时间，采集端解析日志内时间设为 @timestamp，显示层再转时区</button>
+      <button class="opt">应用输出本地时间（UTC+8），Kibana 按东八区显示，不用转换</button>
+      <div class="ans">正确答案：<b>日志内时间 + UTC + 显示层转换</b>。入库时间会因为网络延迟、队列堆积而失真，排障时对不上事故时刻。跨时区团队必须统一 UTC 存储。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 想统计"过去一小时 error 级别日志的速率"，用 LogQL 应该写？</div>
+      <button class="opt">{job="api"} | json | level="ERROR"</button>
+      <button class="opt">count_over_time({job="api"} | json | level="ERROR" [1h])</button>
+      <button class="opt">sum(rate({job="api"} | json | level="ERROR" [5m]))</button>
+      <div class="ans">正确答案：<b>rate 指标查询</b>。LogQL 的 metric queries（rate/rate_over_time 族）才能产出可聚合的速率序列。count_over_time 是纯计数查询，返回的是原始日志匹配数，不能直接当速率用。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 trace_id 贯穿日志体系，错误的做法是？</div>
+      <button class="opt">在日志里只记 span_id，不记 trace_id，排障时靠时间范围自己拼</button>
+      <button class="opt">HTTP 入口生成 trace_id，通过 traceparent header 透传下游，全链路日志带同一 trace_id</button>
+      <button class="opt">用 trace_id 在 Loki 里一次查出整条链路的所有服务日志</button>
+      <div class="ans">正确答案：<b>只记 span_id 是错的</b>。span_id 只标识单个操作，跨服务排障必须靠 trace_id 把网关、订单、库存、支付的日志串成一条线。W3C Trace Context 的 traceparent header 是标准透传方式。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>查询语法速查</h3>
+  <div class="cmds">
+    <div class="crow"><code>level: ERROR and service: payment</code><span class="desc">KQL 基础：字段等值 + and</span><button class="copy">复制</button></div>
+    <div class="crow"><code>trace_id: "4bf92f3577b34da6a3ce929d0e0e4736"</code><span class="desc">KQL：按 trace_id 查全链路日志</span><button class="copy">复制</button></div>
+    <div class="crow"><code>duration_ms >= 1000 and duration_ms &lt; 5000</code><span class="desc">KQL 范围查询</span><button class="copy">复制</button></div>
+    <div class="crow"><code>{job="api"} |= "error"</code><span class="desc">LogQL：标签选择 + 行包含过滤</span><button class="copy">复制</button></div>
+    <div class="crow"><code>{job="api"} | json | level="ERROR"</code><span class="desc">LogQL：解析 JSON 后按字段过滤</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum by (level) (rate({job="api"} | json [5m]))</code><span class="desc">LogQL 指标查询：各级别日志速率</span><button class="copy">复制</button></div>
+    <div class="crow"><code>topk(5, sum by (path) (count_over_time({job="api"} | json [1h])))</code><span class="desc">LogQL：日志量 Top N 接口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET app-logs-*/_search?q=level:ERROR</code><span class="desc">ES API：跨索引搜索</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET _cat/indices/app-logs-*?v&amp;s=store.size:desc</code><span class="desc">ES：看各索引磁盘占用排序</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET _ilm/explain/app-logs-000001</code><span class="desc">ES：看 ILM 执行到哪个阶段</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>ES 日志索引关键配置</h3>
+  <pre><span class="c"># 生产索引模板的 settings（比默认值关键）</span>
+"number_of_shards": 2,                 <span class="c"># 单 shard 目标 30~50GB</span>
+"number_of_replicas": 1,               <span class="c"># 日志可容忍短暂丢，1 副本够</span>
+"refresh_interval": "30s",             <span class="c"># 日志不需要近实时，默认 1s 是浪费</span>
+"codec": "best_compression",           <span class="c"># DEFLATE 换 CPU 省空间</span>
+"translog.durability": "async",        <span class="c"># 异步 translog，写入提速（极端情况丢几秒）</span>
+
+<span class="c"># mapping 设计原则</span>
+"dynamic": false,                      <span class="c"># 关闭动态映射，防字段爆炸</span>
+"level":    { "type": "keyword" },     <span class="c"># 过滤 + 聚合用 keyword</span>
+"msg":      { "type": "text" },        <span class="c"># 全文检索用 text（分词）</span>
+"trace_id": { "type": "keyword" },     <span class="c"># 精确匹配用 keyword</span>
+"@timestamp": { "type": "date", "format": "strict_date_optional_time" }
+
+<span class="c"># Loki limits_config 关键项</span>
+retention_period: 720h                 <span class="c"># 保留 30 天</span>
+ingestion_rate_mb: 10                  <span class="c"># 单租户每秒 10MB，防打爆</span>
+max_query_length: 721h                 <span class="c"># 单查询最大跨度</span>
+max_entries_limit_per_query: 5000      <span class="c"># 单查询返回条数上限</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>EFK</b></td><td>Elasticsearch + Fluentd/Filebeat + Kibana 日志栈</td></tr>
+    <tr><td><b>ELK</b></td><td>Elasticsearch + Logstash + Kibana，EFK 的前身</td></tr>
+    <tr><td><b>Filebeat</b></td><td>Go 写的轻量日志采集器，Elastic 出品</td></tr>
+    <tr><td><b>Fluentd / Fluent Bit</b></td><td>插件生态丰富的采集器，C 重写版为 Fluent Bit</td></tr>
+    <tr><td><b>Logstash</b></td><td>JVM 采集/解析管道，filter 能力最强但重</td></tr>
+    <tr><td><b>Kafka 缓冲</b></td><td>采集与存储之间的削峰队列，防日志突增丢失</td></tr>
+    <tr><td><b>Index</b></td><td>ES 逻辑命名空间，日志按天分索引，删旧日志=删索引</td></tr>
+    <tr><td><b>Shard</b></td><td>索引分片，日志场景单 shard 目标 30~50GB</td></tr>
+    <tr><td><b>Mapping</b></td><td>字段类型定义：text 分词检索，keyword 精确匹配</td></tr>
+    <tr><td><b>dynamic mapping</b></td><td>自动推断字段类型，日志场景是灾难，必须关</td></tr>
+    <tr><td><b>ILM</b></td><td>索引生命周期：Hot → Warm → Cold → Delete</td></tr>
+    <tr><td><b>Rollover</b></td><td>按大小/年龄自动滚动到新索引的机制</td></tr>
+    <tr><td><b>KQL</b></td><td>Kibana Query Language，结构化查询语法</td></tr>
+    <tr><td><b>Lucene</b></td><td>ES 底层查询语法，支持正则，KQL 的替代</td></tr>
+    <tr><td><b>Loki</b></td><td>只索引标签的日志系统，内容压缩存块，成本低</td></tr>
+    <tr><td><b>Promtail / Grafana Agent</b></td><td>Loki 的采集端组件</td></tr>
+    <tr><td><b>LogQL</b></td><td>Loki 查询语言：Log selector + pipeline，支持指标查询</td></tr>
+    <tr><td><b>结构化日志</b></td><td>JSON 格式日志，字段固定，可过滤可聚合</td></tr>
+    <tr><td><b>trace_id</b></td><td>W3C Trace Context 的全链路追踪 ID，日志串联的钥匙</td></tr>
+    <tr><td><b>日志脱敏</b></td><td>在输出前屏蔽手机号/身份证/token 等敏感信息</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 把一个应用的日志改成 JSON 结构化（level/service/trace_id/msg/duration_ms），用 Filebeat multiline 收集；② 给 ES 配索引模板（dynamic: false + ILM 30 天）+ Kibana KQL 查 trace_id；③ 起一个单机 Loki，用 LogQL 做 rate({job="app"} | json | level="ERROR" [5m]) 指标查询；④ 在 Grafana 同一张仪表盘上放 Prometheus 指标 + Loki 日志量，配 Data link 从指标下钻日志。<br><br>
+    <b>之后值得单独学：</b>ES 集群容量规划与分片策略、可搜索快照（Searchable Snapshots）冷数据方案、OpenTelemetry Logging 规范、以及基于日志的 SLO 错误预算计算。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透日志栈 · 上线前务必检查：mapping 是否收敛、时间戳时区、ILM 保留期、敏感字段脱敏</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（LogQL）和模块 6（结构化日志）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Kibana/Grafana 里敲查询。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：用 docker-compose 起 ES + Kibana，或单机 Grafana Loki 试 LogQL';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

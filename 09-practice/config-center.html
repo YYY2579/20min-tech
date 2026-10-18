@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透配置中心设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">二十分钟系列 · 第 9 期 · 实战篇</span>
+    <h1>二十分钟学透配置中心设计</h1>
+    <p class="sub">配置中心的本质是把"改行为"从"发版本"里解放出来。这篇讲机制：为什么不能用配置文件和数据库自建表凑合、Apollo/Nacos/Consul 怎么选、长轮询推送的完整时序、灰度发布与回滚怎么做、敏感配置怎么加密、服务端宕机时客户端靠什么兜底，以及<b>推送风暴、回滚不一致、敏感信息明文、客户端无兜底</b>四个经典死法。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>4</b> 种技术选型</span>
+      <span class="chip"><b>3</b> 层推送机制</span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边数：你的服务里有多少配置，改一次要走多久发版流程</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>起一个能练的环境</h2></div>
+  <p class="lead">Nacos 有官方镜像，单机模式一条命令起；Apollo 依赖 MySQL，本地练建议直接跑 Nacos，理解机制后再对照 Apollo。</p>
+  <pre><span class="c"># Nacos 2.x 单机模式（自带 derby，不需要额外数据库）</span>
+docker run -d --name nacos-standalone --env MODE=standalone -p 8848:8848 -p 9848:9848 nacos/nacos-server:v2.3.0
+
+<span class="c"># 发布一条配置（Open API）</span>
+curl -X POST <span class="g">"http://127.0.0.1:8848/nacos/v1/cs/configs"</span> \
+  -d <span class="g">"dataId=order-service.properties"</span> \
+  -d <span class="g">"group=DEFAULT_GROUP"</span> \
+  -d <span class="g">"content=order.timeout.ms=3000"</span>
+
+<span class="c"># 读取配置</span>
+curl <span class="g">"http://127.0.0.1:8848/nacos/v1/cs/configs?dataId=order-service.properties&amp;group=DEFAULT_GROUP"</span>
+
+<span class="c"># 监听配置（长轮询，30 秒超时）——改配置再执行这条命令看返回</span>
+curl -X POST <span class="g">"http://127.0.0.1:8848/nacos/v1/cs/configs/listener"</span> \
+  -H <span class="g">"Long-Pulling-Timeout: 30000"</span> \
+  -d <span class="g">"Listening-Configs=order-service.properties%0002DEFAULT_GROUP%0002%0000"</span>
+
+<span class="c"># Apollo 本地跑需要 MySQL（建 ApolloPortalDB / ApolloConfigDB），</span>
+<span class="c"># 参考官方 quick-start：https://github.com/apolloconfig/apollo</span></pre>
+  <div class="callout warn">
+    <b>区分两个角色：</b>配置中心管的是<b>运行期可变的配置</b>（阈值、开关、URL、频率），不是应用的启动参数。数据库连接、监听端口这类"启动时读一次就不会变"的东西留在配置文件和环境变量里即可——强行动态化只会增加复杂度。反过来，"每次改动都要发版"的配置（活动开关、限流阈值、降级策略）<b>必须</b>进配置中心。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>为什么需要配置中心</h2></div>
+  <p class="lead">Twelve-Factor App 第三条：<b>配置存储在环境中，与代码严格分离</b>。同一份代码，在不同环境靠不同配置跑出不同行为——这是配置中心存在的全部理由。</p>
+  <h3>没有配置中心的四种凑合姿势</h3>
+  <table>
+    <tr><th style="width:150px">方案</th><th style="width:250px">问题</th><th>死法</th></tr>
+    <tr><td><b>硬编码</b></td><td>改常量要改代码、走 CI、发版</td><td>紧急调限流要等 40 分钟发版，流量已经打垮</td></tr>
+    <tr><td><b>打进镜像的配置文件</b></td><td>每个环境一个镜像，配置散落</td><td>test 配置打进 prod 镜像，联调开关上线</td></tr>
+    <tr><td><b>数据库自建配置表</b></td><td>各服务自己读自己表，格式五花八门</td><td>没有版本、没有审计、改错无法回滚；各服务重复造轮子</td></tr>
+    <tr><td><b>塞进注册中心 KV</b></td><td>Nacos/Consul/etcd 都能存 KV，看似够用</td><td>无版本 diff、无灰度、无权限分级，规模上来后治理成本爆炸</td></tr>
+  </table>
+  <h3>配置分类：决定什么该进配置中心</h3>
+  <table>
+    <tr><th style="width:150px">类型</th><th style="width:230px">例子</th><th>放哪</th></tr>
+    <tr><td><b>启动配置</b></td><td>DB 连接串、端口、注册中心地址</td><td>环境变量 / 配置文件（<b>不进</b>配置中心）</td></tr>
+    <tr><td><b>运行配置</b></td><td>限流 QPS、超时时间、功能开关、黑白名单、缓存 TTL</td><td><b>配置中心</b>，动态生效</td></tr>
+    <tr><td><b>业务参数</b></td><td>活动规则、抽奖概率、运费模板</td><td>配置中心 + 运营后台管理</td></tr>
+    <tr><td><b>敏感配置</b></td><td>三方 API Key、数据库密码、加密盐</td><td>配置中心<b>加密存储</b>，或专用 KMS</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>判断标准一句话：</b>"改这个东西要不要惊动发版流程？"要 → 配置中心；不要 → 配置文件。<b>另一个视角：把配置中心当成"运行期参数的热更新管道"，它的核心价值不是存储，是推送和治理（版本、灰度、权限、审计）。</b>
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>核心功能与配置模型</h2></div>
+  <h3>功能清单：缺一个就会疼</h3>
+  <table>
+    <tr><th style="width:110px">功能</th><th style="width:260px">机制</th><th>没有它的后果</th></tr>
+    <tr><td><b>配置管理</b></td><td>CRUD、格式（properties/yaml/json/yml）、按 app 隔离</td><td>退回数据库自建表</td></tr>
+    <tr><td><b>版本管理</b></td><td>每次发布生成版本号，保留历史，支持 diff</td><td>改错了不知道改了什么，无法回滚</td></tr>
+    <tr><td><b>监听推送</b></td><td>客户端注册监听器，配置变更秒级到达</td><td>配置改了要重启生效，等于没动态化</td></tr>
+    <tr><td><b>灰度发布</b></td><td>按实例 IP / 标签只推给部分机器</td><td>改配置全量生效，出错即全网故障</td></tr>
+    <tr><td><b>一键回滚</b></td><td>回到任意历史版本</td><td>线上事故时手动改回，慢且易错</td></tr>
+    <tr><td><b>权限与审计</b></td><td>环境级/namespace 级读写分离，操作留痕</td><td>谁改了限流阈值查不到，敏感配置人人可看</td></tr>
+  </table>
+  <h3>配置模型：三级隔离</h3>
+  <table>
+    <tr><th style="width:120px">层级</th><th style="width:250px">Nacos 术语</th><th>Apollo 术语</th></tr>
+    <tr><td><b>环境</b></td><td>namespace（可建多个，如 dev / test / prod）</td><td>env（DEV / FAT / UAT / PRO）+ portal 多环境入口</td></tr>
+    <tr><td><b>应用</b></td><td>无显式概念，靠 dataId 前缀约定（如 order-service.properties）</td><td>appId（如 100003171）</td></tr>
+    <tr><td><b>分组/集群</b></td><td>group（默认 DEFAULT_GROUP）</td><td>cluster（默认 default）+ namespace（public / private）</td></tr>
+    <tr><td><b>定位一条配置</b></td><td class="f">namespace + dataId + group</td><td class="f">appId + cluster + namespace + key</td></tr>
+  </table>
+  <pre><span class="c"># 命名规范（强烈建议，避免多团队 key 冲突）</span>
+dataId = &lt;服务名&gt;.&lt;用途&gt;.&lt;格式&gt;
+<span class="c"># 例：</span>
+order-service.properties          <span class="c"># 主配置</span>
+order-service-feature.properties  <span class="c"># 功能开关，独立 dataId 便于单独灰度</span>
+order-service-threshold.properties <span class="c"># 阈值参数，只读给 SRE</span>
+
+<span class="c"># key 规范：小写点分，带单位后缀，禁止同义不同名</span>
+order.timeout.ms=3000        <span class="c"># ✓ 一眼看出是毫秒</span>
+orderTimeout=3000            <span class="c"># ✗ 驼峰、无单位、无层级</span>
+order.timeout=3s             <span class="c"># ✗ 与上一条同义，两处维护必不一致</span></pre>
+  <div class="callout warn">
+    <b>公共配置的两种共享方式：</b>① Nacos 的<b>扩展 dataId 共享</b>（一个应用订阅多个 dataId）；② Apollo 的 <b>public namespace</b>（继承给所有应用）。选择原则：公共配置要能被使用方<b>审计和追溯</b>——谁都能改的公共配置，早晚变成谁都不敢动的炸弹。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>技术选型：Apollo / Nacos / Consul / 自研</h2></div>
+  <table>
+    <tr><th style="width:110px">产品</th><th style="width:250px">架构要点</th><th>推送机制</th><th>优势</th><th>短板</th></tr>
+    <tr><td><b>Apollo</b></td><td>portal + admin service + config service + client，配置存 MySQL</td><td>客户端长轮询（60s），服务端通知即断开</td><td>功能最全（版本/灰度/回滚/审计），国内大厂验证</td><td>组件多（4 个服务 + DB），运维重</td></tr>
+    <tr><td><b>Nacos</b></td><td>注册中心与配置中心一体，Raft（持久数据 CP）+ 自研协议（临时数据 AP）</td><td>长轮询（30s）</td><td>一套底座两用，社区活跃，云原生生态好</td><td>版本/灰度能力弱于 Apollo</td></tr>
+    <tr><td><b>Consul</b></td><td>KV store + Watch（blocking query）</td><td>watch 长轮询 + HTTP 缓存协商</td><td>多数据中心、Service Mesh 集成</td><td>配置管理功能薄，无版本 diff/灰度</td></tr>
+    <tr><td><b>自研（etcd/ZK）</b></td><td>etcd watch / ZK watch 推给客户端</td><td>watch 推送</td><td>完全可控，可嵌业务逻辑</td><td>长连接管理、推送风暴、灰度回滚全要自己做</td></tr>
+  </table>
+  <h4>Apollo 的完整链路</h4>
+  <pre><span class="c"># 一次配置发布的完整路径（ Apollo ）</span>
+用户在 Portal 点击发布
+  → Admin Service 写入 ApolloConfigDB（生成版本号、写 ReleaseMessage）
+  → Config Service 收到 ReleaseMessage 通知
+  → Config Service 找到监听该 namespace 的客户端长轮询连接
+  → 立即返回响应（携带最新配置的 MD5）
+  → 客户端比对 MD5 发现变化 → 拉取全量新配置 → 触发监听器回调
+
+<span class="c"># 关键设计：通知里不带配置内容，只带"有变化"信号</span>
+<span class="c"># 好处：推送量极小（一个 namespace 一条通知），万级客户端也能扛</span>
+<span class="c"># 代价：客户端需要二次拉取，多一次 RTT（可接受，配置变更低频）</span></pre>
+  <div class="callout">
+    <b>选型建议（按规模对号入座）：</b><br>
+    ① <b>已经在用 Nacos 做注册中心</b> → 配置直接用 Nacos，别引入第二套组件，除非你需要 Apollo 级的灰度回滚。<br>
+    ② <b>多环境、多团队、需要审计和灰度</b>（金融、中台）→ <b>Apollo</b>，功能换来的运维成本值得。<br>
+    ③ <b>K8s 为主、云原生栈</b> → Consul / etcd + 自研薄层，或云厂商托管配置服务。<br>
+    ④ <b>只有三五个服务、配置几十条</b> → 什么都别上，配置文件 + 环境变量 + CI 变量注入就是正解。为了三个开关维护一套 Apollo，是过度设计。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>推送机制：长轮询的完整时序</h2></div>
+  <p class="lead">推送机制是配置中心的技术核心。<b>三种姿势：短轮询（浪费）、服务端推（要维护海量长连接）、长轮询（折中，业界主流）。</b></p>
+  <table>
+    <tr><th style="width:110px">机制</th><th style="width:250px">过程</th><th>问题</th></tr>
+    <tr><td><b>短轮询</b></td><td>客户端每 5 秒问一次"配置变了吗"</td><td>99.99% 的请求白问；万级客户端 = 每秒几千 QPS 空转</td></tr>
+    <tr><td><b>服务端推</b></td><td>服务端持有所有客户端长连接，变更时主动下发</td><td>长连接管理复杂；单播风暴（N 个客户端订阅同一配置 = N 条推送）</td></tr>
+    <tr><td><b>长轮询</b></td><td>客户端发起请求，服务端 hold 住 30~60 秒，期间无变更返回 304，有变更立即返回</td><td>实现略复杂（本质还是客户端发起，HTTP 友好）</td></tr>
+  </table>
+  <h4>长轮询时序（文字版）</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>客户端启动</b>：从配置中心拉一次全量配置，缓存到本地文件，注册监听器</div></div>
+    <div class="step"><div class="txt"><b>发起长轮询</b>：请求体带上本地所有配置的 MD5 集合；服务端<b>挂起</b>这个请求（不关闭）</div></div>
+    <div class="step"><div class="txt"><b>等待期间配置变更</b>：用户发布 → 服务端向自身发通知 → 找到挂起的请求，立即返回"有变化"</div></div>
+    <div class="step"><div class="txt"><b>超时无变更</b>：30/60 秒到期，服务端返回 304 Not Modified</div></div>
+    <div class="step"><div class="txt"><b>客户端收到响应</b>：有变化 → 立即拉取新配置 → 回调监听器 → 马上再发起下一次长轮询；304 → 直接再发起</div></div>
+  </div>
+  <pre><span class="c"># Nacos 长轮询请求形态（ Listening-Configs 是 配置 MD5 列表，不是配置内容）</span>
+POST /nacos/v1/cs/configs/listener
+Long-Pulling-Timeout: 30000
+Listening-Configs: order-service.properties^DEFAULT_GROUP^e10adc3949ba59abbe56e057f20f883e^
+
+<span class="c"># Apollo 客户端同理：notifications/v2 接口带 appId+cluster+namespace 列表，</span>
+<span class="c"># 服务端最多 hold 60 秒；期间该 namespace 有新发布，立即返回通知列表</span></pre>
+  <h4>Nacos Java 客户端监听代码（真实 API）</h4>
+  <pre><span class="c">// 读取配置</span>
+ConfigService configService = NacosFactory.createConfigService(<span class="g">"127.0.0.1:8848"</span>);
+String timeout = configService.getConfig(<span class="g">"order-service.properties"</span>, <span class="g">"DEFAULT_GROUP"</span>, 5000);
+
+<span class="c">// 注册监听器：配置变更时回调（长轮询由 SDK 内部维护，应用层无感）</span>
+configService.addListener(<span class="g">"order-service.properties"</span>, <span class="g">"DEFAULT_GROUP"</span>,
+    <span class="b">new</span> Listener() {
+      <span class="b">public</span> <span class="b">void</span> receiveConfigInfo(String configInfo) {
+        <span class="c">// 注意：这个回调里要做的事必须轻——阻塞它会导致后续变更通知积压</span>
+        log.info(<span class="g">"配置已更新: {}"</span>, configInfo);
+        refreshRuntimeConfig(configInfo);
+      }
+      <span class="b">public</span> Executor getExecutor() { <span class="b">return</span> <span class="b">null</span>; } <span class="c">// null = SDK 默认线程池</span>
+    });</pre>
+  <h4>Apollo Java 客户端监听代码（真实 API）</h4>
+  <pre>Config config = ConfigService.getAppConfig();
+config.addChangeListener(<span class="b">new</span> ConfigChangeListener() {
+  <span class="b">public</span> <span class="b">void</span> onChange(ConfigChangeEvent changeEvent) {
+    <span class="b">for</span> (String key : changeEvent.changedKeys()) {
+      ConfigChange change = changeEvent.getChange(key);
+      log.info(<span class="g">"{} : {} -&gt; {}"</span>, key, change.getOldValue(), change.getNewValue());
+    }
+  }
+});
+String value = config.getProperty(<span class="g">"order.timeout.ms"</span>, <span class="g">"3000"</span>);</pre>
+  <div class="callout danger">
+    <b>推送风暴是怎么发生的：</b>配置中心每次变更要通知<b>所有长轮询连接</b>。如果 ① 客户端数量失控（忘记下线的机器、压测实例）；② 通知实现成"每个客户端一条单播消息"；③ 客户端收到 304 后立刻重连（无退避）——三者叠加，一次配置变更能让配置中心 CPU 打满，进而所有服务读不到配置。<b>防护：客户端数量纳入监控；通知聚合发送；客户端重连加随机退避（1~5s jitter）；服务端对同一 namespace 的连续变更做合并窗口（如 500ms 内多次变更只通知一次）。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>灰度发布与回滚</h2></div>
+  <p class="lead">配置变更的影响面是<b>全网实例</b>，所以发布节奏必须和数据发布一样：<b>灰度 → 观察 → 全量</b>，且每一步可回滚。</p>
+  <h4>发布流程（四种状态）</h4>
+  <table>
+    <tr><th style="width:110px">状态</th><th style="width:260px">行为</th><th>检查点</th></tr>
+    <tr><td><b>草稿</b></td><td>编辑中，不发布不影响线上</td><td>diff 与线上版本对比</td></tr>
+    <tr><td><b>灰度</b></td><td>只推给规则命中的实例（如 IP 段 / 标签）</td><td>灰度实例的监控指标：错误率、RT、业务量</td></tr>
+    <tr><td><b>全量</b></td><td>推给该 namespace 下所有实例</td><td>全量后 30 分钟内盯核心指标</td></tr>
+    <tr><td><b>回滚</b></td><td>切回上一个历史版本，同样支持灰度回滚</td><td>回滚后确认监听器已触发</td></tr>
+  </table>
+  <pre><span class="c"># Apollo Open API：发布一个版本（v1.9+ 路径格式）</span>
+curl -X PUT <span class="g">"http://apollo-portal/apps/order-service/envs/PRO/clusters/default/namespaces/application/releases"</span> \
+  -H <span class="g">"Authorization: $APOLLO_TOKEN"</span> \
+  -H <span class="g">"Content-Type: application/json"</span> \
+  -d <span class="g">'{
+    "releaseTitle":"超时从5s调整为3s",
+    "releasedBy":"zhangsan",
+    "releaseComment":"大促降级预案",
+    "items":[{"key":"order.timeout.ms","value":"3000"}]
+  }'</span>
+
+<span class="c"># 灰度：Apollo 的灰度规则挂在 namespace 上，按实例 IP 白名单匹配</span>
+<span class="c"># 命中灰度的实例在"实例列表"里能看到"灰度版本"列，与正式版本不同</span>
+<span class="c"># 回滚：指定回到某个 releaseId，同样走灰度→全量两段式，避免回滚本身造成抖动</span></pre>
+  <div class="callout warn">
+    <b>回滚不一致的经典场景：</b>你在灰度回滚到 v5 的同时，有运维在全量发布 v6。结果 A 实例拿 v5、B 实例拿 v6、C 实例（新扩容）拿 v6。<b>全网三种配置并存，故障表现为"部分用户行为异常"，极难定位。</b>防护：① 配置发布走变更单，同一 namespace 同一时刻只允许一个进行中的发布；② 回滚操作也记录为一次正式发布（生成新版本而非"删除"）；③ 实例侧上报"当前配置版本"，dashboard 能看全网版本分布。
+  </div>
+  <h4>灰度规则设计要点</h4>
+  <ul>
+    <li><b>按实例不按流量</b>：配置是进程级概念，灰度对象是机器/IP，不是用户请求</li>
+    <li><b>先内部机器后生产</b>：先在 dev/test 实例验证配置格式能被正确解析，再推生产</li>
+    <li><b>灰度时长有下限</b>：至少覆盖一个业务高峰周期，只看 5 分钟平稳说明不了问题</li>
+    <li><b>可观测先行</b>：灰度前先确认灰度实例的监控能单独筛选，否则灰度=盲飞</li>
+  </ul>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>配置安全与高可用</h2></div>
+  <h3>敏感配置加密</h3>
+  <table>
+    <tr><th style="width:130px">方案</th><th style="width:250px">机制</th><th>适用</th></tr>
+    <tr><td><b>服务端托管加密</b></td><td>Apollo 2.x 起支持配置加密存储，portal 侧可设"加密字段"，服务端统一加解密</td><td>团队不想在客户端引入解密逻辑</td></tr>
+    <tr><td><b>客户端解密</b></td><td>配置值以密文存储（如 <span class="k">ENC(密文)</span>），客户端启动时用本地密钥解密（Jasypt 模式）</td><td>密钥不经过配置中心，暴露面最小</td></tr>
+    <tr><td><b>专用 KMS</b></td><td>密钥托管在 KMS/Vault，配置里只存密文引用，运行时换取</td><td>金融级合规，密钥可轮转、有审计</td></tr>
+  </table>
+  <pre><span class="c"># 反面教材（真实事故常见形态）</span>
+<span class="c"># application.properties 里明文写死数据库密码，提交到公司 Git</span>
+db.password=<span class="g">Passw0rd123</span>
+<span class="c"># 后果：Git 泄露面 = 所有有仓库读权限的人 + CI 日志 + 备份 + fork</span>
+
+<span class="c"># 正确形态：配置中心只存密文，密钥在客户端环境</span>
+db.password=<span class="y">ENC(xK2m...==)</span>
+<span class="c"># 客户端启动时用 KMS 下发的密钥解密，进程内存里只在用的时候解</span>
+<span class="c"># 密钥本身绝不进 Git、绝不进配置中心、绝不打进日志</span></pre>
+  <h3>权限与审计</h3>
+  <ul>
+    <li><b>环境级隔离</b>：能改 prod 配置的人和能改 test 的人必须是两拨，prod 变更走审批流</li>
+    <li><b>namespace 级读写分离</b>：owner 可改，其他人只读；公共 namespace 收归平台组</li>
+    <li><b>操作审计</b>：谁、什么时间、改了哪个 key、从什么值改成什么值、是否回滚——出了故障先查这个</li>
+    <li><b>传输加密</b>：配置内容含业务敏感信息，client↔server 走 TLS；内网也不是法外之地</li>
+  </ul>
+  <h3>高可用：客户端缓存兜底是最后底线</h3>
+  <table>
+    <tr><th style="width:130px">层</th><th>机制</th></tr>
+    <tr><td><b>服务端</b></td><td>多实例部署 + 负载均衡；配置数据在数据库/磁盘，实例挂了数据不丢</td></tr>
+    <tr><td><b>客户端本地缓存</b></td><td>首次拉到的配置落本地磁盘（Apollo：/opt/data/{appId}/config-cache；Nacos：本地缓存目录）。<b>服务端全挂时，客户端读本地缓存启动和运行</b></td></tr>
+    <tr><td><b>降级策略</b></td><td>服务端不可达 + 本地缓存也没有（全新扩容的机器）→ 用打包镜像里的默认配置启动，并告警</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>血泪教训：某次配置中心 DB 故障，重启后服务批量起不来，原因是客户端"启动时必须连上配置中心"，没有本地缓存兜底。</b>配置中心是为了让服务更稳，结果它自己成了单点。<b>设计铁律：客户端必须能在"配置中心完全不可用"的情况下，用本地缓存（或内置默认值）正常启动和运行。</b>这条要写进客户端接入规范，并在演练中验证——拔掉配置中心网线，看服务会不会挂。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>落地清单：接入规范与治理</h2></div>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>命名规范</div><div class="cd">dataId = 服务.用途.格式；key 小写点分带单位；禁止同义不同名；公共配置独立 dataId 便于审计</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--ok)"></span>默认值兜底</div><div class="cd">客户端读配置一律带默认值：getProperty(key, default)。配置中心挂了、key 被删了、值格式错了，服务按默认行为运行</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--warn)"></span>类型校验</div><div class="cd">配置项声明类型和范围（如 order.timeout.ms ∈ [100, 60000]），发布时校验。防止把"3000"改成"三千"导致解析异常</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--violet)"></span>变更闭环</div><div class="cd">变更单 → 灰度 → 观察 → 全量 → 监控确认 → 关闭变更单。配置变更必须可追溯到人、可回滚</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>敏感项管控</div><div class="cd">密钥/密码类配置一律加密存储，明文值进配置中心 = 安全事故；定期扫描配置内容中的密钥特征</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--accent)"></span>监控大盘</div><div class="cd">客户端数量、长轮询连接数、通知延迟、配置拉取失败率、版本分布。配置中心自身要有 on-call</div></div>
+  </div>
+  <pre><span class="c"># 客户端接入的最小检查清单（代码 review 时逐条过）</span>
+<span class="c"># 1. getProperty(key, default) —— 永远带默认值</span>
+<span class="c"># 2. 监听器回调里不做重活（不查库、不发网络请求），只更新内存态并打点</span>
+<span class="c"># 3. 配置解析失败时记日志但不 Crash —— 单个坏配置不该拖垮服务</span>
+<span class="c"># 4. 本地缓存路径可配置且挂持久卷（容器场景尤其注意）</span>
+<span class="c"># 5. 灰度标记透传：能从实例元数据看出该实例用的哪个配置版本</span>
+
+<span class="c"># Java 侧一个健壮的读取封装示例</span>
+<span class="b">public</span> <span class="b">int</span> getOrderTimeoutMs() {
+  <span class="b">try</span> {
+    <span class="b">return</span> Integer.parseInt(
+        config.getProperty(<span class="g">"order.timeout.ms"</span>, <span class="g">"3000"</span>));
+  } <span class="b">catch</span> (NumberFormatException e) {
+    log.warn(<span class="g">"order.timeout.ms 解析失败，使用默认值 3000"</span>);
+    <span class="b">return</span> 3000;   <span class="c">// 配置脏了也不能让服务挂</span>
+  }
+}</pre>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">客户端没有本地缓存兜底，配置中心宕机服务起不来</div><div class="pd">启动强依赖配置中心可用，一次 DB 故障引发批量服务重启失败。客户端必须落本地缓存，服务端全挂也能启动。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">推送风暴：一次变更通知打满配置中心</div><div class="pd">万级长轮询连接逐条单播通知，客户端无退避立即重连。要聚合通知、合并变更窗口、客户端重连加 jitter。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">灰度比例失控，配置意外全量生效</div><div class="pd">灰度规则配错（IP 段写成 0.0.0.0/0）或灰度后忘记点"全量发布"，配置长时间只对部分实例生效，行为不一致难排查。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">回滚与发布并发，全网版本不一致</div><div class="pd">灰度回滚 v5 与全量发布 v6 同时进行，新扩容实例拿 v6，最终三种配置并存。同一 namespace 同时只允许一个进行中的变更。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">敏感信息明文进配置中心、明文进 Git</div><div class="pd">数据库密码、API Key 明文存储，Git 历史永久留痕。必须加密存储 + 密钥分离 + 定期扫描密钥特征。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">长轮询连接数失控</div><div class="pd">下线的机器、压测实例、本地调试进程都持着长连接不释放，服务端内存和文件描述符缓慢耗尽。客户端数量纳入监控，实例下线主动断开。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">配置 key 无规范，同义不同名</div><div class="pd">timeout 和 timeoutMs 并存，改了一个忘了另一个，行为似随机。命名规范 + 上线前 key 审查 + 定期清理僵尸 key。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">注册了监听器但回调里做重活</div><div class="pd">回调里查库、调远程接口，导致后续变更通知在 SDK 线程池积压，表现为"配置有时灵有时不灵"。回调只更新内存态。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">环境隔离不当，test 配置泄漏到 prod</div><div class="pd">公共 namespace 里放了指向测试库的地址，生产实例一并拉到。环境隔离 + 公共配置纳入发布审批 + prod 配置值做目标地址校验。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">配置无类型校验，脏值让服务行为异常</div><div class="pd">把 3000 改成 "3s" 或 "三千"，NumberFormatException 没被捕获，功能直接不可用。发布时校验类型与范围，客户端解析失败降级默认值。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 长轮询相比短轮询的核心改进是？</div>
+      <button class="opt">把配置内容放进推送，减少客户端拉取次数</button>
+      <button class="opt">服务端挂起请求，有变更才返回，大幅减少无效请求</button>
+      <button class="opt">客户端改为多线程轮询，提高拉取频率</button>
+      <div class="ans">正确答案：<b>服务端挂起请求</b>。长轮询把"每秒问五次有没有变化"变成"挂着等，有变化立刻说"。通知内容通常只有配置的 MD5（甚至只有"有变化"信号），客户端再按需拉取，所以推送量极小。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 配置中心（含数据库）整体宕机 10 分钟，已运行中的服务应该？</div>
+      <button class="opt">立即 crash，等配置中心恢复后重启，保证配置一致</button>
+      <button class="opt">用本地缓存继续运行，配置中心恢复后自动续上长轮询</button>
+      <button class="opt">阻塞等待，所有读配置的请求 hang 住直到恢复</button>
+      <div class="ans">正确答案：<b>用本地缓存继续运行</b>。客户端第一次拉到的配置会落本地磁盘，服务端全挂也不影响运行。block 等待会让配置中心故障升级为业务故障，crash 则会让故障范围扩大。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 一个 20 个服务的团队，已经在用 Nacos 做注册中心，配置中心首选？</div>
+      <button class="opt">直接用 Nacos 的配置功能，不引入第二套组件</button>
+      <button class="opt">必须上 Apollo，Nacos 不能做配置中心</button>
+      <button class="opt">自建 etcd + watch，完全可控</button>
+      <div class="ans">正确答案：<b>先用 Nacos 配置功能</b>。注册中心已在跑，配置与注册共用底座，运维成本最低。只有当版本管理、灰度发布、审计这些治理能力成为硬需求时，才值得引入 Apollo 的额外组件。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 关于配置灰度发布，正确的做法是？</div>
+      <button class="opt">按用户请求流量百分比灰度，和代码发布完全一样</button>
+      <button class="opt">按实例/IP 灰度到少数机器，观察指标后再全量</button>
+      <button class="opt">灰度就是先在 test 环境改，改完直接全量</button>
+      <div class="ans">正确答案：<b>按实例灰度</b>。配置是进程级概念，粒度是机器不是流量。灰度到几台生产机器 → 看错误率/RT/业务指标 → 再全量。只在 test 环境验证过就全量，等于把生产当试验场。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 数据库密码这类敏感配置，最安全的存储方式是？</div>
+      <button class="opt">配置中心存明文，只有管理员能看到，靠权限控制</button>
+      <button class="opt">写死在代码里，不进任何外部系统</button>
+      <button class="opt">配置中心存密文，密钥放客户端环境或专用 KMS，与配置分离</button>
+      <div class="ans">正确答案：<b>密文存储 + 密钥分离</b>。明文 + 权限控制的问题在于权限会被借用、日志会误打印、导出会带走明文。密钥放 KMS 还可以轮转和有审计。写死在代码里则 Git 泄露面无限大。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 一次配置变更导致配置中心 CPU 打满、全网服务读不到配置，最可能的原因是？</div>
+      <button class="opt">推送风暴：海量长轮询连接被逐条通知，客户端无退避立即重连</button>
+      <button class="opt">配置内容太大，占满带宽</button>
+      <button class="opt">客户端缓存全部失效，同时发起全量拉取</button>
+      <div class="ans">正确答案：<b>推送风暴</b>。变更通知命中所有长轮询连接，无聚合、无退避时通知和重连请求叠加成流量尖峰。防护：通知聚合、变更合并窗口、客户端重连 jitter、连接数纳入监控。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查操作</h3>
+  <div class="cmds">
+    <div class="crow"><code>POST /nacos/v1/cs/configs</code><span class="desc">Nacos 发布配置（dataId+group+content）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>GET /nacos/v1/cs/configs?dataId=...&amp;group=...</code><span class="desc">Nacos 读取配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>POST /nacos/v1/cs/configs/listener</code><span class="desc">长轮询监听（带配置 MD5 列表）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>configService.addListener(dataId, group, listener)</code><span class="desc">Nacos Java 客户端注册监听</span><button class="copy">复制</button></div>
+    <div class="crow"><code>config.addChangeListener(...)</code><span class="desc">Apollo Java 客户端注册监听</span><button class="copy">复制</button></div>
+    <div class="crow"><code>config.getProperty(key, default)</code><span class="desc">读配置永远带默认值</span><button class="copy">复制</button></div>
+    <div class="crow"><code>/opt/data/{appId}/config-cache</code><span class="desc">Apollo 客户端本地缓存路径，宕机兜底靠它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>PUT .../namespaces/{ns}/releases</code><span class="desc">Apollo Open API 发布版本</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>核心配置示例</h3>
+  <pre><span class="c"># order-service.properties（配置中心里的内容）</span>
+order.timeout.ms=3000
+order.retry.max=3
+order.switch.new-engine=true
+order.blacklist.uid=10086,10087
+pay.callback.url=<span class="y">ENC(xK2mP7...==)</span>   <span class="c"># 敏感值加密存储</span>
+
+<span class="c"># 客户端 Spring Boot 集成（以 Apollo 为例，bootstrap 阶段拉取）</span>
+<span class="c"># application.properties</span>
+app.id=order-service
+apollo.meta=http://apollo-config-service:8080
+apollo.bootstrap.enabled=true
+apollo.bootstrap.eagerLoad.enabled=true   <span class="c"># 注入 Spring Environment，@Value 直接可用</span>
+apollo.bootstrap.namespaces=application,order-service-feature.properties
+
+<span class="c"># Nacos 对应配置</span>
+spring.cloud.nacos.config.server-addr=127.0.0.1:8848
+spring.config.import=nacos:order-service.properties?refresh=true</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>配置即代码</b></td><td>配置与代码同库管理、同流程评审，好处是 review 与回滚</td></tr>
+    <tr><td><b>动态生效</b></td><td>配置变更不重启服务即改变行为，靠监听推送实现</td></tr>
+    <tr><td><b>namespace</b></td><td>配置的最高隔离单位，通常按环境划分（dev/test/prod）</td></tr>
+    <tr><td><b>dataId</b></td><td>Nacos 中一条配置集合的唯一 ID，常按"服务.用途.格式"命名</td></tr>
+    <tr><td><b>group</b></td><td>Nacos 配置的分组，默认 DEFAULT_GROUP，用于区分业务域</td></tr>
+    <tr><td><b>appId</b></td><td>Apollo 中应用的唯一标识，配置接入的身份</td></tr>
+    <tr><td><b>长轮询</b></td><td>客户端发请求、服务端挂起、有变更立即返回的推送折中方案</td></tr>
+    <tr><td><b>304 Not Modified</b></td><td>长轮询超时无变更时的响应，客户端收到即重新发起</td></tr>
+    <tr><td><b>监听器 Listener</b></td><td>客户端注册的回调，配置变更时触发，回调里禁止重活</td></tr>
+    <tr><td><b>灰度发布</b></td><td>先推给规则命中的少数实例，观察指标后再全量</td></tr>
+    <tr><td><b>回滚 rollback</b></td><td>切回历史版本，同样应走灰度→全量两段式</td></tr>
+    <tr><td><b>ReleaseMessage</b></td><td>Apollo 中"配置已发布"的通知消息，触发客户端拉取</td></tr>
+    <tr><td><b>本地缓存兜底</b></td><td>客户端落盘缓存，配置中心全挂也能启动运行</td></tr>
+    <tr><td><b>敏感配置加密</b></td><td>密文存储 + 密钥分离（客户端环境或 KMS），禁止明文</td></tr>
+    <tr><td><b>配置漂移</b></td><td>多环境/多实例配置悄悄不一致，表现为随机疑难杂症</td></tr>
+    <tr><td><b>推送风暴</b></td><td>变更通知叠加无退避重连，把配置中心打满的连锁故障</td></tr>
+    <tr><td><b>CP / AP</b></td><td>分布式系统权衡：一致性与分区容错 vs 可用性与分区容错</td></tr>
+    <tr><td><b>public namespace</b></td><td>Apollo 中继承给所有应用的公共配置区</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用 Nacos 单机版完成这五件事 —— ① 发布一条配置，Java 客户端读出来并注册监听器；② Portal/API 改值，观察回调触发与本地日志；③ 停掉 Nacos 容器，重启客户端，验证本地缓存兜底能启动；④ 起两个客户端，一个带 IP 灰度标记，发布配置观察谁先收到；⑤ 把配置值改成非法格式，验证你的解析降级逻辑。<br><br>
+    <b>之后值得单独学：</b>Apollo 的灰度规则与 Open API 全量用法、Nacos 1.x→2.x 的协议变化（gRPC 长连接）、配置中心与 K8s ConfigMap/Secret 的协同、以及配置变更的自动化测试（如何在不重启的情况下验证新配置行为正确）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透配置中心设计 · 上线前务必确认：本地缓存兜底、灰度流程、敏感项加密、长轮询监控</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（长轮询推送）和模块 6（安全与兜底）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边对着你的服务逐条检查接入规范。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边数：你的服务里有多少配置，改一次要走多久发版流程';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

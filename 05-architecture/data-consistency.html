@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透数据一致性设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 高密度版</span>
+    <h1>二十分钟学透数据一致性设计</h1>
+    <p class="sub">一致性问题没有银弹，只有<b>选择与代价</b>。这篇讲：一致性模型谱系怎么选、CAP/PACELC 的实践含义、五种分布式事务方案的真实对比、对账补偿怎么设计、Quorum 与时钟怎么用，以及那些"把最终一致当强一致用"的坑。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>7</b> 种一致性模型</span>
+      <span class="chip"><b>5</b> 类事务方案对比</span>
+      <span class="chip"><b>10</b> 个一致性坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">边看边问自己：你的系统里，哪些数据其实是"最终一致"但被当成了强一致？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>一致性模型谱系</h2></div>
+  <p class="lead">一致性不是开关，是<b>光谱</b>。工程上的正确姿势：按业务容忍度选最弱的满足要求的模型——每强一级，都是真金白银的延迟和复杂度。</p>
+  <table>
+    <tr><th style="width:120px">模型</th><th style="width:130px">保证</th><th style="width:230px">直观解释</th><th>典型实现</th></tr>
+    <tr><td><b>线性一致</b></td><td>最强</td><td>所有操作看起来在某一瞬间原子完成；写完立刻所有人都能读到</td><td>etcd、ZooKeeper（Raft/ZAB 共识）</td></tr>
+    <tr><td><b>顺序一致</b></td><td>强</td><td>保全局操作顺序，但不保证与实时时间对齐</td><td>理论模型，实际系统少有纯实现</td></tr>
+    <tr><td><b>因果一致</b></td><td>中</td><td>有因果关系的操作保序，无因果的可乱序</td><td>因果追踪系统（学术原型为主）</td></tr>
+    <tr><td><b>最终一致</b></td><td>弱</td><td>不再更新后，副本最终收敛到相同值</td><td>Redis 主从、DNS、Cassandra 默认</td></tr>
+    <tr><td><b>读己之写</b></td><td>场景型</td><td>自己写完的，自己一定能读到</td><td>写后读主库；按会话路由</td></tr>
+    <tr><td><b>会话一致</b></td><td>场景型</td><td>同一会话内读己之写，换会话不保证</td><td>电商购物车、社交 Feed</td></tr>
+    <tr><td><b>单调读</b></td><td>场景型</td><td>不会读到比上次更旧的值（不倒退）</td><td>读修复后的副本、粘性会话</td></tr>
+  </table>
+  <h3>一个时间线例子（最终一致的可见窗口）</h3>
+  <pre><span class="c"># 主库在北京，从库在上海，异步复制</span>
+T1  10:00:00.100  用户在北京节点写入  X = 1
+T2  10:00:00.150  同一用户在上海节点读 X  →  <span class="r">读到 0（旧值！）</span>
+T3  10:00:00.300  再读 X                    →  <span class="g">读到 1（复制已追平）</span>
+
+窗口 ≈ 150ms，但高峰期复制延迟可能到秒级。
+业务上这叫"我刚发的朋友圈刷新一下没了"——投诉重灾区。</pre>
+  <div class="callout">
+    <b>选型口诀：先问"最弱的模型是什么还能满足业务"。</b>余额扣减要强一致（读主库/行锁）；帖子点赞最终一致就够；购物车会话一致即可；Feed 流单调读防倒退。一上来全按最强设计，延迟和成本双输。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>CAP 与 PACELC 的实践含义</h2></div>
+  <p class="lead">CAP 讲的是<b>网络分区发生时</b>的取舍，PACELC 补上了"没有分区时"的那半边——后者才是你每天在做的选择。</p>
+  <h3>CAP 的正确用法</h3>
+  <table>
+    <tr><th style="width:70px">阵营</th><th style="width:260px">分区时的行为</th><th>典型系统</th></tr>
+    <tr><td><b>CP</b></td><td>保一致牺牲可用：少数派节点拒绝服务，直到分区恢复或重新选主</td><td>etcd、ZooKeeper、HBase、Spanner</td></tr>
+    <tr><td><b>AP</b></td><td>保可用牺牲一致：各节点继续服务，分区恢复后对账/合并冲突</td><td>Cassandra、DynamoDB、Redis 主从</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>"CAP 三选二"是被误读的说法。</b>没有分区时，C 和 A 都要考虑，只是延迟不同——同步强一致延迟高，异步最终一致延迟低。CAP 只描述分区那一瞬间的行为；把"我们选了 CA"挂嘴边，通常意味着没搞懂 CAP 在讲什么。
+  </div>
+  <h3>PACELC：没有分区时的另一半</h3>
+  <p>表述：<b>如果发生分区（P），在可用性（A）和一致性（C）之间取舍；否则（E），在延迟（L）和一致性（C）之间取舍。</b>每个系统都在这两个维度上有确定站位：</p>
+  <table>
+    <tr><th style="width:150px">系统</th><th style="width:110px">分区时</th><th style="width:130px">无分区时</th><th>含义</th></tr>
+    <tr><td><b>DynamoDB</b></td><td>AP</td><td>EL</td><td>默认最终一致读换低延迟；可开强一致读（代价是延迟翻倍）</td></tr>
+    <tr><td><b>Cassandra</b></td><td>AP</td><td>EL</td><td>一致性级别 ONE 低延迟，QUORUM 折中，ALL 强一致</td></tr>
+    <tr><td><b>MongoDB</b></td><td>AP</td><td>EC</td><td>多数派读写保一致性，写确认等待多数副本</td></tr>
+    <tr><td><b>Spanner</b></td><td>CP</td><td>EC</td><td>TrueTime + 2PC 换全局强一致，延迟以数十毫秒计</td></tr>
+    <tr><td><b>etcd / ZooKeeper</b></td><td>CP</td><td>EC</td><td>Raft 多数派提交，配置类小数据强一致</td></tr>
+  </table>
+  <h3>实践含义</h3>
+  <ul>
+    <li><b>每次存储选型都是一次 PACELC 表态</b>：选 Cassandra 就是选"平时低延迟、分区时保可用"；选 etcd 就是选"任何时候强一致、牺牲写入延迟"。</li>
+    <li><b>"既要强一致又要低延迟"的方案评审结论 = 没想清楚</b>。可以在同一系统里混用（下单强一致走 PG、用户资料最终一致走 Dynamo），但同一个数据不能既要又要。</li>
+    <li><b>把一致性声明写进架构文档</b>：每个数据域标注"强一致 / 最终一致 + 收敛时间目标"，下游团队按声明做设计，避免互相假设。</li>
+  </ul>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>分布式事务方案对比</h2></div>
+  <p class="lead">五种方案没有排名，只有适用场景。<b>选错方案的代价：2PC 拖垮数据库、TCC 写三倍代码、Saga 读到中间状态。</b>下表是真实权衡。</p>
+  <table>
+    <tr><th style="width:130px">方案</th><th style="width:90px">一致性</th><th style="width:80px">隔离性</th><th style="width:70px">性能</th><th style="width:80px">复杂度</th><th>适用场景</th></tr>
+    <tr><td><b>2PC / XA</b></td><td>强一致</td><td>有（锁资源到提交）</td><td>低</td><td>中</td><td>传统数据库、短事务、低并发；Seata XA 模式底层即此</td></tr>
+    <tr><td><b>TCC</b></td><td>最终一致</td><td>无（业务层防冲突）</td><td>高</td><td>高</td><td>资金、库存等高价值短流程；Seata TCC 模式</td></tr>
+    <tr><td><b>Saga 编排</b></td><td>最终一致</td><td>无</td><td>高</td><td>中</td><td>长流程跨多服务（下单→支付→物流），有中心协调者</td></tr>
+    <tr><td><b>Saga 协同</b></td><td>最终一致</td><td>无</td><td>高</td><td>中</td><td>同上；事件链无单点，但链路追踪更难</td></tr>
+    <tr><td><b>本地消息表</b></td><td>最终一致</td><td>无</td><td>高</td><td>低</td><td>发消息/发事件，与业务同库保证不丢；接收方无侵入</td></tr>
+    <tr><td><b>最大努力通知</b></td><td>弱</td><td>无</td><td>最高</td><td>低</td><td>支付结果通知商户等可重试、允许延迟的场景</td></tr>
+  </table>
+  <h3>2PC 的问题（为什么不默认用它）</h3>
+  <pre><span class="c"># 两阶段：prepare → commit</span>
+阶段一（prepare）：协调者问所有参与者"能提交吗"，参与者锁定资源、写 redo/undo 日志
+阶段二（commit）：协调者通知"提交"，参与者释放锁、正式生效
+
+<span class="r">问题 1</span>：prepare 后参与者资源被锁，长事务下数据库连接/行锁被长时间占用
+<span class="r">问题 2</span>：协调者单点——commit 前宕机，参与者全部悬挂（锁着资源等指令）
+<span class="r">问题 3</span>：同步阻塞，吞吐受最慢参与者拖累</pre>
+  <h3>TCC 三接口（以库存服务为例）</h3>
+  <pre><span class="c">// Try：预留资源（冻结库存 10 件，可多次调用需幂等）</span>
+boolean tryDeduct(String bizNo, String skuId, int count);
+
+<span class="c">// Confirm：确认扣减（把冻结的 10 件真正扣掉）</span>
+boolean confirmDeduct(String bizNo);
+
+<span class="c">// Cancel：回滚预留（释放冻结的 10 件）</span>
+boolean cancelDeduct(String bizNo);
+
+<span class="c">// 三个接口全部按 bizNo 幂等：网络重试/重复投递不能重复扣</span></pre>
+  <h3>本地消息表（可靠性最高的轻方案）</h3>
+  <pre><span class="c">-- 消息与业务数据同库，靠本地事务保证不丢</span>
+CREATE TABLE msg_outbox (
+  id          BIGINT PRIMARY KEY,
+  biz_id      VARCHAR(64)  NOT NULL,
+  topic       VARCHAR(64)  NOT NULL,
+  payload     JSON         NOT NULL,
+  status      TINYINT      NOT NULL DEFAULT 0,  <span class="c">-- 0 待发送 1 已发送 2 失败</span>
+  retry_count INT          NOT NULL DEFAULT 0,
+  created_at  DATETIME     NOT NULL,
+  KEY idx_status (status, id)
+);
+
+<span class="c">-- 发送流程：</span>
+<span class="c">-- 1. 同一个本地事务里写业务表 + 插 msg_outbox（status=0）</span>
+<span class="c">-- 2. 定时任务（每 1s）扫 status=0 且 id 递增的批量发送到 MQ</span>
+<span class="c">-- 3. 发送成功 → status=1；失败 → retry_count++</span>
+<span class="c">-- 4. retry_count &gt; 5 → status=2，进死信表 + 告警人工</span></pre>
+  <div class="callout ok">
+    <b>选型决策顺序（按此顺序问自己）：</b>① 能不能不用分布式事务（服务内单库事务覆盖）？② 不能的话允许最终一致吗？允许 → 本地消息表 / Saga / TCC 按流程长度选；③ 必须强一致 → 2PC/XA，且把事务压到最短（准备阶段不锁长资源）；④ 跨公司/外部系统 → 最大努力通知 + 对账，别幻想强一致。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>对账与补偿设计</h2></div>
+  <p class="lead">对账是异步系统的兜底机制：<b>任何"最终一致"的声明，背后都应该有一个对账任务在验证它真的收敛了。</b>没有对账的异步链路等于闭眼开车。</p>
+  <h3>三层对账</h3>
+  <table>
+    <tr><th style="width:130px">层级</th><th style="width:180px">频率</th><th>发现问题的时效</th></tr>
+    <tr><td><b>准实时对账</b></td><td>5~15 分钟</td><td>分钟级发现差异，立即告警，控制爆炸半径</td></tr>
+    <tr><td><b>日切对账</b></td><td>T+1 全量</td><td>发现跨日、补单、批量遗漏类问题</td></tr>
+    <tr><td><b>财务月结</b></td><td>月度</td><td>与财务账目逐笔勾兑，出审计报告</td></tr>
+  </table>
+  <h3>对账 SQL（找单边账）</h3>
+  <pre><span class="c">-- 差异类型一：本地有、渠道无（短款嫌疑）</span>
+SELECT l.id, l.amount
+FROM local_trade l
+LEFT JOIN channel_trade c ON l.channel_no = c.channel_no
+WHERE l.create_time &gt;= DATE_SUB(NOW(), INTERVAL 1 DAY)
+  AND l.status = 1
+  AND c.channel_no IS NULL;
+
+<span class="c">-- 差异类型二：状态不一致（金额或状态对不上）</span>
+SELECT l.id, l.amount AS local_amt, c.amount AS channel_amt, l.status, c.status
+FROM local_trade l
+JOIN channel_trade c ON l.channel_no = c.channel_no
+WHERE l.amount != c.amount OR l.status != c.status;</pre>
+  <h3>补偿设计四原则</h3>
+  <ol>
+    <li><b>幂等</b>：补偿单号唯一键约束，"同一补偿执行多次 = 执行一次"。重复退款事故的第一来源就是补偿不幂等。</li>
+    <li><b>可重入</b>：先查当前状态再操作，补偿执行到一半失败时重试能接着走，而不是从头再退一次。</li>
+    <li><b>逆操作先行</b>：设计正向流程时就设计好逆向接口（Cancel / 冲正），别等出事故了才发现原操作不可逆。</li>
+    <li><b>有界重试 + 升级</b>：指数退避重试（1min/5min/30min），5 次失败进死信队列 + 电话告警，人工处理台兜底。<b>永远允许人工介入，永远不留"自动走到黑"的补偿。</b></li>
+  </ol>
+  <div class="callout danger">
+    <b>对账的常见死法是"跑着但没人看"。</b>差异表每天几百条没人处理，三个月后没人知道基线是多少。对账必须闭环：差异条数进监控看板，超过阈值（如 &gt;10 条或环比突增）自动告警，每条差异有处理状态跟踪（待处理/已补单/已退款/误报关闭）。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>Quorum 机制：NWR</h2></div>
+  <p class="lead">Quorum（多数派）是副本存储里调节一致性的旋钮：<b>N 个副本，写等 W 个确认、读等 R 个副本返回，W + R &gt; N 就保证读到最近写入。</b></p>
+  <h3>N=3 时的组合与代价</h3>
+  <table>
+    <tr><th style="width:130px">配置</th><th style="width:150px">读延迟</th><th style="width:150px">写延迟</th><th>说明</th></tr>
+    <tr><td><b>W=3, R=1</b></td><td>最低（任一副本）</td><td>最高（等全部）</td><td>强一致读；写最慢，一个副本慢就拖死写</td></tr>
+    <tr><td><b>W=1, R=3</b></td><td>最高</td><td>最低</td><td>写最快；读最慢，适合写多读少</td></tr>
+    <tr><td class="f">W=2, R=2</td><td>中</td><td>中</td><td><b>最常用折中</b>：读写至少重叠 1 个副本，P99 最低</td></tr>
+    <tr><td><b>W=2, R=1</b></td><td>低</td><td>中</td><td><b>不满足 W+R&gt;N</b>：可能读到旧值，属最终一致</td></tr>
+  </table>
+  <pre><span class="c"># 为什么 W+R&gt;N 能读到最新写？</span>
+写 X=1 得到 2 个副本确认（W=2）；读从 2 个副本（R=2）收集
+2 + 2 = 4 &gt; 3 → 读的 2 个副本里必至少 1 个包含 X=1
+取版本号最大的返回值 → 读到 X=1 ✓</pre>
+  <h3>落地形态</h3>
+  <ul>
+    <li><b>Cassandra</b>：一致性级别 ONE / QUORUM / ALL / LOCAL_QUORUM（真实可选值），按读写操作单独指定。</li>
+    <li><b>etcd / Raft 系</b>：写必须多数派（(N+1)/2）确认才返回，读默认走 leader（强一致），可用 serializable 读换低延迟。</li>
+    <li><b>DynamoDB</b>：默认最终一致读（省一半延迟、费用减半），强一致读需显式指定。</li>
+  </ul>
+  <div class="callout warn">
+    <b>W+R&gt;N 有个隐藏前提：失败节点不能丢已确认的数据。</b>节点宕机恢复后落后于其他副本，若恰好躲过了读的 R 个集合，就会丢已确认写。配套机制：读修复（read repair，读时发现旧副本后台修补）、 hinted handoff（临时托管）、反熵（anti-entropy，Merkle 树比对）。没有这些，Quorum 只是降低了概率，没有消灭窗口。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>时钟与顺序</h2></div>
+  <p class="lead">分布式系统里，<b>物理时间是参考信息，不是排序依据</b>。依赖时间戳判先后的系统，会在时钟回拨、NTP 跳变的那一天集体出错。</p>
+  <h3>物理时钟的三个坑</h3>
+  <table>
+    <tr><th style="width:150px">问题</th><th>后果</th></tr>
+    <tr><td><b>NTP 误差</b></td><td>同机房理论 &lt;1ms，实际 1~10ms；跨区 10~100ms，相差百毫秒是常态</td></tr>
+    <tr><td><b>时钟回拨</b></td><td>NTP 同步导致时间倒流，"后发生"的事件时间戳反而更小，排序和去重逻辑错乱</td></tr>
+    <tr><td><b>闰秒</b></td><td>UTC 插入闰秒时未处理的系统出现时间重复/跳变</td></tr>
+  </table>
+  <h3>反例：时间戳排序丢更新</h3>
+  <pre><span class="c"># 两个节点时间差 100ms，都写同一个 key</span>
+10:00:00.050  节点 B 写 X = 2   <span class="c"># 实际后发生</span>
+10:00:00.100  节点 A 写 X = 1   <span class="c"># 实际先发生</span>
+
+按"时间戳大的赢"合并 → <span class="r">X = 1（旧值覆盖新值，B 的写入丢失）</span>
+按"时间戳小的赢"合并 → <span class="r">X = 2（先发生的被丢弃，因果颠倒）</span>
+
+<span class="g">结论：跨节点排序永远不要用物理时间戳。用版本号、序号或共识协议。</span></pre>
+  <h3>三种替代方案</h3>
+  <table>
+    <tr><th style="width:130px">方案</th><th style="width:270px">机制</th><th>能力边界</th></tr>
+    <tr><td><b>Lamport 时钟</b></td><td>本事件 +1；发消息携带计数值；接收方取 max 后 +1</td><td>保 happened-before 偏序；<b>无法判断并发</b>（不可比 = 并发，也可能只是不知道）</td></tr>
+    <tr><td><b>向量时钟</b></td><td>每节点维护向量 [A:5, B:3]，发送合并各方向量</td><td>能精确判断因果与并发（可比的才是因果）；向量随节点数增长</td></tr>
+    <tr><td><b>HLC</b></td><td>混合逻辑时钟：(物理时间, 逻辑计数器)，单调不减</td><td>接近物理时间且单调；CockroachDB 等采用，适合做事务时间戳</td></tr>
+  </table>
+  <h3>Snowflake ID 的时钟回拨</h3>
+  <pre><span class="c"># Snowflake：41bit 毫秒时间戳 + 10bit 机器 + 12bit 序列</span>
+<span class="c"># 回拨处理三选一（生产必须实现其中一种）：</span>
+<span class="b">1. 拒绝发号</span>：回拨 &lt; 阈值（如 5ms）时短暂等待时钟追回
+<span class="b">2. 借号</span>：从备用号段/其他机器借序列，回拨期间继续发
+<span class="b">3. 报错 + 告警</span>：超过容忍阈值直接失败，让人工介入修 NTP
+<span class="r">✗ 不处理：回拨后毫秒数变小，可能发出与回拨前重复的 ID（主键冲突）</span></pre>
+  <div class="callout ok">
+    <b>工程三字诀：排序用序号，去重用唯一键，时间只用来展示。</b>版本号（乐观锁）、单调递增 ID、共识协议日志序号都是可靠顺序；数据库唯一约束、幂等键是可靠去重；物理时间戳放进"创建时间"字段给人看可以，参与业务裁决不行。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>数据库选型与一致性保证</h2></div>
+  <p class="lead">先定一致性需求，再选数据库；不要反过来。<b>同一份数据换一个存储，一致性语义可能完全变了</b>——这个切换必须过 ADR。</p>
+  <table>
+    <tr><th style="width:140px">数据库 / 形态</th><th style="width:130px">一致性保证</th><th style="width:180px">关键机制</th><th>坑</th></tr>
+    <tr><td><b>PostgreSQL / MySQL 单机</b></td><td>强一致</td><td>ACID 事务 + 隔离级别</td><td>RR 隔离下也有间隙锁死锁风险</td></tr>
+    <tr><td><b>MySQL 主从</b></td><td>最终一致（默认异步）</td><td>binlog 复制</td><td><b>切主丢数据</b>；半同步在退化为异步时仍有窗口</td></tr>
+    <tr><td><b>PostgreSQL 流复制</b></td><td>同步/异步可选</td><td>WAL 流复制</td><td> synchronous_commit = on 才强一致，写延迟 +1 个 RTT</td></tr>
+    <tr><td><b>Redis 主从</b></td><td>最终一致</td><td>异步复制</td><td>可用 <span class="k">WAIT numreplicas timeout</span> 提升同步度（仍非强一致）</td></tr>
+    <tr><td><b>etcd / ZooKeeper</b></td><td>线性一致</td><td>Raft / ZAB 共识</td><td>写吞吐受多数派 RTT 限制，别当业务数据库用</td></tr>
+    <tr><td><b>Kafka</b></td><td>分区内有序 + 可配持久性</td><td>acks=all + min.insync.replicas</td><td>acks=1（默认）丢数据；多分区间无全局顺序</td></tr>
+    <tr><td><b>MongoDB</b></td><td>多数派近似线性一致</td><td>writeConcern:majority + readConcern:majority</td><td>默认 w:1 配置下故障会丢已确认写</td></tr>
+    <tr><td><b>Cassandra</b></td><td>可调 NWR</td><td>一致性级别 ONE~ALL</td><td>默认 ONE；轻量事务（LWT）很慢，别当强一致用</td></tr>
+  </table>
+  <h3>读己之写的落地手法</h3>
+  <ul>
+    <li><b>会话内固定读主库</b>：写后 N 秒内该用户的请求路由到主库，或用"写后等一个复制延迟窗口"再读从。</li>
+    <li><b>版本号回执</b>：写操作返回数据版本号，读请求携带"至少版本 V"，从库版本 &lt; V 时改读主库或等待。</li>
+    <li><b>因果令牌</b>：把上一次读到的版本作为本次读的前置条件，存储层保证不返回更旧的数据。</li>
+  </ul>
+  <div class="callout warn">
+    <b>最危险的切换：把 MySQL 换成"最终一致"的存储而不改读路径。</b>代码里到处是"写完立刻查"的逻辑，换库后全部读到旧值。迁移评审必问：原系统的读己之写保证还在吗？不在的话，读路径要怎么改？
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个真实的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把最终一致当强一致用</div><div class="pd">支付成功后立刻查余额查到旧值，用户投诉"钱没了"。异步链路读路径要么读主库，要么带版本等待，别默认从库即最新。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">缺少对账</div><div class="pd">消息"应该"会到，没人验证到没到。月底财务发现差账时已经积累了几千条。准实时对账 + 差异告警是异步系统的安全带。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">时钟回拨</div><div class="pd">NTP 同步导致节点时间倒流，依赖时间戳排序/去重的逻辑集体错乱，ID 生成重复。用单调时钟、HLC 或版本号，物理时间只用于展示。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">网络分区下的脑写</div><div class="pd">旧主感知不到新主已选出，继续接受写，恢复后数据被回滚或双写冲突。用多数派提交（Raft）+ fencing token（递增纪元号拒绝旧主写入）防护。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">2PC 用于长事务</div><div class="pd">prepare 之后锁资源几十秒，数据库连接池被打满，连带拖垮无关业务。长流程用 Saga/TCC，2PC 只留给秒级短事务。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">TCC 的 Try 没有幂等</div><div class="pd">Confirm 网络超时重试，冻结被重复执行，库存多扣。三个接口全部按业务单号幂等，这是 TCC 的及格线。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Saga 没有隔离性</div><div class="pd">下游服务读到"订单已创建未支付"的中间态，按此状态做了错误决策（如给未支付订单发货）。设计时让中间态对外不可见，或用语义锁。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">本地消息表只投一次</div><div class="pd">发送失败没有重试机制，消息永久丢失，下游永远等不到。消息表必须有状态机（待发送/已发送/失败）+ 重试 + 死信 + 对账四件套。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用自增 ID 做分布式排序</div><div class="pd">分库后各库自增 ID 冲突或跳变，按 ID 排序结果错乱。全局唯一 ID 用 Snowflake/号段，排序另建单调序号字段。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">补偿接口不能重入</div><div class="pd">补偿执行一半失败，重试时又退一次款，资金双损失。补偿接口幂等键 + 状态检查，执行前先查"这单退过没有"。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. "用户发的帖子，自己刷新后一定能看到"描述的是哪种一致性？</div>
+      <button class="opt">线性一致</button>
+      <button class="opt">最终一致</button>
+      <button class="opt">读己之写（Read-your-writes）</button>
+      <button class="opt">单调写</button>
+      <div class="ans">正确答案：<b>读己之写</b>。它只约束"自己的写对自己可见"，比线性一致弱得多、成本也低得多。落地手法：写后短时间内该用户请求路由到主库，或读请求携带版本号等待从库追平。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 3 副本系统配置 W=2、R=2，能保证什么？</div>
+      <button class="opt">写不丢失任何数据</button>
+      <button class="opt">读一定能读到最近一次成功的写（W+R&gt;N，读写副本必重叠）</button>
+      <button class="opt">系统永不停机</button>
+      <button class="opt">读延迟最低</button>
+      <div class="ans">正确答案：<b>读到最近写入</b>。2+2=4&gt;3，读的 2 个副本与写的 2 个副本必至少重叠 1 个，取版本号最大的返回值即可。注意前提：失败节点不能丢已确认数据，否则仍需读修复/反熵兜底。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 关于 2PC（XA）的主要问题，哪个说法不对？</div>
+      <button class="opt">prepare 阶段会锁住资源，长事务下拖垮数据库</button>
+      <button class="opt">协调者是单点，commit 前宕机会让参与者悬挂</button>
+      <button class="opt">同步阻塞，吞吐受最慢参与者拖累</button>
+      <button class="opt">它能保证最终一致性，因此适合所有分布式场景</button>
+      <div class="ans">正确答案：<b>"适合所有场景"是错的</b>。2PC 是强一致方案，代价正是阻塞、锁资源、协调者单点。它只适合短事务低并发；长流程用 Saga/TCC，发消息用本地消息表。不存在"一个方案通吃"的分布式事务。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 两个节点时间相差 100ms，都写了同一个 key。按物理时间戳合并会怎样？</div>
+      <button class="opt">可能让后发生的写被先发生的覆盖（丢更新或因果颠倒）</button>
+      <button class="opt">一定能正确合并，NTP 误差可以忽略</button>
+      <button class="opt">数据库会自动检测并拒绝后写的请求</button>
+      <button class="opt">只要时间戳精度到毫秒就没问题</button>
+      <div class="ans">正确答案：<b>可能丢更新/因果颠倒</b>。跨节点排序永远不要用物理时间戳。可靠顺序来自版本号、单调序号或共识协议日志；物理时间戳只放进"创建时间"字段给人看。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. PACELC 理论相比 CAP 补充了什么？</div>
+      <button class="opt">分区时一致性和可用性都不重要</button>
+      <button class="opt">没有分区时，系统仍在延迟（L）和一致性（C）之间做权衡</button>
+      <button class="opt">CAP 是错误的，应该被淘汰</button>
+      <button class="opt">一致性可以用分区数量来量化</button>
+      <div class="ans">正确答案：<b>无分区时的 L/C 权衡</b>。DynamoDB 平时用低延迟的最终一致读（EL），分区时保可用（AP）；Spanner 任何时候都选一致性（PC/EC）但延迟高。每次存储选型都是一次 PACELC 表态。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 本地消息表方案中，消息发送失败后的正确处理是？</div>
+      <button class="opt">标记失败即可，下次对账会补充</button>
+      <button class="opt">立即人工介入处理</button>
+      <button class="opt">按指数退避重试，超过阈值进死信并告警，同时靠对账兜底</button>
+      <button class="opt">重新插一条同样的消息继续发</button>
+      <div class="ans">正确答案：<b>有界重试 + 死信 + 告警 + 对账</b>。消息表必须有状态机（待发送/已发送/失败）和重试计数；只标记不重试等于丢消息；无脑重插会造成重复投递，必须靠消费端幂等 + 对账双重保证。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>关键数字与公式速记</h3>
+  <pre><span class="c"># Quorum（N 副本）</span>
+强一致读最近写：  W + R &gt; N
+Raft/etcd 多数派： floor(N/2) + 1
+常用折中（N=3）： W=2, R=2
+
+<span class="c"># 时钟精度参考</span>
+同机房 NTP 理想误差   &lt; 1ms
+同机房实际常见       1 ~ 10ms
+跨可用区             10 ~ 100ms
+跨地域               50ms ~ 数百 ms
+<span class="g">结论：物理时间戳不能做跨节点排序依据</span>
+
+<span class="c"># 补偿重试节奏（参考）</span>
+重试间隔：1min → 5min → 30min → 2h → 8h（共 5 次）
+第 5 次失败 → 死信队列 + 电话告警 + 人工处理台</pre>
+  <h3>常用命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>SHOW SLAVE STATUS\G</code><span class="desc">MySQL 看复制延迟（Seconds_Behind_Master）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM pg_stat_replication;</code><span class="desc">PostgreSQL 看流复制状态与延迟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>WAIT 1 5000</code><span class="desc">Redis 等 1 个从库确认（提升同步度，仍非强一致）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>consistency ONE|QUORUM|ALL</code><span class="desc">Cassandra cqlsh 里切换一致性级别</span><button class="copy">复制</button></div>
+    <div class="crow"><code>etcdctl endpoint status -w table</code><span class="desc">看 etcd 各节点 raft 进度与 lag</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kafka-consumer-groups.sh --describe --group g</code><span class="desc">看 Kafka 消费组 lag，监控消息堆积</span><button class="copy">复制</button></div>
+  </div>
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>线性一致</b></td><td>所有操作像在单一时间点原子发生，最强的一致性模型</td></tr>
+    <tr><td><b>顺序一致</b></td><td>保全局操作顺序，但不保证与实时时间对齐</td></tr>
+    <tr><td><b>因果一致</b></td><td>有因果关系的操作保序，无因果的可乱序</td></tr>
+    <tr><td><b>最终一致</b></td><td>停止更新后副本最终收敛，收敛前有可见窗口</td></tr>
+    <tr><td><b>读己之写</b></td><td>自己写完后自己一定能读到该值</td></tr>
+    <tr><td><b>会话一致</b></td><td>同一会话内读己之写，跨会话不保证</td></tr>
+    <tr><td><b>单调读</b></td><td>重复读不会读到比上次更旧的值</td></tr>
+    <tr><td><b>CAP 定理</b></td><td>分区发生时，一致性与可用性二选一</td></tr>
+    <tr><td><b>PACELC</b></td><td>CAP 的补充：无分区时仍在延迟与一致性间权衡</td></tr>
+    <tr><td><b>2PC / XA</b></td><td>两阶段提交：prepare + commit，强一致但阻塞锁资源</td></tr>
+    <tr><td><b>TCC</b></td><td>Try-Confirm-Cancel：业务层三接口实现最终一致</td></tr>
+    <tr><td><b>Saga</b></td><td>长事务拆成有序本地事务 + 补偿操作，无隔离性</td></tr>
+    <tr><td><b>本地消息表</b></td><td>Outbox：消息与业务同库同事务，可靠投递的轻方案</td></tr>
+    <tr><td><b>最大努力通知</b></td><td>主动方尽力重试通知，被动方按对账兜底</td></tr>
+    <tr><td><b>对账</b></td><td>比对双方流水，识别长款/短款/状态差异并处理</td></tr>
+    <tr><td><b>Quorum</b></td><td>多数派确认机制，NWR 模型调节一致性强度</td></tr>
+    <tr><td><b>读修复</b></td><td>Read Repair：读时发现旧副本后台异步修补</td></tr>
+    <tr><td><b>Lamport 时钟</b></td><td>逻辑时钟，保 happened-before 偏序，不能判并发</td></tr>
+    <tr><td><b>向量时钟</b></td><td>每节点维护版本向量，可精确判断因果与并发</td></tr>
+    <tr><td><b>HLC</b></td><td>混合逻辑时钟：物理时间 + 逻辑计数器，单调且接近真实时间</td></tr>
+    <tr><td><b>脑写</b></td><td>Split-brain：分区时旧主未退位继续写，造成冲突数据</td></tr>
+    <tr><td><b>fencing token</b></td><td>递增纪元号，存储层用它拒绝旧 epoch 的写入，防脑写</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作执行多次结果一致，补偿与重试的前提</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>本周就能做的三件事：</b>① 给每个数据域标注一致性声明（强一致/最终一致 + 收敛目标），写进架构文档；② 检查所有"写完立刻查"的代码路径，确认读的是主库或带版本等待；③ 给核心异步链路加准实时对账（5~15 分钟），差异条数进监控告警。<br><br>
+    <b>之后值得深入：</b>Seata 四种模式的工程细节、Raft 论文与 etcd 实现、以及冲突解决（LWW / CRDT / 业务合并）的选型。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透数据一致性设计 · 先问"最弱的模型还能满足业务吗"，再动手选方案</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（事务方案对比）和模块 6（时钟与顺序）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边给系统里的数据域标一致性声明。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='边看边问自己：你的系统里，哪些数据其实是"最终一致"但被当成了强一致？';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

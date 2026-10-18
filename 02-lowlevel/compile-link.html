@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟理解编译与链接</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20分钟速学 · 底层原理</span>
+    <h1>二十分钟理解编译与链接</h1>
+    <p class="sub">写 C/C++ 的人天天用 <span class="k">gcc main.c</span>，但真正卡住人的是链接：<b>undefined reference、duplicate symbol、找不到 .so</b>。这篇把四个阶段拆开，把符号、重定位、PIC、soname 讲透。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 模块</span>
+      <span class="chip"><b>四阶段</b>全流程</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议开一个 Linux 环境装好 gcc、binutils、gdb，每个阶段都用 -o 停下来看产物</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>准备一个能拆开看的工程</h2></div>
+  <p class="lead">全程只用三个小文件，但覆盖了静态库、动态库、多编译单元、全局变量这几种情况。</p>
+  <pre><span class="c">// main.c</span>
+#include &lt;stdio.h&gt;
+#include "mathx.h"
+
+int g_counter = 42;          <span class="c">// 已初始化全局变量 → .data</span>
+int g_zero;                  <span class="c">// 未初始化全局变量 → .bss</span>
+const char *banner = "hi";   <span class="c">// 指针在 .data，字符串在 .rodata</span>
+
+int main(void) {
+    printf("%s %d\n", banner, add(g_counter, 1));
+    return 0;
+}
+
+<span class="c">// mathx.h</span>
+#ifndef MATHX_H
+#define MATHX_H
+int add(int a, int b);
+#endif
+
+<span class="c">// mathx.c</span>
+#include "mathx.h"
+int add(int a, int b) { return a + b; }</pre>
+  <pre><span class="c"># 编译并保留每个阶段的中间产物</span>
+gcc -E main.c -o main.i        <span class="c"># 预处理</span>
+gcc -S main.i -o main.s        <span class="c"># 编译成汇编</span>
+gcc -c main.s -o main.o        <span class="c"># 汇编成目标文件</span>
+gcc -c mathx.c -o mathx.o
+gcc main.o mathx.o -o app      <span class="c"># 链接</span>
+
+<span class="c"># 一条命令完成全部，-v 能看到它到底调了什么</span>
+gcc -v main.c mathx.c -o app 2&gt;&amp;1 | grep -E "^ /usr|collect2|cc1|as "</pre>
+  <p>配套工具，全部来自 binutils（GNU 二进制工具集）：</p>
+  <table>
+    <tr><th style="width:150px">工具</th><th>用途</th></tr>
+    <tr><td class="f">file</td><td>看文件类型：是 relocatable（.o）、executable 还是 shared object</td></tr>
+    <tr><td class="f">nm</td><td>列符号表，看每个符号是定义（T/D/B）还是未定义（U）</td></tr>
+    <tr><td class="f">readelf</td><td>看 ELF 头、段表、符号表、重定位、动态段。<b>最该熟练的一个</b></td></tr>
+    <tr><td class="f">objdump -d</td><td>反汇编，看编译器到底生成了什么指令</td></tr>
+    <tr><td class="f">ldd</td><td>看可执行文件依赖哪些动态库（对不可信二进制不安全，见模块 7）</td></tr>
+    <tr><td class="f">strings</td><td>从二进制里捞可打印字符串，排查版本号、路径</td></tr>
+    <tr><td class="f">ar</td><td>打包/解包静态库（.a 本质就是一堆 .o 的归档）</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>平台差异先声明：</b>文中的汇编、段名、重定位类型以 <b>x86-64 Linux + GCC/ELF</b> 为准。ARM64 的指令序列不同，macOS 用 Mach-O（段叫 <span class="k">__TEXT</span>、<span class="k">__DATA</span>），Windows 用 PE/COFF（段叫 <span class="k">.text</span>、<span class="k">.rdata</span>）。<b>概念一一对应，名字和细节不同</b>，不要把 Linux 的结论硬套到别的平台。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>四个阶段：每一步的输入输出</h2></div>
+  <table>
+    <tr><th style="width:90px">阶段</th><th style="width:110px">驱动命令</th><th style="width:120px">实际程序</th><th style="width:110px">输入 → 输出</th><th>做什么</th></tr>
+    <tr><td><b>预处理</b></td><td class="f">gcc -E</td><td class="f">cc1 -E</td><td class="f">.c → .i</td><td>展开宏、展开 <span class="k">#include</span>、处理条件编译、去注释。产物仍是<b>纯文本 C 代码</b></td></tr>
+    <tr><td><b>编译</b></td><td class="f">gcc -S</td><td class="f">cc1</td><td class="f">.i → .s</td><td>词法/语法/语义分析、优化、生成汇编。<b>这是唯一做优化的阶段</b></td></tr>
+    <tr><td><b>汇编</b></td><td class="f">gcc -c</td><td class="f">as</td><td class="f">.s → .o</td><td>把汇编翻译成机器码，生成<b>可重定位目标文件</b>。此时地址全是占位</td></tr>
+    <tr><td><b>链接</b></td><td class="f">gcc</td><td class="f">collect2 → ld</td><td class="f">.o + .a/.so → 可执行</td><td>合并段、解析符号、做重定位、生成最终地址</td></tr>
+  </table>
+  <pre><span class="c"># 看预处理到底做了什么：行数会从几十行涨到几千行</span>
+wc -l main.c main.i
+head -5 main.i          <span class="c"># 一堆 typedef 和 extern 声明，来自 stdio.h</span>
+
+<span class="c"># 只看用户代码的预处理结果，屏蔽系统头文件的行号标记</span>
+gcc -E -P main.c | tail -20
+
+<span class="c"># 看生成的汇编（-S 已含优化，加 -fverbose-asm 保留变量名注释）</span>
+gcc -S -O2 -fverbose-asm main.c -o -
+cat main.s
+
+<span class="c"># 看目标文件的段和符号</span>
+readelf -S main.o       <span class="c"># 段表：.text/.data/.bss/.rodata 各多大</span>
+readelf -s main.o       <span class="c"># 符号表：每个符号的定义状态</span>
+readelf -r main.o       <span class="c"># 重定位表：哪些位置等着链接器来填</span></pre>
+  <div class="callout">
+    <b>关键认知：<span class="k">.o</span> 文件里的地址不是最终地址。</b>编译 <span class="k">main.c</span> 时编译器不知道 <span class="k">add()</span> 会被放在哪，也不知道 <span class="k">printf</span> 在哪个库。它只能生成一条"调用一个占位地址"的指令，并在重定位表里记一笔：<b>此处需要填入符号 add 的地址</b>。填这个坑，就是链接器的工作。
+  </div>
+  <p>这也解释了为什么<b>编译错误和链接错误必须分开看</b>：编译错误是单个 <span class="k">.c</span> 文件内部的问题（语法、类型、找不到头文件）；链接错误是<b>跨文件</b>的问题（符号找不到、重复定义、库的顺序不对）。报错信息的形态完全不同，前者带行号和列号，后者只有符号名。</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>预处理与宏：文本替换的代价</h2></div>
+  <p class="lead">预处理器的本质是<b>一个不理解 C 语法的文本替换器</b>。它不知道类型、不知道作用域、不做任何检查。所有"宏引发的诡异 bug"都源于这一点。</p>
+  <h4>宏的三个经典陷阱</h4>
+  <pre><span class="c">// 陷阱 1：没有括号，优先级被破坏</span>
+#define SQUARE(x) x * x
+SQUARE(1 + 2)        <span class="c">// 展开成 1 + 2 * 1 + 2 = 5，不是 9</span>
+<span class="c">// 正确：#define SQUARE(x) ((x) * (x))</span>
+
+<span class="c">// 陷阱 2：参数被求值多次</span>
+#define MAX(a, b) ((a) &gt; (b) ? (a) : (b))
+MAX(i++, j++)        <span class="c">// i 和 j 各被自增两次，结果未定义</span>
+<span class="c">// 正确：用 inline 函数，或 GCC 的 typeof 扩展（不可移植）</span>
+
+<span class="c">// 陷阱 3：宏没有作用域，也不受命名空间约束</span>
+#define max(a, b) ...
+<span class="c">// 之后任何叫 max 的函数、变量、成员都会被替换掉，包括 &lt;algorithm&gt; 里的 std::max</span></pre>
+  <h4><span class="k">#include</span> 到底做了什么</h4>
+  <p>它就是<b>把目标文件的全部内容原地粘贴进来</b>，没有任何模块或命名空间的概念。所以：</p>
+  <ul>
+    <li>头文件里<b>只能放声明</b>（<span class="k">extern</span> 变量、函数原型、类型定义、宏），不能放定义。放了定义，被两个 <span class="k">.c</span> 包含就会重复定义。</li>
+    <li>头文件必须用 include guard（<span class="k">#ifndef</span> 或 <span class="k">#pragma once</span>）防重复包含。缺了它，A 包含 B 和 C、B 和 C 又都包含 D 时，D 会被展开两次，类型重定义直接编译失败。</li>
+    <li><span class="k">#include &lt;stdio.h&gt;</span> 用尖括号是<b>只在系统头文件路径里找</b>，<span class="k">#include "x.h"</span> 用引号是<b>先找当前文件所在目录</b>，再找系统路径。这个区别在交叉编译时经常出问题。</li>
+    <li>一个 <span class="k">.c</span> 包含 10 个常用头文件，预处理后轻松几万行。<b>编译慢的一大半时间花在重复解析这些头文件上</b>，这就是预编译头（PCH）和 C++20 modules 想解决的问题。</li>
+  </ul>
+  <pre><span class="c"># 看头文件搜索路径（顺序即优先级）</span>
+gcc -E -v -x c /dev/null 2&gt;&amp;1 | sed -n '/search starts here/,/End of search list/p'
+
+<span class="c"># 只生成依赖关系，不编译（构建系统用它跟踪头文件变化）</span>
+gcc -M main.c
+gcc -MM main.c          <span class="c"># 排除系统头文件，输出更干净</span>
+
+<span class="c"># 展开所有宏后看某个宏到底是什么（排查库里宏定义冲突）</span>
+gcc -E -dM -x c /dev/null | grep -i _GNU_SOURCE</pre>
+  <div class="callout warn">
+    <b>什么时候该用宏，什么时候不该：</b>需要<b>编译期</b>决定的东西只能用宏 —— 条件编译（<span class="k">#ifdef DEBUG</span>）、头文件保护、字符串化（<span class="k">#x</span>）、拼接标识符（<span class="k">a##b</span>）、跨平台分支。<b>凡是能用 <span class="k">const</span> / <span class="k">constexpr</span> / <span class="k">inline</span> / 模板表达的，都不要用宏</b> —— 后者有类型检查、有作用域、能在调试器里看到。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>编译优化与未定义行为</h2></div>
+  <table>
+    <tr><th style="width:80px">级别</th><th>大致做了什么</th><th style="width:150px">适用</th></tr>
+    <tr><td class="f">-O0</td><td>几乎不优化。每个变量都在栈上有位置，每条语句对应一段独立指令</td><td>调试。断点、单步、看变量都符合直觉</td></tr>
+    <tr><td class="f">-O1</td><td>删死代码、合并常量、简单的寄存器分配。编译快，体积和速度都有改善</td><td>需要可调试又想快一点</td></tr>
+    <tr><td class="f">-O2</td><td>在此基础上加指令调度、循环优化、函数内联（保守）、<b>基于别名的优化</b></td><td><b>生产环境的默认选择</b></td></tr>
+    <tr><td class="f">-O3</td><td>更激进的内联、向量化（SIMD）、循环展开</td><td>计算密集；<b>体积膨胀，可能因 cache 压力反而变慢</b></td></tr>
+    <tr><td class="f">-Os / -Oz</td><td>以体积为目标的优化</td><td>嵌入式、镜像大小敏感的场景</td></tr>
+    <tr><td class="f">-Og</td><td>为调试设计的优化级别，保留大部分可调试性</td><td>开发期想要 -O1 的性能又不想丢断点</td></tr>
+  </table>
+  <h4>为什么 -O2 下断点会"失效"</h4>
+  <p>不是 gdb 坏了，是<b>代码已经不存在了</b>。三种情况：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>变量被优化进寄存器。</b>栈上没有这个变量了，gdb 只能显示 <span class="k">&lt;optimized out&gt;</span>。想看只能在关键位置加 <span class="k">volatile</span> 或打印日志。</div></div>
+    <div class="step"><div class="txt"><b>函数被内联。</b>调用点直接展开成函数体，符号表里没有这个函数，断点打不上。用 <span class="k">__attribute__((noinline))</span> 可以临时禁掉。</div></div>
+    <div class="step"><div class="txt"><b>语句被重排或合并。</b>源码第 10 行和第 12 行可能对应同一段指令，单步时行号会来回跳。这是<b>编译器重排</b>，不是调试信息错了。</div></div>
+  </div>
+  <pre><span class="c"># 编译时带上调试信息（-g 与优化级别互不冲突）</span>
+gcc -O2 -g -o app main.c mathx.c
+
+<span class="c"># 想看变量真实值：用 -Og 开发，或对关键变量加 volatile</span>
+<span class="c"># 想看汇编与源码的对应关系</span>
+objdump -dS --no-show-raw-insn app | less
+
+<span class="c"># 看内联决策（GCC 会输出每个函数为什么被内联/拒绝内联）</span>
+gcc -O2 -fopt-info-inline -c main.c -o /dev/null</pre>
+  <h4>未定义行为在优化下的表现</h4>
+  <p>这是 C/C++ 最反直觉的部分。UB（Undefined Behavior，未定义行为）不是"结果不确定"，而是<b>编译器可以假设它永远不会发生</b>，并据此删掉代码。</p>
+  <pre><span class="c">// 典型例子：有符号整数溢出是 UB</span>
+int check(int x) {
+    if (x + 1 &gt; x) return 1;   <span class="c">// 编译器推理：若 x+1 溢出则 UB，而 UB 不可能发生</span>
+    return 0;                   <span class="c">// 所以 x+1 必然大于 x，这个分支是死代码</span>
+}
+
+<span class="c">// gcc -O2 的实际输出：整个函数变成 return 1</span>
+<span class="c">// 也就是说，当 x == INT_MAX 时，这段代码返回 1，而"朴素"的机器语义应该是 0</span>
+
+<span class="c">// 另一个经典：空指针解引用会被当作"此指针非空"的证据</span>
+void f(int *p) {
+    int x = *p;        <span class="c">// 若 p 为空则 UB</span>
+    if (p == NULL) {   <span class="c">// 编译器据此推断 p 一定非空 → 整个 if 被删掉</span>
+        abort();
+    }
+}</pre>
+  <div class="callout danger">
+    <b>工程结论：</b>① <b>把 <span class="k">-Wall -Wextra</span> 当成最低配置</b>，再加 <span class="k">-Wstrict-overflow</span>、<span class="k">-Wnull-dereference</span>；② 需要"溢出回绕"语义时用<b>无符号</b>类型（无符号溢出是定义良好的模运算），或显式写 <span class="k">__builtin_add_overflow</span>；③ 用 <b>UBSan</b>（<span class="k">-fsanitize=undefined</span>）在测试环境跑一遍，它会在运行时抓住这些行为，成本远低于上线后排查；④ <b>不要用"我在 -O0 下测过没问题"来论证正确性</b>，-O0 和 -O2 的语义差异足以让 UB 表现完全不同。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>目标文件与符号</h2></div>
+  <p class="lead">ELF（Executable and Linkable Format，可执行与可链接格式）文件用<b>段（section）</b>组织内容。链接器看的是段，加载器看的是段表映射出来的 segment，两套概念经常被混用。</p>
+  <table>
+    <tr><th style="width:120px">段</th><th style="width:110px">内容</th><th>为什么放这里</th></tr>
+    <tr><td class="f">.text</td><td>机器指令</td><td>只读可执行，多进程可共享同一份物理页</td></tr>
+    <tr><td class="f">.rodata</td><td>只读数据：字符串字面量、<span class="k">const</span> 全局、跳转表</td><td>写入会触发段错误，能提前暴露越界写</td></tr>
+    <tr><td class="f">.data</td><td><b>已初始化且非 0</b> 的全局/静态变量</td><td>必须在文件里存初值</td></tr>
+    <tr><td class="f">.bss</td><td><b>未初始化或初值为 0</b> 的全局/静态变量</td><td><b>只记录大小，不占文件空间</b>，加载时由内核清零</td></tr>
+    <tr><td class="f">.symtab / .strtab</td><td>符号表与字符串表</td><td>链接时需要；<span class="k">strip</span> 后消失，不影响运行</td></tr>
+    <tr><td class="f">.rela.text</td><td>代码段的重定位表</td><td>记录"哪个偏移处需要填哪个符号的地址"</td></tr>
+    <tr><td class="f">.plt / .got</td><td>过程链接表 / 全局偏移表</td><td>动态链接的跳转与地址存储（见模块 5）</td></tr>
+    <tr><td class="f">.dynamic / .dynsym</td><td>动态段与动态符号表</td><td>运行时动态链接器靠它找依赖和符号</td></tr>
+  </table>
+  <div class="callout">
+    <b>.bss 为什么能省空间：</b>一个 100MB 的全局数组 <span class="k">char buf[100*1024*1024];</span> 如果放在 <span class="k">.data</span>，可执行文件就会真的大 100MB。<b>放在 <span class="k">.bss</span>，文件里只多一条"需要 100MB 零初始化空间"的记录</b>，加载时内核用零页映射，实际内存按需分配。这是嵌入式和大数组场景必须知道的细节。
+  </div>
+  <h4>符号表怎么看</h4>
+  <pre><span class="c"># nm 的字母含义：大写=全局，小写=局部</span>
+<span class="c"># T/t 代码段   D/d 已初始化数据   B/b 未初始化数据   R/r 只读数据</span>
+<span class="c"># U 未定义（本文件引用、别处定义）   W 弱符号</span>
+nm main.o
+<span class="c">#                  U add          ← 只声明，没定义，等链接器填</span>
+<span class="c"># 0000000000000000 T main         ← 本文件定义</span>
+<span class="c"># 0000000000000004 D g_counter    ← 已初始化全局</span>
+<span class="c"># 0000000000000004 B g_zero       ← 未初始化全局</span>
+<span class="c">#                  U printf</span>
+
+<span class="c"># C++ 符号被 mangle，-C 反解成人能看的形式</span>
+nm -C libfoo.so | grep add
+<span class="c"># 0000000000001139 T add(int, int)   ← 原始符号是 _Z3addii</span>
+
+<span class="c"># 看某个符号在哪个库里定义</span>
+nm -A /usr/lib/x86_64-linux-gnu/*.a 2&gt;/dev/null | grep " T add"</pre>
+  <h4>重定位表</h4>
+  <p>编译 <span class="k">main.c</span> 时，<span class="k">call add</span> 这条指令后面跟的地址是 <span class="k">0</span>，同时在 <span class="k">.rela.text</span> 里留一条记录：<b>偏移 0x12 处，填入符号 add 的地址，类型 R_X86_64_PLT32</b>。链接器扫描所有 <span class="k">.o</span>，把同名符号合并、分配最终地址，再逐条回填。</p>
+  <pre><span class="c"># 看重定位条目</span>
+readelf -r main.o
+<span class="c"># Offset          Info           Type            Sym. Name + Addend</span>
+<span class="c"># 000000000012  000500000004 R_X86_64_PLT32   add - 4</span>
+
+<span class="c"># 链接后这些条目应该全部消失（静态链接的情况下）</span>
+readelf -r app | head</pre>
+  <div class="callout warn">
+    <b>静态库的链接顺序是有讲究的。</b>链接器从左到右扫描命令行，<b>静态库只被扫描一次</b>，且只取出"当前还有未定义符号"的那些成员。所以 <span class="k">gcc main.o -lfoo -lbar</span> 里，如果 foo 依赖 bar，bar 必须放在 foo 后面；如果顺序反了，链接器扫 bar 时还不需要它，扫 foo 时产生的未定义符号就没人管了，报 undefined reference。<b>解法：把被依赖的库放右边，或者用 <span class="k">-Wl,--start-group ... -Wl,--end-group</span> 让链接器反复扫描。</b>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>静态链接、动态链接与 PIC</h2></div>
+  <table>
+    <tr><th style="width:110px">维度</th><th>静态链接</th><th>动态链接</th></tr>
+    <tr><td>产物</td><td>所有用到的代码都复制进可执行文件</td><td>只记录依赖（NEEDED），运行时加载 .so</td></tr>
+    <tr><td>体积</td><td>大（每个程序各带一份 libc）</td><td>小（多个进程共享同一份 .so 的物理页）</td></tr>
+    <tr><td>启动</td><td>快，没有符号解析和库加载</td><td>慢，要做库定位、符号绑定、重定位</td></tr>
+    <tr><td>部署</td><td>拷一个文件就能跑，<b>适合容器和救援工具</b></td><td>需要目标机上有兼容版本的库</td></tr>
+    <tr><td>升级</td><td>换库必须重新链接整个程序</td><td>替换 .so 即可（<b>前提是 ABI 兼容</b>）</td></tr>
+    <tr><td>内存</td><td>每个进程独立一份</td><td>代码段共享，只有数据段各一份</td></tr>
+  </table>
+  <h4>PIC：为什么共享库必须是位置无关的</h4>
+  <p>共享库被映射到哪个虚拟地址，在编译时是<b>不知道的</b>，而且不同进程可能映射到不同地址（ASLR）。如果代码里写死了绝对地址，就没法共享。PIC（Position Independent Code，位置无关代码）解决这个问题：</p>
+  <ul>
+    <li><b>模块内部的访问</b>用 RIP 相对寻址（"相对当前指令指针偏移多少"），天然与加载地址无关。</li>
+    <li><b>访问外部全局变量</b>走 <b>GOT</b>（Global Offset Table，全局偏移表）：代码里只放"GOT 表项的位置"，GOT 里存的才是变量的真实绝对地址。加载时动态链接器把 GOT 填好。</li>
+    <li><b>调用外部函数</b>走 <b>PLT</b>（Procedure Linkage Table，过程链接表）：每个外部函数对应一小段跳板代码，第一次调用时跳到动态链接器去解析真实地址并写回 GOT，之后直接跳。</li>
+  </ul>
+  <pre><span class="c"># 对比：不加 -fPIC 的代码里有绝对地址，加了的全是相对寻址</span>
+gcc -O2 -fno-pic -c mathx.c -o m_nopic.o
+gcc -O2 -fPIC   -c mathx.c -o m_pic.o
+objdump -d m_nopic.o | head -20
+objdump -d m_pic.o   | head -20
+
+<span class="c"># 看 GOT / PLT 里有什么</span>
+objdump -d -j .plt app
+readelf -r app | grep -E "GLOB_DAT|JUMP_SLOT"
+
+<span class="c"># 看程序依赖哪些库、需要哪些符号</span>
+readelf -d app | grep NEEDED
+objdump -T app | grep UND</pre>
+  <div class="callout">
+    <b>延迟绑定（lazy binding）：</b>默认情况下，<span class="k">printf</span> 的地址在第一次调用时才解析，而不是启动时。好处是启动快（没调用到的函数不花解析时间），坏处是第一次调用的延迟抖动，且 GOT 必须可写（有被攻击篡改的风险）。<br>
+    要关掉它：链接时加 <span class="k">-Wl,-z,now</span>（立即绑定），配合 <span class="k">-Wl,-z,relro</span> 让 GOT 在重定位后变成只读（Full RELRO）。<b>安全敏感的服务建议默认开启</b>，代价是启动稍慢。
+  </div>
+  <h4>为什么动态链接启动慢</h4>
+  <table>
+    <tr><th style="width:200px">开销来源</th><th>说明</th></tr>
+    <tr><td>库定位与 mmap</td><td>每个依赖都要在搜索路径里找到、打开、映射，依赖还有传递闭包（A 依赖 B，B 又依赖 C）</td></tr>
+    <tr><td>符号解析</td><td>把所有未定义符号在依赖树里查一遍。C++ 程序符号多，这一步能到几十毫秒</td></tr>
+    <tr><td>重定位</td><td>逐条改写 GOT/数据段里的地址。RELRO 关闭时还要改代码段</td></tr>
+    <tr><td>缺页中断</td><td>.so 的代码页是懒加载的，第一次执行到才从磁盘读，冷启动时这部分很可观</td></tr>
+  </table>
+  <pre><span class="c"># 量化启动时的动态链接开销</span>
+LD_DEBUG=statistics ./app 2&gt;&amp;1 | head -20
+<span class="c"># 输出里有 total startup time in dynamic loader 一项，单位是 cycles</span>
+
+<span class="c"># 看符号绑定过程（量很大，建议只对小程序用）</span>
+LD_DEBUG=bindings ./app 2&gt;&amp;1 | head -40
+
+<span class="c"># 用 strace 看打开和 mmap 了哪些库</span>
+strace -e trace=openat,mmap ./app 2&gt;&amp;1 | grep "\.so" | head</pre>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>三类链接错误怎么破</h2></div>
+  <h4>第一类：undefined reference</h4>
+  <p>含义很明确：<b>某个符号被引用（U），但链接器在所有输入里都没找到定义</b>。按下面的顺序排查，基本一次命中。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>确认是真的没定义。</b><span class="k">nm -C 目标文件 | grep 符号名</span>。显示 <span class="k">U</span> 说明只有引用；如果连 <span class="k">U</span> 都没有，说明这个 <span class="k">.o</span> 根本没参与链接。</div></div>
+    <div class="step"><div class="txt"><b>确认库加上了。</b>忘了 <span class="k">-lm</span>（数学库）、<span class="k">-lpthread</span>（老版本 glibc 的线程库）是最常见的两个。现代 glibc 已经把 pthread 合进 libc，但显式加仍然更稳。</div></div>
+    <div class="step"><div class="txt"><b>检查静态库的顺序。</b>被依赖的放右边，或者用 <span class="k">--start-group/--end-group</span> 包起来。</div></div>
+    <div class="step"><div class="txt"><b>C/C++ 混用检查 <span class="k">extern "C"</span>。</b>C++ 编译器会把 <span class="k">add(int,int)</span> 变成 <span class="k">_Z3addii</span>，而 C 库导出的是 <span class="k">add</span>，名字对不上必然找不到。</div></div>
+    <div class="step"><div class="txt"><b>检查 <span class="k">#ifdef</span> 分支。</b>库可能因为没开某个编译选项，把函数编成了空实现或干脆没编进去。</div></div>
+  </div>
+  <h4>第二类：multiple definition</h4>
+  <p>同一个符号在两个 <span class="k">.o</span> 里都有<b>强定义</b>。九成的原因是在头文件里写了变量的定义，然后被多个源文件包含。</p>
+  <pre><span class="c">// 错误：头文件里定义了变量，每个包含它的 .c 都会生成一份</span>
+int g_counter = 0;              <span class="c">// 放在 .h 里 → 两个 .o 各有一份 → 重复定义</span>
+
+<span class="c">// 正确：头文件里只声明</span>
+extern int g_counter;           <span class="c">// 声明</span>
+<span class="c">// 在且仅在一个 .c 里定义</span>
+int g_counter = 0;</pre>
+  <div class="callout warn">
+    <b>GCC 10 的一个破坏性变化：</b>以前 <span class="k">int g_counter;</span>（不带初值）是<b>暂定定义</b>（tentative definition），多个 <span class="k">.o</span> 里出现会被链接器合并成一个（<span class="k">-fcommon</span>）。<b>GCC 10 起默认改成 <span class="k">-fno-common</span></b>，同样写法直接报 multiple definition。老项目升级编译器时集体爆炸，通常就是这个原因。临时兼容可以加 <span class="k">-fcommon</span>，正解还是改成 <span class="k">extern</span> 声明 + 单点定义。
+  </div>
+  <p>另外，<b>头文件里定义的 inline 函数</b>不会重复（<span class="k">inline</span> 有特殊链接语义），但<b>头文件里定义的普通函数</b>会。模板和类内定义的成员函数也是隐式 inline，所以安全。</p>
+  <h4>第三类：ABI 不兼容</h4>
+  <p>ABI（Application Binary Interface，应用二进制接口）是"编译后的约定"：结构体布局、参数传递方式、名字修饰规则、异常处理机制、标准库对象的内部布局。<b>源码兼容不代表 ABI 兼容。</b></p>
+  <table>
+    <tr><th style="width:210px">破坏 ABI 的改动</th><th>后果</th></tr>
+    <tr><td>给类<b>中间</b>插入成员变量</td><td>所有成员的偏移量变化，老代码按老偏移读写，数据错乱（不是崩溃，更难查）</td></tr>
+    <tr><td>增加/删除虚函数</td><td>虚表（vtable）布局变化，虚调用跳到错误的函数</td></tr>
+    <tr><td>改变函数签名或默认参数</td><td>名字修饰结果变化，运行时找不到符号</td></tr>
+    <tr><td>换编译器大版本（如 GCC 4 → 5）</td><td><span class="k">std::string</span> / <span class="k">std::list</span> 换了实现，受 <span class="k">_GLIBCXX_USE_CXX11_ABI</span> 控制，两种 ABI 不能混链</td></tr>
+    <tr><td>Debug 与 Release 混链</td><td><span class="k">_GLIBCXX_DEBUG</span> 会改变容器的布局和大小</td></tr>
+  </table>
+  <pre><span class="c"># 看一个 C++ 符号被 mangle 成什么（用 c++filt 反解）</span>
+echo "_Z3addii" | c++filt          <span class="c"># add(int, int)</span>
+nm -C app | grep add               <span class="c"># 直接看反解后的名字</span>
+
+<span class="c"># 检查一个库用的是哪套 string ABI</span>
+nm -D libfoo.so | grep -c "__cxx11"    <span class="c"># 非 0 表示用了新 ABI（GCC 5 及以后）</span>
+nm -D libfoo.so | grep -c "_ZNSs"      <span class="c"># 非 0 表示用了老 ABI（GCC 4.x）</span>
+
+<span class="c"># 对比两个版本的导出符号差异（升级库之前必做）</span>
+diff &lt;(nm -D --defined-only libfoo.so.1.0 | awk '{print $3}' | sort) \
+     &lt;(nm -D --defined-only libfoo.so.1.1 | awk '{print $3}' | sort)</pre>
+  <div class="callout danger">
+    <b>最难查的一类：链接期正常，运行期崩溃或结果错乱。</b>编译时符号名对得上（因为签名没变），但结构体布局变了。表现是"某个字段莫名其妙变成别的值""析构时堆损坏"。<b>对策是版本化发布：库的 ABI 变了就升 soname</b>（见模块 7），让新旧版本可以共存，而不是偷偷替换。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>库的版本管理：soname 与查找路径</h2></div>
+  <p class="lead">Linux 上的共享库有<b>三个名字</b>，各管一件事。搞不清这三个名字，就永远理不清"为什么编译过了运行却找不到"。</p>
+  <table>
+    <tr><th style="width:170px">名字</th><th style="width:200px">示例</th><th>谁用</th></tr>
+    <tr><td><b>真实文件名</b></td><td class="f">libfoo.so.1.2.3</td><td>实际存放的文件，含完整版本号</td></tr>
+    <tr><td><b>soname</b></td><td class="f">libfoo.so.1</td><td><b>运行时</b>。链接时用 <span class="k">-Wl,-soname,libfoo.so.1</span> 写进库的 <span class="k">.dynamic</span> 段，可执行文件记录的是它</td></tr>
+    <tr><td><b>链接名</b></td><td class="f">libfoo.so</td><td><b>编译时</b>。<span class="k">-lfoo</span> 找的就是这个，通常是开发包提供的符号链接</td></tr>
+  </table>
+  <pre><span class="c"># 构建一个规范的共享库</span>
+gcc -O2 -fPIC -shared -Wl,-soname,libfoo.so.1 -o libfoo.so.1.2.3 foo.c
+ln -sf libfoo.so.1.2.3 libfoo.so.1     <span class="c"># 运行时找这个</span>
+ln -sf libfoo.so.1     libfoo.so       <span class="c"># 编译时找这个（属于 -devel 包）</span>
+ldconfig                                <span class="c"># 刷新缓存</span>
+
+<span class="c"># 看一个可执行文件到底需要哪个 soname</span>
+readelf -d app | grep NEEDED
+<span class="c"># 0x0000000000000001 (NEEDED)  Shared library: [libfoo.so.1]</span></pre>
+  <h4>动态链接器的查找顺序</h4>
+  <p>这个顺序是固定的，按优先级从高到低：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>DT_RPATH</b>（可执行文件里写死的路径）。已废弃，如果同时存在 DT_RUNPATH 则被忽略。</div></div>
+    <div class="step"><div class="txt"><b><span class="k">LD_LIBRARY_PATH</span></b> 环境变量。方便调试，<b>不适合生产</b>。</div></div>
+    <div class="step"><div class="txt"><b>DT_RUNPATH</b>（链接时用 <span class="k">-Wl,-rpath</span> 写入）。注意它<b>只对本直接依赖生效，不传递给间接依赖</b>，这是和 RPATH 的关键区别。</div></div>
+    <div class="step"><div class="txt"><b><span class="k">/etc/ld.so.cache</span></b>。由 <span class="k">ldconfig</span> 扫描 <span class="k">/etc/ld.so.conf</span> 和 <span class="k">/etc/ld.so.conf.d/*.conf</span> 生成，是生产环境的标准做法。</div></div>
+    <div class="step"><div class="txt"><b>默认路径</b> <span class="k">/lib</span>、<span class="k">/usr/lib</span>（以及 64 位系统上的 <span class="k">/lib64</span>、<span class="k">/usr/lib64</span>）。</div></div>
+  </div>
+  <h4>"找不到 .so" 的排查顺序</h4>
+  <pre><span class="c"># 1. 先确认到底缺哪个（报错信息里通常有 soname）</span>
+./app
+<span class="c"># error while loading shared libraries: libfoo.so.1: cannot open shared object file</span>
+
+<span class="c"># 2. 看依赖清单与 rpath</span>
+readelf -d app | grep -E "NEEDED|RPATH|RUNPATH"
+
+<span class="c"># 3. 看动态链接器实际去哪找了（最直接的一步）</span>
+LD_DEBUG=libs ./app 2&gt;&amp;1 | grep -A2 "libfoo"
+
+<span class="c"># 4. 确认库在不在、soname 对不对</span>
+find / -name "libfoo.so*" 2&gt;/dev/null
+readelf -d /path/to/libfoo.so.1.2.3 | grep SONAME
+
+<span class="c"># 5. 缓存里有没有</span>
+ldconfig -p | grep libfoo
+
+<span class="c"># 6. 临时验证（不要写进生产脚本）</span>
+LD_LIBRARY_PATH=/opt/foo/lib ./app</pre>
+  <div class="callout warn">
+    <b><span class="k">ldd</span> 有坑。</b>它本质上是设置环境变量后运行动态链接器，<b>对不可信的二进制可能执行其中的代码</b>。分析来源不明的文件时，用 <span class="k">objdump -p app | grep NEEDED</span> 或 <span class="k">readelf -d</span> 代替。<br>
+    <b>另一个坑：<span class="k">LD_LIBRARY_PATH</span> 会污染子进程。</b>它会被继承，导致这个 shell 里启动的所有程序都用你的库，包括 <span class="k">ls</span>、<span class="k">systemctl</span>，很容易把系统搞出诡异问题。生产上应该用 rpath 或 ldconfig。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>现代构建系统在解决什么</h2></div>
+  <p class="lead">从手写 <span class="k">gcc a.c b.c</span> 到 CMake、Bazel，解决的其实只有三件事：<b>依赖关系的描述</b>、<b>增量构建的正确性</b>、<b>构建结果的可复用性</b>。</p>
+  <table>
+    <tr><th style="width:120px">工具</th><th style="width:230px">核心模型</th><th>适用</th></tr>
+    <tr><td><b>Make</b></td><td>目标 : 依赖 → 命令，<b>靠文件时间戳</b>判断是否重建</td><td>小项目、脚本编排。跨平台差，头文件依赖要手动生成</td></tr>
+    <tr><td><b>CMake</b></td><td>生成器：写 CMakeLists.txt，生成 Makefile 或 Ninja 文件</td><td>C/C++ 事实标准。<b>target 制</b>（PUBLIC/PRIVATE/INTERFACE）能正确传递编译选项和依赖</td></tr>
+    <tr><td><b>Ninja</b></td><td>只负责"按依赖图最快地执行"，不做配置</td><td>作为 CMake 的后端，比 Make 快很多</td></tr>
+    <tr><td><b>Bazel</b></td><td><b>内容哈希 + 沙箱 + 远程缓存</b>，声明式、可重现</td><td>超大单体仓库、多语言、需要分布式构建</td></tr>
+  </table>
+  <h4>增量构建的原理与它为什么会错</h4>
+  <p>Make 的规则简单到粗暴：<b>目标文件比任一依赖旧，就重新生成</b>。这带来两个经典问题：</p>
+  <ul>
+    <li><b>头文件不在依赖里。</b>只写了 <span class="k">main.o: main.c</span>，改了 <span class="k">mathx.h</span> 不会触发重编，链接出来的还是旧代码。<b>解法是用编译器自动生成依赖</b>：<span class="k">gcc -MMD -MP -c main.c</span> 会额外产出 <span class="k">main.d</span>，里面列全了所有头文件，在 Makefile 里 <span class="k">-include $(DEPS)</span> 即可。</li>
+    <li><b>时间戳不可靠。</b>从 git 切分支、<span class="k">rsync</span> 同步、NFS 时钟漂移，都可能让文件时间倒流或相同，导致"该编的没编"或"每次都全编"。<b>基于内容哈希的构建系统（Bazel、ccache）没有这个问题</b>。</li>
+  </ul>
+  <pre><span class="c"># 自动生成头文件依赖的标准写法</span>
+CFLAGS += -MMD -MP
+<span class="c"># 编译后会得到 main.d，内容形如：</span>
+<span class="c"># main.o: main.c mathx.h</span>
+
+<span class="c"># ccache：把编译结果按"预处理后的源码 + 编译参数 + 编译器版本"哈希缓存</span>
+ccache gcc -O2 -c main.c -o main.o
+ccache -s                    <span class="c"># 看命中率</span>
+<span class="c"># 注意：CCACHE_BASEDIR 和 -fdebug-prefix-map 能让不同路径下的构建命中同一份缓存</span></pre>
+  <h4>分布式构建与远程缓存</h4>
+  <p>Bazel 这类系统的做法是：<b>把每个编译动作的输入（源文件、头文件、编译参数、工具链）全部哈希，得到 action key；输出存进内容寻址存储（CAS）。</b>换一台机器、换一个开发者，只要输入哈希一致，直接下载输出，不重新编译。</p>
+  <p>这要求构建是<b>可重现的</b>：不能依赖当前时间、随机数、绝对路径、环境变量。所以 Bazel 会强制在沙箱里执行每个动作，只暴露声明过的输入。</p>
+  <table>
+    <tr><th style="width:190px">能力</th><th>Make</th><th>CMake+Ninja</th><th>Bazel</th></tr>
+    <tr><td>头文件依赖自动跟踪</td><td>需手动配置</td><td>自动（编译器 -MMD）</td><td>自动（沙箱强制声明）</td></tr>
+    <tr><td>跨平台</td><td>差</td><td>好</td><td>好</td></tr>
+    <tr><td>本地增量</td><td>时间戳</td><td>时间戳 + deps</td><td>内容哈希</td></tr>
+    <tr><td>远程/分布式缓存</td><td>无</td><td>需配合 ccache/sccache</td><td>原生支持</td></tr>
+    <tr><td>学习成本</td><td>低</td><td>中</td><td>高</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>选型建议：</b>库或中小项目用 <b>CMake + Ninja</b>，生态最全，IDE 和包管理器（vcpkg、Conan）都支持。单一语言、几十万行以内的服务，Make 也够用。<b>只有在仓库大到"改一行要编半小时"、或者需要跨团队共享构建缓存时，Bazel 的复杂度才划得来。</b>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">常见坑</span><h2>十个踩过才知道的坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">在头文件里定义全局变量</div><div class="pd">被两个 .c 包含就 multiple definition。头文件里只能 extern 声明，定义放在某一个 .c 里。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">静态库链接顺序写反</div><div class="pd">链接器从左到右只扫一遍静态库。被依赖的库要放右边，或者用 -Wl,--start-group 包起来强制多轮扫描。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">用 -O2 编译然后抱怨断点打不上、变量看不了</div><div class="pd">变量进了寄存器、函数被内联、语句被重排。开发用 -Og，或者对关键变量加 volatile，别指望 -O2 下还能逐行调试。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用 -O0 的测试结果证明代码正确</div><div class="pd">有符号溢出、空指针解引用这类 UB，在 -O2 下会被编译器当成"不可能发生"而删掉分支。用 UBSan 在测试环境跑一遍才靠谱。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">C 和 C++ 混用，忘了 extern "C"</div><div class="pd">C++ 会把函数名 mangle 成 _Z3addii，C 库导出的是 add，链接期直接 undefined reference。给 C 头文件加 #ifdef __cplusplus extern "C" { 包起来。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">替换 .so 却不升 soname</div><div class="pd">ABI 变了但文件名没变，老程序加载新库，符号名对得上但结构体布局变了，运行期数据错乱。ABI 变更必须升 soname，让新旧版本共存。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">生产环境用 LD_LIBRARY_PATH 指定库</div><div class="pd">会被子进程继承，污染整个会话；顺序也容易被其他变量覆盖。用 rpath 或 ldconfig 才是可运维的做法。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">静态链接 glibc 后 getaddrinfo 行为异常</div><div class="pd">glibc 的 NSS（名字服务切换）靠 dlopen 动态加载 libnss_* 模块，静态链接下无法工作。要静态链接又需要域名解析，得改用 musl 或显式处理 NSS 依赖。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">Makefile 不跟踪头文件依赖</div><div class="pd">改了 .h 不重编，跑的还是旧逻辑，排查半天以为是编译器 bug。加 -MMD -MP 并 include 生成的 .d 文件。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用 ldd 分析来源不明的二进制</div><div class="pd">ldd 会以运行方式加载目标程序，恶意文件可借此执行代码。改用 objdump -p 或 readelf -d 只读解析。</div></div></div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一个 100MB 的未初始化全局数组，会让可执行文件变大 100MB 吗？</div>
+      <button class="opt">会，数据必须存在文件里</button>
+      <button class="opt">不会，它在 .bss 段，文件里只记录大小，加载时由内核清零</button>
+      <button class="opt">会，但会被压缩</button>
+      <div class="ans">正确答案：<b>不会</b>。未初始化或初值为 0 的全局变量放在 <span class="k">.bss</span>，不占文件空间。如果给它一个非 0 初值，就会落到 <span class="k">.data</span>，文件真的会变大。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 用 -O2 编译后 gdb 显示变量 &lt;optimized out&gt;，最可能的原因是？</div>
+      <button class="opt">编译时忘了加 -g</button>
+      <button class="opt">gdb 版本太旧</button>
+      <button class="opt">变量被优化进寄存器或直接消除了，栈上没有对应的内存位置</button>
+      <div class="ans">正确答案：<b>变量被优化掉了</b>。-g 只负责生成调试信息，不阻止优化。-O2 下变量可能只存在于寄存器，gdb 无法从内存读。开发期用 -Og，或对关键变量加 volatile。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. gcc main.o -lfoo -lbar 报 undefined reference，但符号确实在 libbar.a 里。最可能的原因是？</div>
+      <button class="opt">链接顺序问题：bar 被依赖却放在右边，应改为 -lbar -lfoo 或用 --start-group</button>
+      <button class="opt">libbar.a 损坏了</button>
+      <button class="opt">必须加 -static 才能链接静态库</button>
+      <div class="ans">正确答案：<b>链接顺序</b>。链接器从左到右扫描，静态库只扫一次。扫 bar 时还不需要它，扫 foo 时产生的未定义符号就没人解析了。被依赖的库要放在依赖者右边。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 共享库必须用 -fPIC 编译，根本原因是？</div>
+      <button class="opt">PIC 能让代码跑得更快</button>
+      <button class="opt">共享库的加载地址在编译时未知，代码必须用相对寻址并通过 GOT 访问外部符号</button>
+      <button class="opt">不加 -fPIC 就无法生成 .so 文件</button>
+      <div class="ans">正确答案：<b>加载地址未知</b>。如果代码里写死绝对地址，多个进程就无法把它映射到不同地址，也无法共享。PIC 用 RIP 相对寻址 + GOT/PLT 解决这个问题。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. soname（如 libfoo.so.1）的作用是？</div>
+      <button class="opt">给开发者看的版本号，没有实际作用</button>
+      <button class="opt">编译时 -lfoo 查找的文件名</button>
+      <button class="opt">运行时动态链接器查找的名字，写在可执行文件的 NEEDED 里</button>
+      <div class="ans">正确答案：<b>运行时的名字</b>。编译时找 <span class="k">libfoo.so</span>，运行时找 <span class="k">libfoo.so.1</span>。soname 在主版本升级（ABI 破坏）时才变，这样新旧版本可以共存。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. C++ 代码调用 C 库函数报 undefined reference，符号名是 _Z3addii。正确做法是？</div>
+      <button class="opt">在 C 头文件里用 extern "C" 包住声明，禁止 C++ 名字修饰</button>
+      <button class="opt">把 C 库用 g++ 重新编译一遍</button>
+      <button class="opt">在链接时加 -fno-mangle</button>
+      <div class="ans">正确答案：<b>extern "C"</b>。C++ 为了支持重载会把函数名修饰成 <span class="k">_Z3addii</span>，而 C 库导出的是 <span class="k">add</span>。<span class="k">extern "C"</span> 让 C++ 按 C 的规则生成符号，链接才能对上。注意 gcc 没有 <span class="k">-fno-mangle</span> 这个选项。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>按场景查命令</h3>
+  <div class="cmds">
+    <div class="crow"><code>gcc -E main.c -o main.i</code><span class="desc">只做预处理，看宏展开结果</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -S -O2 main.c -o main.s</code><span class="desc">生成汇编，看优化后的指令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -c main.c -o main.o</code><span class="desc">只编译不链接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -v main.c -o app</code><span class="desc">看驱动实际调用的每个子命令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>readelf -S main.o</code><span class="desc">看段表：.text/.data/.bss 各多大</span><button class="copy">复制</button></div>
+    <div class="crow"><code>readelf -s main.o</code><span class="desc">看符号表，U 表示未定义</span><button class="copy">复制</button></div>
+    <div class="crow"><code>readelf -r main.o</code><span class="desc">看重定位条目</span><button class="copy">复制</button></div>
+    <div class="crow"><code>readelf -d app | grep NEEDED</code><span class="desc">看依赖的 soname</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nm -C app | grep 符号</code><span class="desc">反解 C++ 符号，查定义状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>objdump -dS app</code><span class="desc">反汇编并混排源码</span><button class="copy">复制</button></div>
+    <div class="crow"><code>objdump -p app | grep NEEDED</code><span class="desc">安全地看依赖（替代 ldd）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>LD_DEBUG=libs ./app</code><span class="desc">看动态链接器的库查找过程</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ldconfig -p | grep libfoo</code><span class="desc">查缓存里有没有这个库</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -MMD -MP -c main.c</code><span class="desc">生成头文件依赖的 .d 文件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gcc -fsanitize=undefined -g app.c</code><span class="desc">运行时抓 UB</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ccache -s</code><span class="desc">看编译缓存命中率</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>常用链接参数</h3>
+  <pre><span class="c"># 生成共享库（三件套缺一不可）</span>
+gcc -O2 -fPIC -shared -Wl,-soname,libfoo.so.1 -o libfoo.so.1.0.0 foo.c
+
+<span class="c"># 指定 rpath（写进 ELF，运行时优先于 ld.so.cache）</span>
+gcc main.o -L. -lfoo -Wl,-rpath,'$ORIGIN/../lib' -o app
+<span class="c"># $ORIGIN 表示可执行文件所在目录，适合打包分发</span>
+
+<span class="c"># 安全加固：立即绑定 + GOT 只读 + 栈不可执行</span>
+gcc -O2 -fstack-protector-strong -Wl,-z,relro,-z,now -o app main.c
+
+<span class="c"># 静态库打包与查看</span>
+ar rcs libfoo.a foo.o bar.o
+ar t libfoo.a
+
+<span class="c"># 强制多轮扫描，解决静态库循环依赖</span>
+gcc main.o -Wl,--start-group -lfoo -lbar -Wl,--end-group -o app
+
+<span class="c"># 减小体积：去掉符号表和未用段</span>
+gcc -O2 -ffunction-sections -fdata-sections -Wl,--gc-sections -s -o app main.c</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>编译单元</b></td><td>一个 .c 文件加上它包含的所有头文件，是编译的最小单位</td></tr>
+    <tr><td><b>可重定位目标文件</b></td><td>.o 文件，地址未定，靠重定位表等链接器填</td></tr>
+    <tr><td><b>ELF</b></td><td>Linux 上的可执行与可链接格式，用段组织代码、数据、符号</td></tr>
+    <tr><td><b>.bss</b></td><td>未初始化全局变量的段，不占文件空间，加载时清零</td></tr>
+    <tr><td><b>符号表</b></td><td>记录每个符号的名字、类型、所在段、定义或未定义</td></tr>
+    <tr><td><b>重定位</b></td><td>把目标文件里的占位地址替换成最终地址的过程</td></tr>
+    <tr><td><b>强符号 / 弱符号</b></td><td>函数和已初始化变量是强符号，重复定义报错；弱符号可被覆盖</td></tr>
+    <tr><td><b>静态链接</b></td><td>把库代码复制进可执行文件，产物独立但体积大</td></tr>
+    <tr><td><b>动态链接</b></td><td>运行时加载 .so，多进程共享代码页，但需解析符号</td></tr>
+    <tr><td><b>PIC</b></td><td>位置无关代码，用相对寻址 + GOT 使代码可在任意地址加载</td></tr>
+    <tr><td><b>GOT</b></td><td>全局偏移表，存放外部符号的绝对地址，加载时由链接器填写</td></tr>
+    <tr><td><b>PLT</b></td><td>过程链接表，外部函数调用的跳板，支持延迟绑定</td></tr>
+    <tr><td><b>延迟绑定</b></td><td>函数第一次被调用时才解析地址，加快启动</td></tr>
+    <tr><td><b>soname</b></td><td>共享库的运行时名字，写在 NEEDED 里，主版本变化时才改</td></tr>
+    <tr><td><b>ABI</b></td><td>二进制层面的约定：结构体布局、调用约定、名字修饰</td></tr>
+    <tr><td><b>name mangling</b></td><td>C++ 把函数签名编码进符号名的机制，用于支持重载</td></tr>
+    <tr><td><b>UB</b></td><td>未定义行为，编译器可假设其永不发生并据此优化</td></tr>
+    <tr><td><b>内联</b></td><td>把函数体直接展开到调用点，省掉调用开销但增大体积</td></tr>
+    <tr><td><b>增量构建</b></td><td>只重建受改动影响的目标，靠时间戳或内容哈希判断</td></tr>
+    <tr><td><b>CAS</b></td><td>内容寻址存储，按内容哈希存放构建产物，供远程缓存复用</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 把示例工程拆成四个阶段各跑一遍，用 <span class="k">wc -l</span> 对比 <span class="k">main.c</span> 和 <span class="k">main.i</span> 的行数；② 写一个头文件里定义变量的例子，制造 multiple definition，再用 <span class="k">extern</span> 修好；③ 故意把 <span class="k">-lfoo -lbar</span> 顺序写反，观察报错并修好；④ 构建一个带 soname 的 .so，用 <span class="k">LD_DEBUG=libs</span> 观察查找过程；⑤ 写一段有符号溢出的代码，分别在 <span class="k">-O0</span> 和 <span class="k">-O2</span> 下运行，对比结果。<br><br>
+    <b>之后值得单独学：</b>GOT/PLT 的具体指令序列（<span class="k">objdump -d -j .plt</span> 逐条读）、符号版本（version script）、LD_PRELOAD 的原理与用途、C++ 的 ODR 规则、以及 LTO（链接时优化）为什么能跨编译单元内联。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟理解编译与链接 · 三个万能动作：readelf 看结构、nm 看符号、LD_DEBUG 看加载</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 4（目标文件与符号）和模块 7（soname 与查找路径）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边用 readelf 和 nm 拆开 .o 文件看。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议开一个 Linux 环境装好 gcc、binutils、gdb，每个阶段都用 -o 停下来看产物';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

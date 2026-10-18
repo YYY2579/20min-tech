@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二十分钟学透高并发系统设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学系列 · 架构篇 · 第 4 期 · 高密度版</span>
+    <h1>二十分钟学透高并发系统设计</h1>
+    <p class="sub">高并发不是“用过高大上的框架”，是<b>算得清账</b>：QPS 和线程数什么关系、MySQL 单机写到多少就打满、连接池多大算合理。这篇全是可以掰着指头算的数字。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip">并发四板斧</span>
+      <span class="chip">容量估算 <b>全公式</b></span>
+      <span class="chip"><b>10</b> 个线上坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">建议准备纸笔或计算器：本篇大量容量估算，跟着算一遍比看懂重要。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>指标体系：QPS/TPS/并发数/响应时间的关系</h2></div>
+  <p class="lead">这四个量不是独立的，一个公式串起来：<b>并发数 = QPS × 平均响应时间</b>（Little's Law 的工程表述）。</p>
+  <table>
+    <tr><th style="width:130px">指标</th><th style="width:200px">定义</th><th>注意</th></tr>
+    <tr><td><b>QPS</b></td><td>每秒查询/请求数（Queries Per Second）</td><td>泛指所有请求，读多写少系统常用</td></tr>
+    <tr><td><b>TPS</b></td><td>每秒事务数（Transactions Per Second）</td><td>一个事务可能含多个请求。写场景（下单/支付）用 TPS 更贴切</td></tr>
+    <tr><td><b>并发数</b></td><td>系统<b>同时处理</b>的请求数</td><td>= QPS × RT。QPS 1万、RT 100ms → 并发 1000</td></tr>
+    <tr><td><b>响应时间 RT</b></td><td>从发请求到收完响应</td><td>看 P99/P999，平均会骗人（长尾才是体验杀手）</td></tr>
+    <tr><td><b>吞吐量</b></td><td>单位时间处理的数据量/业务量</td><td>和 QPS 的区别：1 个请求搬 10MB 和搬 10B 完全不同</td></tr>
+  </table>
+  <pre><span class="c"># 核心公式（Little's Law）：L = λ × W</span>
+<span class="c"># 并发数 L = 到达率 λ(QPS) × 停留时间 W(RT)</span>
+
+<span class="c"># 算例 1：接口 RT 50ms，目标支撑 10,000 QPS</span>
+并发线程需求 = 10000 × 0.05 = <span class="g">500</span> 个线程同时处理
+
+<span class="c"># 算例 2：秒杀峰值 50,000 QPS，RT 200ms（含排队）</span>
+并发 = 50000 × 0.2 = <span class="g">10,000</span> 个在途请求
+<span class="c"># 这意味着：无论你开多少线程，队列/连接/内存都得按 1 万在途设计</span>
+
+<span class="c"># 算例 3：反过来，系统只有 200 个工作线程，RT 最多多少？</span>
+max_qps = 200 / 0.05 = <span class="g">4,000</span> QPS（RT 50ms 时）
+<span class="c"># 超过就排队，RT 线性恶化，直到超时雪崩</span></pre>
+  <div class="callout ok">
+    <b>这张表是后面所有决策的算力基础：</b>扩容要扩到多少、连接池开多大、压测打到什么目标——全部从这三个数（目标 QPS、目标 RT、现有并发容量）推出来，不是拍脑袋。
+  </div>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>并发四板斧：缓存、异步、扩容、隔离</h2></div>
+  <p class="lead">所有高并发手段，逃不出这四类。按成本从低到高、见效从快到慢排：</p>
+  <table>
+    <tr><th style="width:100px">板斧</th><th style="width:230px">手段</th><th style="width:130px">见效</th><th>代价</th></tr>
+    <tr><td><b>缓存</b></td><td>本地缓存（Caffeine）、分布式缓存（Redis）、CDN、浏览器缓存</td><td>分钟级，读提升 10~1000 倍</td><td>一致性窗口、缓存成本、命中率治理</td></tr>
+    <tr><td><b>异步</b></td><td>MQ 削峰、线程池并行、CompletableFuture、非阻塞 IO</td><td>天级，写提升 5~50 倍</td><td>最终一致性、补偿逻辑、调试复杂度</td></tr>
+    <tr><td><b>扩容</b></td><td>水平扩容（加机器）+ 无状态化、分库分表、读写分离</td><td>周级，线性扩展</td><td>数据一致性、分布式复杂度、钱</td></tr>
+    <tr><td><b>隔离</b></td><td>线程池隔离、信号量隔离、集群隔离、业务分级</td><td>天级，防雪崩</td><td>资源利用率下降</td></tr>
+  </table>
+  <h4>隔离的具体做法（以线程池隔离为例）</h4>
+  <pre><span class="c">// 反模式：所有下游调用共用一个线程池</span>
+<span class="b">private static final</span> ExecutorService POOL = Executors.newFixedThreadPool(200);
+
+<span class="c">// 库存服务 RT 从 10ms 劣化到 2s → 200 线程全卡在库存调用上</span>
+<span class="c">// → 支付、优惠券全部拿不到线程 → 全站雪崩（一个慢依赖拖死所有）</span>
+
+<span class="c">// 正解：每个下游一个线程池，配额隔离</span>
+<span class="b">private static final</span> ExecutorService INVENTORY_POOL  = <span class="c">// 库存调用专用</span>
+    <span class="b">new</span> ThreadPoolExecutor(20, 20, 0, MINUTES, <span class="b">new</span> ArrayBlockingQueue&lt;&gt;(200),
+        <span class="b">new</span> ThreadFactoryBuilder().setNameFormat(<span class="y">"inv-%d"</span>).build(),
+        <span class="b">new</span> CallerRunsPolicy());   <span class="c">// 队列满 → 调用方线程执行 → 天然背压</span>
+
+<span class="b">public</span> InventoryVO query(Long skuId) {
+    <span class="b">try</span> {
+        <span class="b">return</span> INVENTORY_POOL.submit(() -&gt; inventoryClient.get(skuId)).get(300, MILLISECONDS);
+    } <span class="b">catch</span> (TimeoutException e) {
+        <span class="b">throw new</span> DownstreamTimeoutException(<span class="y">"inventory"</span>);   <span class="c">// 快速失败，别死等</span>
+    }
+}
+<span class="c">// 库存再慢，最多占 20 线程 + 200 排队，其余业务不受影响</span></pre>
+  <div class="callout warn">
+    <b>Sentinel/Hystrix 的舱壁模式就是线程池隔离的框架化。</b>自研时三个要点：① 每个下游独立池 + 独立队列；② 队列必须<b>有界</b>（无界队列 = 内存耗尽）；③ 拒绝策略明确（快速失败 or 调用方执行，不要静默丢弃）。
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>读写分离与分库分表回顾</h2></div>
+  <h4>读写分离：主写从读</h4>
+  <table>
+    <tr><th style="width:150px">问题</th><th>解法</th></tr>
+    <tr><td><b>主从延迟</b></td><td>写后读走主库（按业务判断：支付后查订单状态）；关键读强制走主；监控 Seconds_Behind_Master，超阈值熔断从库读</td></tr>
+    <tr><td><b>复制延迟放大</b></td><td>大事务会堵复制：DELETE 百万行、一次 INSERT 十万条，从库秒级落后。批量操作必须分批</td></tr>
+    <tr><td><b>连接数翻倍</b></td><td>主库 2000 连接、从库每个 2000，5 个从库 = 1.2 万连接。MySQL 默认 max_connections=151，一定要调且要算内存</td></tr>
+  </table>
+  <h4>分库分表：容量与写入的极限解法</h4>
+  <table>
+    <tr><th style="width:150px">维度</th><th style="width:200px">分库</th><th>分表</th></tr>
+    <tr><td><b>解决</b></td><td>单库连接数/IO/CPU 上限</td><td>单表数据量（B+ 树深度、索引维护成本）</td></tr>
+    <tr><td><b>路由</b></td><td>按 sharding key（user_id % 库数）</td><td>同一库内按 user_id % 表数</td></tr>
+    <tr><td><b>代价</b></td><td>跨库事务（不可能）、跨库 join（不可能）</td><td>分页深翻页、count 全表扫描</td></tr>
+  </table>
+  <pre><span class="c"># 单库单表演进路线（经验值，非定律）</span>
+单表 &lt; 500 万行        → 不用分，索引正常扛
+单表 500 万 ~ 5000 万   → 先优化：归档历史数据、加合适索引、分区表
+单表 &gt; 5000 万 且持续涨 → 分表（同库分表最简单，无跨库问题）
+单库写入 &gt; 3000 TPS    → 分库（先加从库分摊读，再分库分摊写）
+
+<span class="c"># 分片键选择是生死决策：</span>
+<span class="c"># ✓ user_id：数据均匀、查询多带 user_id、同一用户数据在同库（可本地事务）</span>
+<span class="c"># ✗ 时间/状态：热点全在最新分片；order_id 随机：查用户订单要广播所有分片</span>
+
+<span class="c"># 深分页问题：LIMIT 1000000, 10 要扫 100 万行再丢 999990</span>
+<span class="c"># 解法：游标分页 WHERE id &gt; 上一页最大 id LIMIT 10（ O(log n) ）</span>
+<span class="b">SELECT</span> * <span class="b">FROM</span> orders <span class="b">WHERE</span> user_id = ? <span class="b">AND</span> id &gt; ? <span class="b">ORDER BY</span> id <span class="b">LIMIT</span> 10;</pre>
+  <div class="callout danger">
+    <b>分库分表不可逆，上之前必须问三个问题：</b>① 单表真的到 5000 万了吗？（多数项目没有，是运维懒）；② 所有查询都带分片键吗？（按手机号查订单 = 全库路由，方案作废）；③ 有全局 ID、跨片查询、分布式事务的配套方案吗？<b>没有想清楚就分，是给自己埋三年的坑。</b>更推荐先试：归档 + 分区表 + 读写分离。
+  </div>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>连接池调优：数据库与 HTTP 客户端</h2></div>
+  <p class="lead">连接池是“用有界资源服务无界并发”的经典矛盾。开小了排队，开大了把对端打死。</p>
+  <h4>核心公式（HikariCP 官方建议）</h4>
+  <pre><span class="c"># HikariCP 作者的铁律：connections = (core_count * 2) + effective_spindle_count</span>
+<span class="c"># SSD 时代 effective_spindle_count 视为 1（不再按机械盘头数算）</span>
+
+<span class="c"># 算例：4 核 CPU 的应用服务器，SSD 数据库</span>
+pool_size = 4 * 2 + 1 = <span class="g">9</span>   <span class="c"># 对！9 个连接往往比 100 个更快</span>
+
+<span class="c"># 为什么不是越大越好？</span>
+<span class="c"># 1. MySQL 每个连接一个线程，100 个连接 = 100 个线程抢 CPU，上下文切换爆炸</span>
+<span class="c"># 2. InnoDB 内部锁竞争随连接数上升，purge、buffer pool 刷新都被拖慢</span>
+<span class="c"># 3. 连接本身吃内存：每连接 sort_buffer + join_buffer 默认 256KB+128KB</span>
+
+<span class="c"># 多台应用服务器时的总量核算</span>
+10 台应用 × 10 连接 = 100 连接 → 检查 MySQL: max_connections ≥ 100 + 预留 50
+SHOW VARIABLES LIKE 'max_connections';        <span class="c"># 默认 151！</span>
+SHOW STATUS LIKE 'Threads_connected';         <span class="c"># 当前连接数</span>
+SHOW STATUS LIKE 'Aborted_connects';          <span class="c"># 被拒连接，涨了就是不够</span></pre>
+  <h4>HikariCP 关键配置</h4>
+  <table>
+    <tr><th style="width:210px">参数</th><th style="width:150px">建议值</th><th>说明</th></tr>
+    <tr><td class="f">maximumPoolSize</td><td>按公式算，通常 10~20</td><td>别再默认 10 或拍 100</td></tr>
+    <tr><td class="f">minimumIdle</td><td>= maximumPoolSize</td><td>固定池大小，避免伸缩抖动</td></tr>
+    <tr><td class="f">connectionTimeout</td><td>30000（30s，默认）</td><td>等连接超时。<b>压测时别设太短</b>，否则全抛异常看不出队尾</td></tr>
+    <tr><td class="f">maxLifetime</td><td>&lt; MySQL wait_timeout</td><td>默认 1800000（30 分钟）。MySQL 8.0 起 wait_timeout 默认 8h，但防火墙/中间件可能 5 分钟掐断</td></tr>
+    <tr><td class="f">keepaliveTime</td><td>0（禁用）或 &gt; 30s</td><td>保活探测，防中间设备掐长连接</td></tr>
+    <tr><td class="f">leakDetectionThreshold</td><td>60000</td><td>连接借出超 60s 未还就打警告日志，抓连接泄漏神器</td></tr>
+  </table>
+  <h4>HTTP 客户端连接池（OkHttp / Apache HttpClient）</h4>
+  <table>
+    <tr><th style="width:210px">参数</th><th style="width:150px">建议</th><th>理由</th></tr>
+    <tr><td class="f">maxConnections / maxTotal</td><td>按下游容量算，通常 50~200</td><td>超过下游承受能力 = 把对方打挂</td></tr>
+    <tr><td class="f">maxConnectionsPerRoute</td><td>= maxConnections（单下游）</td><td>OkHttp 默认 5！单下游只有 5 条连接，高并发下严重排队</td></tr>
+    <tr><td class="f">connectionTimeout</td><td>1~3s</td><td>建连超时宜短，下游 IP 挂了快速失败</td></tr>
+    <tr><td class="f">readTimeout</td><td>按下游 P99 定，3~10s</td><td>读超时是主要耗时来源，必须设</td></tr>
+    <tr><td class="f">idle connection eviction</td><td>30~60s</td><td>清理空闲连接，防对端掐断后拿到死连接</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>最常见的连接池事故：每次请求 new 一个客户端/连接。</b>HTTP 短连接每次 TCP 握手 + TLS 握手（2 个 RTT 起步），RT 从 5ms 变 30ms，且 TIME_WAIT 堆积耗尽端口。<b>第二个事故：池开得比下游容量大</b>——数据库 max_connections=151，10 台应用各配 50，第 4 台就连不上了。
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>无状态化、会话保持与热点治理</h2></div>
+  <h4>无状态化：水平扩容的前提</h4>
+  <table>
+    <tr><th style="width:170px">状态</th><th>集中化方案</th><th>注意</th></tr>
+    <tr><td>登录会话 Session</td><td>Redis 集中存储，客户端带 sessionId</td><td>Redis 成了关键路径，要主从 + 本地缓存兜底</td></tr>
+    <tr><td>本地文件/缓存</td><td>对象存储（OSS/S3）+ CDN</td><td>本地磁盘扩容无效，是反模式</td></tr>
+    <tr><td>本地定时任务</td><td>分布式调度（XXL-Job/ElasticJob）</td><td>多机部署时定时任务会重复执行 N 次</td></tr>
+    <tr><td>节点内存数据</td><td>Redis + 本地缓存双层</td><td>见本期《缓存架构设计》多级缓存一致性</td></tr>
+  </table>
+  <h4>热点 key：流量倾斜的治理</h4>
+  <ul>
+    <li><b>检测：</b>Redis <span class="k">--hotkeys</span>（LFU 模式下）、客户端埋点统计、Proxy 层统计（twemproxy/Codis 有热点上报）</li>
+    <li><b>本地缓存兜底：</b>热 key 加 Caffeine 本地缓存（TTL 秒级），命中率 99% 的请求根本不到 Redis</li>
+    <li><b>key 复制：</b><span class="k">hotkey#1</span> ~ <span class="k">hotkey#N</span> 多副本散列到不同节点，读随机选一个，写全写 + 短 TTL 容忍不一致</li>
+    <li><b>读扩散：</b>把单个热 key 的 value 拆成多个子 key（如大 list 分段），请求分散到不同 slot</li>
+  </ul>
+  <h4>库存扣减：高并发写的经典题</h4>
+  <pre><span class="c"># 方案演进（按并发量选）</span>
+
+<span class="c"># ① 数据库行锁：UPDATE stock SET n = n - 1 WHERE sku = ? AND n &gt; 0</span>
+<span class="c"># 单行更新 = 串行化，1000 QPS 就是极限，且行锁等待堆积</span>
+
+<span class="c"># ② Redis 预扣（Lua 原子）：扣减在 Redis，异步同步 DB</span>
+<span class="c">-- stock.lua：扣减 + 防超卖 + 防重（同一请求幂等）</span>
+<span class="b">local</span> stock = redis.call(<span class="y">'GET'</span>, KEYS[1])
+<span class="b">if</span> stock == <span class="b">false</span> <span class="b">then</span> <span class="b">return</span> -1 <span class="b">end</span>          <span class="c">-- 未初始化</span>
+<span class="b">local</span> n = <span class="b">tonumber</span>(stock)
+<span class="b">if</span> n &lt;= 0 <span class="b">then</span> <span class="b">return</span> 0 <span class="b">end</span>                 <span class="c">-- 售罄</span>
+<span class="b">local</span> used = redis.call(<span class="y">'SISMEMBER'</span>, KEYS[2], ARGV[1])
+<span class="b">if</span> used == 1 <span class="b">then</span> <span class="b">return</span> -2 <span class="b">end</span>          <span class="c">-- 重复请求</span>
+redis.call(<span class="y">'DECR'</span>, KEYS[1])
+redis.call(<span class="y">'SADD'</span>, KEYS[2], ARGV[1])          <span class="c">-- 记录已扣用户</span>
+<span class="b">return</span> 1
+<span class="c"># 调用：EVAL script 2 stock:sku88 used:sku88 req-abc</span>
+
+<span class="c"># ③ 扣减异步化：Redis 扣成功即返回"抢购成功"，落库走 MQ</span>
+<span class="c"># 用户体验最快；DB 最终一致；超卖的账用对账兜底（Redis 与 DB 库存日终核对）</span>
+
+<span class="c"># ④ 分段库存：10000 件拆 100 段，每段 100 件，请求哈希到段，段内行锁</span>
+<span class="c"># 锁竞争降 100 倍；缺点是某段卖完其他段有余（运营可接受）</span></pre>
+  <div class="callout warn">
+    <b>库存扣减的铁律：Redis 可以快，但数据库必须是最终真相。</b>Redis 丢数据（宕机、淘汰）就会超卖，所以：① Redis 扣减前先落<b>扣减流水</b>（异步批量也行）；② DB 保留兜底校验（<span class="k">WHERE n &gt; 0</span>）；③ 日终对账修复漂移。纯 Redis 扣减不上账，丢一次数据就是一批超卖订单。
+  </div>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>削峰填谷与线程模型</h2></div>
+  <h4>削峰：把脉冲流量摊平</h4>
+  <table>
+    <tr><th style="width:150px">手段</th><th style="width:230px">机制</th><th>适用</th></tr>
+    <tr><td><b>MQ 缓冲</b></td><td>请求进队列，消费者按能力匀速处理</td><td>下单、支付等写流量。用户等待 = 异步结果通知</td></tr>
+    <tr><td><b>漏斗限流</b></td><td>令牌桶/漏桶，超过速率直接拒绝或排队</td><td>保护型场景。拒绝要优雅（排队页/验证码分流）</td></tr>
+    <tr><td><b>答题/验证码</b></td><td>把请求压力转移给客户端，拉长到达间隔</td><td>秒杀防刷。把 1 秒的脉冲摊到 5 秒</td></tr>
+    <tr><td><b>预约开售</b></td><td>提前收意向，开售时均匀放量</td><td>大促运营手段，非技术</td></tr>
+  </table>
+  <pre><span class="c"># 削峰算例：秒杀 60,000 QPS 涌入，系统只能扛 5,000 TPS 落库</span>
+<span class="c"># 不削峰：60,000 并发打进来，DB 连接池瞬间耗尽 → 全站超时</span>
+<span class="c"># MQ 削峰：请求全部进队列（MQ 抗 10 万+ 写入），</span>
+<span class="c">#           消费者 20 个实例 × 250 TPS = 5,000 TPS 匀速消费</span>
+<span class="c">#           队列深度 60,000/5,000 = 12 秒消费完 → 用户等 12 秒收到"抢购成功"</span>
+<span class="c"># 关键：MQ 要有积压监控（lag 突增 = 消费能力不足），且积压上限要能算</span>
+<span class="c">#       积压上限 = 可容忍最大等待时间 × 消费速率 = 60s × 5000 = 30 万条</span></pre>
+  <h4>线程模型：IO 密集 vs CPU 密集</h4>
+  <table>
+    <tr><th style="width:130px">类型</th><th style="width:230px">特征</th><th>线程数公式</th></tr>
+    <tr><td><b>CPU 密集</b></td><td>计算为主（加解密、压缩、图像处理）</td><td>线程数 = CPU 核数（+1）。多了纯增加切换开销</td></tr>
+    <tr><td><b>IO 密集</b></td><td>等数据库/Redis/HTTP 为主</td><td>线程数 = 核数 × (1 + 等待时间/计算时间)，经验 50~200</td></tr>
+    <tr><td><b>混合型</b></td><td>大部分业务服务</td><td>按 RT 拆解：计算段用 CPU 数，等待段按公式放大</td></tr>
+  </table>
+  <pre><span class="c"># IO 密集线程数算例：业务 RT 100ms，其中 CPU 计算 10ms、等下游 90ms</span>
+<span class="c"># 4 核机器，期望 CPU 不空转：</span>
+<span class="c"># 每线程 100ms 内干活 10ms → 单线程 CPU 利用率 10%</span>
+<span class="c"># 打满 4 核需要 4 / 0.1 = 40 个业务线程 → 支撑 QPS = 40 / 0.1s = 400 QPS/实例</span>
+<span class="c"># 目标 4000 QPS → 10 实例；或用异步/协程把等待时间"折叠"（见下）</span>
+
+<span class="c"># 阻塞模型的根本问题：一个线程 = 一份栈内存（默认 1MB）</span>
+<span class="c"># 1000 并发 = 1GB 栈内存 + 1000 次上下文切换/请求</span>
+<span class="c"># 异步/协程方案（WebFlux/virtual thread/Go goroutine）：</span>
+<span class="c"># 等待时不占线程 → 同样 4 核可挂 1 万在途请求，内存是栈的 1/100</span>
+<span class="c"># 代价：调试栈断裂、异常难追、线程上下文变量（ThreadLocal）失效</span></pre>
+  <div class="callout ok">
+    <b>务实结论：</b>90% 的业务系统用<b>阻塞模型 + 有界线程池</b>就够了，Tomcat 默认 200 线程能扛 200/0.05 = 4000 QPS。需要 &gt; 1 万并发在途再考虑异步/协程。<b>别为了技术时髦把团队拖进响应式的深渊。</b>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>容量估算与压测：用数字说话</h2></div>
+  <h4>单机 MySQL 写入上限估算</h4>
+  <pre><span class="c"># 一次事务提交，InnoDB 的磁盘成本（SSD，RAID10）</span>
+<span class="c"># 1. redo log 顺序写：组提交后一次 fsync，批量越大摊得越薄</span>
+<span class="c">#    单条 redo 约 200~600B，组提交 100 条一次 fsync → 每条摊 ~1ms 的 1/100</span>
+<span class="c"># 2. binlog 顺序写：同组提交机制</span>
+<span class="c"># 3. 脏页刷盘：随机写，最贵。双1配置（sync_binlog=1, innodb_flush_log_at_trx_commit=1）</span>
+<span class="c">#    时一次提交 = 2 次 fsync，SSD 上单 fsync ~0.5~1ms</span>
+
+<span class="c"># 保守估算（双1，单行 INSERT，无慢 SQL）：</span>
+单机 TPS ≈ 1000ms / (2 × 1ms fsync) × 组提交加速系数 ≈ <span class="g">1000~3000</span> TPS
+
+<span class="c"># 现实修正：</span>
+<span class="c"># - 关闭双1（sync_binlog=1000 / flush_log=N）：丢数据换性能，可到 5,000~8,000</span>
+<span class="c"># - SSD 换成 NVMe：fsync 降到 ~0.1ms，可再翻倍</span>
+<span class="c"># - 大事务/复杂索引/触发器：直接打对折</span>
+<span class="c"># - 云 RDS（共享存储）：看规格，保守按自建 60% 估</span>
+
+<span class="c"># 行业常说"单机 MySQL 写入上限约 2000 TPS"就是这么来的，不是拍脑袋，</span>
+<span class="c"># 是 fsync 成本 ÷ 组提交效率的经验值。读（主从+缓存）可以轻松上万 QPS</span></pre>
+  <h4>容量规划模板</h4>
+  <table>
+    <tr><th style="width:200px">步骤</th><th>算例（电商大促）</th></tr>
+    <tr><td>① 峰值 QPS 预估</td><td>日常 2,000 QPS，大促 ×10 = 20,000 QPS（按 UV×转化×集中系数估）</td></tr>
+    <tr><td>② 按接口拆流量占比</td><td>商品详情 70%（读）、下单 5%（写）、支付 2%（写）、其他 23%</td></tr>
+    <tr><td>③ 各环节容量核对</td><td>详情读 14,000 QPS → Redis 集群（单节点 8 万 QPS，2 主够）+ 本地缓存扛 80%</td></tr>
+    <tr><td>④ 写下沉核算</td><td>下单 1,000 TPS + 支付 400 TPS &gt; 单机 2,000 → 分 4 库，或 MQ 削峰到 800 TPS</td></tr>
+    <tr><td>⑤ 单机能力 × 冗余系数</td><td>单机 4,000 QPS × 目标利用率 60% = 2,400 有效 QPS/实例 → 20,000/2,400 ≈ 9 → 部署 12 台留余量</td></tr>
+    <tr><td>⑥ 压测验证</td><td>按目标 1.5 倍（30,000 QPS）压，看瓶颈点和拐点，不达标回炉</td></tr>
+  </table>
+  <h4>压测模型：单机、全链路、生产镜像</h4>
+  <table>
+    <tr><th style="width:150px">模型</th><th style="width:230px">做法</th><th>能发现什么</th></tr>
+    <tr><td><b>单机基准</b></td><td>一台实例梯度加压（100→1000→5000 QPS）</td><td>单机拐点、RT 曲线、GC 影响</td></tr>
+    <tr><td><b>全链路压测</b></td><td>流量染色 + 影子库表，生产环境或 1:1 仿真</td><td>DB 容量、缓存容量、下游依赖、真实网络</td></tr>
+    <tr><td><b>生产引流</b></td><td>线上小比例真实流量（1%→10%）</td><td>数据倾斜、缓存命中率、长尾</td></tr>
+  </table>
+  <pre><span class="c"># 压测必看的四个拐点（JMeter/wrk 梯度加压时记录）</span>
+<span class="c"># 1. RT 拐点：P99 从 100ms 跳到 500ms 的 QPS = 真实容量上限（不是错误率拐点）</span>
+<span class="c"># 2. 错误率拐点：超时/5xx 开始出现的压力点，通常紧挨 RT 拐点之后</span>
+<span class="c"># 3. 资源拐点：CPU &gt; 70% 持续、内存 GC 频率翻倍、DB 连接池等待 &gt; 0</span>
+<span class="c"># 4. 恢复能力：压力撤掉后 RT 能否 10 秒内回到基线（不能 = 队列积压设计有问题）</span>
+
+<span class="c"># 报告必含数字（样例）：</span>
+<span class="c"># 目标 20,000 QPS，实测拐点 24,000 QPS @ P99 380ms，CPU 峰值 68%</span>
+<span class="c"># 瓶颈：库存服务 DB 连接池（等待 120ms）→ 扩容从库 / 加本地缓存后复测</span></pre>
+  <div class="callout danger">
+    <b>没有压测的容量规划是玄学。</b>最常见的悲剧：按“理论值”估算 10 台够，上线当天真实流量带了 30% 大查询和爬虫，实际容量只有 6 台。<b>压测的另一半价值是发现未知瓶颈</b>——你以为瓶颈在 DB，压出来发现是日志同步写磁盘。
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>十个线上坑</h2></div>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">连接池按拍脑袋配置</div><div class="pd">默认 10 太小排队、设 100 把 DB 打挂。用公式算：核数×2+1，总量乘实例数核对 max_connections。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">每次请求新建 HTTP 客户端</div><div class="pd">无连接复用，RT 涨 6 倍，TIME_WAIT 耗尽端口。客户端必须单例 + 连接池，OkHttp 注意 maxConnectionsPerRoute 默认只有 5。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">线程池无界队列</div><div class="pd">Executors.newFixedThreadPool 默认 LinkedBlockingQueue 无限堆积，内存 OOM 前毫无征兆。必须 new ThreadPoolExecutor 显式有界队列 + 拒绝策略。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">所有下游共用一个线程池</div><div class="pd">一个慢依赖（库存 P99 劣化）占满线程，全站一起超时。按下游分池隔离 + 快速失败。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">主从延迟上读后写读走从库</div><div class="pd">用户刚下的单查不到（从库还没同步），投诉“订单丢了”。支付/下单后查询强制走主，或加延迟容忍逻辑。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">分库分表前没想清楚分片键</div><div class="pd">选了随机 order_id 或时间，结果“按用户查订单”要全库扫描。分片键必须覆盖 80% 以上查询条件。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">热点 key 不设本地兜底</div><div class="pd">爆款商品 key 单节点 10 万 QPS，Redis 该节点 CPU 100%，集群其他节点闲着。本地缓存 + key 复制双管齐下。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Redis 扣库存不落账</div><div class="pd">Redis 淘汰/宕机丢扣减记录，超卖一批订单。扣减流水必须异步落库 + DB 兜底校验 + 日终对账。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">MQ 积压无监控无上限</div><div class="pd">消费者 bug 导致 lag 涨到千万条，发现时已经积压 3 小时。lag 必须告警，且积压上限 = 可容忍等待 × 消费速率，超限要熔断入口。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">上线前没压测，按理论值扩容</div><div class="pd">真实流量带大查询和爬虫，实际容量只有估算一半，大促当晚雪崩。上线前按目标 1.5 倍压测，看 RT 拐点而不是平均。</div></div></div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 系统当前 500 QPS，平均 RT 100ms。要支撑 5000 QPS 且 RT 不变，同时处理的并发请求会变成多少？</div>
+      <button class="opt">50，并发数只和 QPS 有关与 RT 无关</button>
+      <button class="opt">5000，并发数等于 QPS</button>
+      <button class="opt">500，按 Little's Law：并发 = 5000 × 0.1s = 500 个在途请求</button>
+      <div class="ans">正确答案：<b>500 个并发</b>（5000 × 0.1s）。本题是陷阱：并发数 = QPS × RT，原来 500×0.1=50，QPS 翻 10 倍且 RT 不变，并发也翻 10 倍 = 500。线程池、队列、DB 连接都要按 500 在途设计。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 一台 4 核应用服务器连 SSD 数据库，HikariCP 连接池 size 最合理的初始值是？</div>
+      <button class="opt">约 9（核数 × 2 + 1）</button>
+      <button class="opt">50，留足余量</button>
+      <button class="opt">200，避免等待</button>
+      <div class="ans">正确答案：<b>9 左右</b>。这是 HikariCP 作者的公式（4 核 SSD：4×2+1）。连接数远超 CPU 处理能力时，MySQL 内部锁竞争和上下文切换会让总吞吐反而下降。50/200 是拍脑袋配置的典型，会把数据库打挂。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 秒杀 6 万 QPS 涌入，系统落库能力 5000 TPS，最合理的削峰手段是？</div>
+      <button class="opt">把线程池开到 6 万，硬扛</button>
+      <button class="opt">请求进 MQ 队列，消费者按 5000 TPS 匀速消费，异步通知结果</button>
+      <button class="opt">限流拒绝 55000 QPS，只服务 5000</button>
+      <div class="ans">正确答案：<b>MQ 削峰 + 异步</b>。开 6 万线程内存先崩；纯拒绝损失 90% 用户体验（且集中拒绝也耗资源）。队列把脉冲摊成匀速，用户等约 12 秒收到结果，这是大促标准做法（需配积压监控）。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 关于“单机 MySQL 写入上限约 2000 TPS”这个经验值，它的主要依据是？</div>
+      <button class="opt">MySQL 源代码里的硬编码限制</button>
+      <button class="opt">应用服务器网卡带宽上限</button>
+      <button class="opt">双 1 配置下每次事务提交约 2 次 fsync 的磁盘成本，除以组提交效率</button>
+      <div class="ans">正确答案：<b>fsync 成本</b>。sync_binlog=1 + innodb_flush_log_at_trx_commit=1 时每次提交要刷 redo + binlog，SSD 单次 fsync 亚毫秒级，组提交能把批量开销摊薄，最终落在 1000~3000 TPS 区间。关双 1 或 NVMe 可以显著上探。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 高并发扣减库存，下列哪种说法是对的？</div>
+      <button class="opt">Redis 扣减求快，但扣减流水要落库 + DB 兜底校验 + 对账，防超卖</button>
+      <button class="opt">Redis 原子扣减绝对可靠，不需要碰数据库</button>
+      <button class="opt">直接 UPDATE stock SET n=n-1 不加 WHERE n&gt;0，数据库行锁会保护</button>
+      <div class="ans">正确答案：<b>Redis 快 + DB 兜底 + 对账</b>。Redis 会丢数据（淘汰、宕机、误操作），纯 Redis 扣减一旦丢记录就是超卖。DB 侧 WHERE n&gt;0 是最后防线，日终对账修复漂移。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 一个接口 RT 100ms，其中 10ms 是 CPU 计算、90ms 在等数据库和下游。提高单机吞吐最有效的方向是？</div>
+      <button class="opt">增加线程数到 1000，让更多请求同时等</button>
+      <button class="opt">减少等待占比：加缓存/异步化/减少下游调用，或换异步模型折叠等待</button>
+      <button class="opt">升级到更多核 CPU，计算越快越好</button>
+      <div class="ans">正确答案：<b>压等待时间</b>。90% 的时间在等，加线程只是让更多线程一起等（内存和切换成本暴涨）；加 CPU 核只加速那 10%。缓存命中、合并下游调用、MQ 异步化、或协程/异步 IO 折叠等待，才是对准瓶颈的优化。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">附录</span><h2>速查卡与术语表</h2></div>
+  <h3>容量速查表（经验值，按自己硬件校准）</h3>
+  <div class="cmds">
+    <div class="crow"><code>并发数 = QPS × RT</code><span class="desc">Little's Law，一切容量估算的起点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>单机 MySQL 写 ~2000 TPS</code><span class="desc">双 1 配置 SSD 经验值，关双 1/NVMe 可上探</span><button class="copy">复制</button></div>
+    <div class="crow"><code>DB 连接池 = 核数×2+1</code><span class="desc">HikariCP 公式，总量乘实例数核对 max_connections</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Redis 单节点 ~8 万 QPS</code><span class="desc">读为主；大 value/热 key 会远低于此</span><button class="copy">复制</button></div>
+    <div class="crow"><code>单机分表阈值 ~5000 万行</code><span class="desc">先试归档/分区，再考虑分表；分库看写入 TPS</span><button class="copy">复制</button></div>
+    <div class="crow"><code>MQ 积压上限 = 可容忍等待 × 消费速率</code><span class="desc">60s × 5000 TPS = 30 万条，超限熔断入口</span><button class="copy">复制</button></div>
+    <div class="crow"><code>CPU 密集型线程数 = 核数</code><span class="desc">IO 密集型 = 核数 ×(1+等待/计算)，经验 50~200</span><button class="copy">复制</button></div>
+    <div class="crow"><code>Tomcat 默认 200 线程 ≈ 4000 QPS</code><span class="desc">按 RT 50ms 估；异步改造前先算这个账</span><button class="copy">复制</button></div>
+    <div class="crow"><code>部署台数 = 目标 QPS ÷ (单机 QPS × 60%)</code><span class="desc">按 60% 目标利用率留 GC/突发余量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>压测按目标 1.5 倍打</code><span class="desc">看 RT 拐点和恢复能力，不看平均值</span><button class="copy">复制</button></div>
+  </div>
+
+  <h3>关键配置速查</h3>
+  <pre><span class="c"># application.yml（HikariCP）</span>
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 16            <span class="c"># 按公式算，不是越大越好</span>
+      minimum-idle: 16                 <span class="c"># 固定池，避免伸缩抖动</span>
+      connection-timeout: 30000        <span class="c"># 等连接超时（ms）</span>
+      max-lifetime: 600000             <span class="c"># 必须小于对端 wait_timeout</span>
+      leak-detection-threshold: 60000  <span class="c"># 连接泄漏检测（ms）</span>
+
+<span class="c"># 线程池（显式构造，禁用 Executors 工厂方法）</span>
+<span class="b">new</span> ThreadPoolExecutor(
+    8, 16, 60, TimeUnit.SECONDS,
+    <span class="b">new</span> ArrayBlockingQueue&lt;&gt;(1000),              <span class="c"># 有界！</span>
+    <span class="b">new</span> ThreadFactoryBuilder().setNameFormat(<span class="y">"biz-%d"</span>).build(),
+    <span class="b">new</span> CallerRunsPolicy()                     <span class="c"># 拒绝策略：背压给调用方</span>
+);
+
+<span class="c"># MySQL 侧核对</span>
+SHOW VARIABLES LIKE 'max_connections';    <span class="c"># 默认 151，多实例部署必查</span>
+SHOW STATUS LIKE 'Threads_running';       <span class="c"># 正在执行的连接，持续接近上限 = 过载</span>
+SHOW STATUS LIKE 'Aborted_connects';      <span class="c"># 连接被拒次数，涨了要扩容</span></pre>
+
+  <h3>术语表</h3>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>QPS / TPS</b></td><td>每秒请求数 / 每秒事务数，后者一个事务可含多个请求</td></tr>
+    <tr><td><b>Little's Law</b></td><td>并发数 = 到达率 × 停留时间，容量估算第一公式</td></tr>
+    <tr><td><b>P99 / P999</b></td><td>99%/99.9% 请求的响应时间上限，比平均值更能体验瓶颈</td></tr>
+    <tr><td><b>吞吐量</b></td><td>单位时间处理的业务量，区别于请求数（还要看单请求数据量）</td></tr>
+    <tr><td><b>四板斧</b></td><td>缓存、异步、扩容、隔离，高并发手段的四大类</td></tr>
+    <tr><td><b>无状态化</b></td><td>实例不存本地状态，是水平扩容的前提</td></tr>
+    <tr><td><b>读写分离</b></td><td>主库写从库读，注意主从延迟对写后读的影响</td></tr>
+    <tr><td><b>分库分表</b></td><td>按分片键拆分数据库和表，解决容量与写入上限，代价是不可逆</td></tr>
+    <tr><td><b>连接池</b></td><td>复用数据库/HTTP 连接的有界资源池，大小按公式而非直觉</td></tr>
+    <tr><td><b>舱壁隔离</b></td><td>每个下游独立线程池/资源配额，防单点劣化扩散</td></tr>
+    <tr><td><b>背压</b></td><td>过载时把压力回传给调用方（拒绝/排队），而非自己崩溃</td></tr>
+    <tr><td><b>削峰填谷</b></td><td>用队列把脉冲流量摊成匀速消费，保护后端</td></tr>
+    <tr><td><b>令牌桶/漏桶</b></td><td>两种限流算法：允许突发 vs 严格匀速</td></tr>
+    <tr><td><b>热点 key</b></td><td>访问量集中的缓存 key，用本地缓存/key 复制治理</td></tr>
+    <tr><td><b>双 1 配置</b></td><td>sync_binlog=1 + innodb_flush_log_at_trx_commit=1，最安全最慢</td></tr>
+    <tr><td><b>组提交</b></td><td>多个事务合并一次 fsync，摊薄磁盘成本的机制</td></tr>
+    <tr><td><b>全链路压测</b></td><td>带流量染色的端到端压测，影子库表隔离数据</td></tr>
+    <tr><td><b>容量拐点</b></td><td>RT 或错误率突变的压力值，即系统真实容量上限</td></tr>
+    <tr><td><b>IO 密集/CPU 密集</b></td><td>等待为主/计算为主的负载，决定线程池规模公式</td></tr>
+    <tr><td><b>异步/协程</b></td><td>折叠等待时间的执行模型，高并发在途的解法，代价是调试难</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 算出你系统的“当前 QPS × RT = 并发数”，画出容量仪表盘；② 检查项目的 HikariCP/OkHttp 配置，用公式重算一遍；③ 用 wrk/JMeter 做单机梯度压测，找到 RT 拐点，和你的理论估算对比；④ 给最核心的写接口设计 MQ 削峰 + 积压监控 + 对账方案。<br><br>
+    <b>之后值得单独学：</b>JVM GC 调优（延迟 vs 吞吐）、Linux 网络调优（somaxconn/tcp_tw_reuse）、分布式限流算法（单机 vs 集群）、以及云原生弹性伸缩（HPA/VPA）策略。
+  </div>
+</section>
+
+</main>
+
+<footer>二十分钟学透高并发 · 并发 = QPS × RT；先算账，再扩容；先隔离，再优化</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（连接池）和模块 6（容量估算）是数字密度最高的部分，值得再算一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 拿起计算器，跟着把每个算例算一遍。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议准备纸笔或计算器：本篇大量容量估算，跟着算一遍比看懂重要。';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+</body>
+</html>
