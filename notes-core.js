@@ -551,8 +551,9 @@
     '.n20-item .doc{font-size:13px;font-weight:600;display:inline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62%}',
     '.n20-item .sec{font-size:11px;color:#534AB7;background:#EEEDFE;border-radius:999px;padding:1px 8px;margin-left:6px;',
     'white-space:nowrap;vertical-align:1px}',
-    '.n20-item .del{float:right;border:none;background:none;color:#C5C4BE;font-size:14px;cursor:pointer;padding:0 2px;line-height:1.4}',
-    '.n20-item .del:hover{color:#A32D2D}',
+    '.n20-item .del{float:right;border:none;background:none;color:#A8A7A0;font-size:13px;cursor:pointer;padding:2px 7px;',
+    'border-radius:6px;line-height:1.5;font-family:inherit}',
+    '.n20-item .del:hover{color:#A32D2D;background:#FCEBEB}',
     '.n20-item .time{font-size:11px;color:#9A9A93;margin-left:8px}',
     '.n20-item .txt{font-size:12px;color:#6B6B66;margin-top:4px;max-height:3.6em;overflow:hidden;',
     'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}',
@@ -667,6 +668,7 @@
   }
 
   function closePanel() {
+    flushAutosave();
     ui.open = false;
     dom.panel.classList.remove('on');
     dom.mask.classList.remove('on');
@@ -674,6 +676,7 @@
   }
 
   function switchTab(tab) {
+    if (ui.tab === 'doc' && tab !== 'doc') flushAutosave();
     ui.tab = tab;
     $$('#n20-tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
     if (tab === 'doc') renderDocTab();
@@ -709,8 +712,9 @@
       // 先从 DOM 捕获最新文本（编辑态有文本框；预览态没有，不能当成空）
       var ta = $('.n20-ta');
       if (ta) ui.text = ta.value;
+      flushAutosave();                 // 落盘任何待存内容（按原 key，不串写）
       ui.preview = !ui.preview;
-      saveCurrentNote(false, ui.text);
+      saveCurrentNote(false, ui.text); // 显式带文本，绝不由 DOM 推断
       renderDocTab();
     };
     var btnSave = el('button', 'n20-btn pri', '保存');
@@ -733,7 +737,10 @@
       var ta = el('textarea', 'n20-ta');
       ta.placeholder = '在这里记录 ' + ui.cur.title + ' 的要点、疑问、命令…\n\n支持 Markdown：\n# 小标题\n- [ ] 待办事项\n| 命令 | 作用 |\n| --- | --- |';
       ta.value = text;
-      ta.oninput = function () { ui.text = ta.value; scheduleAutosave(ta.value); };
+      ta.oninput = function () {
+        ui.text = ta.value;
+        scheduleAutosave(ta.value, ui.cur.key, ui.cur);
+      };
       b.appendChild(ta);
       setTimeout(function () { ta.focus(); }, 60);
     }
@@ -745,21 +752,45 @@
     var c = el('button', 'n20-chip' + (ui.cur && ui.cur.key === s.key ? ' on' : ''), esc(s.title));
     if (has) c.appendChild(el('i', 'dot'));
     c.title = s.title;
-    c.onclick = function () { ui.cur = s; renderDocTab(); };
+    c.onclick = function () {
+      // 切区块前：捕获当前文本并立即落盘到原 key，防止延迟保存串写到新区块
+      var ta = $('.n20-ta');
+      if (ta) ui.text = ta.value;
+      flushAutosave();
+      ui.cur = s;
+      renderDocTab();
+    };
     return c;
   }
 
-  var scheduleAutosave = debounce(function (text) { saveCurrentNote(false, text); }, 700);
+  /* 自动保存：待存内容与目标 key/区块绑定。
+     切换区块、关闭面板、离开页面前强制落盘（flush），
+     杜绝"旧模块的文字延迟保存到新模块 key 上"的串写。 */
+  var pendingSave = null;
+  function scheduleAutosave(text, key, sec) {
+    pendingSave = { text: text, key: key, sec: sec };
+    clearTimeout(pendingSave.timer);
+    pendingSave.timer = setTimeout(flushAutosave, 700);
+  }
+  function flushAutosave() {
+    if (!pendingSave) return;
+    clearTimeout(pendingSave.timer);
+    var p = pendingSave;
+    pendingSave = null;
+    saveCurrentNote(false, p.text, p.key, p.sec);
+  }
 
-  function saveCurrentNote(manual, textOverride) {
-    if (!page.isDoc || !ui.cur) return;
-    // 文本唯一来源：显式传入 > ui.text（由输入/加载时维护）。
+  function saveCurrentNote(manual, textOverride, keyOverride, secOverride) {
+    if (!page.isDoc) return;
+    var sec = secOverride || ui.cur;
+    if (!sec) return;
+    // 文本唯一来源：显式传入 > ui.text（由输入/加载/切换前捕获维护）。
     // 绝不再查询 DOM——预览态没有文本框，查不到会被误判为"清空"而删笔记。
     var text;
     if (textOverride != null) text = textOverride;
     else if (typeof ui.text === 'string') text = ui.text;
     else return;
-    var key = ui.cur.key;
+    var key = keyOverride || sec.key;
     if (!text.trim()) {
       if (notesApi.get(key)) notesApi.remove(key);
       setStatus('已清空该区块笔记');
@@ -769,8 +800,8 @@
         updatedAt: Date.now(),
         doc: page.id,
         docTitle: page.title,
-        sec: ui.cur.title,
-        secId: ui.cur.secId
+        sec: sec.title,
+        secId: sec.secId
       });
       setStatus('已保存 ' + fmtClock());
     }
@@ -860,11 +891,20 @@
   function jumpToNote(rec) {
     var url = page.isHome ? rec.doc : ('../' + rec.doc);
     if (page.isDoc && rec.doc === page.id) {
-      // 同文档：直接定位并打开对应区块
-      var sec = page.sections.filter(function (s) { return s.key === rec.doc + '#m' + s.idx && s.secId === rec.secId; })[0];
+      // 同文档：直接定位并打开对应区块（按 secId 匹配，key 格式不影响定位）
       var summary = rec.sec.indexOf('总结') >= 0;
-      ui.cur = summary ? { key: notesApi.summaryKey(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true }
-        : (sec || { key: rec.doc + '#' + rec.secId, title: rec.sec, secId: rec.secId });
+      var sec = page.sections.filter(function (s) { return s.secId === rec.secId; })[0];
+      var cur;
+      if (summary) {
+        cur = { key: notesApi.summaryKey(page.id), title: '⭐ 本篇总结', secId: '', isSummary: true };
+      } else if (sec) {
+        cur = sec;
+      } else {
+        // 兼容历史 key：sN 统一映射为 #mN，避免同章节出现两条
+        var idx = /^s(\d+)$/.test(rec.secId || '') ? parseInt(RegExp.$1, 10) : null;
+        cur = { key: notesApi.sectionKey(page.id, idx != null ? idx : rec.secId), title: rec.sec, secId: rec.secId };
+      }
+      ui.cur = cur;
       openPanel('doc');
       if (rec.secId) {
         var t = document.getElementById(rec.secId);
@@ -1216,6 +1256,10 @@
 
     handleHash();
     maybeAutoPull();
+
+    // 离开页面前强制落盘待存笔记（防抖内容不丢）
+    window.addEventListener('beforeunload', flushAutosave);
+    window.addEventListener('pagehide', flushAutosave);
 
     // 跨标签页同步（storage 事件在文档页同样生效）
     window.addEventListener('storage', function (e) {

@@ -222,7 +222,86 @@ server.listen(8899, '127.0.0.1', async function () {
     var itemHtml = await page.$eval('#n20-list .n20-item', function (e) { return e.innerHTML; });
     check('列表摘要为纯文本', itemHtml.indexOf('<img') < 0);
 
-    /* ---------- 9. 控制台干净 ---------- */
+    /* ---------- 11. 回归：反复保存不产生重复条目（用户报"每次保存就是一条新的"） ---------- */
+    console.log('== 重复条目回归 ==');
+    await page.goto(base + '/04-data/redis.html');
+    await page.waitForTimeout(500);
+    await page.click('#n20-fab'); await page.waitForTimeout(300);
+    chips = await page.$$('#n20-body .n20-chip');
+    for (var n = 0; n < chips.length; n++) {
+      if ((await chips[n].textContent()).indexOf('四种高级结构') >= 0) { await chips[n].click(); break; }
+    }
+    await page.waitForTimeout(200);
+    // 连续：手动保存 ×2 + 预览切换 ×2 + 修改后自动保存
+    var saveBtn = await page.$$('#n20-body .n20-toolbar .n20-btn');
+    await saveBtn[1].click(); await page.waitForTimeout(150);          // 保存
+    var pvb = await page.$$('#n20-body .n20-toolbar .n20-btn');
+    await pvb[0].click(); await page.waitForTimeout(200);              // → 预览
+    pvb = await page.$$('#n20-body .n20-toolbar .n20-btn');
+    await pvb[0].click(); await page.waitForTimeout(200);              // → 编辑
+    saveBtn = await page.$$('#n20-body .n20-toolbar .n20-btn');
+    await saveBtn[1].click(); await page.waitForTimeout(150);          // 再保存
+    await page.fill('.n20-ta', '# 模块3要点\n- **HyperLogLog** 跑过一遍\n\n| 结构 | 场景 |\n| --- | --- |\n| ZSet | 排行榜 |\n\n补充一句');
+    await page.waitForTimeout(1100);                                   // 等自动保存
+    await page.click('#n20-tabs button[data-tab="all"]');
+    await page.waitForTimeout(300);
+    var secItems = await page.$$eval('#n20-list .n20-item', function (els) {
+      return els.filter(function (e) { return e.textContent.indexOf('四种高级结构') >= 0; }).length;
+    });
+    check('该章节在全部列表只有 1 条（不重复）', secItems === 1, '实际 ' + secItems);
+    var allN = await page.evaluate(function () { return Object.keys(JSON.parse(localStorage.getItem('20min.notes.v1') || '{}')).length; });
+    check('笔记总数 = 3（m1 XSS测试 + 模块3 + 总结，无重复）', allN === 3, '实际 ' + allN);
+
+    /* ---------- 12. 回归：删除按钮可用 ---------- */
+    console.log('== 删除按钮 ==');
+    var delBtn = await page.$('#n20-list .n20-item .del');
+    check('每条笔记都有删除按钮', delBtn !== null);
+    page.on('dialog', function (d) { d.accept(); });
+    await delBtn.click();  // 删除第一条（最新 = 模块3）
+    await page.waitForTimeout(400);
+    var afterDel = await page.evaluate(function () {
+      var n = JSON.parse(localStorage.getItem('20min.notes.v1') || '{}');
+      return { m3: !!n['04-data/redis.html#m3'], total: Object.keys(n).length };
+    });
+    check('点击删除后该笔记被移除', afterDel.m3 === false && afterDel.total === 2,
+      JSON.stringify(afterDel));
+
+    /* ---------- 13. 回归：700ms 内快速切换模块不串写 ---------- */
+    console.log('== 快速切换模块不串写 ==');
+    await page.click('#n20-tabs button[data-tab="doc"]');
+    await page.waitForTimeout(250);
+    // 先给模块1写一条
+    chips = await page.$$('#n20-body .n20-chip');
+    for (var p = 0; p < chips.length; p++) {
+      if ((await chips[p].textContent()).indexOf('为什么 Redis 这么快') >= 0) { await chips[p].click(); break; }
+    }
+    await page.fill('.n20-ta', '模块1的专属内容-单线程IO多路复用');
+    await page.waitForTimeout(1100);
+    // 再给"模块3"写不同内容，700ms 内立刻切到"总结"
+    chips = await page.$$('#n20-body .n20-chip');
+    for (var q = 0; q < chips.length; q++) {
+      if ((await chips[q].textContent()).indexOf('四种高级结构') >= 0) { await chips[q].click(); break; }
+    }
+    await page.fill('.n20-ta', '模块3的专属内容-别被串写成模块1');
+    await page.waitForTimeout(100); // 故意不满足 700ms 防抖
+    chips = await page.$$('#n20-body .n20-chip');
+    for (var r = 0; r < chips.length; r++) {
+      if ((await chips[r].textContent()).indexOf('本篇总结') >= 0) { await chips[r].click(); break; }
+    }
+    await page.waitForTimeout(1200); // 等延迟保存落盘
+    var cross = await page.evaluate(function () {
+      var n = JSON.parse(localStorage.getItem('20min.notes.v1') || '{}');
+      return {
+        m1: (n['04-data/redis.html#m1'] || {}).text || '',
+        m3: (n['04-data/redis.html#m3'] || {}).text || '',
+        sum: (n['04-data/redis.html#__summary__'] || {}).text || ''
+      };
+    });
+    check('模块1 内容未被污染', cross.m1.indexOf('单线程IO多路复用') >= 0 && cross.m1.indexOf('别被串写') < 0, cross.m1.slice(0, 30));
+    check('模块3 内容落盘到自己的 key', cross.m3.indexOf('别被串写成模块1') >= 0, cross.m3.slice(0, 30));
+    check('总结区块未被误写', cross.sum.indexOf('别被串写') < 0);
+
+    /* ---------- 14. 控制台干净（终检） ---------- */
     console.log('== 控制台 ==');
     var realErrors = errors.filter(function (e) { return e.indexOf('favicon') < 0 && e.indexOf('net::ERR') < 0; });
     check('无 JS 报错', realErrors.length === 0, realErrors.slice(0, 3).join(' ; '));
