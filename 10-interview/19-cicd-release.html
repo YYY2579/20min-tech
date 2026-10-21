@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI/CD 与发布策略：怎么发才不出事</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 19 期</span>
+    <h1>CI/CD 与发布策略：怎么发才不出事</h1>
+    <p class="sub">发布出事的根因通常不是代码，是<b>不可回滚的数据库变更</b>和<b>没写完的优雅退出</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>10</b> 个流程</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>14</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：回滚一个已经执行过 DROP COLUMN 的版本，数据从哪里回来？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三次发布，三次都不是代码的错</h2></div>
+  <p class="lead">「新版本有问题，回滚。」这句话说出口的时候，很多人心里是没底的——因为他不确定<b>回滚之后数据库还认不认旧代码</b>。发布系统的成熟度，不体现在它能把代码推上去，而体现在它能不能把一个错误的版本干净地撤回来。</p>
+  <p>下面三种现场，是发布事故里最典型的三个类别：<b>切换太快</b>、<b>变更不可逆</b>、<b>进程死得太急</b>。它们和业务逻辑无关，全是流程和设计问题。</p>
+  <table>
+    <tr><th style="width:210px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>滚动更新刚开始，网关 502 涨了 30 秒</td><td>新版本有 bug，或者机器性能不够</td><td>旧 Pod 收到 SIGTERM 立刻退出，但负载均衡的端点摘除是异步的，这几百毫秒里流量还在往已死的进程上打</td></tr>
+    <tr><td>回滚镜像后服务起不来，报「列不存在」</td><td>回滚不彻底，镜像没换对</td><td>上一个版本已经执行了 <span class="k">DROP COLUMN</span>。新代码不认旧表结构，旧代码也不认新表结构，两个方向都断了</td></tr>
+    <tr><td>灰度 5% 时一切正常，全量后错误率飙升</td><td>灰度没用，纯属运气</td><td>灰度只看了「请求成功率」，没看下游依赖的容量和慢查询。5% 的流量掩盖了连接池、缓存命中率这类非线性问题</td></tr>
+  </table>
+  <p>把这三件事抽象一下，就是发布系统的三条铁律：<b>流量要能慢慢给、数据要能向前兼容、进程要能体面地死。</b>剩下的流水线设计、分支策略、制品管理，都是为这三条服务的。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>可重复</div><div class="cd">同一个制品，从测试环境到生产环境不重新构建。构建一次、晋级多次，才能保证「测过的就是发的」。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>可观测</div><div class="cd">发布过程中要有明确的判据：错误率、延迟、关键业务指标。没有判据的发布，等于闭着眼睛开车。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>可回滚</div><div class="cd">回滚不只是换镜像。数据变更、配置变更、消息格式变更，每一个都要能退回去，或者一开始就不做成破坏性的。</div></div>
+  </div>
+  <p>这一篇按「一次发布的生命周期」组织：流水线该有哪几段、分支怎么管、制品怎么保证一致、流量怎么切、回滚怎么设计、开关怎么治理、上线前检查什么、K8s 里那些探针和优雅退出到底怎么配合。最后是九个坑和六道题。</p>
+  <p><b>面试落点：</b>「我评价一套发布系统看三件事：制品是不是不可变、数据变更是不是向前兼容、出问题时能不能在几分钟内回到上一个稳定状态。这三件事决定了发布是工程，还是赌博。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>流水线的六段：每一段失败都该指向不同的责任人</h2></div>
+  <p class="lead">很多团队的「CI/CD」其实只有两段：拉代码、推镜像。中间没有测试，后面没有验证。这样的流水线跑得很快，但它只是把「手工发布」变成了「自动手工发布」。</p>
+  <p>一条能用的流水线，应该按<b>反馈速度</b>从快到慢排列，让开发在最便宜的阶段发现问题：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>提交门禁</b>：格式化、lint、类型检查、提交信息规范。几秒钟出结果，在本地或 pre-commit 就拦住，不占用 CI 资源。</div></div>
+    <div class="step"><div class="txt"><b>构建</b>：编译、打包、生成镜像。这一步的产物要被后续所有阶段复用，<b>只做一次</b>。构建慢就上依赖缓存和分层缓存，不要靠删测试来提速。</div></div>
+    <div class="step"><div class="txt"><b>测试</b>：单元测试跑得快、覆盖面广，放前面；集成测试依赖外部服务，放后面；端到端测试最慢最脆，只保留关键链路。测试失败必须阻断，不能设成「允许失败」。</div></div>
+    <div class="step"><div class="txt"><b>制品</b>：推送到镜像仓库，记录 tag 与 digest，附上构建号、commit、构建时间。这一步之后，产物就是不可变的，任何人不得重新构建同一版本。</div></div>
+    <div class="step"><div class="txt"><b>部署</b>：按环境逐级晋级（测试 → 预发 → 生产）。生产环境通常需要人工审批，但审批的内容应该是「变更说明和回滚方案」，而不是「点一下通过」。</div></div>
+    <div class="step"><div class="txt"><b>验证</b>：发布后自动跑冒烟用例、比对核心指标、观察一段固定窗口。验证不通过就自动回滚，别等人发现。</div></div>
+  </div>
+  <p>为什么强调「每段失败指向不同责任人」？因为流水线的价值不只是自动化，而是<b>把问题定位到正确的环节</b>。lint 挂了是开发本地没跑；集成测试挂了可能是环境或依赖；部署失败是配置或权限；验证失败才是这次变更本身有问题。如果所有失败都显示成「构建失败」，排查就从「看一眼日志」变成「从头查一遍」。</p>
+  <table>
+    <tr><th style="width:130px">阶段</th><th>典型耗时</th><th>失败意味着</th></tr>
+    <tr><td>提交门禁</td><td>秒级</td><td>代码风格或类型问题，本地就该拦</td></tr>
+    <tr><td>构建</td><td>分钟级</td><td>依赖、编译、基础镜像变化</td></tr>
+    <tr><td>单测</td><td>分钟级</td><td>逻辑错误，最该在这一层拦住</td></tr>
+    <tr><td>集成 / E2E</td><td>十分钟级</td><td>接口契约、环境差异、数据准备</td></tr>
+    <tr><td>部署</td><td>分钟级</td><td>权限、配置、资源配额、镜像拉取</td></tr>
+    <tr><td>验证</td><td>十分钟级</td><td>变更本身有问题，或者容量不够</td></tr>
+  </table>
+  <pre><span class="c"># 一条最小可用的流水线骨架（以 YAML 结构示意，字段名按你用的平台调整）</span>
+stages: [lint, build, test, package, deploy, verify]
+
+build:
+  stage: build
+  script:
+    - make build
+  artifacts:
+    expire_in: 1 day
+
+package:
+  stage: package
+  script:
+    <span class="c"># 用 commit 短哈希做 tag，绝不用 latest</span>
+    - docker build -t registry.example.com/shop/api:${CI_COMMIT_SHORT_SHA} .
+    - docker push registry.example.com/shop/api:${CI_COMMIT_SHORT_SHA}
+    <span class="c"># 记录 digest，后续所有环境都用它，不认 tag</span>
+    - docker inspect --format='{{index .RepoDigests 0}}' registry.example.com/shop/api:${CI_COMMIT_SHORT_SHA}
+
+verify:
+  stage: verify
+  script:
+    - ./scripts/smoke.sh
+    - ./scripts/check-slo.sh --window 10m --max-error-rate 0.5</pre>
+  <div class="callout warn">
+    <b>别在流水线里做「允许失败」的测试。</b>一旦某个阶段的失败不阻断，它就会在三个月内变成永远红着、没人看的状态，然后真正的失败也被忽略。要么修好它，要么删掉它，不要留着当装饰。
+  </div>
+  <p><b>面试落点：</b>「流水线我按反馈速度排阶段：lint 和单测放最前，集成和 E2E 放后面，构建只做一次，产物晋级而不是重复构建。每个阶段的失败要能直接指向问题类型，最后一定要有发布后的自动验证，否则回滚永远靠人肉发现。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>分支策略：分支活得越久，合并越像拆炸弹</h2></div>
+  <p class="lead">「你们用 GitFlow 还是 trunk-based？」这个问题背后考的不是记不记得两种模型，而是<b>你知不知道长生命周期分支的成本</b>。</p>
+  <p>GitFlow 有 <span class="k">main</span>、<span class="k">develop</span>、<span class="k">feature/*</span>、<span class="k">release/*</span>、<span class="k">hotfix/*</span> 五类分支，规则清晰，适合有明确版本号、需要同时维护多个已发布版本的产品（比如客户端、私有化部署）。代价是合并路径复杂：一个 hotfix 要同时合回 main 和 develop，漏一次就埋一个雷。</p>
+  <p>trunk-based 只有一个长期分支，所有人的改动以小批量、高频次直接进主干（或者经由存活不超过一两天的短分支）。它的前提很硬：<b>必须有完善的自动化测试和 Feature Flag</b>，否则未完成的功能会直接被发出去。收益也很明显：没有长期分叉，就没有大面积冲突；集成是持续的，不是发布前的一次性战役。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>GitFlow</th><th>trunk-based</th></tr>
+    <tr><td>长期分支</td><td>至少两个（main + develop）</td><td>一个</td></tr>
+    <tr><td>合并冲突</td><td>分支活得久，冲突大且晚发现</td><td>小批量高频，冲突小且早发现</td></tr>
+    <tr><td>发布节奏</td><td>按 release 分支批量发布</td><td>随时可发布，靠开关控制可见性</td></tr>
+    <tr><td>前置条件</td><td>分支纪律、版本管理</td><td>高覆盖测试、Feature Flag、快速回滚能力</td></tr>
+    <tr><td>适合场景</td><td>多版本并行维护、交付型项目</td><td>SaaS、持续部署、单版本在线服务</td></tr>
+  </table>
+  <p>不管选哪种，有几条是通用的：<b>主干必须受保护</b>（不能直接 push，必须过 CI 和评审）；<b>分支存活时间要有限制</b>（超过几天的分支要么拆小，要么强制 rebase）；<b>发布分支只做修复不做功能</b>，一旦开始往里加功能，它就变成了第二个 develop。</p>
+  <pre><span class="c"># 看分支活了多久：超过一周的分支要有人认领</span>
+git for-each-ref --sort=committerdate --format='%(committerdate:short) %(refname:short)' refs/heads
+
+<span class="c"># 看一个分支落后主干多少：落后越多，合并越危险</span>
+git rev-list --count HEAD..origin/main
+
+<span class="c"># 主干保护的关键配置（以你用的平台为准）：</span>
+<span class="c">#   禁止直接 push、必须 PR、必须通过 CI、至少一个 review、</span>
+<span class="c">#   合并前必须与主干同步、禁止 force push</span>
+
+<span class="c"># 用 squash 合并让主干历史保持线性，回滚时一个 commit 就是一个变更</span>
+git merge --squash feature/order-timeout</pre>
+  <div class="callout">
+    <b>一个常被忽略的细节：</b>回滚的粒度取决于提交历史。如果主干上是一个个 merge commit 混着几十个改动，你没法只回滚其中一个；如果每次合并是 squash 后的单个 commit，<span class="k">git revert</span> 就能精确撤掉一个功能。<b>分支策略不只影响协作，也影响你出事时的选择余地。</b>
+  </div>
+  <p><b>面试落点：</b>「分支模型要和发布能力匹配。没有开关和自动化测试就上 trunk-based，等于把半成品直接发给用户；团队小、版本少却用完整 GitFlow，大部分流程是空转。我倾向于短分支 + 主干保护 + squash 合并，发布靠开关控制，而不是靠分支隔开。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>制品不可变：测过的那个东西，必须就是发的那个</h2></div>
+  <p class="lead">「测试环境是好的，生产怎么就不行？」——如果两个环境的镜像是分别构建的，这个问题就没有答案。因为<b>你测的和发的根本不是同一个东西</b>，哪怕代码一模一样。</p>
+  <p>镜像构建不是确定性的：基础镜像可能在这期间更新了，依赖安装可能拉到了新版本，构建时间戳会被写进产物，编译器的缓存状态也可能不同。任何一次重新构建，都是一次「未经测试的新制品」。所以规则只有一条：<b>构建一次，之后所有环境都用同一个 digest 晋级。</b></p>
+  <p>tag 是可变的，digest 不是。同一个 tag 可以被反复推送覆盖，而 digest 由内容算出，改了内容 digest 就变。<b>部署时用 digest 而不是 tag</b>，才能保证「我部署的确实是那个东西」。<span class="k">latest</span> 更糟：它既不可追溯，又会让 <span class="k">imagePullPolicy: IfNotPresent</span> 的节点一直用旧缓存。</p>
+  <table>
+    <tr><th style="width:170px">做法</th><th>问题</th><th>替代</th></tr>
+    <tr><td>每个环境重新构建</td><td>测的和发的不是同一制品，环境差异无法排除</td><td>构建一次，按环境晋级同一个 digest</td></tr>
+    <tr><td>用 <span class="k">latest</span> 标签</td><td>不可追溯、缓存不可控、回滚无目标</td><td>commit 短哈希或版本号 + digest</td></tr>
+    <tr><td>把配置打进镜像</td><td>换个环境就要重新构建，制品不再唯一</td><td>配置外置：环境变量、ConfigMap、配置中心</td></tr>
+    <tr><td>只在镜像里放代码，密钥也打进去</td><td>镜像一旦泄露，密钥全泄</td><td>密钥由运行时注入，镜像里只有代码和依赖</td></tr>
+  </table>
+  <p>「配置外置」这条经常被误解成「所有配置都放配置中心」。合理的分法是：<b>和环境无关的（代码、依赖、静态资源）进镜像；和环境相关的（数据库地址、开关、密钥）在运行时注入。</b>这样同一个镜像可以在测试、预发、生产三个环境跑，差异全部来自外部配置，出问题时可以把「镜像」和「配置」两个变量分开验证。</p>
+  <pre><span class="c"># 构建时打上可追溯的标签，并记录 digest</span>
+docker build -t registry.example.com/shop/api:1.8.3-9f2c1ab .
+docker push registry.example.com/shop/api:1.8.3-9f2c1ab
+
+<span class="c"># 用 digest 部署，杜绝 tag 被覆盖带来的不确定性</span>
+kubectl set image deployment/shop-api \
+  api=registry.example.com/shop/api@sha256:&lt;digest&gt; -n prod
+
+<span class="c"># 确认线上跑的到底是哪个镜像</span>
+kubectl get pods -n prod -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[0].imageID}{"\n"}{end}'
+
+<span class="c"># 回滚到上一个版本：Deployment 会保留 revision 历史</span>
+kubectl rollout history deployment/shop-api -n prod
+kubectl rollout undo deployment/shop-api -n prod</pre>
+  <div class="callout ok">
+    <b>面试怎么答：</b>「制品不可变的落地方式就一句话：构建一次，用 digest 晋级。tag 只作为人类可读的别名，部署时认 digest。配置和密钥在运行时注入，不打进镜像。这样出问题时可以确定地说『线上跑的就是测试过的那一份』，而不是『代码应该一样』。」
+  </div>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>蓝绿、金丝雀、灰度：三种切流方式，三个不同的目的</h2></div>
+  <p class="lead">很多人把这三个词当同义词用，都说成「先给一部分流量」。其实它们解决的问题不同：<b>蓝绿买的是「切换和回滚的速度」，金丝雀买的是「用小流量验证风险」，灰度买的是「按人群精确控制」。</b></p>
+  <table>
+    <tr><th style="width:100px">方式</th><th>怎么切</th><th>优点</th><th>代价 / 限制</th></tr>
+    <tr><td><b>蓝绿</b></td><td>两套完整环境，入口一次性切到新环境</td><td>回滚极快，切回旧环境即可；新旧完全隔离</td><td>资源翻倍；数据库通常共享，所以数据变更仍然要兼容；切换瞬间是「全有或全无」</td></tr>
+    <tr><td><b>金丝雀</b></td><td>新版本只接一小部分流量（1%、5%、20%…），观察指标后逐步放大</td><td>风险可控，能发现只有真实流量才暴露的问题</td><td>需要流量切分能力和指标判据；版本共存期间要保证兼容</td></tr>
+    <tr><td><b>灰度</b></td><td>按用户维度（UID 哈希、白名单、地域、设备）决定走哪个版本</td><td>可控到人，适合功能验证和客诉处理</td><td>同一个用户必须稳定落在同一版本，否则体验割裂</td></tr>
+  </table>
+  <p>蓝绿最常见的误解是「安全」。它确实让回滚变快，但它<b>不能帮你发现新版本的 bug</b>——因为一切就是 100%，等发现问题时，所有人都已经受影响了。蓝绿适合「变更可控、验证充分、需要快速回退」的场景，比如基础设施升级、大版本切换。真正要降低发现风险，得靠金丝雀。</p>
+  <p>金丝雀的关键不在「切多少」，而在<b>拿什么判断能不能继续</b>。只看 HTTP 5xx 是不够的：一个把缓存命中率从 95% 打到 60% 的版本，5xx 可能一个都没有，但数据库压力会在一小时后爆炸。所以判据至少要覆盖三层：<b>入口指标</b>（错误率、P99 延迟）、<b>依赖指标</b>（数据库 QPS、慢查询数、缓存命中率）、<b>业务指标</b>（下单成功率、支付转化率）。</p>
+  <pre><span class="c"># 金丝雀的流量切分通常在入口层做，以 Nginx 权重为例（按需替换为你的网关）</span>
+upstream shop_api {
+    server 10.0.1.11:8080 weight=95;   <span class="c"># 稳定版本</span>
+    server 10.0.1.12:8080 weight=5;    <span class="c"># 金丝雀版本</span>
+}
+
+<span class="c"># Istio 里更常见的是按比例路由，改 VirtualService 的 weight</span>
+<span class="c"># 灰度到人则用匹配条件，例如按请求头里的用户 ID 取模</span>
+
+<span class="c"># 发布过程中盯这几个指标（示例查询，字段按你的监控系统调整）</span>
+<span class="c"># 入口错误率</span>
+sum(rate(http_requests_total{job="shop-api",code=~"5.."}[1m]))
+  / sum(rate(http_requests_total{job="shop-api"}[1m]))
+
+<span class="c"># 依赖侧：数据库 QPS 与慢查询，金丝雀放大前必须看</span>
+rate(mysql_global_status_questions[1m])
+rate(mysql_global_status_slow_queries[1m])</pre>
+  <div class="callout warn">
+    <b>金丝雀期间两个版本必须能同时读同一份数据。</b>如果新版本写入了旧版本不认识的字段、或者改了枚举含义，那金丝雀就不是「降低风险」，而是「制造两个不兼容的世界」。<b>切流方案的前提永远是数据兼容</b>，这一点在下一节会展开。
+  </div>
+  <p><b>面试落点：</b>「蓝绿解决的是回滚速度，代价是资源翻倍，而且它是全量切换，发现问题的能力和直接发布差不多；金丝雀解决的是风险发现，关键在判据，不能只看 5xx，要看依赖和业务指标；灰度是按人群控制，要求同一用户稳定命中同一版本。三者可以叠加，但前提都是数据库向前兼容。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>回滚设计：应用能退，数据退不回去</h2></div>
+  <p class="lead">「回滚」这个词在应用层很轻——换个镜像而已。在数据层很重——<span class="k">DROP COLUMN</span> 之后，数据是真的没了。所以发布设计的核心，不是让应用可回滚，而是<b>让数据库变更永远不需要回滚</b>。</p>
+  <p>做法叫 expand-contract（扩展-收缩），也叫并行变更。核心思想是<b>把一次破坏性变更拆成多次兼容性变更</b>，让任意两个相邻版本都能同时读写同一份数据：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>Expand（扩展）</b>：加新列 / 新表，设为可空或有默认值，不动旧结构。这一步对旧代码完全无感，可以先上。</div></div>
+    <div class="step"><div class="txt"><b>双写</b>：发布新代码，写数据时同时写新旧两处，读仍然读旧的。此时旧版本回滚也不影响，因为它只认旧列。</div></div>
+    <div class="step"><div class="txt"><b>迁移</b>：后台任务分批把历史数据补齐到新结构，控制批次大小，避免长事务和主从延迟。</div></div>
+    <div class="step"><div class="txt"><b>切读</b>：确认新结构数据完整后，代码改成读新、仍写双份。观察一段时间。</div></div>
+    <div class="step"><div class="txt"><b>Contract（收缩）</b>：确认没有旧版本实例在跑之后，停止写旧列，再下一个版本删掉旧列。删除永远单独一次发布，不和功能混在一起。</div></div>
+  </div>
+  <p>对照着看那些「绝对不能在同一次发布里做」的操作：<b>重命名列</b>（旧代码找不到旧名）、<b>改列类型</b>（新代码写进去的值旧代码读不出来）、<b>删列</b>（旧代码直接报错）、<b>改枚举含义</b>（同一个值在两个版本里意思不同，这类最隐蔽）、<b>加非空无默认值的列</b>（旧代码的 INSERT 会失败）。</p>
+  <table>
+    <tr><th style="width:200px">变更</th><th>能一次做完吗</th><th>正确姿势</th></tr>
+    <tr><td>新增可空列</td><td>可以</td><td>先加列，代码后续再用；旧版本无感</td></tr>
+    <tr><td>重命名列</td><td>不行</td><td>加新列 → 双写 → 迁数据 → 切读 → 停写旧列 → 删旧列</td></tr>
+    <tr><td>改列类型</td><td>不行</td><td>按新类型加新列，双写并转换，切读后再删旧列</td></tr>
+    <tr><td>删列</td><td>不行</td><td>先确认无任何旧版本读取，单独一次发布删除</td></tr>
+    <tr><td>大表加索引</td><td>看版本和工具</td><td>用 online DDL 或 gh-ost，避开高峰，先确认没有长事务</td></tr>
+    <tr><td>数据回填</td><td>不能一次全量</td><td>分批、限速、可重入、有进度记录</td></tr>
+  </table>
+  <p>还有一层经常被跳过：<b>回滚要演练</b>。很多团队的回滚方案写在文档里，从来没执行过。真正出事时才发现：镜像仓库里的旧 tag 被清了、旧版本的配置项已经删了、数据库迁移脚本的 down 根本没写、写了也不敢跑。回滚能力和代码覆盖率一样，<b>没验证过就等于没有</b>。</p>
+  <pre><span class="c">-- 反面例子：一次发布里同时改结构又改语义，回滚必炸</span>
+ALTER TABLE orders CHANGE COLUMN status state TINYINT NOT NULL;
+<span class="c">-- 旧代码还在 SELECT status，直接报 Unknown column</span>
+
+<span class="c">-- 正面：扩展阶段只加不改，旧代码完全无感</span>
+ALTER TABLE orders ADD COLUMN state TINYINT NULL;
+<span class="c">-- 双写一段时间、回填历史数据、切读之后，才在下一个版本收缩</span>
+
+<span class="c">-- 回填要分批，避免一次锁太多行、也避免从库延迟暴涨</span>
+UPDATE orders SET state = status
+WHERE state IS NULL ORDER BY id LIMIT 1000;
+<span class="c">-- 循环执行直到 affected rows 为 0，每批之间 sleep 一小段</span>
+
+<span class="c"># 回滚前先确认目标 revision 和它的镜像还在</span>
+kubectl rollout history deployment/shop-api -n prod
+kubectl rollout undo deployment/shop-api -n prod --to-revision=7</pre>
+  <div class="callout danger">
+    <b>备份不是回滚方案。</b>从备份恢复意味着丢掉备份点之后的所有写入，通常是小时级的数据损失，而且恢复过程本身可能几十分钟。备份是「灾难恢复」的底线，不是「发布失败」的首选。<b>发布失败的解法是向前兼容 + 快速切回旧版本，不是 restore。</b>
+  </div>
+  <p><b>面试落点：</b>「应用回滚是换镜像，数据回滚基本不可能，所以我的原则是让数据变更永远向前兼容。具体就是 expand-contract：先加新结构、双写、迁数据、切读、最后单独一次发布删旧结构。任何一次发布都保证前后两个版本能同时读写同一份数据，这样回滚才真的可用。回滚方案必须演练过，没演练过的等于没有。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Feature Flag：把「部署」和「发布」拆成两件事</h2></div>
+  <p class="lead">传统发布里，代码上线就等于功能上线。这两件事被绑死之后，你只有两个选择：要么等整个功能做完再发，要么发一个半成品。<b>Feature Flag 的价值就是把它们拆开</b>——代码可以先上，功能由开关决定对谁可见。</p>
+  <p>开关不止一种，用途和行为完全不同：</p>
+  <table>
+    <tr><th style="width:150px">类型</th><th>生命周期</th><th>用途</th></tr>
+    <tr><td><b>发布开关</b></td><td>几天到几周</td><td>隐藏未完成的功能，功能全量后<b>必须删除</b></td></tr>
+    <tr><td><b>实验开关</b></td><td>一个实验周期</td><td>A/B 测试，按用户分流，实验结束就清理</td></tr>
+    <tr><td><b>运维开关</b></td><td>长期</td><td>降级、熔断、限流的总闸，也就是常说的 kill switch</td></tr>
+    <tr><td><b>权限开关</b></td><td>长期</td><td>按租户 / 套餐 / 白名单开放功能</td></tr>
+  </table>
+  <p>开关最大的成本不是实现，是<b>债务</b>。一个上线两年的发布开关，代码里还留着 <span class="k">if (flag) {...} else {...}</span> 两条路径，测试要覆盖两遍，新人读代码要猜哪条是活的，最糟的是没人记得它现在是开还是关。所以每个开关从创建那天起就该有<b>负责人和过期时间</b>，到期自动告警。</p>
+  <p>另一个常见误解是「开关等于灰度」。开关控制的是<b>功能可见性</b>，灰度控制的是<b>流量分配</b>。两者组合起来才有用：新功能用开关包住，先用灰度给 1% 用户打开，指标正常再逐步放量，出问题先把开关关掉——<b>关开关比回滚快得多</b>，因为它不需要重新部署，也不影响同一版本里的其他改动。</p>
+  <pre><span class="c"># 开关的取值要能审计：谁改的、什么时候改的、改之前是什么</span>
+<span class="c"># 配置中心里的一条记录大致长这样</span>
+{
+  "key": "order.new_pricing",
+  "enabled": true,
+  "rules": [
+    {"type": "percentage", "value": 5},
+    {"type": "whitelist", "value": ["uid:1001", "uid:1002"]}
+  ],
+  "owner": "team-order",
+  "expire_at": "2026-12-31"
+}
+
+<span class="c"># 代码里的原则：先判开关，再走逻辑；默认值必须是"关闭"</span>
+<span class="c"># flag 的默认值决定了配置中心挂掉时的行为，这一条比开关本身更重要</span>
+
+<span class="c"># 排查"为什么这个用户看到了新功能"：先查开关快照，再查用户分桶</span>
+<span class="c"># 开关评估要能打印出命中规则，否则线上问题无法复现</span></pre>
+  <div class="callout">
+    <b>默认值的方向很关键。</b>开关默认关闭，配置中心挂了最坏是功能不生效；开关默认开启，配置中心挂了就是全量生效，而且你失去了关闭它的手段。<b>凡是能造成写入或资损的开关，默认必须是关。</b>
+  </div>
+  <p><b>面试落点：</b>「Feature Flag 的本质是把部署和发布解耦。发布开关是短期的，功能全量后要删；运维开关是长期的，用来做降级。开关的成本是债务，所以要有 owner 和过期时间。它比回滚快，因为不需要重新部署，但前提是默认值要安全，配置中心挂了不能把功能全放开。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>发布前检查清单：能照着念的那种</h2></div>
+  <p class="lead">清单的价值不在于全面，而在于<b>在紧张的时候不用靠记忆</b>。下面这份可以直接抄进发布单，每一项都要有明确答案，答不上来的那一项就是风险点。</p>
+  <table>
+    <tr><th style="width:150px">类别</th><th>要确认的事</th></tr>
+    <tr><td><b>变更内容</b></td><td>这次改了什么、影响哪些接口和下游、有没有不兼容的接口契约变化</td></tr>
+    <tr><td><b>数据变更</b></td><td>有没有 DDL / DML；是否向前兼容；能否在旧版本运行时执行；回填是否分批；有没有长事务</td></tr>
+    <tr><td><b>配置变更</b></td><td>新增了哪些配置项、默认值是什么、各环境是否已配、配置中心不可用时行为如何</td></tr>
+    <tr><td><b>依赖</b></td><td>依赖的服务 / 中间件版本是否兼容；对方是否已知晓；限流和超时是否有调整</td></tr>
+    <tr><td><b>容量</b></td><td>新版本资源请求是否变化；副本数够不够；数据库连接池、缓存容量是否需要调整</td></tr>
+    <tr><td><b>观测</b></td><td>关键指标、日志、告警是否覆盖新逻辑；出问题看哪几个面板</td></tr>
+    <tr><td><b>回滚</b></td><td>回滚命令是什么、多久能完成、旧镜像和旧配置是否还在、数据能否兼容</td></tr>
+    <tr><td><b>人与时间</b></td><td>谁执行、谁观察、谁决策回滚；避开业务高峰和上下游发布窗口</td></tr>
+    <tr><td><b>验证</b></td><td>发布后跑哪几条冒烟用例；观察窗口多长；达到什么条件判定成功</td></tr>
+  </table>
+  <p>这份清单里最容易空着的是「回滚多久能完成」和「达到什么条件判定成功」。前者决定你敢不敢发，后者决定你会不会在指标已经恶化时还在等「再看看」。<b>把判据提前写死，是防止发布期间情绪化决策的唯一办法。</b></p>
+  <p>还有一条经验：<b>一次发布只改一件事。</b>把「升级依赖」「改配置」「上功能」打包在一起，出问题时你无法判断是哪个引起的，回滚也会把三件事一起撤掉。变更越小，定位越快，回滚越便宜。</p>
+  <pre><span class="c"># 发布前 5 分钟能跑完的自动检查，写进脚本比写进文档有用</span>
+<span class="c"># 1. 确认没有长事务（MySQL）</span>
+SELECT id, time, state, LEFT(info, 80)
+FROM information_schema.processlist
+WHERE time &gt; 60 AND command != 'Sleep';
+
+<span class="c"># 2. 确认目标集群当前是健康的：没有未完成的滚动更新</span>
+kubectl rollout status deployment/shop-api -n prod --timeout=5s
+kubectl get pods -n prod -l app=shop-api
+
+<span class="c"># 3. 确认旧版本镜像还在，回滚有目标</span>
+docker manifest inspect registry.example.com/shop/api:1.8.2
+
+<span class="c"># 4. 记录发布前的基线指标，事后对比才有依据</span>
+<span class="c">#    错误率、P99、QPS、数据库连接数，各存一份快照</span></pre>
+  <div class="callout ok">
+    <b>面试怎么答：</b>「发布单我只强制三件事：数据变更是否兼容、回滚命令和时间、成功判据。其他的可以简化，这三项缺一个就不能发。因为数据不兼容会让回滚失效，不知道回滚时间就没法决定要不要回滚，没有判据就会在指标恶化时继续等。」
+  </div>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>K8s 滚动发布：探针和优雅退出是怎么配合的</h2></div>
+  <p class="lead">「滚动更新的时候有几十秒的 502」——这个现象在 K8s 上极其常见，而且原因往往不是应用有 bug，是<b>三个默认配置各干各的，没人管它们的配合</b>。</p>
+  <p>先把三个探针的分工说清。<b>readinessProbe</b> 决定这个 Pod 是否接收流量，失败只是从 Service 端点里摘掉，不重启；<b>livenessProbe</b> 决定是否重启容器，失败会杀掉重建；<b>startupProbe</b> 用于启动很慢的应用，成功之前不执行另外两个探针。三者混用是事故高发点：把 liveness 配成和 readiness 一样的检查，依赖一抖动容器就被重启，重启后又没准备好，形成雪崩式重启。</p>
+  <p>再看退出流程。Pod 被删除时，K8s 会并行做两件事：<b>从 Service 端点里摘除</b>、<b>向容器发 SIGTERM</b>。问题在于，摘除是异步的——kube-proxy、Ingress、外部负载均衡各有各的同步周期，<b>这期间仍然有流量打向这个 Pod</b>。如果进程收到 SIGTERM 立刻退出，这些流量就全部失败。</p>
+  <p>所以正确的组合是：<b>preStop 里先 sleep 几秒</b>（等端点摘除生效），然后再让进程收到 SIGTERM，进程收到信号后停止接收新请求、处理完在途请求再退出，总时间必须小于 <span class="k">terminationGracePeriodSeconds</span>（默认 30 秒，超时会 SIGKILL）。</p>
+  <pre><span class="c"># 一份能用的 Deployment 片段：滚动参数 + 三个探针 + 优雅退出</span>
+spec:
+  replicas: 6
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1              <span class="c"># 先多起 1 个，保证容量不下降</span>
+      maxUnavailable: 0        <span class="c"># 不允许同时少 Pod，发布期间容量只增不减</span>
+  minReadySeconds: 10          <span class="c"># 新 Pod Ready 后再等 10 秒才算可用，避免"刚就绪就崩"</span>
+  template:
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: api
+          image: registry.example.com/shop/api@sha256:&lt;digest&gt;
+          readinessProbe:
+            httpGet: { path: /healthz/ready, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /healthz/live, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          lifecycle:
+            preStop:
+              exec:
+                <span class="c"># 等端点摘除传播完成，再让进程退出；同时在应用侧停止接收新请求</span>
+                command: ["sh", "-c", "sleep 10"]</pre>
+  <p>为什么 <span class="k">maxUnavailable: 0</span> 很重要？默认值通常是 25%，六个副本意味着发布期间可能只剩四个半在扛流量，如果这时候流量正好在涨，剩下的 Pod 会被压垮，然后连锁反应。代价是发布变慢、需要额外资源起新 Pod——<b>这是用资源换稳定，值得。</b></p>
+  <p>还有一个配套项：<b>PodDisruptionBudget</b>。它约束的是「自愿中断」（节点排水、集群升级），不是 Deployment 的滚动更新。很多人在滚动发布出问题时去调 PDB，发现完全没效果，因为两者管的是不同的东西。PDB 保护的是「驱逐时至少留几个可用」，滚动更新看的是 <span class="k">maxUnavailable</span>。</p>
+  <pre><span class="c"># 观察一次滚动发布：看副本替换过程有没有出现可用数为 0</span>
+kubectl rollout status deployment/shop-api -n prod
+kubectl get deployment shop-api -n prod -w
+
+<span class="c"># 出问题立刻暂停，保留现场再决定回滚还是继续</span>
+kubectl rollout pause deployment/shop-api -n prod
+kubectl rollout resume deployment/shop-api -n prod
+
+<span class="c"># 看 Pod 为什么没就绪：事件里通常写得很清楚</span>
+kubectl describe pod -n prod -l app=shop-api | tail -40
+
+<span class="c"># 排水节点时验证 PDB 是否生效（会被 PDB 拦住或放行）</span>
+kubectl drain node-1 --dry-run=server</pre>
+  <div class="callout danger">
+    <b>优雅退出要在应用里真的实现。</b>preStop 的 sleep 只是拖延时间，如果进程收到 SIGTERM 后立刻 <span class="k">exit(0)</span>，那 10 秒只是让你晚 10 秒失败。应用必须做三件事：停止接受新连接、等在途请求处理完（有上限）、关闭连接池和消费者。<b>消费型服务还要先停止拉取新消息，再处理完手头的。</b>
+  </div>
+  <p><b>面试落点：</b>「滚动发布 502 的根因是端点摘除和进程退出之间存在时间差。解法是 preStop sleep 加应用侧的优雅退出，总时长要小于 terminationGracePeriodSeconds。探针要分工：readiness 管流量、liveness 管重启、startup 管慢启动。滚动参数我一般设 maxUnavailable 为 0，用资源换发布期间的容量稳定。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>9 个坑：每一条都能独立造成一次事故</h2></div>
+  <p class="lead">这些不是「最佳实践建议」，是<b>已经重复发生过很多次的具体错误</b>。共同点是：当时看起来都没问题。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">每个环境重新构建镜像</div><div class="pd">基础镜像和依赖都可能变，测过的和发出去的不是同一个东西。构建一次，用 digest 晋级。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">用 latest 标签部署</div><div class="pd">不可追溯、缓存不可控、回滚没有明确目标。至少用 commit 哈希，最好直接认 digest。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把配置和密钥打进镜像</div><div class="pd">制品不再唯一，换环境就要重建；镜像一旦泄露，密钥跟着泄。配置运行时注入。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">数据库破坏性变更和代码同批上线</div><div class="pd">重命名列、改类型、删列，任何一项都会让回滚失效。用 expand-contract 拆成多次兼容变更。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">回滚方案只写在文档里，从没演练</div><div class="pd">真出事才发现旧镜像被清理、旧配置已删除、down 脚本不存在。回滚要定期演练，至少每次大版本前跑一次。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把 liveness 配成和 readiness 一样</div><div class="pd">依赖抖动时容器被反复重启，重启后又没准备好，形成雪崩。liveness 只该判断「进程是不是死了」。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">没有 preStop 和优雅退出</div><div class="pd">端点摘除有延迟，进程立刻退出就会丢请求。preStop 等几秒 + 应用处理完在途请求，两边都要做。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">开关只增不减，没人负责</div><div class="pd">代码里堆积几十个永久开关，两条分支都要测试，没人知道线上是开是关。每个开关要有 owner 和过期时间。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">发布完立刻宣布成功</div><div class="pd">错误率、延迟、依赖压力都有滞后性。至少留一个观察窗口，把发布前的基线拿出来对比，而不是看「没报错」。</div></div></div>
+  <p><b>面试落点：</b>讲一个具体的。比如「我们有次发布把 liveness 和 readiness 配成同一个接口，结果数据库抖动了一下，所有 Pod 同时被判定不健康然后重启，本来只是一个依赖慢查询，最后变成全站不可用。后来 liveness 只检查进程存活，readiness 才检查依赖」。这类回答的杀伤力在于，它说明你真的见过连锁反应。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 「制品不可变」在发布流程里的准确含义是？</div>
+      <button class="opt">镜像推送后不允许再打新标签</button>
+      <button class="opt">每个环境都应该重新构建，以保证环境一致性</button>
+      <button class="opt">构建一次，之后所有环境都部署同一个 digest，不再重新构建</button>
+      <button class="opt">制品一旦发布就不能删除，必须永久保留</button>
+      <div class="ans">正确答案：<b>构建一次，按 digest 晋级</b>。镜像构建不是确定性的（基础镜像、依赖版本、时间戳都可能变），重新构建等于发一个没测过的新制品。tag 只是人类可读的别名，可以被覆盖，digest 由内容决定，才能保证「测过的就是发的」。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 需要把 <span class="k">orders.status</span> 重命名为 <span class="k">state</span>，且不能停机。正确做法是？</div>
+      <button class="opt">一次发布里同时执行 RENAME 并改代码，缩短窗口</button>
+      <button class="opt">加新列 state → 双写 → 回填 → 切读 → 停写旧列 → 单独一次发布删旧列</button>
+      <button class="opt">先停服，改完表结构再启动，避免双写复杂度</button>
+      <button class="opt">在数据库里建一个视图映射，代码不用改</button>
+      <div class="ans">正确答案：<b>expand-contract 分步走</b>。同一次发布里改结构又改代码，会让新旧版本都无法读写，回滚直接失效。分步做的核心是保证任意相邻两个版本能同时读写同一份数据：先扩展、再双写、迁移、切读，最后单独一次发布收缩。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. readinessProbe 失败时，K8s 的行为是？</div>
+      <button class="opt">重启容器</button>
+      <button class="opt">删除 Pod 并重新调度</button>
+      <button class="opt">把节点标记为不可调度</button>
+      <button class="opt">把 Pod 从 Service 端点摘除，停止给它发流量，但不重启</button>
+      <div class="ans">正确答案：<b>摘流量，不重启</b>。readiness 管的是「能不能接流量」，失败只是暂时移出端点，恢复后自动加回。liveness 失败才会重启容器。把两者配成同一个检查，依赖抖动就会引发全量重启，这是很典型的事故链。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 滚动更新期间出现约 30 秒的 502，最可能的原因是？</div>
+      <button class="opt">端点摘除是异步的，旧 Pod 收到 SIGTERM 后立即退出，期间仍有流量打进来</button>
+      <button class="opt">新 Pod 的镜像拉取太慢</button>
+      <button class="opt">maxSurge 设置得太小</button>
+      <button class="opt">Service 的 ClusterIP 分配失败</button>
+      <div class="ans">正确答案：<b>摘除延迟 + 立即退出</b>。删除 Pod 时摘除端点和发送 SIGTERM 是并行发生的，各层负载均衡同步需要时间。解法是 preStop 里 sleep 一段等传播完成，同时应用侧实现优雅退出：停止接收新请求、处理完在途请求再退出，总时长要小于 terminationGracePeriodSeconds。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于蓝绿发布和金丝雀发布，说法正确的是？</div>
+      <button class="opt">两者完全等价，只是叫法不同</button>
+      <button class="opt">金丝雀是两套完整环境切换，蓝绿是按比例放量</button>
+      <button class="opt">蓝绿是整体切换、回滚快但风险一次性暴露；金丝雀是小流量验证、逐步放量</button>
+      <button class="opt">蓝绿不需要数据库兼容，金丝雀需要</button>
+      <div class="ans">正确答案：<b>蓝绿整体切、金丝雀逐步放</b>。蓝绿的优势是回滚极快（切回旧环境），但切换即全量，发现问题的能力和直接发布接近，且资源要翻倍。金丝雀用小流量暴露问题，关键是判据要覆盖入口、依赖和业务三层指标。两者都要求数据库向前兼容。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 「部署（deploy）」和「发布（release）」的区别，用 Feature Flag 怎么解释？</div>
+      <button class="opt">两者是同一件事，Flag 只是语法糖</button>
+      <button class="opt">部署是把代码送上生产，发布是让用户可见；Flag 让代码先上线、功能后开放</button>
+      <button class="opt">部署指上测试环境，发布指上生产环境</button>
+      <button class="opt">Flag 打开就等于完成了发布，不需要观察</button>
+      <div class="ans">正确答案：<b>部署是代码到位，发布是功能可见</b>。把两者解耦后，未完成的功能可以先合并、先部署，由开关控制可见性；出问题时关开关比回滚更快，因为不需要重新部署。但发布开关是短期债务，功能全量后必须删除，否则代码里会积累两条永久分支。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>制品（artifact）</b></td><td>构建产出的不可变文件，通常是镜像，用 digest 唯一标识</td></tr>
+    <tr><td><b>digest</b></td><td>由镜像内容算出的哈希，内容变则 digest 变，部署时比 tag 可靠</td></tr>
+    <tr><td><b>制品晋级</b></td><td>同一个 digest 从测试环境逐级提升到生产，不重新构建</td></tr>
+    <tr><td><b>expand-contract</b></td><td>把破坏性数据变更拆成「扩展—双写—迁移—切读—收缩」多步，保证版本兼容</td></tr>
+    <tr><td><b>双写</b></td><td>过渡期内同时写新旧两个结构，让新旧代码都能正常工作</td></tr>
+    <tr><td><b>蓝绿发布</b></td><td>两套完整环境，入口一次性切换，回滚快但风险一次性暴露</td></tr>
+    <tr><td><b>金丝雀发布</b></td><td>新版本先接小比例流量，按指标逐步放量</td></tr>
+    <tr><td><b>灰度</b></td><td>按用户维度决定版本，同一用户需稳定命中同一版本</td></tr>
+    <tr><td><b>Feature Flag</b></td><td>用开关控制功能可见性，把部署与发布解耦</td></tr>
+    <tr><td><b>kill switch</b></td><td>运维开关，用于快速关闭某个功能或降级依赖</td></tr>
+    <tr><td><b>readinessProbe</b></td><td>就绪探针，失败只摘流量不重启</td></tr>
+    <tr><td><b>livenessProbe</b></td><td>存活探针，失败会重启容器，只该判断进程是否还能工作</td></tr>
+    <tr><td><b>preStop</b></td><td>容器终止前执行的钩子，常用于等待端点摘除传播完成</td></tr>
+    <tr><td><b>terminationGracePeriodSeconds</b></td><td>终止宽限期，从 preStop 开始计时，超时后 SIGKILL</td></tr>
+    <tr><td><b>PDB</b></td><td>PodDisruptionBudget，约束节点排水等自愿中断时最少的可用副本数</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在测试集群里把 <span class="k">maxUnavailable</span> 设成 100%、去掉 preStop，发一次版，用 <span class="k">ab</span> 或 <span class="k">wrk</span> 压着看 502 曲线，再加上 preStop 和优雅退出复测，两次曲线放一起看；② 用一张测试表完整做一遍 expand-contract：加列、双写、分批回填、切读、删列，每一步都试一次「回滚到上一版本」，确认真的能退；③ 给一个已有服务加上发布开关，把默认值设成关闭，然后手动制造一次配置中心不可用，观察它是否安全兜底。<br><br>
+    <b>之后值得单独学：</b>第 8、10 期讲 Docker 与 K8s 核心对象，滚动更新和探针的底层行为在那里；第 15 期讲 SLO 与告警，发布判据本质上就是拿 SLO 当门禁；第 20 期把发布系统当成系统设计题，会问多集群、可回滚、配置中心一致性这些更上层的问题；第 21 期讲事故处理，发布失败之后的沟通与复盘是另一套能力。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 19 期 · 发布能力的天花板，是你敢不敢在十分钟内把一个错误版本完整撤回</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

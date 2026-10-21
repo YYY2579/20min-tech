@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux 内核参数调优：面试爱问的那几个 sysctl</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 28 期</span>
+    <h1>Linux 内核参数调优：面试爱问的那几个 sysctl</h1>
+    <p class="sub"><span class="k">somaxconn</span>、<span class="k">tcp_tw_reuse</span>、<span class="k">vm.swappiness</span>——能说清「调了会怎样、<b>什么时候不该调</b>」的人不多。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>15</b> 个参数</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>5</b> 条验证命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：somaxconn 和 tcp_max_syn_backlog，哪个管的是「握完手等 accept」的队列？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一份从博客抄来的「万能优化」，把连接搞丢了</h2></div>
+  <p class="lead">接手一台机器，<span class="k">/etc/sysctl.conf</span> 里有二十几行，注释写着「高并发优化」。其中三行很眼熟：<span class="k">tcp_tw_recycle=1</span>、<span class="k">tcp_tw_reuse=1</span>、<span class="k">somaxconn=65535</span>。机器前面是 NAT 网关，用户侧偶发「连接超时、重试就好」，监控上看不出任何异常——因为丢包发生在内核里，应用日志干净得像没发生过。</p>
+  <p>这三行分别踩了三个不同的坑：第一行在内核里已经不存在了；第二行只对出方向有效，服务端开了等于没开；第三行只调了内核的一半，应用那边的 <span class="k">listen</span> backlog 没动，取小值之后仍然白调。它们共同说明一件事：<b>内核参数不是「越大越好」的开关，每个参数都绑着一个具体的队列、计数器或者回收策略。</b></p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:190px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>NAT 后面偶发连接超时，重试正常</td><td>网络抖动，或者带宽不够</td><td>开了 <span class="k">tcp_tw_recycle</span> 的老内核会按时间戳判断报文新旧。NAT 后多台机器共用 IP，时间戳顺序乱了，正常包被当成旧包丢掉</td></tr>
+    <tr><td>服务端 TIME_WAIT 三万多，开了 reuse 没变化</td><td>参数没生效，需要重启</td><td>这个参数只作用于<b>主动发起连接</b>的一方。服务端的 TIME_WAIT 通常是客户端留下的，或者自己作为主动关闭方的那部分，跟被动连接无关</td></tr>
+    <tr><td>压测时新连接大量超时，<span class="k">ss -lnt</span> 看着正常</td><td>内核队列参数不够，调 somaxconn</td><td>要看的不是连接状态，是监听队列：<span class="k">Recv-Q</span> 贴着 <span class="k">Send-Q</span> 就是 accept 队列满了，而应用 backlog 与 somaxconn 取小值</td></tr>
+  </table>
+  <div class="callout">
+    <b>这一篇的立场：</b>调优的第一动作是<b>量</b>，不是改。<span class="k">sysctl -a</span> 里有两千多个参数，线上真正值得动的不到二十个，而且大部分时候正确答案是「不改，去改应用」。面试里能说出「这个参数我不建议动，因为……」的人，比能背十个推荐值的人可信。
+  </div>
+  <p>按「资源 → 参数」组织：先讲调优的前提和观测，再依次是文件句柄、连接队列、TIME_WAIT 与端口、缓冲区与拥塞控制、内存、文件系统与 IO 调度，收在怎么持久化、怎么灰度、怎么回滚。</p>
+  <p><b>面试怎么答：</b>「我调内核参数有三个前提：有基线数据、定位到了具体瓶颈、一次只改一个变量。因为大部分参数是互相牵制的，一次改五个，出了问题不知道回滚哪个，性能好了也不知道是哪一行起的作用。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>调优的前提：先证明瓶颈在哪，再决定动不动手</h2></div>
+  <p class="lead">「服务器性能不好，你会调什么参数？」这个问题如果直接开始报参数名，基本就废了。因为参数调优在绝大多数性能问题里排在最后——前面还有代码、SQL、架构、容量四层，任何一层的问题都不是 sysctl 能救的。</p>
+  <p>正确的顺序是：<b>先定义症状</b>（延迟高、吞吐上不去、连接失败、内存涨），<b>再定位层</b>（CPU、内存、IO、网络、应用），<b>再看这一层有没有可调的队列或上限被打满</b>，都排除完才轮到改参数。<span class="k">sysctl</span> 能解决的，几乎只有一类问题：<b>某个上限或队列长度成了瓶颈，而资源本身还有余量</b>。</p>
+  <table>
+    <tr><th style="width:150px">症状</th><th>先看什么</th><th>参数能不能救</th></tr>
+    <tr><td>新连接超时，老连接正常</td><td><span class="k">ss -lnt</span> 的 Recv-Q、<span class="k">nstat</span> 的 ListenOverflows</td><td>能。队列上限或应用 accept 速度</td></tr>
+    <tr><td>吞吐上不去，延迟随距离增大</td><td>RTT、窗口、重传率</td><td>部分能。缓冲区小于 BDP 时有效</td></tr>
+    <tr><td>内存一直涨，最后 OOM</td><td>RSS、page cache、swap 使用</td><td>基本不能。先查泄漏和 limit</td></tr>
+    <tr><td>磁盘写延迟周期性飙高</td><td><span class="k">iostat -x</span> 的 await、dirty 比例</td><td>有时能。脏页回写参数</td></tr>
+    <tr><td>CPU 的 <span class="k">%sy</span> 很高</td><td>上下文切换、软中断、系统调用</td><td>很少。多半是应用或中断分布问题</td></tr>
+  </table>
+  <p>观测先固定成三条命令，别一上来就翻几十个文件：<span class="k">ss -s</span> 看连接总量和状态分布，<span class="k">nstat -az</span> 看协议栈计数器的累计值，<span class="k">sysctl -a</span> 或者直接 <span class="k">cat /proc/sys/...</span> 看当前值。计数器的关键是<b>看增量</b>，绝对值没有意义——一台跑了半年的机器，重传几十万次可能完全正常。</p>
+  <p>还有一件事必须在动手前做：<b>记录基线</b>。改之前的 QPS、P99、重传率、队列溢出数、内存占用，全部记下来。没有基线，改完你只能凭感觉说「好像快了」，这在生产上等于没验证。回滚也需要基线，否则不知道该退回哪个值。</p>
+  <pre><span class="c"># 三条命令建立基线</span>
+ss -s
+nstat -az | grep -Ei 'ListenOverflows|ListenDrops|SyncookiesSent|RetransSegs|TCPTimeouts'
+free -m; vmstat 1 3
+
+<span class="c"># 关键参数的当前值（临时改动用 -w，重启失效）</span>
+sysctl net.core.somaxconn net.ipv4.tcp_max_syn_backlog
+sysctl net.ipv4.tcp_tw_reuse net.ipv4.tcp_timestamps
+sysctl vm.swappiness vm.overcommit_memory
+
+<span class="c"># 看某个计数器每秒增量，比看总值有用</span>
+nstat -n1 -z TcpExtListenOverflows TcpExtListenDrops</pre>
+  <p><b>面试怎么答：</b>「我不会先问调什么参数，我会先问症状和基线。内核参数能解决的只有『上限或队列打满但资源还有余量』这一类问题。如果是 CPU 算不过来、内存泄漏、SQL 慢，调 sysctl 只是把问题往后推。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>文件句柄：三个上限，改错一个等于没改</h2></div>
+  <p class="lead">「Too many open files」是运维最熟的报错之一，但很多人改完 <span class="k">/etc/security/limits.conf</span> 就以为完事了，重启服务照样报——因为 systemd 启动的服务根本不读那个文件，它读的是 unit 里的 <span class="k">LimitNOFILE</span>。</p>
+  <p>这里有三个层次的上限，从下往上卡：<b>内核全局</b>的 <span class="k">fs.file-max</span>（整机所有进程能开的 fd 总数）、<b>单进程硬上限</b> <span class="k">fs.nr_open</span>（setrlimit 能设到的天花板）、<b>进程自身的 soft/hard limit</b>（<span class="k">ulimit -n</span> 看到的）。soft 是当前生效值，hard 是 soft 能调到多高；普通进程只能把 soft 提到 hard 以内，不能超过 <span class="k">fs.nr_open</span>。</p>
+  <table>
+    <tr><th style="width:200px">位置</th><th>管什么</th><th>调错的表现</th></tr>
+    <tr><td><span class="k">fs.file-max</span></td><td>整机 fd 总数上限</td><td>进程级怎么调都提不上去，日志里可能出现 allocation failure</td></tr>
+    <tr><td><span class="k">fs.nr_open</span></td><td>单进程 fd 的绝对上限</td><td>setrlimit 报 Invalid argument，服务起不来</td></tr>
+    <tr><td><span class="k">ulimit -n</span> / <span class="k">limits.conf</span></td><td>shell 会话及其子进程</td><td>只对登录会话生效，systemd 服务不认</td></tr>
+    <tr><td><span class="k">LimitNOFILE</span></td><td>systemd 管理的服务</td><td>改 limits.conf 后重启服务，值还是旧的</td></tr>
+    <tr><td>容器 <span class="k">nofile</span></td><td>容器内进程</td><td>宿主调大了，容器里还是 1024</td></tr>
+  </table>
+  <p>怎么算「该给多少」？不是拍一个 65535。先看真实的 fd 分布：<span class="k">ls /proc/&lt;pid&gt;/fd | wc -l</span> 看当前用量，再按连接模型估峰值——一个进程持有 N 条连接，每条连接至少 1 个 fd，加上日志、配置文件、管道、epoll 句柄。给到峰值的 1.5 到 2 倍就够，给太大反而掩盖泄漏。</p>
+  <p>还有一个容易忽略的事实：<b>fd 泄漏和内存泄漏经常同时出现</b>。连接不关，fd 涨，每个连接还有读写缓冲，内存也涨。这时候调 <span class="k">ulimit</span> 只是把爆炸时间往后推，从「一小时挂」变成「一天挂」，问题还在。</p>
+  <pre><span class="c"># 当前会话与进程的实际限制</span>
+ulimit -n
+ulimit -Hn
+cat /proc/$(pgrep -f myapp | head -1)/limits | grep -i 'open files'
+
+<span class="c"># 内核层的两个上限</span>
+sysctl fs.file-max fs.nr_open
+
+<span class="c"># systemd 服务的限制（改完要 daemon-reload + 重启服务）</span>
+systemctl show myapp -p LimitNOFILE
+<span class="c"># /etc/systemd/system/myapp.service.d/override.conf</span>
+<span class="c"># [Service]</span>
+<span class="c"># LimitNOFILE=65535</span>
+
+<span class="c"># 谁在吃 fd</span>
+ls /proc/12345/fd | wc -l
+lsof -p 12345 | awk '{print $5}' | sort | uniq -c | sort -rn | head</pre>
+  <div class="callout warn">
+    <b>别把 <span class="k">fs.file-max</span> 当成万能钥匙。</b>它是整机总量，调得再大，单进程的 <span class="k">nofile</span> 不放开照样撞墙；反过来，只把单进程调到几十万而 <span class="k">fs.nr_open</span> 没跟上，设置直接失败。三个值的关系是「全局 ≥ 单进程硬上限 ≥ 进程 soft」，顺序搞反就会互相打架。
+  </div>
+  <p><b>面试怎么答：</b>「fd 有三个层次：fs.file-max 是整机总量，fs.nr_open 是单进程能设到的上限，ulimit 的 soft/hard 才是进程实际拿到的。systemd 服务不读 limits.conf，要改 unit 的 LimitNOFILE。调之前先算真实用量，不然只是把泄漏的爆炸时间往后推。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>两个队列：somaxconn 管的是「握完手等 accept」那一个</h2></div>
+  <p class="lead">这是本篇最容易被答错的一题，也是最能区分「背过」和「查过」的一题。面试官问「somaxconn 和 tcp_max_syn_backlog 有什么区别」，如果答「都是连接队列，一个总上限一个半连接上限」还算及格；如果答「都管全连接队列」或者「调大 somaxconn 就能防 SYN Flood」，就是错的。</p>
+  <p>服务端有两个队列，位置完全不同。<b>半连接队列（SYN 队列）</b>放的是「收到 SYN、回了 SYN-ACK、还在等最后一个 ACK」的连接，状态是 <span class="k">SYN_RECV</span>。它的长度受 <span class="k">net.ipv4.tcp_max_syn_backlog</span> 影响，灌满它的是 SYN Flood。<b>全连接队列（accept 队列）</b>放的是「三次握手已经完成、但应用还没调 accept 取走」的连接，状态在 <span class="k">ss</span> 里表现为监听套接字的 <span class="k">Recv-Q</span>。它的上限是 <b>listen(fd, backlog) 与 somaxconn 的较小值</b>。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>半连接队列</th><th>全连接队列</th></tr>
+    <tr><td>放什么</td><td>SYN_RECV，握手未完成</td><td>握手完成、等应用 accept</td></tr>
+    <tr><td>相关参数</td><td><span class="k">tcp_max_syn_backlog</span>，受 syncookies 影响</td><td><span class="k">somaxconn</span> 与应用 backlog 取小</td></tr>
+    <tr><td>谁打满它</td><td>SYN Flood、客户端回程丢包</td><td>应用 accept 太慢、突发流量</td></tr>
+    <tr><td>看什么指标</td><td><span class="k">ss -tan state syn-recv</span>、SyncookiesSent</td><td><span class="k">ss -lnt</span> 的 Recv-Q/Send-Q、ListenOverflows</td></tr>
+    <tr><td>调参能解决吗</td><td>缓解，但根治要靠 syncookies 和限速</td><td>能缓解，但根治要提升 accept 速度</td></tr>
+  </table>
+  <p>全连接队列溢出时，客户端看到的现象是<b>超时</b>而不是「连接被拒」。因为 <span class="k">tcp_abort_on_overflow</span> 默认为 0 时，内核会把客户端的最后一个 ACK 丢掉，客户端以为自己已经 ESTABLISHED，发数据过去没有响应，重传几次后超时。这也是为什么「服务端 <span class="k">ss</span> 看起来一切正常，客户端就是连不上」——连接压根没进到能被 <span class="k">ss</span> 看见的状态。</p>
+  <p>调的时候必须<b>两边一起调</b>：内核的 <span class="k">somaxconn</span> 和应用 <span class="k">listen()</span> 的 backlog。Nginx 的 backlog 在 <span class="k">listen 80 backlog=4096</span> 里，默认值以你环境的版本为准；Tomcat、Gunicorn、Node 各有自己的参数名。只改内核，取小值之后等于没改；只改应用，超过 somaxconn 的部分会被截断。</p>
+  <pre><span class="c"># 看监听队列水位：Recv-Q 接近 Send-Q 就是满了</span>
+ss -lnt
+<span class="c"># State  Recv-Q  Send-Q  Local Address:Port</span>
+<span class="c"># LISTEN 4096    4096    0.0.0.0:8080        &lt;-- 满了，应用 accept 跟不上</span>
+
+<span class="c"># 两个参数当前值（默认值随内核版本变化，以你环境为准）</span>
+sysctl net.core.somaxconn net.ipv4.tcp_max_syn_backlog
+sysctl net.ipv4.tcp_abort_on_overflow
+
+<span class="c"># 溢出计数看增量</span>
+nstat -n1 -z TcpExtListenOverflows TcpExtListenDrops TcpExtSyncookiesSent
+
+<span class="c"># 半连接堆积</span>
+ss -tan state syn-recv | wc -l</pre>
+  <div class="callout">
+    <b>关于半连接队列的边界要说清：</b><span class="k">tcp_max_syn_backlog</span> 影响的是 SYN 队列能排多长，但它的最终有效长度还受内核版本、是否开启 syncookies 等因素影响，<b>具体计算以你内核版本的文档和源码为准</b>，不要照抄某个博客给的固定数字。能确定的是：它和 <span class="k">somaxconn</span> 管的是两个不同的队列，不能互相替代。
+  </div>
+  <p>SYN Flood 的正解不是把 <span class="k">tcp_max_syn_backlog</span> 调到十万。队列再长也能被灌满，而且每个半连接都占内存。<b>syncookies 才是那个「不存状态」的方案</b>：队列满了之后不回 SYN-ACK 就丢，而是把连接信息编码进初始序号，客户端带回 ACK 时再校验重建。<span class="k">tcp_syncookies</span> 有三个值：0 关闭，1 只在溢出时启用，2 无条件启用。多数发行版默认是 1，代价是部分 TCP 选项信息无法携带。</p>
+  <p><b>面试怎么答：</b>「这是两个不同的队列。somaxconn 限制的是全连接队列，也就是握手完成、等着应用 accept 的那批，上限取 listen backlog 和 somaxconn 的较小值；tcp_max_syn_backlog 影响的是半连接队列，放 SYN_RECV。前者满了表现为客户端超时、ListenOverflows 增长，后者满了是被 SYN Flood 打。调 somaxconn 必须同时调应用 backlog，否则取小值等于没调。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>TIME_WAIT 与端口：reuse 有边界，recycle 已经没了</h2></div>
+  <p class="lead">这两个参数的名字只差几个字母，却是「还能用」和「已经不存在」的区别。更麻烦的是，网上大量「高并发优化」文章还在教人打开 <span class="k">tcp_tw_recycle</span>，而它在 <b>Linux 4.12 就已经从内核移除</b>。你在新机器上执行 <span class="k">sysctl -w net.ipv4.tcp_tw_recycle=1</span>，只会得到一个「no such file」类的错误。</p>
+  <p>先说 TIME_WAIT 是什么。<b>主动关闭连接的一方</b>在发完最后一个 ACK 后进入这个状态，Linux 上固定等 60 秒，没有 sysctl 能改这个时长。<span class="k">tcp_fin_timeout</span> 改不了它，那个参数管的是「孤儿 FIN_WAIT_2」，两回事。堆积量约等于「每秒主动关闭的连接数 × 60」，所以它本质上是个容量信号。</p>
+  <p>再说 <span class="k">tcp_tw_reuse</span> 的边界，这是最容易答错的地方。它允许<b>主动发起连接</b>的一方复用还在 TIME_WAIT 的四元组，<b>只对出方向生效</b>，而且<b>需要开启 <span class="k">tcp_timestamps</span></b> 才有意义（靠时间戳判断新连接的回绕序号是否安全）。它不能减少本机作为服务端被动关闭产生的 TIME_WAIT，也不能让监听套接字受益。所以「服务端 TIME_WAIT 多，开 reuse」这个动作，方向就是错的。</p>
+  <table>
+    <tr><th style="width:230px">参数</th><th>实际作用</th><th>边界与现状</th></tr>
+    <tr><td><span class="k">tcp_tw_reuse</span></td><td>允许主动连接复用 TIME_WAIT 的四元组</td><td>只影响出方向；依赖时间戳；不改变 TIME_WAIT 的时长</td></tr>
+    <tr><td><span class="k">tcp_tw_recycle</span></td><td>曾经用于快速回收 TIME_WAIT</td><td><b>4.12 起已从内核移除</b>；老内核开启后在 NAT 下会误丢连接，不应使用</td></tr>
+    <tr><td><span class="k">tcp_max_tw_buckets</span></td><td>TIME_WAIT 套接字总数上限</td><td>超限直接销毁并打日志，是掩盖不是解决</td></tr>
+    <tr><td><span class="k">tcp_fin_timeout</span></td><td>孤儿 FIN_WAIT_2 的超时</td><td>跟 TIME_WAIT 无关，调它没用</td></tr>
+    <tr><td><span class="k">ip_local_port_range</span></td><td>客户端可用本地端口范围</td><td>扩大能推迟端口耗尽，要同步看 conntrack 和防火墙</td></tr>
+    <tr><td><span class="k">tcp_timestamps</span></td><td>启用时间戳选项</td><td>reuse 依赖它；关掉会让 PAWS 和 RTT 测量受影响</td></tr>
+  </table>
+  <p>算一笔账就明白端口为什么会耗尽：假设本地端口范围给了约 2.8 万个，TIME_WAIT 60 秒，那么对<b>同一个目的地址</b>的新建连接速率上限大约是 28000 ÷ 60 ≈ 470 次/秒。超过这个量就会报 <span class="k">Cannot assign requested address</span>。注意这里限定「同一个目的地址」，因为四元组里目的 IP 和端口不同也能复用同一个源端口。</p>
+  <p>正确的处置顺序是：先看是不是短连接打同一个下游，能不能改连接池或长连接；再看端口范围是否过窄；参数只作为辅助。<span class="k">tcp_tw_reuse</span> 在「客户端侧、大量短连接、已开时间戳」这个组合下是有意义的，其他场景基本无效。</p>
+  <pre><span class="c"># 现状：端口范围、TIME_WAIT 数量、两个开关</span>
+sysctl net.ipv4.ip_local_port_range
+ss -tan state time-wait | wc -l
+sysctl net.ipv4.tcp_tw_reuse net.ipv4.tcp_timestamps
+
+<span class="c"># 按远端聚合，看是不是集中在某几个下游（短连接的典型特征）</span>
+ss -tan state time-wait | awk 'NR&gt;1 {print $5}' | cut -d: -f1 | \
+  sort | uniq -c | sort -rn | head
+
+<span class="c"># 确认这个内核到底有没有 recycle（新内核会报错，这是正常的）</span>
+sysctl net.ipv4.tcp_tw_recycle
+
+<span class="c"># 临时调整（重启失效，持久化见模块 8）</span>
+sysctl -w net.ipv4.ip_local_port_range="10240 65000"</pre>
+  <div class="callout danger">
+    <b>面试里提到 <span class="k">tcp_tw_recycle</span>，唯一正确的说法是「它已被移除，不该用」。</b>如果要展开，就说它在 NAT 环境下依赖对端时间戳递增来判断报文新旧，多台客户端共用出口 IP 时时间戳顺序不可比，正常报文会被丢弃，表现为「偶发连不上、重试就好」。这条历史正好解释了为什么内核把它删了，而不是留个开关。
+  </div>
+  <p><b>面试怎么答：</b>「TIME_WAIT 是主动关闭方等 60 秒，Linux 上改不了时长，tcp_fin_timeout 管的是另一件事。tcp_tw_reuse 只对主动发起连接的一方有效，而且依赖时间戳，服务端被动关闭的那部分用不上。tcp_tw_recycle 在 4.12 已经从内核移除，现在不该出现在任何配置里。真正的解法是长连接和连接池。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>缓冲区与拥塞控制：先算 BDP，再谈调多大</h2></div>
+  <p class="lead">「把 rmem_max 和 wmem_max 调到 16MB，网络就快了」——这句话在局域网低延迟环境里几乎没用，在跨地域链路上才可能有效。因为决定要不要调的不是「越大越好」，而是<b>带宽时延积</b>：这条链路上「在途数据」最多能有多少。</p>
+  <p>BDP 的算法很朴素：<b>带宽 × RTT</b>。100 Mbps 的链路、RTT 100ms，在途数据最多约 12.5 MB/s × 0.1s = 1.25 MB。如果接收窗口和缓冲区远小于这个值，发送方就会因为「窗口满了」停下来等 ACK，吞吐被卡在「窗口 ÷ RTT」，链路再宽也用不满。这就是长肥管道（长距离、高带宽）里单流跑不快的经典原因。</p>
+  <table>
+    <tr><th style="width:220px">参数</th><th>作用</th><th>怎么用</th></tr>
+    <tr><td><span class="k">net.ipv4.tcp_rmem</span></td><td>接收缓冲的最小/默认/最大，三元组</td><td>自动调优开启时，内核在 min 和 max 之间动态调整</td></tr>
+    <tr><td><span class="k">net.ipv4.tcp_wmem</span></td><td>发送缓冲的最小/默认/最大</td><td>同上，最大值决定单连接能撑多大 BDP</td></tr>
+    <tr><td><span class="k">net.core.rmem_max / wmem_max</span></td><td>应用用 setsockopt 能设到的上限</td><td>应用自己设缓冲区时受它限制</td></tr>
+    <tr><td><span class="k">tcp_moderate_rcvbuf</span></td><td>接收缓冲自动调优开关</td><td>默认开启，一般不用动</td></tr>
+    <tr><td><span class="k">tcp_congestion_control</span></td><td>拥塞控制算法</td><td>默认通常是 cubic，可切 bbr</td></tr>
+    <tr><td><span class="k">default_qdisc</span></td><td>默认排队规则</td><td>BBR 通常搭配 fq</td></tr>
+  </table>
+  <p>调缓冲区的风险要说清：<b>每个连接都会占内存</b>。最大缓冲调到 16MB，一万条活跃连接在极端情况下可能吃掉几十 GB。而且缓冲区太大会造成 bufferbloat——数据堆在队列里，延迟升高，交互型业务反而更差。所以「调大缓冲」这件事只对<b>大带宽长延迟的吞吐型流量</b>成立，对短请求、低延迟业务是负收益。</p>
+  <p>拥塞控制的选择是另一个维度。CUBIC 把丢包当拥塞信号，在有一定随机丢包的链路上会过度降速；BBR 持续测量瓶颈带宽和最小 RTT，不把丢包直接等同于拥塞。切 BBR 的前提是内核支持（4.9 以后的主线才有，具体以你内核为准），并且通常配合 <span class="k">fq</span> 排队规则。切换是全局的，会影响这台机器上所有连接，<b>必须灰度</b>：先一台，观察吞吐、重传、CPU 和公平性，再推广。</p>
+  <pre><span class="c"># 看当前值和可用算法</span>
+sysctl net.ipv4.tcp_rmem net.ipv4.tcp_wmem
+sysctl net.core.rmem_max net.core.wmem_max
+sysctl net.ipv4.tcp_congestion_control
+sysctl net.ipv4.tcp_available_congestion_control
+
+<span class="c"># 单连接的窗口、RTT、重传，用来验证是不是窗口不够</span>
+ss -tin dst 10.0.0.12:8080
+<span class="c"># 关注 rtt、cwnd、snd_wnd、rcv_space、retrans</span>
+
+<span class="c"># 切 BBR（先确认模块可用，再灰度）</span>
+modprobe tcp_bbr
+sysctl -w net.ipv4.tcp_congestion_control=bbr
+sysctl -w net.core.default_qdisc=fq
+
+<span class="c"># 看队列规则是否生效</span>
+tc qdisc show dev eth0</pre>
+  <div class="callout warn">
+    <b>别在容器里随手改 <span class="k">net.*</span>。</b>一部分网络参数是按 network namespace 隔离的，改了只影响当前命名空间；另一部分是全命名空间共享的，改了会影响宿主上的所有容器。<b>具体哪些隔离、从哪个内核版本开始隔离，以你内核版本的文档为准。</b>在容器里调参前先确认作用域，否则很容易「调了没效果」或者「影响了别人」。
+  </div>
+  <p><b>面试怎么答：</b>「缓冲区要不要调，先算 BDP：带宽乘 RTT。窗口小于 BDP 时吞吐会被卡住，这时候调大才有效。但缓冲区是按连接占内存的，调太大会 bufferbloat，延迟反而升高。拥塞控制我一般先看链路的丢包特征，BBR 适合有随机丢包的场景，切换要灰度，还要配 fq。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>内存：swappiness 不是「关 swap 的开关」</h2></div>
+  <p class="lead">「数据库服务器要把 swappiness 设成 0」——这句话流传极广，但它是把「减少换页」误解成了「禁止换页」。<span class="k">vm.swappiness</span> 调的是<b>回收匿名页和文件页的相对倾向</b>，不是开关；设成 0 也不代表不会 swap，只是内核会尽量先回收 page cache。</p>
+  <p>取值范围在较新内核里是 0 到 200（100 表示匿名页和文件页同等对待），默认通常是 60。<b>不同内核版本的语义和默认值有差异，以你环境为准。</b>把它调低适合「延迟敏感、内存足够、希望尽量保留 page cache」的场景；调成 0 在内存压力大时可能导致回收不动匿名页，最后触发 OOM，而不是优雅地换出——这比 swap 更糟。</p>
+  <table>
+    <tr><th style="width:230px">参数</th><th>作用</th><th>典型误用</th></tr>
+    <tr><td><span class="k">vm.swappiness</span></td><td>匿名页与文件页的回收倾向</td><td>设 0 当成禁用 swap</td></tr>
+    <tr><td><span class="k">vm.overcommit_memory</span></td><td>0 启发式、1 总是允许、2 严格按上限</td><td>无脑设 2，导致 fork 失败</td></tr>
+    <tr><td><span class="k">vm.overcommit_ratio</span></td><td>模式 2 下可超额的比例</td><td>设了 2 却没算 CommitLimit</td></tr>
+    <tr><td><span class="k">vm.dirty_ratio</span></td><td>脏页占总内存多少时同步回写阻塞</td><td>调很大，写突发时延迟飙升</td></tr>
+    <tr><td><span class="k">vm.dirty_background_ratio</span></td><td>多少时开始后台回写</td><td>和 dirty_ratio 贴太近，失去缓冲</td></tr>
+    <tr><td><span class="k">vm.min_free_kbytes</span></td><td>内核保留的空闲内存水位</td><td>调太大反而压缩可用内存</td></tr>
+  </table>
+  <p><span class="k">overcommit_memory</span> 的三个值要能说清：0 是启发式判断，大多数情况够用；1 是「总是答应」，分配时不检查，真正写入时才可能 OOM；2 是「严格不许超过上限」，上限由 <span class="k">CommitLimit</span> 决定，跟 <span class="k">overcommit_ratio</span> 和 swap 有关。Redis 做后台保存时 fork 子进程，官方建议把 1 打开，原因是 fork 依赖 COW，而启发式判断可能在这种大地址空间下拒绝分配。<b>这是特定场景的建议，不是所有服务的通用配置。</b></p>
+  <p>脏页参数是另一个高频现场：内存很大、写入很猛，<span class="k">dirty_ratio</span> 默认在 20% 左右，意味着可以攒下几十 GB 脏页，攒到阈值后内核开始同步回写，所有写操作一起卡住，表现为「每隔一段时间 IO 延迟飙高」。这种周期性尖刺，调 <span class="k">dirty_background_ratio</span> 让后台回写更早介入，比换 SSD 更直接。</p>
+  <pre><span class="c"># 内存与回收的现状</span>
+free -m
+sysctl vm.swappiness vm.overcommit_memory vm.overcommit_ratio
+grep -E 'CommitLimit|Committed_AS|Dirty|Writeback' /proc/meminfo
+
+<span class="c"># 脏页回写参数（比例和字节两套，设了字节就以字节为准）</span>
+sysctl vm.dirty_ratio vm.dirty_background_ratio
+sysctl vm.dirty_expire_centisecs vm.dirty_writeback_centisecs
+
+<span class="c"># 透明大页：数据库和 Redis 场景经常要关掉或改成 madvise</span>
+cat /sys/kernel/mm/transparent_hugepage/enabled
+
+<span class="c"># 谁在吃内存（RSS 会重复计共享库，PSS 更准）</span>
+ps -eo pid,rss,comm --sort=-rss | head
+grep -E '^(AnonPages|Cached|Slab|SReclaimable)' /proc/meminfo</pre>
+  <div class="callout">
+    <b>透明大页（THP）值得单独记一句。</b>它把 4KB 页合并成 2MB，减少 TLB miss，对吞吐型负载有好处；但分配和整理大页时会引入延迟抖动，某些数据库和缓存服务因此建议设成 <span class="k">madvise</span> 或 <span class="k">never</span>。这是<b>取舍</b>不是定论：延迟敏感就保守，吞吐优先可以保留默认，改之前必须压测对比。
+  </div>
+  <p><b>面试怎么答：</b>「swappiness 调的是匿名页和文件页的回收倾向，不是 swap 开关，设 0 也可能换页，还可能更容易 OOM。overcommit 三个模式里，2 是严格上限，配错会让 fork 直接失败；Redis 建议设 1 是 fork 加 COW 的特定场景。脏页参数调不好会出现周期性写延迟尖刺。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>文件系统与 IO 调度：先看设备类型，再选策略</h2></div>
+  <p class="lead">「IO 调度器选哪个」——这题没有统一答案，只有「这块盘是什么类型」。给 NVMe 配 bfq，纯属浪费；给机械盘配 none，请求全堆在设备队列里，延迟会更难看。判断依据是设备的寻道成本和并发能力，不是「哪个名字新」。</p>
+  <p>挂载选项里最值得改的是 <span class="k">noatime</span>。默认的 <span class="k">relatime</span> 已经比老式的 <span class="k">atime</span> 省很多（只在 atime 早于 mtime 或超过一天时更新），但对写密集、读频繁的目录，<span class="k">noatime</span> 还能再省掉一批元数据写。代价是「最后访问时间」不再准确——如果有备份工具或审计依赖它，就不能关。</p>
+  <table>
+    <tr><th style="width:170px">设备类型</th><th>常用调度器</th><th>理由</th></tr>
+    <tr><td>NVMe / 高性能 SSD</td><td><span class="k">none</span>（或 mq-deadline）</td><td>设备自身并发强、没有寻道，内核再排序收益很小</td></tr>
+    <tr><td>普通 SATA SSD</td><td><span class="k">mq-deadline</span></td><td>保证请求在截止时间内被处理，兼顾吞吐和延迟</td></tr>
+    <tr><td>机械盘</td><td><span class="k">bfq</span> 或 mq-deadline</td><td>需要合并和排序，减少寻道；bfq 对交互延迟更友好</td></tr>
+    <tr><td>虚拟化云盘</td><td>跟随厂商建议，常为 none</td><td>调度在宿主机侧做，客户机里再排一次意义有限</td></tr>
+  </table>
+  <p>除了调度器，还有两个常被忽略的：<span class="k">read_ahead_kb</span>（预读大小，顺序读大文件时可以调大，随机读调大是浪费）和文件系统的挂载参数（比如 <span class="k">nodiratime</span>、日志模式）。这些都要配合业务 IO 模式来定，顺序读和随机读的最优值完全不同。</p>
+  <p>怎么判断 IO 是不是瓶颈？不要只看 <span class="k">%util</span>。<span class="k">iostat -x</span> 里更值得看的是 <span class="k">await</span>（平均等待，含排队）、<span class="k">aqu-sz</span>（平均队列长度）和 <span class="k">r/s</span>、<span class="k">w/s</span> 的分布。一块 NVMe 的 <span class="k">%util</span> 到 100% 可能还有余量，因为设备内部并行度很高；而机械盘 <span class="k">await</span> 一涨，基本就是队列堆起来了。</p>
+  <pre><span class="c"># 当前调度器与预读</span>
+cat /sys/block/nvme0n1/queue/scheduler
+cat /sys/block/nvme0n1/queue/read_ahead_kb
+
+<span class="c"># 临时切换调度器（重启失效，持久化用 udev 规则更稳）</span>
+echo mq-deadline &gt; /sys/block/sda/queue/scheduler
+
+<span class="c"># 挂载选项：确认 noatime 有没有生效</span>
+findmnt -no OPTIONS /
+mount | grep ' / '
+
+<span class="c"># IO 现状：await、aqu-sz 比 %util 更能说明排队</span>
+iostat -x 1 3</pre>
+  <div class="callout warn">
+    <b>云环境里改调度器经常是无效动作。</b>块设备可能是 virtio 或者厂商自研驱动，调度发生在宿主机；你在客户机里改了，看起来生效了，实际路径上并不经过。改之前先确认设备型号和虚拟化类型，再看厂商的推荐值，别把物理机的经验直接套上去。
+  </div>
+  <p><b>面试怎么答：</b>「调度器按设备选：NVMe 用 none，SATA SSD 用 mq-deadline，机械盘用 bfq 或 mq-deadline，云盘跟厂商建议。挂载上 noatime 能省元数据写，但要看有没有工具依赖 atime。判断 IO 瓶颈我看 await 和 aqu-sz，不只看 %util，因为 NVMe 的 util 到 100% 不代表饱和。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>持久化与灰度：改内核参数是一次线上变更</h2></div>
+  <p class="lead">「参数改了，重启之后全没了」——这是最冤的一类返工。反过来更危险的是「改了、也持久化了、但没人记得改过」，半年后换人接手，看到一堆来历不明的数字，不敢动也不敢删。</p>
+  <p>持久化的正确位置是 <span class="k">/etc/sysctl.d/</span> 下的独立文件，按文件名排序加载，用 <span class="k">sysctl --system</span> 一次性应用。<b>不要直接改 <span class="k">/etc/sysctl.conf</span></b>，那个文件是兼容用的，多个团队往里追加，冲突了很难查。文件名带上用途和日期，比如 <span class="k">99-nginx-conn.conf</span>，注释写清「为什么改、谁改的、对应哪次故障」，这比参数本身更重要。</p>
+  <p>要注意加载顺序：<span class="k">sysctl --system</span> 会按文件名排序读多个目录，后读的覆盖先读的。所以 <span class="k">99-</span> 开头的会覆盖 <span class="k">10-</span> 开头的，同名参数以最后一个为准。排查「我明明写了为什么没生效」时，先看有没有别的文件在后面覆盖了它。</p>
+  <pre><span class="c"># /etc/sysctl.d/99-web-conn.conf</span>
+<span class="c"># 2026-03 新连接超时排查：accept 队列溢出，配合应用 backlog 一起调</span>
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 4096
+
+<span class="c"># Kubernetes 节点上常见的转发与端口范围</span>
+net.ipv4.ip_forward = 1
+net.ipv4.ip_local_port_range = 10240 65000
+
+<span class="c"># 应用并确认</span>
+sysctl --system
+sysctl net.core.somaxconn
+
+<span class="c"># 看某个参数被哪些文件定义过（排查覆盖）</span>
+grep -rn 'somaxconn' /etc/sysctl.conf /etc/sysctl.d/</pre>
+  <p>灰度是另一半。内核参数影响的是整机所有进程，改错一次可能是全站故障，所以流程要和发布一样：<b>选一台低峰期灰度机 → 记录基线 → 改一个参数 → 观察至少一个业务周期 → 对比指标 → 再推第二批</b>。观察窗口不能太短，很多问题（比如脏页回写、端口耗尽）要十几分钟甚至几小时才显形。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>写变更单。</b>参数名、旧值、新值、依据、预期影响、回滚命令，五样缺一不可。没有回滚命令的变更不该执行。</div></div>
+    <div class="step"><div class="txt"><b>先在一台上改。</b>用 <span class="k">sysctl -w</span> 临时生效，不写文件。这样重启就能回滚，适合先验证。</div></div>
+    <div class="step"><div class="txt"><b>观察四类指标。</b>业务的成功率与 P99、连接队列溢出计数、重传与超时计数、内存与脏页。至少看一个完整业务周期。</div></div>
+    <div class="step"><div class="txt"><b>确认后写进 sysctl.d。</b>同时把临时值改成文件里的持久值，避免「重启后行为变了」这种二次故障。</div></div>
+    <div class="step"><div class="txt"><b>分批推，留回滚窗口。</b>第二批、第三批之间留间隔。回滚就是改回旧值再 <span class="k">sysctl --system</span>，事先把命令写在变更单里。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>面试里的加分点不是「我调过什么」，是「我怎么知道它有效」。</b>能说出「改之前记了基线，改完对比 ListenOverflows 的增量和 P99，灰度一天后才全量」，比报一串数字可信得多。参数值会过时，方法不会。
+  </div>
+  <p><b>面试怎么答：</b>「内核参数我当成一次线上变更来做：写进 /etc/sysctl.d 独立文件、注释写清原因、先在一台机器用 sysctl -w 验证、观察一个业务周期、再分批推。回滚命令提前写好。因为这类参数影响整机所有进程，出问题的面比单个服务大。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个坑：抄来的配置，往往比默认值更危险</h2></div>
+  <p class="lead">内核参数的坑有个共同特征：<b>改错了不会立刻报错</b>。系统照常启动，服务照常运行，问题在某个特定流量模式下才显形。所以下面十条里，一半是「不该改」，一半是「改了但没改对」。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">打开 tcp_tw_recycle</div><div class="pd">这个参数在 Linux 4.12 已经被移除。老内核上开它，在 NAT 环境会按时间戳判断报文新旧，多客户端共用出口 IP 时正常包被丢弃，表现为偶发连接超时、重试就好。看到配置里有它，直接删。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为 tcp_tw_reuse 能解决服务端的 TIME_WAIT</div><div class="pd">它只作用于主动发起连接的一方，还需要 tcp_timestamps 开启。服务端被动关闭产生的 TIME_WAIT 跟它无关。方向搞错，改了也看不到任何变化。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 somaxconn 和 tcp_max_syn_backlog 当成同一个队列</div><div class="pd">前者限制全连接队列（等 accept），后者影响半连接队列（SYN_RECV）。一个满了表现为客户端超时、ListenOverflows 增长，另一个满了是被 SYN Flood 打。调错对象等于没调。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">只调 somaxconn，不调应用 backlog</div><div class="pd">全连接队列上限取两者的较小值。内核调到 65535，Nginx 还是默认 backlog，实际生效的就是那个小的。两边必须一起改。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把 somaxconn 调到十万就以为能扛住高并发</div><div class="pd">队列只是缓冲，真正消费连接的是应用的 accept 速度。应用 accept 慢，队列再长也只是把超时时间往后推，同时占用更多内存。先看 Recv-Q 的增长趋势和应用的 accept 逻辑。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">改了 limits.conf，systemd 服务不生效</div><div class="pd">limits.conf 由 PAM 在登录会话时应用，systemd 启动的服务走的是 unit 里的 LimitNOFILE。改完还要 daemon-reload 并重启服务，光 reload 不行。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把 vm.swappiness 设成 0 当成关闭 swap</div><div class="pd">它调的是回收倾向，不是开关。设 0 之后内核尽量不换出匿名页，内存压力大时可能直接触发 OOM，比换页更糟。延迟敏感场景调低可以，别把它当禁用。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">vm.overcommit_memory 无脑设 2</div><div class="pd">模式 2 是严格上限，超过 CommitLimit 的分配直接失败，fork、启动大堆服务都可能报错。它适合需要确定性内存控制的场景，不适合所有机器。Redis 建议的是 1，不是 2。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 TCP 缓冲区拉到最大就以为更快</div><div class="pd">缓冲区按连接占内存，调太大会 bufferbloat，排队延迟升高。要先算 BDP，再看业务是吞吐型还是延迟型。短请求业务调大缓冲通常是负收益。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">改完不持久化，或者持久化后不记录</div><div class="pd">只 sysctl -w 不写文件，重启就回到旧值，下次故障重现；写了文件不写注释，半年后没人知道这几个数字是干什么的，没人敢删。参数、原因、日期、回滚方式，四样一起留下。</div></div></div>
+  <p><b>面试怎么答：</b>挑一条最有把握的讲，重点放在「你怎么发现它错了」。比如「我们一台机器上有 tcp_tw_recycle，NAT 后面偶发超时，抓包看到服务端直接把包丢了、没有 RST，查下来是这个参数，删掉就好了，从那以后所有机器都加了配置审计」。有现象、有证据、有机制，才叫经验。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 关于 <span class="k">net.ipv4.tcp_tw_recycle</span>，下面哪个说法正确？</div>
+      <button class="opt">仍然可用，但只建议在 NAT 环境下开启</button>
+      <button class="opt">仍然可用，只是默认关闭，需要手动打开</button>
+      <button class="opt">已在 Linux 4.12 从内核移除，不应再出现在配置里</button>
+      <button class="opt">只对 IPv6 生效，IPv4 下无作用</button>
+      <div class="ans">正确答案：<b>已移除</b>。它在 4.12 就被删掉了，新内核上设置会直接失败。老内核里它的机制依赖对端时间戳递增来判断报文新旧，NAT 后多台客户端共用 IP 时时间戳不可比，正常报文会被丢掉，所以内核选择移除而不是保留开关。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. <span class="k">tcp_tw_reuse=1</span> 对下面哪种情况有效？</div>
+      <button class="opt">服务端被动关闭连接后留下的 TIME_WAIT</button>
+      <button class="opt">本机作为客户端主动发起连接时，复用 TIME_WAIT 的四元组，且需要时间戳开启</button>
+      <button class="opt">监听套接字上的半连接队列</button>
+      <button class="opt">任何方向的 TIME_WAIT，只要数量超过阈值</button>
+      <div class="ans">正确答案：<b>主动发起连接的一方</b>。这个参数只影响出方向，并且依赖 <span class="k">tcp_timestamps</span>（用时间戳判断新连接的序号是否安全）。它不缩短 TIME_WAIT 的 60 秒，也不作用于服务端被动关闭的那部分，所以「服务端 TIME_WAIT 多就开 reuse」是无效动作。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. <span class="k">net.core.somaxconn</span> 限制的是哪个队列？</div>
+      <button class="opt">全连接队列，也就是握手完成、等待应用 accept 的连接，上限取 listen backlog 与它的较小值</button>
+      <button class="opt">半连接队列，存放 SYN_RECV 状态的连接</button>
+      <button class="opt">网卡收包队列，由中断和软中断处理</button>
+      <button class="opt">TIME_WAIT 套接字的总数</button>
+      <div class="ans">正确答案：<b>全连接队列</b>。它和应用 <span class="k">listen()</span> 的 backlog 一起决定 accept 队列长度，取较小值。半连接队列由 <span class="k">tcp_max_syn_backlog</span> 影响（实际有效长度还受内核版本和 syncookies 影响）。两者是不同队列，不能互相替代。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 压测时客户端大量连接超时，服务端 <span class="k">ss -lnt</span> 显示监听套接字 Recv-Q 等于 Send-Q，最可能的原因是？</div>
+      <button class="opt">半连接队列被 SYN Flood 打满</button>
+      <button class="opt">防火墙把 SYN 包丢了</button>
+      <button class="opt">本地端口范围不够</button>
+      <button class="opt">全连接队列满，应用 accept 太慢或队列上限太小</button>
+      <div class="ans">正确答案：<b>全连接队列满</b>。<span class="k">Recv-Q</span> 是当前等待 accept 的连接数，<span class="k">Send-Q</span> 是队列上限，两者相等就是满了。默认 <span class="k">tcp_abort_on_overflow=0</span> 时内核会丢掉客户端的 ACK，客户端以为自己已连上，实际发数据没响应，最后超时——所以现象是超时而不是拒绝。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于 <span class="k">vm.swappiness</span>，下面哪个理解正确？</div>
+      <button class="opt">设成 0 就是完全禁用 swap</button>
+      <button class="opt">设得越高，越倾向于换出匿名页、保留文件缓存</button>
+      <button class="opt">它调整的是回收匿名页与文件页的相对倾向，不是 swap 开关</button>
+      <button class="opt">它只影响容器，不影响宿主机</button>
+      <div class="ans">正确答案：<b>回收倾向</b>。它不是开关，设成 0 也不保证不换页，只是内核会尽量先回收 page cache；在内存压力大时反而可能更容易触发 OOM。取值上限在较新内核里是 200，默认通常是 60，具体语义和默认值以你环境的内核文档为准。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. <span class="k">fs.file-max</span> 和 <span class="k">fs.nr_open</span> 的区别是？</div>
+      <button class="opt">两者完全等价，只是名字不同</button>
+      <button class="opt">file-max 是整机 fd 总量上限，nr_open 是单进程能设置到的 fd 上限</button>
+      <button class="opt">file-max 限制单进程，nr_open 限制整机</button>
+      <button class="opt">file-max 只对 root 生效，nr_open 对所有用户生效</button>
+      <div class="ans">正确答案：<b>整机 vs 单进程</b>。<span class="k">fs.file-max</span> 是系统范围内所有进程能打开的 fd 总数；<span class="k">fs.nr_open</span> 是单个进程通过 setrlimit 能设到的天花板。进程实际生效的是 ulimit 的 soft 值，systemd 服务则由 unit 的 <span class="k">LimitNOFILE</span> 决定。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>BDP</b></td><td>带宽时延积，带宽乘 RTT，决定链路上最多能有多少在途数据</td></tr>
+    <tr><td><b>半连接队列</b></td><td>存放 SYN_RECV 的队列，受 tcp_max_syn_backlog 影响，是 SYN Flood 的目标</td></tr>
+    <tr><td><b>全连接队列</b></td><td>握手完成、等待 accept 的队列，上限取 listen backlog 与 somaxconn 的较小值</td></tr>
+    <tr><td><b>syncookies</b></td><td>队列满时不保存状态，把连接信息编码进初始序号，收到 ACK 再校验</td></tr>
+    <tr><td><b>ListenOverflows</b></td><td>全连接队列满导致连接被丢弃的累计次数，要看增量</td></tr>
+    <tr><td><b>TIME_WAIT</b></td><td>主动关闭方发完最后一个 ACK 后的状态，Linux 固定 60 秒</td></tr>
+    <tr><td><b>tcp_tw_reuse</b></td><td>允许主动连接复用 TIME_WAIT 四元组，依赖时间戳，只影响出方向</td></tr>
+    <tr><td><b>tcp_tw_recycle</b></td><td>已从 Linux 4.12 移除，NAT 环境下会误丢连接</td></tr>
+    <tr><td><b>somaxconn</b></td><td>全连接队列的内核上限，与应用 backlog 取小值</td></tr>
+    <tr><td><b>swappiness</b></td><td>匿名页与文件页的回收倾向，不是 swap 开关</td></tr>
+    <tr><td><b>overcommit</b></td><td>内存超额分配策略，0 启发式、1 总是允许、2 严格上限</td></tr>
+    <tr><td><b>dirty_ratio</b></td><td>脏页占比达到多少时同步回写，调不好会出现周期性写延迟尖刺</td></tr>
+    <tr><td><b>THP</b></td><td>透明大页，减少 TLB miss，但可能带来延迟抖动，属于取舍</td></tr>
+    <tr><td><b>mq-deadline</b></td><td>多队列下的截止时间调度器，SSD 常用；NVMe 常直接用 none</td></tr>
+    <tr><td><b>sysctl.d</b></td><td>内核参数的持久化目录，按文件名排序加载，后加载的覆盖前面的</td></tr>
+  </table>
+
+  <div class="cmds">
+    <div class="crow"><code>ss -lnt</code><span class="desc">Recv-Q 贴近 Send-Q 就是全连接队列满了</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nstat -n1 -z TcpExtListenOverflows TcpExtListenDrops</code><span class="desc">看每秒增量，判断队列是否在持续溢出</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sysctl net.core.somaxconn net.ipv4.tcp_max_syn_backlog</code><span class="desc">两个队列的上限，别混为一谈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -tan state time-wait | wc -l</code><span class="desc">TIME_WAIT 总量，配合远端聚合看是不是短连接</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sysctl --system</code><span class="desc">应用 /etc/sysctl.d 下的全部配置</span><button class="copy">复制</button></div>
+  </div>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在测试机上把 <span class="k">somaxconn</span> 调到 8、应用 backlog 也调到 8，用 <span class="k">ab -c 50</span> 压一下，看 <span class="k">Recv-Q</span> 和 <span class="k">ListenOverflows</span> 怎么变，这是理解两个队列最快的方式；② 用 <span class="k">ss -tan state time-wait</span> 观察一次短连接脚本跑完后的堆积量，验证「速率乘 60」这个估算；③ 把 <span class="k">net.ipv4.tcp_tw_recycle</span> 在一个新内核上设一次，亲眼看它报错，比背「已移除」记得牢。<br><br>
+    <b>之后值得单独学：</b>第 5 期讲 TCP 状态机，能解释这些参数背后的协议行为；第 26 期讲 Nginx，里面有 <span class="k">listen backlog</span> 和超时的具体配置；第 2 期的排查顺序，可以帮你判断「这次到底该不该动内核参数」。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 28 期 · 面试问内核参数，考的不是你记得几个推荐值，是你能不能说清它管哪个队列、边界在哪、什么时候不该动</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

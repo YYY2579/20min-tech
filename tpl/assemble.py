@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""把 tpl/parts/*.part.html 的内容片段装配成 10-interview/ 下的完整单文件 HTML。
+
+片段只包含 <header>…</header><main>…</main><footer>…</footer>，
+DOCTYPE / head / style / 计时脚本 由本脚本统一注入 —— 保证全站 CSS 指纹一致。
+
+用法:
+    python tpl/assemble.py            # 装配全部片段
+    python tpl/assemble.py 01         # 只装配文件名以 01 开头的片段
+"""
+import os, re, sys, html
+
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TPL = os.path.join(BASE, 'tpl')
+OUT = os.path.join(BASE, '10-interview')
+
+CSS = open(os.path.join(TPL, 'style.css'), encoding='utf-8').read()
+JS = open(os.path.join(TPL, 'app.js'), encoding='utf-8').read()
+
+DOC = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{title}</title>
+<style>{css}</style>
+</head>
+<body>
+<div id="bar"></div>
+
+{body}
+
+{js}
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>
+'''
+
+
+def main():
+    prefix = sys.argv[1] if len(sys.argv) > 1 else ''
+    parts = sorted(f for f in os.listdir(os.path.join(TPL, 'parts'))
+                   if f.endswith('.part.html') and f.startswith(prefix))
+    if not parts:
+        print('没有匹配的片段'); return
+    for fn in parts:
+        src = os.path.join(TPL, 'parts', fn)
+        body = open(src, encoding='utf-8').read().strip()
+        m = re.search(r'<h1>(.*?)</h1>', body, re.S)
+        if not m:
+            print('!! %s 缺 <h1>' % fn); continue
+        title = html.unescape(re.sub(r'<[^>]+>', '', m.group(1))).strip()
+        out_name = fn.replace('.part.html', '.html')
+        out = os.path.join(OUT, out_name)
+        open(out, 'w', encoding='utf-8', newline='').write(
+            DOC.format(title=title, css=CSS, body=body, js=JS))
+        print('%-46s %6.1f KB  %s' % (out_name, os.path.getsize(out) / 1024, title))
+
+
+if __name__ == '__main__':
+    main()

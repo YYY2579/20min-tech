@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分布式事务与一致性面试</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 31 期</span>
+    <h1>分布式事务与一致性面试</h1>
+    <p class="sub">别一上来就背 2PC/TCC/Saga，先说清<b>你的业务能容忍多久的不一致</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>5</b> 种落地方式</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>14</b> 个术语</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你的转账业务，允许中间状态「钱已扣、对方没到账」持续几秒？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都说「我们用了分布式事务」</h2></div>
+  <p class="lead">「我们用了 TCC，所以是强一致的。」这句话在评审会上很常见。但只要追问一句「那 Cancel 的时候如果 Try 根本没执行过呢」，多半就沉默了。<b>分布式事务的面试，考的不是你知道几个名词，是你能说出每个方案在哪个时刻会不一致。</b></p>
+  <p>下面三个现场，都是「方案选对了、细节没做对」的典型。它们的共同点是：正常路径跑一万次都没问题，只在超时、重试、宕机这些边缘时刻出事——而线上出事，永远发生在边缘。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:160px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>用户余额被冻结了 300 元，订单却是「已取消」</td><td>代码有 bug，重新解冻一次就好</td><td>Try 请求超时，协调者判失败发起 Cancel；Cancel 先到、Try 后到，Try 又把钱冻住了——这叫<b>悬挂</b>。手工解冻只能救这一笔</td></tr>
+    <tr><td>库存服务回滚了，订单服务没收到回滚通知，一直显示「待发货」</td><td>网络问题，重试一下</td><td>2PC 的协调者在第二阶段宕机，参与者处于「不确定」状态，锁一直不放。它不是网络问题，是<b>协议本身的阻塞点</b></td></tr>
+    <tr><td>对账发现每天有几十笔「扣款成功、权益未发放」</td><td>MQ 丢消息了，换个 MQ</td><td>异步链路任何一个环节失败都没有兜底：消息可能丢、消费可能失败、补偿可能没执行。缺的不是更好的 MQ，是<b>对账</b></td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>理论边界</div><div class="cd">CAP 与 BASE 不是口号，它们决定了你在分区发生时能承诺什么、不能承诺什么。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>协议细节</div><div class="cd">2PC 在哪阻塞、TCC 的三个异常、Saga 缺隔离性。这些细节是「用过」和「背过」的分水岭。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>工程兜底</div><div class="cd">幂等、对账、人工介入。所有分布式方案最后都要落到这三样上，没有例外。</div></div>
+  </div>
+  <p>这篇的走法：先把 CAP 用对（这一节决定你后面所有回答的基调），再拆 2PC/3PC 的阻塞、TCC 的三个异常、Saga 的补偿，然后是本地消息表与事务消息这两种最常用的落地方式、Seata AT 的全局锁，收在最终一致与对账、幂等设计、以及「先问一致性要求再选方案」的答题框架上。</p>
+  <p><b>面试落点：</b>「分布式事务我不背方案名，先问三件事：业务能容忍多久不一致、失败后能不能人工介入、是不是跨企业。这三个答案基本就决定了选 TCC、Saga 还是本地消息表。所有方案最后都靠幂等和对账兜底。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>CAP 与 BASE：分区没发生时，C 和 A 是可以兼得的</h2></div>
+  <p class="lead">「CAP 就是三选二」——这句话是面试里最容易被抓住的一句。准确的说法是：<b>P（分区容忍）不是选项，是现实；CAP 说的是「当分区发生时，你只能在 C 和 A 之间选一个」。</b></p>
+  <p>先把三个字母说准。<b>C（一致性）</b>在这里指线性一致性：任何一次读都能看到之前成功写入的最新值，等价于「整个系统表现得像只有一份数据」。</p>
+  <p><b>A（可用性）</b>指每一个到达非故障节点的请求都能在有限时间内得到一个<b>非错误的</b>响应——注意「非错误」这三个字，返回「系统繁忙请重试」不算可用。</p>
+  <p><b>P（分区容忍）</b>指网络分区（节点之间消息丢失或延迟无限）发生时，系统仍能继续运行。分布式系统跨机房、跨机器，网络分区是<b>必然会发生</b>的事件，不是你可以选择关闭的开关。所以「CA 系统」在分布式语境下不存在，单机数据库才是。</p>
+  <p>于是 CAP 的真实含义是：<b>分区发生时，一个写操作要么被拒绝（保 C，牺牲 A），要么被接受但可能读到旧数据（保 A，牺牲 C）。</b>这就是为什么银行转账在分区时会拒绝部分交易，而购物车的加购在分区时仍然可用——它们对 C 和 A 的取舍不同，而且这个取舍是<b>按业务</b>做的，不是按系统做的。同一个系统里，余额是 CP，商品浏览是 AP，这非常正常。</p>
+  <table>
+    <tr><th style="width:120px">选择</th><th>分区时的行为</th><th>典型场景</th><th>代价</th></tr>
+    <tr><td><b>CP</b></td><td>拒绝写入或让请求失败，保证读到的都是最新的</td><td>账户余额、库存扣减、配置中心</td><td>分区期间部分用户不可用</td></tr>
+    <tr><td><b>AP</b></td><td>继续接受读写，允许读到旧值，事后合并</td><td>购物车、点赞、日志、商品浏览</td><td>要处理冲突与最终一致</td></tr>
+  </table>
+  <p><b>BASE</b> 是 AP 方向的工程化延伸：<b>基本可用</b>（允许降级、限流、延迟响应，但不整体瘫痪）、<b>软状态</b>（允许中间状态存在，比如「支付中」）、<b>最终一致</b>（在没有新写入的前提下，经过一段时间后所有副本达成一致）。它不是说「不一致没关系」，而是说「不一致有时间窗口，我要把这个窗口管起来」。</p>
+  <p>这个「窗口」才是工程里真正要谈的东西。面试里如果你能说出「我们的订单状态允许最多 3 秒的不一致，超过就触发对账」，比说「我们最终一致」有信息量得多。因为「最终」是一个没有期限的词，而 SLA 必须有期限。</p>
+  <div class="callout warn">
+    <b>别把 CAP 当成选型工具。</b>现实系统里更常用的其实是另外两个权衡：<b>延迟 vs 一致性</b>（同步复制更一致但更慢）、<b>可用性 vs 一致性</b>（分区时的取舍）。CAP 只描述分区这一种故障下的行为，而多数线上问题根本不是网络分区，是超时、重试、宕机、慢查询。用 CAP 解释一切，会显得你只读过书。
+  </div>
+  <p><b>面试落点：</b>「CAP 不是三选二，P 是前提。它说的是分区发生时 C 和 A 二选一，没分区时两者可以兼得。而且这个取舍是按业务做的：同一个系统里余额是 CP、商品浏览是 AP。BASE 的价值不在『最终一致』这四个字，在于你必须给这个『最终』定一个时间窗口，并且用对账去兜住超出窗口的部分。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>2PC 与 3PC：阻塞点在哪，为什么 3PC 也没解决问题</h2></div>
+  <p class="lead">2PC 的所有问题可以收成一句话：<b>参与者在投了「可以提交」之后，就失去了对自己资源的控制权，而它不知道什么时候能拿回来。</b></p>
+  <p>两个角色：协调者（事务管理器）和参与者（各个资源，比如两个库）。两个阶段：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>准备阶段（prepare / vote）。</b>协调者问所有参与者「这个事务你能提交吗」。参与者执行事务的实际操作（写 undo/redo、改数据），但<b>不提交</b>，把资源锁住，然后回 yes 或 no。注意：锁是从这一刻开始持有的。</div></div>
+    <div class="step"><div class="txt"><b>提交阶段（commit / rollback）。</b>如果所有人都是 yes，协调者发 commit，参与者真正提交并释放锁；只要有一个人是 no，就发 rollback，所有人回滚。</div></div>
+  </div>
+  <p>阻塞点就在这两个阶段之间。<b>参与者在 prepare 之后、收到最终决定之前，既不能提交也不能回滚，只能等着，而且锁不放。</b>如果协调者在这个窗口里宕机，参与者就进入「不确定」（in-doubt）状态：它自己知道事务做完了，但不知道别人怎么决定，所以只能一直等。等多久？没有上限，取决于协调者什么时候恢复，或者有没有人工介入。</p>
+  <p>这就是 2PC 的两个致命弱点：<b>同步阻塞</b>（prepare 到 commit 之间，所有参与者持有锁，这段时间的并发能力接近零）和<b>协调者单点</b>（协调者一挂，所有参与者悬停，而且它自己的决定日志如果丢了，恢复都恢复不了）。</p>
+  <p>还有一个更隐蔽的问题：<b>部分提交</b>。协调者发出 commit 之后，网络断了，只有一半参与者收到。收到的那一半提交了，没收到的那一半还在等。从这一刻起，系统对外就是不一致的——A 库扣了钱，B 库没加钱。等网络恢复，参与者去问协调者，才发现应该提交，于是补上。所以 2PC 保证的是「最终会一致」，不是「任何时刻都一致」。</p>
+  <p><b>3PC</b> 想解决阻塞，做法是把准备阶段再拆一刀，变成 CanCommit（只问「你有没有能力」，不锁资源）、PreCommit（锁资源、执行）、DoCommit（提交），并且在参与者侧引入<b>超时</b>：进入 PreCommit 之后如果长时间收不到协调者的消息，参与者可以自己决定提交。</p>
+  <p>但这一刀切出了新问题：<b>超时是本地判断，不是全局共识。</b>网络分区时，一部分参与者超时后自行提交，另一部分可能收到协调者的 rollback，两边做出相反的决定，数据直接不一致。所以 3PC 降低了阻塞概率，却把「可能不一致」变成了「分区时确实可能不一致」。这也是它在工程里几乎不被采用的原因——<b>它没有解决 CAP，只是换了一种方式违背 CAP。</b></p>
+  <table>
+    <tr><th style="width:120px">对比</th><th>2PC</th><th>3PC</th></tr>
+    <tr><td><b>阶段数</b></td><td>2（准备、提交）</td><td>3（CanCommit、PreCommit、DoCommit）</td></tr>
+    <tr><td><b>阻塞</b></td><td>prepare 后阻塞，直到收到决定</td><td>理论上可在超时后自行决定，减少阻塞</td></tr>
+    <tr><td><b>协调者故障</b></td><td>参与者悬停，锁不放</td><td>参与者可超时推进，但可能推进错方向</td></tr>
+    <tr><td><b>分区下一致性</b></td><td>可能部分提交，恢复后补齐</td><td>可能一部分提交一部分回滚，不可恢复</td></tr>
+    <tr><td><b>工程使用</b></td><td>XA、部分数据库与中间件</td><td>极少，多用于教学对比</td></tr>
+  </table>
+  <pre><span class="c">-- XA 是 2PC 在数据库层的标准实现，MySQL InnoDB 支持</span>
+<span class="c">-- 注意：prepare 之后行锁一直持有，直到 commit 或 rollback</span>
+XA START 'tx-0001';
+UPDATE account SET balance = balance - 100 WHERE id = 1;
+XA END 'tx-0001';
+XA PREPARE 'tx-0001';
+
+<span class="c">-- 此时在另一个会话里查同一行，会被阻塞；查锁等待能看到它</span>
+<span class="c">-- SELECT * FROM performance_schema.data_locks\G</span>
+
+XA COMMIT 'tx-0001';
+<span class="c">-- 出问题时用 XA RECOVER 看有哪些「悬而未决」的事务</span>
+XA RECOVER;</pre>
+  <div class="callout danger">
+    <b>XA 在生产里最危险的状态叫「悬而未决」。</b><span class="k">XA RECOVER</span> 能列出所有 prepared 但没提交的事务，它们持有行锁。如果应用侧的事务管理器没有正确记录全局事务状态，这些锁会一直挂着，表现为「某几行数据谁也改不了，但查不到谁在锁」。处置只能靠人工判断该提交还是回滚，这就是 2PC 协调者单点的真实代价。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>XA RECOVER;</code><span class="desc">列出所有 prepared 但未提交的事务，2PC 出问题时的第一现场</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM performance_schema.data_locks\G</code><span class="desc">看这些悬停事务到底锁了哪些行，判断影响面</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM performance_schema.data_lock_waits\G</code><span class="desc">看谁在等谁，确认是阻塞而不是死锁</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW ENGINE INNODB STATUS\G</code><span class="desc">里面有当前的事务列表和等待信息，配合 XA RECOVER 一起看</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「2PC 的阻塞点在 prepare 之后：参与者已经锁了资源，但还没拿到最终决定，这时协调者挂了它就悬停。它保证的是最终一致，不是任何时刻一致，因为提交阶段可能只有部分参与者收到。3PC 用超时减少阻塞，但超时是本地判断，分区时可能一半提交一半回滚，反而不一致，所以工程上基本不用。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>TCC：空回滚、悬挂、幂等，这三个词是一套的</h2></div>
+  <p class="lead">TCC 被讲得最多，也被讲得最浅。多数人只能说出「Try 预留资源、Confirm 确认、Cancel 释放」，而面试官真正想听的三个词是：<b>空回滚、悬挂、幂等</b>。</p>
+  <p>先把三个阶段的语义说准。<b>Try</b> 做资源检查和预留，不真正扣减：冻结 300 元、锁定 2 件库存、把订单置为「处理中」。<b>Confirm</b> 使用预留的资源，真正落账：扣掉那 300 元、扣减那 2 件库存。它<b>不能失败</b>，因为资源已经预留好了，理论上一定成功；如果真失败（比如数据库挂了），只能重试到成功。<b>Cancel</b> 释放预留资源：解冻那 300 元、释放库存。</p>
+  <p>关键点在于：<b>Confirm 和 Cancel 是由协调者发起的，而协调者只能根据「超时」来判断 Try 是否成功。</b>超时不等于失败——Try 可能已经在参与者那边执行成功了，只是响应没回来。这个信息差，就是三个异常的来源。</p>
+  <h3>空回滚：Try 没执行，Cancel 来了</h3>
+  <p>场景：Try 请求因为网络问题根本没到达参与者（或者在参与者执行前就超时了），协调者判定失败，发起 Cancel。参与者收到 Cancel，却没有对应的预留资源可以释放。</p>
+  <p>如果 Cancel 里直接抛异常「找不到冻结记录」，协调者会一直重试，事务永远结束不了；如果 Cancel 里做了「无条件解冻」，那可能会释放掉<b>别人</b>冻的钱。正确做法是：<b>Cancel 必须能识别「这笔事务我从没 Try 过」，并且返回成功</b>——什么都不做，只记一笔「已回滚」的标记。</p>
+  <h3>悬挂：Cancel 先到，Try 后到</h3>
+  <p>场景：Try 请求在网络里堵了一会儿，协调者超时发起 Cancel，Cancel 先到达并执行完（空回滚，直接成功）。然后那个迟到的 Try 到了，参与者老老实实地冻结了 300 元——<b>这笔钱再也没有人来解冻</b>，因为事务在协调者那边已经结束了。</p>
+  <p>防护只有一条路：<b>Try 执行前先检查这笔事务是不是已经被 Cancel 过</b>，如果已经回滚，直接拒绝执行。这就要求 Try、Confirm、Cancel 三个动作都读写同一张「事务控制表」。</p>
+  <h3>幂等：Confirm 和 Cancel 会被重复调用</h3>
+  <p>协调者的重试是没有上限的（直到成功），所以 Confirm 和 Cancel 一定会被重复调用。Confirm 重复执行会重复扣钱，Cancel 重复执行会重复解冻（甚至冻成负数）。所以两者都必须幂等，靠的也是那张事务控制表的状态机。</p>
+  <table>
+    <tr><th style="width:110px">异常</th><th>触发条件</th><th>后果</th><th>解法</th></tr>
+    <tr><td><b>空回滚</b></td><td>Try 未执行，Cancel 到达</td><td>Cancel 报错导致事务悬停，或无脑释放造成资金错乱</td><td>Cancel 检测不到 Try 记录时，插入「已回滚」标记并返回成功</td></tr>
+    <tr><td><b>悬挂</b></td><td>Cancel 先于 Try 到达</td><td>迟到的 Try 预留了资源，永远无人释放</td><td>Try 执行前检查控制表，已存在 Cancel 记录则拒绝</td></tr>
+    <tr><td><b>幂等</b></td><td>协调者重试 Confirm / Cancel</td><td>重复扣款、重复解冻</td><td>控制表状态机，同一状态的操作直接返回成功</td></tr>
+  </table>
+  <pre><span class="c">-- 一张表同时解决三个问题：事务控制表</span>
+CREATE TABLE tcc_tx (
+  tx_id      VARCHAR(64) NOT NULL,      <span class="c">-- 全局事务 ID</span>
+  branch_id  VARCHAR(64) NOT NULL,      <span class="c">-- 分支（参与者）ID</span>
+  status     TINYINT     NOT NULL,      <span class="c">-- 1=TRYING 2=CONFIRMED 3=CANCELLED</span>
+  amount     DECIMAL(10,2) DEFAULT NULL,
+  updated_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (tx_id, branch_id)
+) ENGINE=InnoDB;
+
+<span class="c">-- Try：已存在 CANCELLED 记录就拒绝（防悬挂）；已 TRYING 就直接返回（幂等）</span>
+<span class="c">-- INSERT ... ON DUPLICATE KEY UPDATE 配合 status 判断，别用先查后写</span>
+
+<span class="c">-- Cancel：查不到记录说明是空回滚，插入一条 CANCELLED 再返回成功</span>
+<span class="c">-- UPDATE tcc_tx SET status = 3 WHERE tx_id = ? AND branch_id = ? AND status = 1;</span>
+<span class="c">-- 影响行数为 0 且记录存在，说明已经 Cancel 过，直接返回成功</span></pre>
+  <div class="callout warn">
+    <b>空回滚和悬挂要一起防，只防一个等于没防。</b>只处理空回滚（Cancel 时容错），迟到的 Try 依然会冻结资源；只防悬挂（Try 时检查），Cancel 遇到不存在的记录依然会报错。这两个问题的解是同一个：<b>让 Try / Confirm / Cancel 三个动作都在同一张表上留下状态，并且用状态判断能不能执行。</b>
+  </div>
+  <p>TCC 的代价也要说清：<b>它对业务代码侵入极大</b>，每个参与方都要写三个接口，还要处理预留资源的可见性（冻结的钱在账上怎么展示）、并发（同一笔钱能不能被多次冻结）。所以它只适合「资金、库存这类必须强一致且能明确预留」的场景，不适合当通用方案。</p>
+  <p><b>面试落点：</b>「TCC 的三个异常是连在一起的：Try 超时但协调者只知道超时不知道结果，于是发起 Cancel，就产生了空回滚；Cancel 比迟到的 Try 先执行，就产生了悬挂；Confirm 和 Cancel 会被重试，就需要幂等。三个问题用同一张事务控制表解决：Cancel 查不到记录就插入已回滚标记并返回成功，Try 执行前发现已回滚就拒绝，Confirm 和 Cancel 按状态机判重。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Saga：长事务的答案，代价是没有隔离性</h2></div>
+  <p class="lead">Saga 的思路很朴素：<b>既然不能把多个服务锁在一起，那就一个个做，做失败了就把前面做过的挨个撤回来。</b>它的价值在长流程，它的问题也在「撤回来」这三个字上。</p>
+  <p>结构上，一个 Saga 由一串本地事务 T1、T2……Tn 组成，每个 Ti 都有一个对应的补偿动作 Ci。正常情况一路走到底；第 k 步失败，就执行 C(k-1)、C(k-2)……C1，把已经完成的部分撤销。每个 Ti 和 Ci 都是<b>本地事务</b>，不跨库、不持长锁——这是它相对 2PC 的最大优势。</p>
+  <p>两种组织方式：<b>编排式</b>（orchestration）有一个中心协调器，它知道整个流程，按顺序调用各个服务，失败时调用补偿；<b>协同式</b>（choreography）没有中心，每个服务完成自己的事后发一个事件，下一个服务监听事件继续，失败时发失败事件，前面的服务各自监听并补偿。编排式好维护、好观测，但协调器容易变成新的单点；协同式松耦合，但流程散落在各个服务里，出问题时很难看清全貌。</p>
+  <p><b>Saga 最大的问题是没有隔离性。</b>2PC 靠锁保证中间状态对外不可见，Saga 没有锁，所以 T1 完成、T2 还没完成的这段时间，中间状态是<b>对外可见</b>的：钱已经扣了，货还没发；订单已创建，库存还没锁。别的请求可能读到这个中间态，甚至基于它做出错误决策。</p>
+  <p>工程上的缓解手段有两个：<b>语义锁</b>（用业务状态标记「处理中」，让其他请求知道这笔还在流程里，比如订单状态机只允许「待支付」跳到「已支付」，不允许跳过）、<b>状态机约束</b>（把中间态设计成用户可理解、业务可容忍的状态，而不是暴露「一半完成」）。但这两个都是<b>业务层的弥补</b>，不是协议保证的隔离性。所以 Saga 不适合「账户余额」这种绝对不能出现中间态的场景。</p>
+  <p>第二个问题是<b>补偿不是回滚</b>。回滚是「当作没发生过」，补偿是「再做一件相反的事」，而有些事情做了就撤不回：短信发出去了、优惠券被用户用掉了、第三方已经放款了。这时候补偿只能是「发一条更正通知」「补一张券」「走人工退款」。所以设计 Saga 时必须逐条确认：<b>这一步的补偿动作是什么？它能不能执行成功？失败了怎么办？</b></p>
+  <p>第三个问题是<b>补偿也会失败</b>。补偿失败后不能简单重试到天荒地老，通常要「重试有限次 → 进补偿失败队列 → 告警 → 人工介入」。这也是为什么 Saga 一定要配监控和对账。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>Saga</th><th>2PC</th></tr>
+    <tr><td><b>锁</b></td><td>不持锁，各步独立提交</td><td>prepare 后持锁到最终决定</td></tr>
+    <tr><td><b>隔离性</b></td><td>没有，中间状态可见</td><td>有，靠锁</td></tr>
+    <tr><td><b>适合时长</b></td><td>长流程，秒到天</td><td>短事务，毫秒到秒</td></tr>
+    <tr><td><b>失败处理</b></td><td>反向补偿，补偿可能失败</td><td>统一回滚，靠日志恢复</td></tr>
+    <tr><td><b>典型场景</b></td><td>订单履约、出行订票、跨企业流程</td><td>同库或少数库的强一致操作</td></tr>
+  </table>
+  <pre><span class="c"># 一个 Saga 的补偿链，重点是每一步都要定义「撤不回来时怎么办」</span>
+T1 创建订单        C1 取消订单（幂等，按订单号）
+T2 锁定库存        C2 释放库存（幂等，按锁定单号）
+T3 扣减余额        C3 退款（幂等，按支付单号，异步到账）
+T4 发券            C4 收回券（用户已使用则转人工）
+T5 通知物流        C5 取消运单（已揽收则拦截，失败转人工）
+
+<span class="c"># 关键不是链路图画得多漂亮，是每个 Ci 都能回答三个问题：</span>
+<span class="c"># 1) 重复执行会怎样  2) 执行失败重试几次  3) 还失败谁负责</span></pre>
+  <div class="callout">
+    <b>一个判断标准：</b>如果某一步的补偿是「发通知让对方改回来」，那它本质上已经不是事务了，是<b>业务协商</b>。这种流程用 Saga 是合适的（比如跨企业的订单变更），但你不能对用户承诺「要么全成功要么全失败」——你只能承诺「最终会纠正」。把这句话说清楚，比硬套一个强一致方案更专业。
+  </div>
+  <p><b>面试落点：</b>「Saga 是长事务的方案，每一步都是本地事务，失败靠反向补偿。它最大的代价是没有隔离性，中间状态对外可见，只能靠语义锁和状态机在业务层缓解。第二个代价是补偿不等于回滚，有些动作撤不回来，只能做更正。所以它适合订单履约这类长流程，不适合余额这类不能有中间态的场景。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>本地消息表与事务消息：工程上最常用的两种落地</h2></div>
+  <p class="lead">真实项目里，绝大多数「分布式事务」最后都落成了这两种方案之一。原因很简单：<b>它们不要求参与者支持任何事务协议，只需要一个数据库和一根消息队列。</b></p>
+  <h3>本地消息表：把「发消息」变成一次本地写入</h3>
+  <p>核心思路是：<b>不要「写完库再发消息」，而是把消息也写进同一个库，让它们共享一个本地事务。</b>具体做法是在业务库里加一张消息表，业务操作和「插入一条待发送消息」放在同一个事务里提交。这样要么都成功，要么都失败，不存在「订单建了但消息没发」的中间态。</p>
+  <p>然后有一个独立的投递器（定时任务或独立的发送进程）扫描这张表里状态为「待发送」的记录，投递到 MQ，收到 broker 确认后把状态改成「已发送」（或者直接删掉）。如果投递失败，下一轮继续扫。</p>
+  <p>它的优点非常实在：<b>不依赖 MQ 的事务能力</b>，换任何 MQ 都能用；实现简单，逻辑全在自己的代码里；失败可重试、可观测（表里有多少条待发送，一目了然）。</p>
+  <p>缺点也明确：<b>与业务库强耦合</b>（每个要发消息的服务都得加一张表）；<b>有轮询延迟</b>（扫描间隔就是最小延迟，通常几百毫秒到几秒）；<b>消息表会膨胀</b>（必须定期归档或清理）；<b>仍然可能重复投递</b>（投递成功但更新状态前崩溃，下一轮会再发一次）——所以消费端必须幂等。</p>
+  <h3>CDC：把轮询换成 binlog 订阅</h3>
+  <p>本地消息表的延迟来自轮询。一个常见的优化是不扫表，而是<b>订阅数据库的 binlog</b>（Canal、Debezium 这类工具），业务表一插入就捕获变更并投递。这样延迟能降到毫秒级，业务代码几乎不用改。代价是多了一个必须高可用的组件，以及「binlog 位点管理」这类新问题——位点回退会重复投递，位点跳跃会丢消息。</p>
+  <h3>事务消息：让 broker 帮你回查</h3>
+  <p>RocketMQ 的事务消息是这个思路的代表。流程分三步：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>发半消息。</b>生产者先把消息发给 broker，broker 存下来但<b>对消费者不可见</b>，然后回一个确认。</div></div>
+    <div class="step"><div class="txt"><b>执行本地事务。</b>生产者收到确认后，才执行本地数据库操作，然后告诉 broker：提交、回滚、或者「我不确定」。</div></div>
+    <div class="step"><div class="txt"><b>回查。</b>如果 broker 收到的是「不确定」，或者压根没收到响应（生产者宕机了），它会<b>主动回查</b>生产者的本地事务状态，根据结果决定投递还是丢弃。回查的次数和间隔由 broker 配置决定，以你使用的版本文档为准。</div></div>
+  </div>
+  <p>它解决的是「本地事务成功但消息没发出」这个经典问题：消息先落地在 broker，本地事务失败就回滚消息，本地事务成功就投递。但它<b>不解决消费端重复</b>——提交之后 broker 仍然可能重复投递（至少一次语义），所以消费端幂等照旧要做。</p>
+  <table>
+    <tr><th style="width:150px">对比</th><th>本地消息表</th><th>事务消息</th></tr>
+    <tr><td><b>依赖</b></td><td>一个数据库 + 任意 MQ</td><td>支持事务消息的 MQ（如 RocketMQ）</td></tr>
+    <tr><td><b>延迟</b></td><td>轮询间隔，几百毫秒到几秒；用 CDC 可到毫秒</td><td>接近普通消息，多一次交互</td></tr>
+    <tr><td><b>业务侵入</b></td><td>每个服务加一张表 + 一个投递器</td><td>实现回查接口，其余较少</td></tr>
+    <tr><td><b>可观测</b></td><td>很好，待发送条数就是积压</td><td>依赖 broker 的控制台与日志</td></tr>
+    <tr><td><b>跨 MQ 迁移</b></td><td>容易</td><td>被绑定在特定 MQ 上</td></tr>
+  </table>
+  <pre><span class="c">-- 本地消息表：业务写入与消息写入必须同一个事务</span>
+BEGIN;
+INSERT INTO orders (id, user_id, amount, status) VALUES ('O1001', 42, 300.00, 'CREATED');
+INSERT INTO outbox_msg (msg_id, topic, payload, status, created_at)
+VALUES ('M-1001-1', 'order.created', '{"orderId":"O1001"}', 'PENDING', NOW());
+COMMIT;
+
+<span class="c">-- 投递器：抢一批待发送的，改成 SENDING 再投，避免多实例重复抢</span>
+<span class="c">-- UPDATE outbox_msg SET status='SENDING' WHERE status='PENDING'</span>
+<span class="c">--   ORDER BY id LIMIT 100;   -- 实际用 SELECT ... FOR UPDATE SKIP LOCKED</span>
+
+<span class="c">-- 投递成功改 SENT，失败改回 PENDING 并累加重试次数</span>
+<span class="c">-- 定时清理：DELETE FROM outbox_msg WHERE status='SENT' AND created_at &lt; NOW() - INTERVAL 7 DAY;</span>
+
+<span class="c">-- 监控：待发送积压就是这条链路的水位</span>
+SELECT status, COUNT(*) FROM outbox_msg GROUP BY status;</pre>
+  <div class="callout ok">
+    <b>面试怎么答：</b>「我最常用的落地是本地消息表：业务和消息在同一个本地事务里写，投递器扫表发送，消费端幂等。它不依赖 MQ 的事务能力，换 MQ 不用改代码，待发送条数就是天然的积压指标。延迟高就上 CDC 订阅 binlog。如果用的 MQ 支持事务消息，也可以用半消息加回查，但消费端幂等一样不能省。」
+  </div>
+  <p><b>面试落点：</b>「本地消息表解决的是『本地事务和发消息不能原子』这个问题，做法是同库同事务写入。它不解决重复投递，所以消费端必须幂等。事务消息用半消息加回查解决同一个问题，但把依赖绑在了特定 MQ 上。两者都比 2PC 更常用，因为不要求参与者支持事务协议。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Seata AT：不改业务代码的代价，是读未提交</h2></div>
+  <p class="lead">「有没有不改代码就能做分布式事务的方案？」有，AT 模式就是。它是国内面试里出现频率很高的追问，因为它是「理想方案」和「真实代价」之间最典型的一次交易。</p>
+  <p>AT 的核心是<b>自动生成反向 SQL</b>。它在数据源上做代理，拦截业务 SQL，解析出两样东西：<b>前镜像</b>（执行前的行数据）和<b>后镜像</b>（执行后的行数据），把这两个镜像写进一张 <span class="k">undo_log</span> 表，<b>和业务 SQL 放在同一个本地事务里提交</b>。业务代码一行不用改，本地事务已经提交了，行锁也释放了。</p>
+  <p>到了二阶段，如果是全局提交，它只需要<b>异步删掉 undo_log</b>，非常快；如果是全局回滚，它就根据 undo_log 里的前镜像生成反向 SQL，把数据改回去。回滚前会先比对当前数据和后镜像是否一致，防止把别人后来的修改覆盖掉（这叫脏写校验）。</p>
+  <p>那问题来了：一阶段本地事务已经提交、锁已经释放，别的全局事务如果同时改同一行，回滚就会互相踩。所以 AT 引入了一个<b>全局锁</b>：由事务协调器维护「哪一行正在被哪个全局事务占用」，一阶段提交前要拿到全局锁，二阶段结束才释放。这样同一行的写操作在全局范围内是互斥的。</p>
+  <p>代价也随之而来：<b>全局锁是一个中心化的竞争点</b>，热点行的并发会掉下来；<b>默认隔离级别是读未提交</b>，因为一阶段的本地事务已经提交，别的会话能读到还没全局提交的数据。<b>要读到「已提交」，必须用 <span class="k">SELECT ... FOR UPDATE</span></b>，让它去拿全局锁——这等于把 AT 的优势（不改代码）又还回去了一部分。</p>
+  <table>
+    <tr><th style="width:150px">阶段</th><th>做什么</th><th>注意</th></tr>
+    <tr><td><b>一阶段</b></td><td>解析 SQL，记录前后镜像到 undo_log，业务 SQL 与 undo_log 同一本地事务提交</td><td>本地锁已释放，靠全局锁保证写互斥</td></tr>
+    <tr><td><b>二阶段提交</b></td><td>异步删除 undo_log</td><td>很快，对业务几乎无感</td></tr>
+    <tr><td><b>二阶段回滚</b></td><td>按前镜像生成反向 SQL，校验后镜像后补偿</td><td>校验失败说明有脏写，需要人工介入</td></tr>
+  </table>
+  <p>它适合什么？<b>业务代码不想改、并发不极端、能接受读未提交</b>的场景。它不适合什么？<b>热点账户</b>（全局锁会把并发打回串行）、<b>必须读已提交</b>的场景（每个读都要加 FOR UPDATE）、<b>长事务</b>（全局锁持有时间等于整个全局事务的时长）。</p>
+  <p>面试里如果被问「AT 和 TCC 怎么选」，一句话就能答清：<b>AT 用全局锁换「不改代码」，TCC 用「改代码」换「不锁资源」。</b>前者适合快速接入的非核心链路，后者适合资金库存这类必须精确控制的场景。</p>
+  <pre><span class="c"># 判断一个 AT 事务有没有卡住：先看 undo_log 有没有堆积</span>
+SELECT COUNT(*), MIN(log_created) FROM undo_log;
+
+<span class="c"># 全局锁冲突时，业务表现为「更新很慢但没报错」，不是死锁</span>
+<span class="c"># 看 TC 侧（事务协调器）的锁表与全局事务状态，具体表名以实现版本为准</span>
+
+<span class="c"># 读已提交的代价：热点行上每个读都要拿全局锁</span>
+SELECT * FROM account WHERE id = 1 FOR UPDATE;</pre>
+  <div class="callout warn">
+    <b>「不改代码」是有账要付的。</b>AT 的隔离级别默认是读未提交，这意味着一个还没全局提交的中间状态可能被别的请求读到——和 Saga 的问题一样，只是它至少还有全局锁保证写不冲突。所以别把 AT 当成「免费的强一致」，它换来的是「写互斥、读可能脏」。
+  </div>
+  <p><b>面试落点：</b>「AT 靠 undo_log 里的前后镜像做自动补偿，一阶段本地事务直接提交，所以它必须配一个全局锁来保证同一行的写互斥，代价是热点行并发下降、默认隔离级别是读未提交。它的价值是不侵入业务代码，适合快速接入；要精确控制资源就用 TCC，两者是『锁资源』和『改代码』的交换。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>最终一致与对账：所有异步方案的最后一根绳子</h2></div>
+  <p class="lead">「消息不会丢的，我们配了 acks=all。」——这句话在有对账的团队里没人敢说。因为只要链路是异步的，就一定存在失败窗口，而<b>对账是唯一能发现「窗口里丢了什么」的手段</b>。</p>
+  <p>先把失败窗口列清楚。一条异步链路至少有五个可能断的地方：本地事务提交了但消息没写进消息表（同事务可解）、消息表写了但投递器没投（重试可解）、投出去了但 broker 没收到（确认加重试可解）、broker 收到了但消费者没处理成功（重试可解）、消费者处理成功了但状态没更新（这就只能靠对账）。<b>前四个靠重试，第五个靠对账。</b></p>
+  <p>对账的基本形态是：<b>双方都有一份流水，按业务单号比对，找出差异。</b>一方是「我这边认为应该发生的」，另一方是「对方那边实际发生的」，两份数据按同一个键对齐，差集就是问题。听起来简单，难的是三件事：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>谁是基准。</b>以支付渠道的流水为准，还是以自己库里的订单为准？基准选错，对出来的差异全是噪音。通常以「钱真正动了的那一方」为基准。</div></div>
+    <div class="step"><div class="txt"><b>对账的粒度与频率。</b>准实时（分钟级，只对增量）适合发现「刚刚漏了」；全量（T+1）适合发现「历史错账」。两者都要有，前者止损快，后者兜底全。</div></div>
+    <div class="step"><div class="txt"><b>差异怎么处置。</b>差异必须分类：我方有对方无、对方有我方无、金额不符、状态不符。每一类对应不同的自动修复动作，修不了才进人工。差异池要有归属人、有 SLA，否则它会变成一个永远没人看的报表。</div></div>
+  </div>
+  <p>对账本身也必须<b>幂等、可重跑</b>。因为对账任务会失败、会重跑，如果修复动作不幂等，重跑一次就多退一次钱。这一点最容易被忽略：大家都很认真地做对账，却没想过「对账任务自己重跑会不会出事」。</p>
+  <p>还有一个认知上的坎：<b>对账不是「出问题才做」的应急手段，它是架构的一部分。</b>如果你在设计阶段就说「这里最终一致，用对账兜底」，那你必须同时说清楚：对账多久跑一次、差异多久能发现、发现后多久能修复、修复不了谁负责。这四个问题答不出来，「最终一致」就是一句空话。</p>
+  <table>
+    <tr><th style="width:150px">手段</th><th>能发现什么</th><th>发现延迟</th></tr>
+    <tr><td><b>实时对账（增量）</b></td><td>刚刚发生的单笔不一致</td><td>分钟级</td></tr>
+    <tr><td><b>全量对账（T+1）</b></td><td>历史错账、批量问题、逻辑 bug</td><td>一天</td></tr>
+    <tr><td><b>业务指标监控</b></td><td>比例异常（比如成功率突然掉 1%）</td><td>分钟级，但只能报警不能定位</td></tr>
+    <tr><td><b>用户投诉</b></td><td>一切，但最贵</td><td>不可控</td></tr>
+  </table>
+  <pre><span class="c">-- 增量对账：以我方订单为主表，找出「我方有、对方没有或对不上」的差异</span>
+SELECT a.order_no,
+       a.amount AS our_amount, b.amount AS their_amount,
+       CASE WHEN b.order_no IS NULL THEN '我方有对方无'
+            WHEN a.amount &lt;&gt; b.amount THEN '金额不符'
+            ELSE '状态不符' END AS diff_type
+FROM our_order a
+LEFT JOIN their_bill b ON a.order_no = b.order_no
+WHERE a.created_at &gt;= '2026-10-20' AND a.created_at &lt; '2026-10-21'
+  AND (b.order_no IS NULL OR a.amount &lt;&gt; b.amount OR a.status &lt;&gt; b.status);
+
+<span class="c">-- 「对方有我方无」要反过来查：以对方流水为主表去 LEFT JOIN 我方订单</span>
+<span class="c">-- 两个方向都查，才是完整的双向对账；只查一边会漏掉另一半错账</span>
+
+<span class="c">-- 差异池：每条差异都要有状态、归属、重试次数，不能只有一张报表</span>
+<span class="c">-- diff_pool(order_no, diff_type, status, owner, retry_cnt, created_at, resolved_at)</span></pre>
+  <div class="callout danger">
+    <b>只做重试不做对账，等于把问题推迟到用户投诉。</b>重试能解决「暂时失败」，解决不了「状态写错」「逻辑分支漏了」「消息被消费到死信队列没人管」。这三种在日志里全都是「成功」，只有对账能发现。
+  </div>
+  <p><b>面试落点：</b>「异步链路一定有失败窗口，重试只能覆盖其中一部分，剩下那部分必须靠对账。我会在设计阶段就把对账定下来：基准是哪一方、增量和全量各多久跑一次、差异怎么分类、自动修复的边界在哪、超时未修复谁负责。而且对账任务本身要幂等可重跑，否则重跑一次就多修一次。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>幂等设计：所有方案的公共底座</h2></div>
+  <p class="lead">不管选 TCC、Saga 还是本地消息表，最后都会落到同一句话上：<b>这个操作重复执行一次，会怎样？</b>答不出这句话，方案选得再对也没用。</p>
+  <p>幂等的实现手段有强弱之分，值得按强度排一遍：</p>
+  <table>
+    <tr><th style="width:150px">手段</th><th>强度</th><th>适用</th><th>边界</th></tr>
+    <tr><td><b>数据库唯一索引</b></td><td>最强，约束在存储层</td><td>插入类操作</td><td>只防重复插入，不防重复更新</td></tr>
+    <tr><td><b>状态机（带前置条件）</b></td><td>强，靠 SQL 的 WHERE 条件</td><td>状态流转类，如订单、支付</td><td>要求状态定义清晰、无跳跃流转</td></tr>
+    <tr><td><b>乐观锁版本号</b></td><td>强，影响行数为 0 即冲突</td><td>更新类，有明确当前值</td><td>高并发下冲突率高，要重试</td></tr>
+    <tr><td><b>去重表</b></td><td>强，但要和业务同事务</td><td>通用</td><td>表会膨胀，要归档</td></tr>
+    <tr><td><b>Token（先取后删）</b></td><td>中，靠原子删除</td><td>防用户重复提交</td><td>只防一次，重试场景不适用</td></tr>
+    <tr><td><b>分布式锁</b></td><td>弱，是「减少并发」不是「保证唯一」</td><td>配合其他手段做第一道闸</td><td>锁失效、超时、脑裂都会漏</td></tr>
+  </table>
+  <p><b>幂等键怎么选</b>是这道题的核心。正确选择是「业务上唯一标识这件事的键」，比如订单号 + 操作类型（<span class="k">O1001:PAY</span>）。错误选择有三个典型：用消息 ID（重发时可能变，两笔真实业务又可能同 ID）、用时间戳（重试时时间变了）、用自增 ID（每次请求都不同）。</p>
+  <p>还有一个容易被忽略的点：<b>幂等要覆盖「中间失败」而不是只覆盖「重复请求」</b>。比如「扣款成功后更新订单状态失败」，重试时会再扣一次款——如果幂等键只用「订单号」，第二次扣款会被判为重复而跳过，但订单状态仍然没更新。所以正确做法是<b>把扣款和状态更新放在同一个本地事务里</b>，让它们要么都成功要么都失败，而不是靠幂等去补。</p>
+  <p>这也引出一条设计原则：<b>幂等是「重复调用不产生额外副作用」，不是「失败可以自动修好」。</b>前者是防重，后者要靠重试加状态机。把两者混为一谈，就会出现「加了唯一索引，结果状态永远卡在中间」的怪现象。</p>
+  <pre><span class="c">-- 状态机幂等：只有从「待支付」才能迁到「已支付」，重复消息影响行数为 0</span>
+UPDATE orders
+SET status = 'PAID', paid_at = NOW()
+WHERE order_no = 'O1001' AND status = 'PENDING';
+<span class="c">-- affected_rows = 0 有两种可能：已经支付过（幂等成功）或状态不对（要告警）</span>
+<span class="c">-- 所以还要再查一次当前状态来区分，不能一律当成功</span>
+
+<span class="c">-- 去重表必须与业务同库同事务，跨库就没有原子性了</span>
+BEGIN;
+INSERT INTO idempotent_record (biz_key, op_type) VALUES ('O1001', 'PAY');
+UPDATE account SET balance = balance - 300 WHERE id = 42 AND balance &gt;= 300;
+COMMIT;</pre>
+  <div class="callout">
+    <b>一个实用的自检问题：</b>把这条消息连续投递三次，系统的最终状态和投递一次是否完全一样？如果不一样，你的幂等就没做完。注意是「最终状态」一样，不是「执行过程」一样——中间多查几次库、多打几条日志都没关系。
+  </div>
+  <p><b>面试落点：</b>「幂等我优先用数据库约束：插入类用唯一索引，状态流转用带前置条件的 UPDATE，更新类用版本号。分布式锁只能当第一道闸，因为它会失效。幂等键必须是业务键，比如订单号加操作类型，不能用消息 ID 或时间戳。另外幂等只保证不重复产生副作用，它不能修复中间失败，那要靠本地事务和重试。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：先问一致性要求，再选方案</h2></div>
+  <p class="lead">「你们怎么做分布式事务？」——最差的答法是直接报一个方案名。最好的答法是<b>先反问四个问题，再说方案</b>。因为方案是被需求推出来的，不是选出来的。</p>
+  <p>四个问题：<b>第一，能容忍多久的不一致？</b>毫秒级、秒级、分钟级、还是可以等到 T+1 的对账？<b>第二，中间状态能不能让用户看到？</b>「支付中」可以，「钱扣了但订单不存在」不行。<b>第三，失败后能不能人工介入？</b>能，方案可以简单很多；不能，就必须有自动补偿和强约束。<b>第四，是不是跨企业？</b>跨企业就只能靠对账和协商，任何协议都锁不住别人的数据库。</p>
+  <table>
+    <tr><th style="width:150px">场景特征</th><th>推荐方案</th><th>理由</th></tr>
+    <tr><td>同一个库，多张表</td><td>本地事务</td><td>根本不需要分布式事务，别把问题复杂化</td></tr>
+    <tr><td>少数几个库，短事务，强一致</td><td>XA / 2PC</td><td>能接受阻塞和性能损失时才用</td></tr>
+    <tr><td>资金、库存，必须精确预留</td><td>TCC</td><td>能明确预留和释放，代价是代码侵入</td></tr>
+    <tr><td>长流程、跨多个服务、可补偿</td><td>Saga</td><td>不持锁，靠补偿，接受中间态可见</td></tr>
+    <tr><td>异步解耦、高吞吐、可最终一致</td><td>本地消息表 / 事务消息</td><td>最常用，落地成本最低</td></tr>
+    <tr><td>不想改代码、并发不极端</td><td>Seata AT</td><td>用全局锁换低侵入，默认读未提交</td></tr>
+  </table>
+  <p>答题的结构建议是「需求 → 方案 → 代价 → 兜底」四段。例如：</p>
+  <div class="callout ok">
+    <b>一段可以直接说出口的话：</b>「下单要扣库存、扣余额、发券，跨三个服务。业务能接受秒级不一致，但用户不能看到『钱扣了订单没建』，所以下单主链路我用 TCC：库存和余额都做冻结而不是直接扣，Confirm 才真正落账，Cancel 释放冻结。三个异常我都处理了——Cancel 查不到 Try 记录就记一笔已回滚并返回成功，Try 执行前检查是否已被 Cancel 防悬挂，Confirm 和 Cancel 按事务表状态机判重。非核心的发券、发短信走本地消息表异步做，消费端按订单号幂等。最后再加一层 T+1 全量对账兜底，差异进池子分给值班同学。」
+  </div>
+  <p>这段话之所以有说服力，是因为它把「一致性要求」「方案」「三个异常」「兜底」全串起来了，而且每一句都能被追问下去——问到哪一层你都有东西可说。</p>
+  <p>反过来，几个典型的减分回答：<b>「我们用 Seata，所以是强一致」</b>（AT 默认读未提交）、<b>「我们用 MQ，消息不会丢」</b>（没提幂等和对账）、<b>「2PC 性能不好，所以我们不用」</b>（说不出阻塞点在哪，等于只知道结论）、<b>「TCC 就是三个接口」</b>（没提空回滚和悬挂）。</p>
+  <p><b>面试落点：</b>「我不先报方案，先问四件事：能容忍多久不一致、中间态能不能被看到、失败能不能人工介入、是不是跨企业。这四个答案决定了选 TCC、Saga 还是消息表。不管选哪个，幂等和对账都是必配的，因为没有任何方案能在所有故障下自动收敛。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：每一个都能被追问到具体代码</h2></div>
+  <p class="lead">下面这些不是名词错误，是<b>把「知道方案」当成「处理过异常」</b>。它们在正常流程里完全看不出来，只在超时和重试的时候暴露。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 CAP 说成「三选二」</div><div class="pd">P 是分布式的前提，不是选项。CAP 说的是分区发生时 C 和 A 二选一，没分区时两者可以兼得。而且取舍是按业务做的，同一个系统里可以既有 CP 又有 AP。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">说 2PC 是强一致所以没问题</div><div class="pd">2PC 保证的是最终一致，提交阶段可能只有部分参与者收到。而且 prepare 后参与者持锁等待，协调者一挂就悬停，XA RECOVER 里那些 prepared 事务就是现场。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">TCC 的 Cancel 查不到记录就抛异常</div><div class="pd">这就是空回滚。Try 没到达但 Cancel 到了，抛异常会让协调者无限重试，事务永远结束不了。正确做法是记一笔已回滚并返回成功。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">只处理空回滚，不防悬挂</div><div class="pd">Cancel 先到、Try 后到，迟到的 Try 会把资源冻住，而事务已经结束了，没人来解冻。Try 执行前必须检查是否已被 Cancel。这两个问题要一起解。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">Confirm 和 Cancel 不做幂等</div><div class="pd">协调者的重试没有上限，重复 Confirm 就是重复扣钱，重复 Cancel 可能把余额解冻成负数。两个接口都必须按状态机判重。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为 Saga 有隔离性</div><div class="pd">Saga 不持锁，每一步本地事务提交后中间状态就对外可见了。别的请求可能读到「钱扣了货没发」并据此做决策，只能靠语义锁和状态机在业务层缓解。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把补偿当成回滚</div><div class="pd">回滚是「当作没发生」，补偿是「再做一件相反的事」。短信发出去了、券被用了，都撤不回来。设计时必须逐条回答「这一步撤不回来时怎么办」。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用了事务消息就以为消费端不用幂等</div><div class="pd">事务消息解决的是「本地事务与发消息的原子性」，投递仍然是至少一次。commit 之后 broker 可能重复投递，消费端幂等一分都不能省。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">只做重试不做对账</div><div class="pd">重试只能救「暂时失败」，救不了「状态写错」「分支漏了」「消息进了死信没人管」。这三种在日志里全是成功，只有对账能发现。</div></div></div>
+  <p><b>面试落点：</b>被问「你踩过什么坑」，讲一个带具体动作的。比如「我们上线 TCC 后隔几天就有几笔冻结金额对不上，查下来是 Try 超时但实际执行成功了，Cancel 空回滚时我们代码里直接抛了异常，协调器一直在重试。后来加了事务控制表，Cancel 查不到记录就写一条 CANCELLED 返回成功，同时 Try 执行前检查这张表来防悬挂，问题才彻底消失」——这比背九个坑名有分量，因为它包含了你当时的错误判断。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 关于 CAP，下面哪种说法是准确的？</div>
+      <button class="opt">分布式系统必须在 C、A、P 三者中选两个，所以叫三选二</button>
+      <button class="opt">P 是分布式的前提，CAP 说的是分区发生时只能在 C 和 A 之间取舍；没分区时两者可以兼得</button>
+      <button class="opt">只要网络足够可靠，就可以同时满足 CAP 三项</button>
+      <button class="opt">CAP 中的 C 指的是数据库的 ACID 中的一致性约束</button>
+      <div class="ans">正确答案：<b>分区时 C 与 A 取舍</b>。分布式系统跨机器通信，网络分区是必然事件，不是可选项。CAP 描述的是分区发生时的行为：要么拒绝写入保一致，要么接受写入但可能读到旧数据。另外这里的 C 是线性一致性，和 ACID 里的 C（约束不被破坏）不是同一个概念。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 2PC 中参与者进入「不确定」状态、资源被长时间锁住，最直接的触发条件是？</div>
+      <button class="opt">参与者在 prepare 阶段返回了 no</button>
+      <button class="opt">参与者的数据库连接池满了</button>
+      <button class="opt">参与者已回复 prepare 成功，但协调者在发出最终决定前宕机</button>
+      <button class="opt">参与者把 binlog 格式设成了 STATEMENT</button>
+      <div class="ans">正确答案：<b>协调者在第二阶段前宕机</b>。参与者已经投了「可以提交」，事务执行完但未提交，资源锁住，此时它既不能自行提交也不能回滚，只能等协调者的决定。这就是 2PC 的同步阻塞与协调者单点问题。返回 no 会直接触发全局回滚，不是这个状态。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. TCC 中出现「空回滚」时，Cancel 的正确实现是？</div>
+      <button class="opt">查不到对应的 Try 记录时，插入一条「已回滚」标记并返回成功，不释放任何资源</button>
+      <button class="opt">查不到记录说明数据异常，直接抛异常让协调者重试</button>
+      <button class="opt">无条件执行解冻，保证资源一定被释放</button>
+      <button class="opt">把异常吞掉并返回成功，同时不做任何记录</button>
+      <div class="ans">正确答案：<b>记标记并返回成功</b>。空回滚是 Try 没到达但 Cancel 到达，此时没有资源可释放，抛异常会让协调者无限重试。同时必须留下「已回滚」的记录，否则迟到的 Try 会再次冻结资源（悬挂）。无条件解冻更危险，可能释放掉别人的冻结。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 防止 TCC 的「悬挂」，关键在于？</div>
+      <button class="opt">把 Confirm 改成异步执行</button>
+      <button class="opt">给 Cancel 加重试次数上限</button>
+      <button class="opt">Try 执行前检查事务控制表，如果这笔事务已经被 Cancel 过就拒绝执行</button>
+      <button class="opt">把 Try 的超时时间调大，避免协调者误判</button>
+      <div class="ans">正确答案：<b>Try 执行前检查是否已 Cancel</b>。悬挂的成因是 Cancel 先到并执行完，迟到的 Try 又预留了资源，而事务已经结束，没人来释放。只能在 Try 入口处拦住它。调大超时能降低概率但消除不了，重试上限和悬挂无关。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">5. 本地消息表要求「业务写入」和「消息写入」在同一个本地事务里，主要目的是？</div>
+      <button class="opt">提高写入性能，减少一次网络往返</button>
+      <button class="opt">让消息可以按顺序投递</button>
+      <button class="opt">避免消息表膨胀</button>
+      <button class="opt">保证不会出现「业务成功但消息没记录」或反过来的中间态</button>
+      <div class="ans">正确答案：<b>消除中间态</b>。同库同事务写入，两者要么都成功要么都失败，从根上避免了「订单建了但消息没发」。它不解决投递重复（消费端仍需幂等），也不解决顺序和表膨胀——那要靠 key 设计和归档策略。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. Seata AT 模式默认的隔离级别和它的原因，正确的是？</div>
+      <button class="opt">读已提交，因为一阶段没有提交本地事务</button>
+      <button class="opt">读未提交，因为一阶段本地事务已提交并释放本地锁，其他会话能读到未全局提交的数据</button>
+      <button class="opt">可重复读，因为依赖 undo_log 做快照</button>
+      <button class="opt">串行化，因为全局锁把同一行的访问串行化了</button>
+      <div class="ans">正确答案：<b>读未提交</b>。AT 的一阶段会把业务 SQL 和 undo_log 放在同一个本地事务里提交，本地锁随即释放，所以别的会话能读到这份「全局尚未提交」的数据。全局锁只保证同一行的写互斥，不保证读隔离；要读到已提交，必须用 SELECT ... FOR UPDATE 去拿全局锁。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>CAP</b></td><td>分区发生时，一致性与可用性只能取其一；P 是分布式的前提而非选项</td></tr>
+    <tr><td><b>BASE</b></td><td>基本可用、软状态、最终一致，是 AP 方向的工程化表述</td></tr>
+    <tr><td><b>2PC</b></td><td>两阶段提交，prepare 后参与者持锁等待最终决定，协调者是单点</td></tr>
+    <tr><td><b>3PC</b></td><td>三阶段提交，用超时减少阻塞，但分区时可能出现部分提交部分回滚</td></tr>
+    <tr><td><b>XA</b></td><td>数据库层的 2PC 标准，prepare 后持有行锁，可用 XA RECOVER 查悬停事务</td></tr>
+    <tr><td><b>TCC</b></td><td>Try 预留、Confirm 确认、Cancel 释放，业务侵入大但能精确控制资源</td></tr>
+    <tr><td><b>空回滚</b></td><td>Try 未执行而 Cancel 到达，Cancel 需识别并返回成功</td></tr>
+    <tr><td><b>悬挂</b></td><td>Cancel 先于 Try 执行，迟到的 Try 预留了无人释放的资源</td></tr>
+    <tr><td><b>Saga</b></td><td>长事务拆成多个本地事务，失败时反向补偿，没有隔离性</td></tr>
+    <tr><td><b>语义锁</b></td><td>用业务状态标记「处理中」，缓解 Saga 中间态可见的问题</td></tr>
+    <tr><td><b>本地消息表</b></td><td>业务与消息同库同事务写入，投递器扫表发送，消费端幂等</td></tr>
+    <tr><td><b>事务消息</b></td><td>半消息加本地事务状态回查，解决本地事务与发消息的原子性</td></tr>
+    <tr><td><b>全局锁</b></td><td>AT 模式中由协调器维护的行级互斥，保证跨全局事务的写不冲突</td></tr>
+    <tr><td><b>幂等键</b></td><td>业务上唯一标识一次操作的键，如订单号加操作类型，不能用消息 ID</td></tr>
+    <tr><td><b>对账</b></td><td>按业务单号比对双方流水，发现重试覆盖不到的错账，是最外层兜底</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用两个数据库加一段 XA 代码，在 prepare 之后直接 kill 掉协调者进程，然后在参与者上执行 <span class="k">XA RECOVER</span>，亲眼看到那个悬停事务和它持有的锁；② 写一个最小的 TCC 例子，故意把 Cancel 的调用放在 Try 之前（模拟悬挂），看你的代码会不会把资源冻死，然后加上事务控制表修好它；③ 建一张 outbox 表，塞 100 条待发送消息，写一个投递器，中途 kill 一次，重启后检查有没有重复投递和漏投——这两个数就是你对「至少一次」的真实体感。<br><br>
+    <b>之后值得单独学：</b>第 30 期消息队列，本地消息表和事务消息的底层就是那一篇的投递语义；第 18 期 Redis 的缓存一致性，本质是同一个「先写谁」的问题；第 32 期限流熔断，讲的是分布式链路里「失败怎么不扩散」，和对账是互补的两件事。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 31 期 · 分布式事务没有正确答案，只有「你能容忍多久不一致」这个前提下的最便宜方案</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>可观测性三支柱：指标、日志、链路怎么配合</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 16 期</span>
+    <h1>可观测性三支柱：指标、日志、链路怎么配合</h1>
+    <p class="sub">metrics 告诉你「出事了」，traces 告诉你「哪一段慢」，logs 告诉你「为什么」。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>9</b> 大模块</span>
+      <span class="chip"><b>20</b> 个考点</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：只有一个 502 的错误率曲线，你能定位到哪一行代码吗？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一次 502，三种视角，三个都缺</h2></div>
+  <p class="lead">晚上八点，网关的 502 比例从 0.1% 涨到 3%。看板上指标齐全：错误率、QPS、P99、下游依赖的调用量，全都有。但你盯着这四条曲线看了十分钟，还是不知道是哪一段出了问题——因为指标只告诉你「多少」，不告诉你「哪一个请求、卡在哪一步」。</p>
+  <p>于是去查日志。日志服务里 grep 502，出来三十万行，每行都是同样的 <span class="k">upstream sent invalid header</span>。你能确认是某个下游返回了脏数据，但不知道是哪个下游、从什么时候开始、影响的是哪类请求。</p>
+  <p>再看链路。采样率 1%，一晚上只有几百条 trace，翻了半天没找到一条真正报错的——因为采样是随机的，它不认识「错误」这个概念。</p>
+  <div class="callout danger">
+    <b>这三个失败是同一类错误：用错工具回答错问题。</b>指标不是用来定位单条请求的，日志不是用来做聚合趋势的，随机采样的 trace 也不是用来抓稀有错误的。三支柱之所以是三根柱子，不是因为厂商想多卖产品，是因为它们的<b>成本结构和查询模式</b>根本不同。
+  </div>
+  <p>这一篇要讲清三件事：每种信号擅长回答什么问题、怎么埋点才让三者能互相关联、以及一次真实的排障应该按什么顺序在三种信号之间跳。最后会落到 OpenTelemetry 和采样策略——这两个是当下面试里区分「用过」和「搭过」的地方。</p>
+  <p><b>面试落点：</b>「我的顺序是用指标发现、用链路定位、用日志解释。因为指标便宜、能覆盖全量，适合发现和告警；链路有请求级因果，能指出是哪一段；日志细节最全但最贵，只适合在已经锁定范围之后去查为什么。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>三支柱：不是三种数据，是三种成本结构</h2></div>
+  <p class="lead">「可观测性三支柱是什么」这题谁都会答。追问「为什么不能用日志替代指标」，才是真正在考你有没有算过账。</p>
+  <table>
+    <tr><th style="width:90px">维度</th><th>Metrics</th><th>Logs</th><th>Traces</th></tr>
+    <tr><td><b>数据形态</b></td><td>预聚合的数值时间序列</td><td>离散事件的文本或 JSON</td><td>请求级的 span 树</td></tr>
+    <tr><td><b>成本驱动</b></td><td>series 数量 × 采样点</td><td>字节数（通常最贵）</td><td>请求数 × span 数 × 采样率</td></tr>
+    <tr><td><b>基数容忍</b></td><td>极低，标签值不能无限增长</td><td>高，什么都能写</td><td>中，受采样和存储周期限制</td></tr>
+    <tr><td><b>擅长回答</b></td><td>多少、多快、趋势如何、要不要告警</td><td>这一次具体发生了什么、错误原文是什么</td><td>这个请求经过了谁、哪一段最慢</td></tr>
+    <tr><td><b>不擅长</b></td><td>单个请求的细节、原因</td><td>聚合统计、长期趋势（太贵）</td><td>全量覆盖（采样必然丢）、长期留存</td></tr>
+    <tr><td><b>典型保留期</b></td><td>数周到一年（视存储方案）</td><td>数天到数月，错误级别更长</td><td>数天到数周</td></tr>
+  </table>
+  <p>为什么日志替代不了指标？算一笔账：一天一亿请求，每个请求打三行日志、每行 300 字节，就是 90GB/天。要在这个量级上算「过去 30 天每小时的 P99」，代价高到不可接受。而同样的问题用直方图指标表达，可能只有几千条 series、每天几 MB。<b>指标是「提前把聚合做好」，代价是你只能问预先设计过的问题。</b></p>
+  <p>反过来，指标也替代不了日志。指标能告诉你错误率涨了，但涨的原因可能是下游超时、证书过期、某个字段解析失败、数据库死锁——这些信息都在错误内容和堆栈里，而把每一种错误原文做成标签，就是基数自杀。<b>所以正确的分工是：指标负责「发现和缩小范围」，日志负责「解释」。中间那一步「是哪一个调用慢」，才轮到链路。</b></p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>指标：广而浅</div><div class="cd">覆盖所有服务和依赖，成本低，能 7×24 盯着。它是雷达，不是显微镜。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>链路：窄而深</div><div class="cd">只覆盖被采样的请求，但能给出完整的调用链和每一段的耗时。它是 X 光。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>日志：全而贵</div><div class="cd">什么都能记，但成本随流量线性上涨。它是病历，只在需要的时候翻。</div></div>
+  </div>
+  <p>还有一个常被追问的点：<b>这三者怎么算「可观测」而不是「可监控」？</b>监控是「你预先知道要问什么」，可观测是「你能问出没预想过的问题」。区别在于标签和属性的丰富度：只看 CPU 和 QPS 是监控；能按用户、按地域、按版本、按依赖切片去问「为什么只有 iOS 用户在华东失败」，才叫可观测。<b>但这句话有边界——丰富度受基数成本约束，所以「可观测」永远是在成本和自由度之间做取舍，不是越多越好。</b></p>
+  <p><b>面试怎么答：</b>「三者的差别不在数据格式，在成本结构。指标是预聚合，最便宜，适合全量覆盖和告警；链路是采样后的请求级因果，适合定位；日志最贵但细节最全，适合解释。所以我不会问『哪个最好』，只会问『这个问题用哪个信号回答成本最低、信息又够用』。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>黄金信号与 RED / USE：两套方法，两个视角</h2></div>
+  <p class="lead">「监控该看哪些指标」——如果答案是「CPU、内存、磁盘、网络」，那只是机器的体检报告，不是服务的健康度。用户不关心你的磁盘，只关心请求有没有成功、快不快。</p>
+  <p>四个黄金信号是 Google SRE 里提出的一组：<b>延迟、流量、错误、饱和度</b>。前三个是用户视角，第四个是容量视角。第四个存在的理由是「预测」——延迟和错误是已经发生的事，饱和度是「快要发生」的事。</p>
+  <table>
+    <tr><th style="width:110px">信号</th><th>怎么量</th><th>陷阱</th></tr>
+    <tr><td><b>延迟</b></td><td>成功请求的耗时分布，通常看「阈值内完成的比例」</td><td>必须把成功和失败的请求分开统计。失败请求往往几十毫秒就返回，混在一起会把平均值拉低，看起来「变快了」</td></tr>
+    <tr><td><b>流量</b></td><td>QPS、并发连接数、消息消费速率</td><td>要区分「用户流量」和「重试流量」。重试风暴时 QPS 翻倍，但真实用户没变</td></tr>
+    <tr><td><b>错误</b></td><td>显式错误（5xx）+ 隐式错误（200 但内容错、超时、空结果）</td><td>只看状态码会漏掉「协议层成功、业务层失败」的情况</td></tr>
+    <tr><td><b>饱和度</b></td><td>最紧缺的那个资源的用量：连接池、线程池、队列长度、CPU throttling</td><td>要找「最先满的那个」，而不是所有资源都盯。通常不是 CPU</td></tr>
+  </table>
+  <p>RED 和 USE 是两套互补的方法，别混着用。<b>RED 面向请求型服务</b>：Rate（速率）、Errors（错误）、Duration（耗时），三个都是「请求视角」。<b>USE 面向资源</b>：Utilization（使用率）、Saturation（饱和度）、Errors（错误），三个都是「资源视角」。一个服务对外用 RED 定义 SLO，对内用 USE 找瓶颈——<b>RED 告诉你用户疼了，USE 告诉你为什么疼。</b></p>
+  <pre><span class="c"># RED：请求速率</span>
+sum(rate(http_requests_total{job="api"}[5m]))
+
+<span class="c"># RED：错误比例（注意分母用有效请求，别把 4xx 算进来）</span>
+sum(rate(http_requests_total{job="api",status=~"5.."}[5m]))
+/
+sum(rate(http_requests_total{job="api",status!~"4.."}[5m]))
+
+<span class="c"># RED：延迟达标率，比 P99 更适合做告警</span>
+sum(rate(http_request_duration_seconds_bucket{job="api",le="0.3"}[5m]))
+/
+sum(rate(http_request_duration_seconds_count{job="api"}[5m]))
+
+<span class="c"># USE：连接池饱和度——比 CPU 更常见的真实瓶颈</span>
+pg_stat_activity_count{state="active"} / pg_settings_max_connections</pre>
+  <div class="callout">
+    <b>为什么延迟告警不用 P99？</b>两个原因。第一，分位数不可聚合，多实例的 P99 没法合并成全局 P99。第二，P99 对桶的边界极其敏感，桶没设计好时它本身就是个估算值。而「300ms 内完成的比例」可以直接聚合、可以直接和 SLO 对比、也可以在告警里说清「现在有 2% 的用户超过 300ms」——这句话人能听懂。
+  </div>
+  <p>还有一个经常被忽略的：<b>饱和度和错误之间有时滞</b>。连接池满了之后，应用会开始排队，然后是超时，最后才是错误率上升。如果只盯错误率，你会比用户晚一到两分钟知道。这也是为什么要给「饱和度」单独配一条 P3 告警——它不叫人起床，但它给你提前量。</p>
+  <p><b>面试怎么答：</b>「对外用 RED 定义 SLO：速率、错误、耗时，都是请求视角；对内用 USE 找瓶颈：使用率、饱和度、错误，都是资源视角。延迟一定要把成功和失败分开统计，否则失败请求会把平均值拉低。饱和度是唯一带预测性的信号，值得单独盯。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>指标埋点：桶的边界决定了你的 SLO 能不能被验证</h2></div>
+  <p class="lead">埋点这件事，最贵的错误发生在设计阶段：桶设错了，三个月后想验证 SLO，发现数据根本不支持——桶太粗，P99 落在 <span class="k">+Inf</span> 里；桶太细，series 爆了，Prometheus 先挂。</p>
+  <p>先说命名，因为它决定了三支柱能不能关联。<b>指标名要有单位、要有类型后缀</b>：Counter 用 <span class="k">_total</span>，时间统一用秒（<span class="k">_seconds</span>），大小统一用字节（<span class="k">_bytes</span>）。不要用毫秒和秒混着来，也不要叫 <span class="k">request_time</span> 这种既没单位也没类型的名字。<b>标签只放低基数维度</b>：method、status_class、route_template、region 可以；user_id、request_id、原始 URL 不行。</p>
+  <p>然后是桶。设计原则只有一条：<b>在你要做判断的那个边界附近，必须有桶</b>。SLO 是「95% 的请求在 300ms 内完成」，那 200ms、250ms、300ms、400ms 这四个桶就是必需品。没有它们，你算出来的「300ms 内比例」其实是相邻两个桶之间的线性插值，误差可能大到让结论翻转。</p>
+  <table>
+    <tr><th style="width:170px">桶设计</th><th>后果</th></tr>
+    <tr><td>用客户端默认桶，不按业务调</td><td>默认桶通常覆盖毫秒到十秒，看着通用，但你的 SLO 边界往往正好落在两个桶中间</td></tr>
+    <tr><td>桶太少（三五个）</td><td>分位数全靠插值，P99 基本是猜的</td></tr>
+    <tr><td>桶太多（三五十个）</td><td>series 数按桶数线性上涨，标签一多直接打爆 TSDB</td></tr>
+    <tr><td>上界没覆盖到超时时间</td><td>所有慢请求挤进 <span class="k">+Inf</span>，你永远不知道到底多慢</td></tr>
+    <tr><td>用 Gauge 记单次耗时</td><td>只剩最后一个值，分布全丢，什么也算不出来</td></tr>
+  </table>
+  <p>算一下成本，面试里能报出这个乘法很加分：一条直方图的 series 数约等于 <b>标签组合数 ×（桶数 + 2）</b>，加 2 是因为 <span class="k">_sum</span> 和 <span class="k">_count</span>。假设有 50 个路由、4 种方法、12 个桶，那就是 50 × 4 × 14 = 2800 条 series，只为一个指标。如果再把 status 细分成 20 种，立刻变成五万多条。<b>这就是为什么「指标要克制」不是风格问题，是容量问题。</b></p>
+  <pre><span class="c"># 一个按 SLO 设计的桶：边界卡在 300ms，上界覆盖到 5s</span>
+http_request_duration_seconds_bucket{route="/pay",le="0.05"}
+http_request_duration_seconds_bucket{route="/pay",le="0.1"}
+http_request_duration_seconds_bucket{route="/pay",le="0.2"}
+http_request_duration_seconds_bucket{route="/pay",le="0.3"}   <span class="c"># SLO 边界</span>
+http_request_duration_seconds_bucket{route="/pay",le="0.5"}
+http_request_duration_seconds_bucket{route="/pay",le="1"}
+http_request_duration_seconds_bucket{route="/pay",le="2"}
+http_request_duration_seconds_bucket{route="/pay",le="5"}
+http_request_duration_seconds_bucket{route="/pay",le="+Inf"}
+
+<span class="c"># exemplar：把一次具体观测关联到 trace，指标点可以直接跳到链路</span>
+http_request_duration_seconds_bucket{route="/pay",le="0.3"} 1024 # {trace_id="4bf92f3577b34da6a3ce929d0e0e4736"} 0.287</pre>
+  <div class="callout ok">
+    <b>exemplar 是被严重低估的一个功能。</b>它让直方图的某个桶携带一个真实的 trace_id，于是你在 Grafana 上看到一个尖刺，可以直接点进去看那一次请求的完整链路。这是「指标发现问题 → 链路定位问题」这条路径上最短的一跳，成本几乎为零，值得默认打开。
+  </div>
+  <p><b>面试怎么答：</b>「指标名带单位和类型后缀，标签只放低基数维度。直方图的桶要卡在 SLO 边界附近，上界覆盖到超时时间，总数控制在十几个，因为 series 数约等于标签组合乘桶数加二。另外我会开 exemplar，让指标点能直接跳到对应的 trace。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>日志：结构化是底线，成本控制是本事</h2></div>
+  <p class="lead">日志的问题从来不是「记不记」，是「记多少、留多久、怎么查」。一个日活百万的服务，如果每个请求打五行 info，日志系统的账单会比计算资源还高。</p>
+  <p>先立一条底线：<b>日志必须是结构化的</b>。同一行文本 <span class="k">"user 123 login failed"</span> 和 <span class="k">{"event":"login_failed","user_id":"123","reason":"bad_password"}</span>，前者只能靠正则，后者可以直接按字段过滤和聚合。结构化不是为了好看，是为了<b>可查询</b>——排障时你少写十个正则，就多十分钟定位。</p>
+  <p>字段约定要统一，而且要和链路、指标对齐：时间戳、级别、服务名、环境、<span class="k">trace_id</span>、<span class="k">span_id</span>、消息、错误对象、耗时、HTTP 状态码。<b>服务名这个字段尤其重要</b>：如果指标里叫 <span class="k">job</span>、日志里叫 <span class="k">app</span>、链路里叫 <span class="k">service.name</span>，那三者永远关联不上。统一到一套语义约定（OpenTelemetry 的 semantic conventions 就是干这个的），比事后写十个 JOIN 脚本划算。</p>
+  <p>级别要有纪律。<span class="k">error</span> 的语义应该是「需要人来看的事」，而不是「捕获了一个异常」。一个每秒钟都在重试失败的连接池，如果每次都打 error，你的错误日志检索会立刻失效。<b>可恢复的重试打 warn 并带上重试次数，只有最终失败才打 error。</b></p>
+  <table>
+    <tr><th style="width:150px">控制手段</th><th>做法</th><th>代价</th></tr>
+    <tr><td>分级保留</td><td>error 留 30 天，info 留 3 天，debug 默认关</td><td>需要日志后端支持按级别设 TTL</td></tr>
+    <tr><td>采样</td><td>info 按 1%~10% 采，error 全留</td><td>采样后的日志不能用来算精确比例</td></tr>
+    <tr><td>采集侧过滤</td><td>在 agent/Collector 就丢掉健康检查、静态资源的日志</td><td>过滤规则要维护，容易误杀</td></tr>
+    <tr><td>字段裁剪</td><td>不打整个请求体，只打关键字段和长度</td><td>排障时需要临时加日志再发一次</td></tr>
+    <tr><td>限流</td><td>按服务设每秒上限，超了丢弃并计数</td><td>突发时可能丢掉关键日志，必须配「丢弃计数」告警</td></tr>
+  </table>
+  <p>如果用的是 Loki 这类「只索引标签、内容压缩存储」的系统，有一条铁律：<b>标签基数决定索引大小，绝不能把 trace_id 当标签</b>。每个请求一个 trace_id，等于每个请求一条流，索引会先于存储爆炸。正确做法是把 trace_id 放进日志行里，用全文过滤查：</p>
+  <pre><span class="c"># 正确：按低基数标签选流，用 filter 找 trace_id</span>
+{service_name="api", env="prod"} |= "4bf92f3577b34da6a3ce929d0e0e4736"
+
+<span class="c"># 错误：把请求级 ID 做成标签，Loki 会为每个值建一条 stream</span>
+{service_name="api", trace_id="4bf92f3577b34da6a3ce929d0e0e4736"}
+
+<span class="c"># 统计某类错误的出现次数（结构化日志里的字段可以直接过滤）</span>
+sum by (service_name) (count_over_time({env="prod"} |= "level=error" [5m]))</pre>
+  <div class="callout warn">
+    <b>日志里不要打敏感数据。</b>手机号、身份证、卡号、token、完整的请求体——这些东西一旦进日志，就等于进了几十台机器的磁盘和若干个备份，合规上很难说清。要打就打脱敏后的前缀加长度，或者只打哈希。这一条在面试里提一句，会显得你有生产意识。
+  </div>
+  <p><b>面试怎么答：</b>「日志第一要求是结构化，字段名要和指标、链路统一，否则关联不上。成本靠分级保留、采样、采集侧过滤和字段裁剪控制。用 Loki 的话标签必须是低基数的，trace_id 只能放在日志内容里用全文检索，绝对不能做标签。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>链路追踪：span 是树干，context 传播是命门</h2></div>
+  <p class="lead">链路追踪的原理十分钟能讲完：一个 trace 是一次请求的完整调用树，一个 span 是其中一个工作单元，有开始时间、结束时间、名字、属性和父 span。真正难的不是概念，是<b>让这条链不断</b>。</p>
+  <p>一条 trace 由 trace_id 标识，全局唯一；每个 span 有自己的 span_id，并记录 parent_span_id。根 span 没有父，子 span 的父指向调用它的那个 span。这样一串起来，就是一棵树：谁的耗时包含谁、哪个环节是串行、哪个是并行，一目了然。</p>
+  <p>断链的根源只有一个：<b>上下文没传过去</b>。跨进程调用时，trace 信息必须放在协议头里带过去；到了对端，服务端从中取出 trace_id 和 parent_span_id，创建自己的 span。<b>HTTP 用 header，gRPC 用 metadata，消息队列要放在消息属性里</b>——最后这个最容易被漏掉，因为发消息和收消息是两个独立的消费链路，中间没有任何调用栈可以继承。</p>
+  <p>W3C 的 <span class="k">traceparent</span> 是目前通用的传播格式，结构是四段用短横线连接：版本（2 位十六进制）、trace_id（32 位）、parent_id（16 位）、flags（2 位），总共 55 个字符。flags 的最低位表示「这个 trace 是否被采样」。还有一个配套的 <span class="k">tracestate</span>，用来携带厂商私有的信息，可以有多条。</p>
+  <pre><span class="c"># traceparent 的结构（示例值，非真实链路）</span>
+00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+│  │                                │                │
+│  │                                │                └─ flags: 01 表示已采样
+│  │                                └─ 本段 span_id（16 位）
+│  └─ trace_id（32 位）
+└─ 版本号
+
+<span class="c"># 抓包确认 header 有没有传过去</span>
+tcpdump -i eth0 -A -s0 'tcp port 8080' | grep -i -E 'traceparent|tracestate'
+
+<span class="c"># 用 curl 手工带一个 trace 上下文，验证服务端有没有正确接续</span>
+curl -H 'traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' \
+     http://localhost:8080/api/ping</pre>
+  <table>
+    <tr><th style="width:190px">断链场景</th><th>为什么断</th><th>怎么修</th></tr>
+    <tr><td>经过网关后链路分成两段</td><td>网关没透传 header，或者重新生成了 trace_id</td><td>网关配置里显式放行 traceparent，禁止重新生成</td></tr>
+    <tr><td>线程池里丢上下文</td><td>trace 存在 ThreadLocal 里，切线程就没了</td><td>用支持上下文传递的包装器，或显式传递 context 对象</td></tr>
+    <tr><td>异步回调、定时任务断链</td><td>没有调用栈可以继承</td><td>把 context 作为参数显式传进任务</td></tr>
+    <tr><td>消息队列消费端是根 span</td><td>生产端没把上下文写进消息头</td><td>生产端注入、消费端提取，并记录 link 关系</td></tr>
+    <tr><td>跨语言服务对不上</td><td>一边用 B3 一边用 W3C</td><td>统一传播格式，或在网关注入转换</td></tr>
+  </table>
+  <div class="callout">
+    <b>面试里最容易加分的细节：</b>span 的耗时应该覆盖「这一段的全部时间」，包括等待下游的时间。父 span 的耗时 ≥ 所有子 span 耗时之和（并行时会更明显），而那些「父 span 很慢、子 span 都很快」的空隙，通常就是真正的瓶颈——它可能是排队、可能是 GC、可能是锁等待，而这些东西不会有独立的 span。
+  </div>
+  <p><b>面试怎么答：</b>「trace 是一棵 span 树，靠 trace_id 和 parent_span_id 串起来。断链的唯一原因是上下文没跨进程传过去，HTTP 走 header、gRPC 走 metadata、消息队列走消息属性。格式上我一般用 W3C 的 traceparent，flags 里带采样标记。看 trace 的时候除了看哪个 span 慢，还要看父 span 和子 span 之间的空隙，那才是真正没被埋点覆盖的地方。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>把三者缝起来：exemplar、trace_id 和统一语义</h2></div>
+  <p class="lead">很多团队三套系统都建了，但排障时还是要人肉在三个页面之间复制粘贴 ID。这不叫可观测性，这叫三个孤岛。缝合它们只需要三样东西，成本都不高。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>指标到链路：exemplar。</b>直方图观测时附带当前 trace_id，Prometheus 存下来，Grafana 上点一下尖刺就能跳到那条 trace。前提是 SDK 支持 exemplar，且抓取格式是 OpenMetrics。</div></div>
+    <div class="step"><div class="txt"><b>链路的身份下放到日志：trace_id 注入。</b>日志框架从当前 span 的上下文里取 trace_id 和 span_id，写进每一行。这样你在 trace 上看到某个慢 span，复制 trace_id 就能拿到那一段的全部日志。</div></div>
+    <div class="step"><div class="txt"><b>三者共享同一套资源属性。</b><span class="k">service.name</span>、<span class="k">deployment.environment</span>、<span class="k">k8s.namespace.name</span>、<span class="k">k8s.pod.name</span> 在指标标签、日志字段、span 属性里用同样的名字和同样的值。名字不统一，前两步白做。</div></div>
+  </div>
+  <p>还有一条隐性的前提：<b>时间必须同步</b>。三套系统的数据来自不同机器，如果某台机器的时钟差了三分钟，你在 trace 上看到的耗时和日志里的时间戳就对不上，关联会变成误导。生产机器必须跑 NTP 或 chrony，容器里也要继承宿主机时间，这一点在面试里说出来很像「真的踩过」。</p>
+  <pre><span class="c"># 排障时的典型跳转路径（都是复制一个 ID 的事）</span>
+<span class="c"># 1. 指标异常 → exemplar 里拿到 trace_id</span>
+histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))
+
+<span class="c"># 2. 用 trace_id 查这条链路的全部 span，找最慢的那一段</span>
+trace_id = 4bf92f3577b34da6a3ce929d0e0e4736
+
+<span class="c"># 3. 用同一个 trace_id 查日志，看那一段到底报了什么</span>
+{service_name="payment"} |= "4bf92f3577b34da6a3ce929d0e0e4736"</pre>
+  <p>为什么很多团队缝不上？最常见的原因是<b>三套系统分别由不同的人搭的</b>：监控用 Prometheus 那套命名，日志用 ELK 那套字段，链路用另一家 SaaS 的默认属性。等到要关联的时候，才发现 <span class="k">service</span>、<span class="k">app</span>、<span class="k">service_name</span> 三个名字指的是同一个东西。<b>这不是技术问题，是约定问题——而约定必须在埋点之前定，事后统一的成本高十倍。</b></p>
+  <p><b>面试怎么答：</b>「关联靠三件事：exemplar 把指标点连到 trace，trace_id 注入日志把链路连到日志，统一资源属性让三者能按同一个维度过滤。前提是字段名和值必须一致，以及机器时间同步。这三件事都不难，难的是在埋点之前就把约定定下来。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>OpenTelemetry：它解决的不是采集，是标准</h2></div>
+  <p class="lead">「OTel 是什么」——如果答「一个采集器」，那把它和 Fluent Bit、Promtail 混为一谈了。OTel 真正的价值是<b>把埋点从厂商 SDK 里解耦出来</b>：换后端不用改代码，一套 SDK 同时产出指标、日志、链路。</p>
+  <p>它分三层：<b>API</b> 是埋点接口（你代码里调的），<b>SDK</b> 是实现（采样、批处理、导出），<b>Collector</b> 是独立的进程（接收、处理、转发）。协议叫 OTLP，跑在 gRPC 或 HTTP 上。这个分层的好处是：业务代码只依赖 API，具体用哪个后端、开不开采样，全在部署侧决定。</p>
+  <table>
+    <tr><th style="width:130px">Collector 组件</th><th>作用</th><th>常见配置</th></tr>
+    <tr><td><b>receiver</b></td><td>接收数据</td><td>otlp、prometheus、filelog、jaeger</td></tr>
+    <tr><td><b>processor</b></td><td>处理、过滤、采样、补属性</td><td>memory_limiter、batch、tail_sampling、resource、filter</td></tr>
+    <tr><td><b>exporter</b></td><td>发往后端</td><td>otlp、prometheusremotewrite、loki、debug</td></tr>
+    <tr><td><b>connector</b></td><td>把一种信号转成另一种</td><td>从 span 里生成指标（spanmetrics）</td></tr>
+    <tr><td><b>extension</b></td><td>自身运维能力</td><td>health_check、pprof、zpages</td></tr>
+  </table>
+  <p>部署形态有两种，选错了会很痛。<b>Agent 模式</b>是每台机器（或每个 DaemonSet）跑一个 Collector，就近接收、简单处理、直接转发，优点是网络短、故障域小。<b>Gateway 模式</b>是集中一层，做尾采样、脱敏、多后端分发，优点是策略统一，缺点是它成了关键路径——它挂了，全站的可观测数据就断了，所以必须多副本加缓冲。</p>
+  <div class="callout danger">
+    <b>Collector 里 <span class="k">memory_limiter</span> 必须放在 processor 链的第一个。</b>它的作用是在内存接近上限时拒绝新数据，避免自己被 OOM kill。如果它排在 batch 后面，前面的处理器已经把数据堆进内存了，限流就来不及了。这条几乎是 OTel 部署的常识题。
+  </div>
+  <p>OTel 的代价也要说清楚，否则答案会显得像在背宣传材料：抽象层多，出问题时要在 API、SDK、Collector、后端四层之间排查；版本演进快，配置项经常改；链路埋点的性能开销取决于采样率和 span 数量，高 QPS 服务上要实测，不能想当然。</p>
+  <p><b>面试怎么答：</b>「OTel 的核心价值是厂商中立和信号统一：业务只依赖 API，采样和导出在 SDK 和 Collector 里配。Collector 我会分 agent 和 gateway 两层，agent 就近收，gateway 做尾采样和多后端分发。部署上 memory_limiter 必须放第一个，而且 gateway 自己就是关键路径，要高可用。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>一次 502 的全链路排查：三种信号怎么轮着用</h2></div>
+  <p class="lead">把前面几节拼起来，走一遍完整的现场。注意每一步都在回答一个<b>更窄的问题</b>——排障的本质不是「看得更多」，是「把范围缩得更小」。</p>
+  <pre>20:03  告警：pay 接口 5xx 比例 3%，SLO 快速燃烧
+       │
+20:04  ① 圈影响面（指标）
+       │   - 只有 /pay 一个路由，其它接口正常
+       │   - 三个可用区都在报，不是单机
+       │   - 20:00 有一次发布，20:02 开始涨
+       │   → 结论：和这次发布强相关，范围是 /pay 的下游调用
+       │
+20:06  ② 看依赖的错误率（指标）
+       │   - 网关侧 502 上涨，upstream 是 payment-svc
+       │   - payment-svc 自身的 5xx 没涨，但它的出向调用耗时涨了 4 倍
+       │   → 结论：payment-svc 没挂，是它依赖的某个东西慢了
+       │
+20:08  ③ 找那一段（链路）
+       │   - 按 route=/pay、status=5xx 过滤 trace
+       │   - 最慢的 span 是 POST risk-service/score，P99 从 80ms 到 3.2s
+       │   - 父 span 有 2.9s 是「空隙」，没有子 span
+       │   → 结论：时间花在 risk-service 的连接建立或等待上
+       │
+20:10  ④ 看为什么（日志）
+       │   - 用 trace_id 查 payment-svc 日志：connection pool timeout
+       │   - 用同一时间段查 risk-service：连接数打满，正在排队
+       │   → 结论：发布把 risk 客户端的连接池从 200 改成了 20
+       │
+20:12  ⑤ 止损（先恢复，再修复）
+           - 回滚配置（不是回滚整个版本，只回滚连接池参数）
+           - 观察 5xx 回落到基线，确认 SLO 停止燃烧
+           - 事后：给连接池饱和度加 P3 告警，把参数纳入配置评审</pre>
+  <p>这条时间线里有三个值得记住的判断。第一，<b>第 ② 步看的是「出向」而不是「入向」</b>：payment-svc 自己的错误率没涨，说明它没崩，问题在它调用的东西上。如果只看入向指标，你会误以为是 payment-svc 的问题，然后在错误的机器上翻半天。</p>
+  <p>第二，<b>第 ③ 步的关键发现是「空隙」</b>。父 span 3.2 秒，子 span 加起来只有 300 毫秒，中间那 2.9 秒没有任何 span——这通常意味着时间花在「没被埋点的地方」：连接池排队、DNS 解析、TLS 握手、线程池等待。链路追踪最有价值的用法不是看哪个 span 最长，是看<b>哪里没有 span</b>。</p>
+  <p>第三，<b>止损和定位是两条线，可以并行但不能颠倒优先级</b>。影响面在扩大时，先回滚再定位；影响面稳定时，可以先花五分钟拿到证据。但无论哪种，<b>回滚前先存一份现场</b>（trace_id、关键日志、指标截图），否则复盘时只能靠回忆。</p>
+  <table>
+    <tr><th style="width:170px">现象</th><th>先看哪个信号</th><th>为什么</th></tr>
+    <tr><td>错误率整体上涨，原因不明</td><td>指标的依赖维度</td><td>先分清是自身还是下游，能砍掉一半排查范围</td></tr>
+    <tr><td>个别请求极慢，平均正常</td><td>链路的慢 trace</td><td>平均值掩盖长尾，只有 trace 能看到单次路径</td></tr>
+    <tr><td>某个下游报错，但不知具体原因</td><td>日志（按 trace_id 过滤）</td><td>错误原文、堆栈、返回值只在日志里</td></tr>
+    <tr><td>只有部分用户受影响</td><td>按维度切分的指标</td><td>地域、版本、设备这些维度只有指标能高效聚合</td></tr>
+  </table>
+  <p><b>面试怎么答：</b>「我先用指标圈定影响面和是否与变更相关，再看依赖维度的出向指标分清是自身还是下游，然后用链路找最慢的那一段——特别注意父 span 和子 span 之间的空隙，那通常是没有埋点的地方，比如连接池排队。最后用 trace_id 去日志里拿错误原文。整个过程是先止损再定位，但止损前会保留现场。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>采样：头部采样省钱，尾部采样救命</h2></div>
+  <p class="lead">「采样率设多少」——10% 是个常见的默认答案，也是最容易出事的答案。因为采样的目的不是「少存点」，是「别丢掉重要的那一条」，而重要的那一条恰恰是少数。</p>
+  <p><b>头部采样（head sampling）</b>在请求开始时就决定了采不采，判断依据只有 trace_id 或者请求头，成本几乎为零，但<b>它不知道这个请求最后会不会失败</b>。于是 1% 的随机采样下，一次 0.01% 的错误可能一条都抓不到——而错误正是你最想看的。</p>
+  <p><b>尾部采样（tail sampling）</b>等整条 trace 的 span 都到齐了再决定，因此可以按「有没有错误」「耗时是否超过阈值」「是否命中特定用户」来采。代价有三个：需要缓冲（内存换时间）、必须保证同一个 trace 的所有 span 落到同一个 Collector 实例（通常按 trace_id 做负载均衡）、以及决策窗口带来的延迟。</p>
+  <table>
+    <tr><th style="width:130px">策略</th><th>决策时机</th><th>优点</th><th>代价</th></tr>
+    <tr><td><b>头部采样</b></td><td>请求开始</td><td>零额外开销、实现简单、SDK 层就能做</td><td>无法按结果采样，稀有错误容易全丢</td></tr>
+    <tr><td><b>尾部采样</b></td><td>trace 结束后</td><td>错误全采、慢请求全采，性价比极高</td><td>要缓冲、要按 trace_id 路由、Collector 内存压力大</td></tr>
+    <tr><td><b>概率采样</b></td><td>请求开始</td><td>简单，量可控</td><td>小流量服务的样本可能少到无法分析</td></tr>
+    <tr><td><b>按属性采样</b></td><td>开始或结束</td><td>可以只采某个租户、某个版本</td><td>规则要维护，容易漏掉新服务</td></tr>
+  </table>
+  <p>实践里最常用的是<b>组合策略</b>：头部先做一道粗筛（比如 20%），尾部再保底保留所有错误和慢请求，正常请求按低比例留。这样既控制了总量，又保证了「出事时一定有数据」。前提是头部采样率不能太低，否则错误的那条在第一步就被丢了，尾部再聪明也救不回来。</p>
+  <div class="callout warn">
+    <b>采样之后，trace 的数量就不能当 QPS 用了。</b>十万请求采 1%，你看到 1000 条 trace，不代表 QPS 是 1000。更隐蔽的问题是：如果采样率中途调整过，同一天的漏斗分析会出现断崖。<b>所有「比例型」的结论都必须来自全量指标，不能来自采样后的 trace 或日志。</b>
+  </div>
+  <p>还有一个必须说清的边界：<b>SLO 的计算绝对不能用采样数据。</b>SLO 要求的是「全部有效请求里成功的比例」，采样会带来统计偏差，尤其是当采样策略和结果相关时（比如「只采错误」），算出来的可用性会低得离谱。指标虽然也有成本，但它是全量的，这是它不可替代的地方。</p>
+  <p><b>面试怎么答：</b>「头部采样在请求开始时决定，便宜但不知道结果，稀有错误容易丢；尾部采样等 trace 完整后按错误和延迟决策，能保证出事时有数据，代价是要缓冲和按 trace_id 路由。实践里我会组合使用：头部粗筛、尾部保错误和慢请求。另外采样后的数据不能用来算 SLO 或 QPS，那些必须用全量指标。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">坑</span><h2>9 个坑：每一个都让「三支柱」变成「三孤岛」</h2></div>
+  <p class="lead">这些坑有一个共同特征：<b>单独看每套系统都正常，合起来用就废了</b>。而且它们大多在搭建阶段埋下，排障当天才爆发。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 trace_id 做成日志系统的标签</div><div class="pd">每个请求一个值，等于每个请求一条 stream，Loki 这类系统的索引会先崩。trace_id 只能放在日志内容里做全文过滤。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">只有指标就想定位根因</div><div class="pd">指标只能告诉你「多少、哪一类」，回答不了「哪一个请求、卡在哪一行」。定位必须靠链路和日志，指标的作用是把范围缩小。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">拿采样后的 trace 数当 QPS</div><div class="pd">1% 采样下看到 1000 条 trace，不代表 1000 QPS。采样率一变，历史对比全废。比例型结论只能用全量指标。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">直方图桶用默认值，不覆盖 SLO 边界</div><div class="pd">SLO 是 300ms，桶边界却是 250ms 和 500ms，你算出来的达标率全靠插值。桶必须在判断边界附近加密。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">日志里打完整请求体和敏感字段</div><div class="pd">成本翻几倍不说，手机号、token、卡号进了日志就等于进了所有备份，合规上很难解释。要打就打脱敏后的摘要。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">异步和消息队列不透传 context</div><div class="pd">发消息时把 trace 上下文写进消息头，消费端提取出来接续。漏了这一步，链路会在 MQ 处断成两条，而 MQ 恰恰是最容易出问题的地方。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">Collector 不配 memory_limiter，或者顺序放错</div><div class="pd">高峰期 Collector 自己被 OOM kill，可观测数据集体断流，而你正好在排障。memory_limiter 必须是 processor 链的第一个。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">三套系统的服务名字段不统一</div><div class="pd">指标叫 job、日志叫 app、链路叫 service.name，关联脚本写不出来。这个约定必须在埋点之前定，事后统一的成本高十倍。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">机器时间不同步</div><div class="pd">时间差几分钟，trace 的耗时和日志的时间戳就对不上，关联会变成误导。生产机必须跑时间同步，容器要继承宿主机时钟。</div></div></div>
+  <p><b>面试落点：</b>第 1 个和第 8 个最适合讲。前者能带出「标签基数是所有可观测系统的共同约束」这个判断，后者能带出「约定先于工具」——这两句话都超出了「我会用某个产品」的层面，属于设计经验。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个接口的错误率突然上涨，但不知道是自身问题还是下游问题。最合理的第一步是？</div>
+      <button class="opt">直接翻日志，grep 所有 error</button>
+      <button class="opt">把所有链路的采样率调到 100%</button>
+      <button class="opt">看指标的依赖维度，特别是这个服务的出向调用错误率和耗时</button>
+      <button class="opt">重启服务，看是否恢复</button>
+      <div class="ans">正确答案：<b>看出向指标</b>。自身入向 5xx 上涨、出向正常，多半是自己代码或资源的问题；入向正常而出向异常，问题在下游。这一步不改任何东西，却能把范围砍掉一半。翻全量日志和调采样率都是高成本动作，应该放在范围缩小之后。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 某直方图指标有 50 个路由、4 种方法、12 个桶。这个指标的 series 数量大致是多少？</div>
+      <button class="opt">50 × 4 = 200 条</button>
+      <button class="opt">50 × 4 × (12 + 2) = 2800 条左右</button>
+      <button class="opt">50 × 4 × 12 = 2400 条，_sum 和 _count 不算 series</button>
+      <button class="opt">与桶数无关，只与标签组合数有关</button>
+      <div class="ans">正确答案：<b>2800 条左右</b>。直方图的每个标签组合会产生「桶数 + 2」条 series，多出来的两条是 <span class="k">_sum</span> 和 <span class="k">_count</span>。这也是为什么桶不能无脑加多——成本和桶数成正比。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 使用 Loki 收集日志时，下面哪个字段绝对不能作为标签（label）？</div>
+      <button class="opt">service_name</button>
+      <button class="opt">env</button>
+      <button class="opt">level</button>
+      <button class="opt">trace_id</button>
+      <div class="ans">正确答案：<b>trace_id</b>。它的取值数量等于请求数量，每个值都会创建一条独立的 stream，标签索引会先于存储爆炸。正确做法是把 trace_id 写在日志内容里，用全文过滤（<span class="k">|=</span>）去查。level 的取值也很少，作为标签是可接受的。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于 trace 上下文传播，哪个说法正确？</div>
+      <button class="opt">跨进程调用必须把 traceparent 放在协议头里传过去，消息队列要放在消息属性里，否则链路会在那里断掉</button>
+      <button class="opt">只要所有服务用同一个 SDK，上下文就会自动传递，不需要额外处理</button>
+      <button class="opt">trace_id 由每个服务自己生成，最后靠时间戳对齐就行</button>
+      <button class="opt">线程池切换不会影响上下文，因为 trace 存在全局变量里</button>
+      <div class="ans">正确答案：<b>第一项</b>。trace 上下文的传递依赖显式携带：HTTP header、gRPC metadata、消息属性。同一个 SDK 也不会自动跨进程传，它只负责在收到 header 时解析。线程池切换会丢失存在 ThreadLocal 里的上下文，必须显式传递。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 为什么很多团队在尾部采样之外，还要保留一个较低的头部采样率？</div>
+      <button class="opt">因为尾部采样不支持错误判断</button>
+      <button class="opt">因为头部采样更准确</button>
+      <button class="opt">先在 SDK 侧把总量降下来，减轻 Collector 的缓冲和网络压力；但头部比例不能太低，否则稀有错误在第一步就被丢了</button>
+      <button class="opt">因为头部采样才能保留完整的 span 树</button>
+      <div class="ans">正确答案：<b>第三项</b>。尾部采样需要把整条 trace 缓冲起来，如果全量上报，Collector 的内存和网络会先撑不住。头部粗筛能显著减量，但它按固定比例丢数据，比例太低时罕见错误会连同 trace 一起消失，所以两者要配合而不是互相替代。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 关于 RED 和 USE 的适用场景，哪个说法正确？</div>
+      <button class="opt">RED 用于资源，USE 用于服务，两者可以互换</button>
+      <button class="opt">RED 从请求视角描述服务（速率、错误、耗时），USE 从资源视角描述瓶颈（使用率、饱和度、错误）</button>
+      <button class="opt">RED 只适用于数据库，USE 只适用于主机</button>
+      <button class="opt">两者都是四个指标，区别只是命名习惯</button>
+      <div class="ans">正确答案：<b>第二项</b>。RED 面向请求型服务，用来定义 SLO 和判断用户是否受影响；USE 面向资源，用来找瓶颈在哪。实际排障是先看 RED 知道用户疼了，再用 USE 找到为什么疼。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>三支柱</b></td><td>指标、日志、链路，成本结构和查询模式各不相同，不能互相替代</td></tr>
+    <tr><td><b>黄金信号</b></td><td>延迟、流量、错误、饱和度，前三个是用户视角，第四个带预测性</td></tr>
+    <tr><td><b>RED</b></td><td>Rate / Errors / Duration，面向请求型服务的方法</td></tr>
+    <tr><td><b>USE</b></td><td>Utilization / Saturation / Errors，面向资源的方法</td></tr>
+    <tr><td><b>直方图桶</b></td><td>预先定义的耗时区间，边界要卡在 SLO 附近，数量影响 series 成本</td></tr>
+    <tr><td><b>exemplar</b></td><td>指标样本上附带的 trace_id，用于从指标直接跳到链路</td></tr>
+    <tr><td><b>结构化日志</b></td><td>字段化的日志格式，可直接按字段过滤和聚合，而不是靠正则</td></tr>
+    <tr><td><b>span</b></td><td>链路中的一个工作单元，记录起止时间、属性和父子关系</td></tr>
+    <tr><td><b>trace_id</b></td><td>一次请求的全局唯一标识，串起所有 span，也用来关联日志</td></tr>
+    <tr><td><b>traceparent</b></td><td>W3C 的上下文传播头，含版本、trace_id、parent_id 和采样标志</td></tr>
+    <tr><td><b>头部采样</b></td><td>请求开始时按比例决定是否采样，便宜但不知道结果</td></tr>
+    <tr><td><b>尾部采样</b></td><td>trace 完整后按错误和延迟决定，能保住关键样本，代价是缓冲和路由</td></tr>
+    <tr><td><b>OTLP</b></td><td>OpenTelemetry 的传输协议，跑在 gRPC 或 HTTP 上</td></tr>
+    <tr><td><b>Collector</b></td><td>OTel 的独立进程，负责接收、处理、导出三类信号</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 docker compose 起 Prometheus + Loki + Tempo（或 Jaeger）加一个 demo 服务，打开 exemplar，把「指标点跳 trace、trace 跳日志」这条路径亲手走通一次；② 故意在代码里用线程池跑一段业务，观察 span 是怎么断的，再用显式传 context 修好；③ 把一条直方图的桶从 12 个改成 5 个，用同一个 SLO 算达标率，看数字偏了多少——这个实验比读十篇文章都记得住。<br><br>
+    <b>之后值得单独学：</b>第 14 期讲 PromQL 的语义细节（本篇只讲该看什么）；第 15 期讲怎么把这些信号变成 SLO 和告警；第 20 期的「设计监控平台 / 日志平台」会把容量估算和成本取舍算给你看。如果你要面 SRE，第 21 期的事故处理可以和本篇第 8 节的排查流程接起来。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 16 期 · 三支柱不是三套系统，是回答同一个问题的三种代价</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

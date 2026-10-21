@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运维笔试题 30 道：手写命令与排障推演</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 36 期</span>
+    <h1>运维笔试题 30 道：手写命令与排障推演</h1>
+    <p class="sub">笔试不只看答案对不对，<b>写出推理过程也能拿分</b>——很多人直接留空，白白丢分。</p>
+    <div class="density">
+      <span class="chip"><b>30</b> 道题</span>
+      <span class="chip"><b>5</b> 类题型</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>30</b> 组评分点</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：给你一道不会的命令题，你是留空，还是把「我要查什么、用什么工具、看哪个判据」写下来？后者有分。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：丢分的地方不在不会，在没写</h2></div>
+  <p class="lead">「这题我没背过那个参数，算了，空着吧。」——笔试成绩出来，这道题其实有三分之二的分是可以拿的：写出工具、写出判据、写出为什么先做这一步。<b>阅卷的人找的是踩点，不是一个标准答案。</b></p>
+  <p>运维笔试和学校考试最大的区别在这里：它的答案很少是唯一的。同一件事可以用 awk、可以用 cut、可以用 sed，只要你能说清「这个命令在做什么、输出里我看哪一列」，就该给分。所以真正丢分的场景，往往不是不会，而是<b>没写</b>。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:160px">考生的判断</th><th>实际发生了什么</th></tr>
+    <tr><td>命令题只写了半行，后面空着</td><td>记不清参数，写了也是错的，不如不写</td><td>评分点是「工具选对 + 关键参数 + 判断依据」，三项里前两项都能靠推理写出来。半行也有踩点，空白是零</td></tr>
+    <tr><td>排障题答了「先看日志，然后重启」</td><td>排障不就是看日志吗</td><td>排障题考的是<b>顺序</b>和<b>分层</b>：先圈影响面、再定层、再验证。答「看日志」等于没答，因为它不构成一个可以被检验的过程</td></tr>
+    <tr><td>最后一道大题没写，前面全对</td><td>时间不够，先保前面的</td><td>大题通常分值最高，而且是「写顺序就给分」的类型。前面纠结一道两分的参数题，亏掉一道十分的推演题，是这类考试最常见的失分结构</td></tr>
+  </table>
+  <div class="callout">
+    <b>先把评分逻辑说透：</b>笔试题的答案通常按三个层次给分——<b>工具选对</b>（说明你知道该用哪类工具）、<b>参数到位</b>（说明你真的用过）、<b>判据说清</b>（说明你能从输出里读出结论）。第三层是区分度所在，也是最多人漏掉的一层。
+  </div>
+  <p>这一篇把 30 道题按五类排开：文件与文本 8 题、进程与网络 8 题、Docker 与 K8s 6 题、Shell 脚本 4 题、排障推演 4 题。每题给参考答案，再给「要点」和「评分点」——<b>要点讲为什么这么写，评分点讲阅卷的人在找什么</b>。两部分都要看，因为前者是知识，后者是策略。</p>
+  <p><b>面试落点：</b>这套东西在线试也也用得上。面试官让你「说说怎么查」，你按「工具 + 参数 + 判据」三段讲，比背一串命令更像做过事的人。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>题型分布与评分逻辑：先看清这张卷子在考什么</h2></div>
+  <p class="lead">同样叫「运维笔试」，不同类型的题考的能力完全不同。命令题考<b>熟练度</b>，脚本题考<b>严谨度</b>，排障题考<b>思维顺序</b>。用同一种方式准备三类题，效率会很低。</p>
+  <table>
+    <tr><th style="width:130px">题型</th><th style="width:70px">题量</th><th>真正在考什么</th><th>最容易丢分的地方</th></tr>
+    <tr><td><b>文件与文本</b></td><td>8</td><td>find / awk / sed / grep 的组合能力，以及日志格式常识</td><td>参数符号写反（-mtime 后面的正负号）、管道少一步排序</td></tr>
+    <tr><td><b>进程与网络</b></td><td>8</td><td>能不能从「一个现象」走到「一个进程 / 一条连接」</td><td>只会 ps，不知道 /proc 和 ss 的判据列</td></tr>
+    <tr><td><b>Docker / K8s</b></td><td>6</td><td>对「声明式系统里状态和期望不一致」的理解</td><td>把所有异常都归成「重启一下」</td></tr>
+    <tr><td><b>Shell 脚本</b></td><td>4</td><td>边界处理：空值、失败、超时、幂等</td><td>脚本能跑但经不起异常输入</td></tr>
+    <tr><td><b>排障推演</b></td><td>4</td><td>顺序感与分层能力，能不能给出可验证的动作</td><td>直接给结论，不给过程</td></tr>
+  </table>
+  <p>评分上的三条规律，值得提前知道：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>踩点给分，不倒扣。</b>所以宁可多写一句判据，不要因为「怕写错」而空着。写错一个参数只损失那个参数的分，不写损失整题。</div></div>
+    <div class="step"><div class="txt"><b>过程分常常高于结论分。</b>排障题尤其明显：顺序对了、分层对了，即便最终原因猜错，也能拿到大部分分。因为阅卷的人也知道，真实故障的原因千奇百怪。</div></div>
+    <div class="step"><div class="txt"><b>危险动作会倒扣。</b>把 <span class="k">rm -rf</span>、<span class="k">kill -9</span>、<span class="k">drop database</span> 写成第一手段，是明确的减分项——它说明你没有风险意识。这一条很多人不知道。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>「标准答案思维」是这类考试最大的敌人。</b>命令题给出一种可行写法就够了，不需要穷举；排障题给出一个自洽的顺序就够了，不需要命中出题人想的那条路径。反过来，如果你为了「猜标准答案」而反复涂改，最后往往写得更少——这在时间紧张的卷子上是致命的。
+  </div>
+  <p>准备方式也应该按题型分开：命令题靠<b>手打一遍</b>（看会了不算，参数顺序会记错），脚本题靠<b>加异常输入跑一次</b>（空文件、权限不足、命令不存在），排障题靠<b>嘴上过一遍</b>（把顺序讲给一个人听，卡住的地方就是你没想清的地方）。</p>
+  <p><b>面试落点：</b>「笔试题我按三类准备：命令题手打，脚本题加异常输入跑一遍，排障题讲给别人听。因为这三类考的能力不一样，用同一种方法复习效率很低。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>文件与文本 8 题：考的是参数细节，不是记性</h2></div>
+  <p class="lead">这一类题的共同点：命令本身人人都知道，<b>拉开差距的是参数符号、管道顺序和「这个输出里我看哪一列」</b>。参数写错不丢人，但把 <span class="k">-mtime -7</span> 和 <span class="k">-mtime +7</span> 搞反，说明没在真实环境里删过东西。</p>
+
+  <h3>Q1 · 找出 /var/log 下 7 天内修改过、且大于 100MB 的普通文件，并列出详情</h3>
+  <pre>find /var/log -xdev -type f -mtime -7 -size +100M -ls 2&gt;/dev/null</pre>
+  <p><b>参考答案要点：</b><span class="k">-type f</span> 排除目录和设备文件，否则目录也会被算进去；<span class="k">-mtime -7</span> 表示「修改时间在 7 天以内」，减号是「以内」，加号是「以前」，没有符号是「正好第 7 天」——这个符号是最常见的错误点；<span class="k">-size +100M</span> 的加号表示「大于」，<span class="k">M</span> 是按 1024×1024 字节算的，换成 <span class="k">k</span> 或 <span class="k">G</span> 同理；<span class="k">-ls</span> 比 <span class="k">-print</span> 多输出 inode、权限、大小和时间，一屏就能判断要不要处理；<span class="k">-xdev</span> 防止跨挂载点扫到别的文件系统；末尾的 <span class="k">2&gt;/dev/null</span> 屏蔽无权限目录的报错——真实环境里 /var/log 下几乎一定有读不了的目录，不屏蔽会刷屏。</p>
+  <p><b>评分点：</b>① 用 find 而不是 ls 加管道（说明知道「按属性筛选」要用 find）；② <span class="k">-mtime</span> 的符号方向解释正确；③ <span class="k">-size</span> 的加号与单位解释正确；④ 提到权限报错的处理或 <span class="k">-type f</span> 的必要性。四点中前两点是硬分。</p>
+
+  <h3>Q2 · 统计 nginx access.log 里访问量前 10 的客户端 IP</h3>
+  <pre>awk '{print $1}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head -10</pre>
+  <p><b>参考答案要点：</b>日志是空格分隔的，<span class="k">$1</span> 就是客户端地址——但这依赖日志格式，如果 <span class="k">log_format</span> 在最前面加了字段，这里就要改。<span class="k">uniq -c</span> 只能合并<b>相邻</b>的重复行，所以必须先 <span class="k">sort</span>，这是整道题的考点；后面那个 <span class="k">sort -rn</span> 的 <span class="k">n</span> 表示按数值排（否则「10」会排在「9」前面），<span class="k">r</span> 是降序。<span class="k">head -10</span> 取前十。</p>
+  <p><b>评分点：</b>① 管道完整（缺 sort 直接扣）；② 说清「uniq 只合并相邻行」这个原因；③ <span class="k">-rn</span> 里 <span class="k">n</span> 的作用；④ 提到字段位置依赖日志格式（加分项，说明真的看过日志）。</p>
+
+  <h3>Q3 · 统计各 HTTP 状态码的出现次数，按状态码升序输出</h3>
+  <pre>awk '{print $9}' /var/log/nginx/access.log | sort | uniq -c | sort -k2,2n</pre>
+  <p><b>参考答案要点：</b>combined 格式里状态码是第 9 列，所以 <span class="k">$9</span>。但如果请求行里本身带空格（URL 里编码不规范），列会整体偏移，稳一点的做法是按引号切：<span class="k">cut -d'"' -f3 | awk '{print $1}'</span>，或者用正则匹配 <span class="k">" 200 </span> 这种形态。最后一步 <span class="k">sort -k2,2n</span> 是按第 2 列（也就是状态码）数值排序，因为 <span class="k">uniq -c</span> 的输出是「次数 值」两列，不指定 <span class="k">-k2</span> 会按次数排，那是另一个意思。</p>
+  <p><b>评分点：</b>① 正确取出状态码字段；② 说明 <span class="k">-k2,2n</span> 为什么要指定列（不加就按次数排了）；③ 提到对日志格式的依赖，或给出更稳的取法。</p>
+
+  <h3>Q4 · 把 /etc/nginx 下所有 .conf 里的 old.example.com 换成 new.example.com，要求留备份</h3>
+  <pre>grep -rl --include='*.conf' 'old\.example\.com' /etc/nginx \
+  | xargs -r sed -i.bak 's/old\.example\.com/new.example.com/g'
+
+<span class="c"># 文件名可能含空格时，换成 NUL 分隔</span>
+grep -rlZ --include='*.conf' 'old\.example\.com' /etc/nginx \
+  | xargs -0 -r sed -i.bak 's/old\.example\.com/new.example.com/g'</pre>
+  <p><b>参考答案要点：</b><span class="k">grep -r</span> 递归、<span class="k">-l</span> 只输出文件名（不输出匹配行，否则没法喂给 sed）、<span class="k">--include</span> 限定后缀。sed 里 <span class="k">.</span> 是正则的「任意字符」，域名里的点必须转义成 <span class="k">\.</span>，否则 <span class="k">oldXexample</span> 也会被替换。<span class="k">-i.bak</span> 在改之前留一份 <span class="k">.bak</span>，这是「留备份」这个要求的落点。<span class="k">xargs -r</span> 表示没有输入就不执行命令（否则 grep 没匹配时 sed 会从标准输入读，卡住）。文件名含空格时 <span class="k">xargs</span> 会拆错，要用 <span class="k">-print0/-Z</span> 配 <span class="k">-0</span>。</p>
+  <p><b>评分点：</b>① 能找到「包含匹配的文件」而不是「匹配的行」；② 域名里的点做了转义；③ 有备份动作；④ 提到空格文件名或 <span class="k">-r</span> 的必要性（加分项）。</p>
+
+  <h3>Q5 · 一个 5GB 的日志文件，怎么快速看最后 100 行？怎么看某时间段的记录？</h3>
+  <pre>tail -n 100 /var/log/app.log
+
+<span class="c"># 按时间区间取：前提是文件内时间有序</span>
+sed -n '/2026-10-21 02:00/,/2026-10-21 02:30/p' /var/log/app.log
+
+<span class="c"># 只想快速扫一段，按字节取尾部，不加载全文件</span>
+tail -c 5000000 /var/log/app.log | less</pre>
+  <p><b>参考答案要点：</b>核心是别 <span class="k">cat</span> 全文件再管道给 tail——那是 5GB 的读放大，在磁盘紧张时还可能把 IO 打满。<span class="k">tail</span> 会从文件尾部 seek 回去，不需要读前面。<span class="k">sed -n '/起/,/止/p'</span> 是按内容区间取，前提是时间有序且格式固定；文件无序时这个方法会漏，得用 awk 逐行比较时间戳。<span class="k">less</span> 而不是 <span class="k">cat</span>，因为它按需加载。</p>
+  <p><b>评分点：</b>① 用 tail 而不是 cat + 管道；② 说出「不必读全文件」这个原因；③ 时间区间给了可行写法；④ 指出有序性这个前提（加分项）。</p>
+
+  <h3>Q6 · 比较两个目录，找出同名但内容不同的文件</h3>
+  <pre>diff -rq /data/a /data/b
+<span class="c"># 输出形如：Files /data/a/x.conf and /data/b/x.conf differ</span>
+
+<span class="c"># 只看差异较多时，先要摘要</span>
+diff -r /data/a /data/b | grep -E '^(Only in|diff )' | head -50</pre>
+  <p><b>参考答案要点：</b><span class="k">-r</span> 递归子目录，<span class="k">-q</span> 只报「有差异」不打印 diff 正文（brief 模式）。退出码有含义：0 表示完全相同，1 表示有差异，2 表示出错（文件不存在、权限不足）——脚本里判断差异要用退出码，不要解析输出。如果只想比对文件内容忽略时间戳，diff 本身不看 mtime，但 <span class="k">rsync -rcn</span> 是另一条常用路径。</p>
+  <p><b>评分点：</b>① 用 diff 的递归模式；② 知道 <span class="k">-q</span> 的作用；③ 提到退出码的含义（这是区分「用过」和「知道」的地方）。</p>
+
+  <h3>Q7 · 统计文件行数。为什么有时 <span class="k">wc -l</span> 和 <span class="k">grep -c</span> 的结果差 1？</h3>
+  <pre>wc -l /var/log/app.log
+grep -c '' /var/log/app.log
+awk 'END{print NR}' /var/log/app.log</pre>
+  <p><b>参考答案要点：</b><span class="k">wc -l</span> 数的是<b>换行符</b>的个数。如果文件最后一行没有以换行结尾（写日志的程序在异常退出时很常见），这一行不会被计入，结果比实际行数少 1。<span class="k">grep -c ''</span> 匹配每一行（空模式匹配所有行），它数的是<b>记录</b>，包含最后那个没有换行符的行。<span class="k">awk</span> 的 <span class="k">NR</span> 也是记录数，行为与 grep 一致。这个差异在对账类场景里很致命：日志行数和业务计数差 1，会让你怀疑丢了一条。</p>
+  <p><b>评分点：</b>① 指出 <span class="k">wc -l</span> 数的是换行符；② 指出最后一行无换行符这个具体场景；③ 给出至少一种替代写法。</p>
+
+  <h3>Q8 · 把一个大文件按 100MB 切分，之后能还原，并验证一致性</h3>
+  <pre>split -b 100M -d -a 3 bigfile part_
+<span class="c"># -b 按字节切，-l 按行切；-d 用数字后缀，-a 3 表示三位（part_000 起）</span>
+
+cat part_* &gt; bigfile.restored
+md5sum bigfile bigfile.restored</pre>
+  <p><b>参考答案要点：</b>按字节切（<span class="k">-b</span>）会切断行，如果下游是按行处理的程序，要用 <span class="k">-l</span> 按行数切。合并时的顺序问题是最容易翻车的地方：默认后缀是字母（aa、ab…），超过 26 个分片后字典序会变成 aa、ab…az、ba，<span class="k">cat part_*</span> 的顺序仍然正确，但如果你自己按文件名排序又用了 <span class="k">-d</span> 却没指定位数，会出现 <span class="k">part_10</span> 排在 <span class="k">part_2</span> 前面的情况。所以 <span class="k">-d -a 3</span> 一起用，位数固定了顺序才稳。最后用 <span class="k">md5sum</span> 或 <span class="k">sha256sum</span> 校验，别用「大小一样」当验证。</p>
+  <p><b>评分点：</b>① 切分参数对；② 想到合并顺序会出问题；③ 有校验动作且校验方法合理（不看大小看摘要）。</p>
+
+  <div class="callout ok">
+    <b>这一类的通用答法：</b>「选工具（find / awk / sed / grep）+ 关键参数 + 我在输出里看哪一列」。三句话齐全，即便命令有一个参数记错，也能拿到大部分踩点。反过来，只写一行命令不解释，阅卷的人无法判断你是记住了还是在猜。
+  </div>
+  <p><b>面试落点：</b>「文本处理我一般用 find 筛文件、awk 取列、sort 加 uniq 聚合、sed 做替换。参数上最容易错的是 -mtime 的正负号和 uniq 前的 sort，这两个我在真实环境里都踩过。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>进程与网络 8 题：从现象走到一个具体的 pid</h2></div>
+  <p class="lead">这一类的评分重点是<b>「你能不能收敛」</b>。说「用 top 看一下」只证明你知道工具，说「top 汇总视图会把单核打满平均掉，所以用 <span class="k">mpstat -P ALL</span>」才证明你被这个问题坑过。</p>
+
+  <h3>Q9 · 找出 CPU 占用最高的 5 个进程，以及其中一个进程内部最耗 CPU 的线程</h3>
+  <pre>ps -eo pid,ppid,pcpu,pmem,etime,comm --sort=-pcpu | head -6
+
+<span class="c"># 线程视图：-H 按线程展开；或者 ps -L</span>
+top -H -p 12345
+ps -L -p 12345 -o tid,stat,pcpu,comm --sort=-pcpu | head</pre>
+  <p><b>参考答案要点：</b><span class="k">--sort=-pcpu</span> 的负号是降序，正号是升序——这个符号和 <span class="k">sort -k</span> 的习惯不同，容易写反。<span class="k">head -6</span> 是因为输出带表头，取 5 条数据要写 6。<span class="k">-H</span> 让 top 按线程展开，<span class="k">ps -L</span> 等价。<b>关键的一句</b>：线程 id（TID）在内核里就是 PID，所以可以拿它去 jstack 里按 <span class="k">nid</span> 找堆栈，但 jstack 里的 nid 是十六进制，需要转换——这一步是区分「知道」和「做过」的地方。</p>
+  <p><b>评分点：</b>① 进程排序写法正确；② 线程视图用了 <span class="k">-H</span> 或 <span class="k">-L</span>；③ 提到 TID 与 nid 的进制转换（加分项）；④ 提到汇总视图会平均掉单核热点。</p>
+
+  <h3>Q10 · 某进程内存持续增长，怎么判断是泄漏还是正常的缓存？</h3>
+  <pre>grep -E 'VmSize|VmRSS|RssAnon|RssFile|RssShmem' /proc/12345/status
+cat /proc/12345/smaps_rollup
+pmap -x 12345 | tail -5</pre>
+  <p><b>参考答案要点：</b>先分清三个口径。<span class="k">VmRSS</span> 是常驻物理内存，但它把共享页在多个进程里各算一遍，会高估；<span class="k">RssAnon</span> 是私有的匿名内存，也就是真正由这个进程申请、别人用不到的堆内存；<span class="k">RssFile</span> 是文件映射，属于可回收的那一类。判断方法：<b>看 RssAnon 在稳态压测下是否单调上涨，且回收后不回落</b>。如果涨的是 RssFile，那多半是 page cache 或 mmap 文件，不是泄漏，系统有压力时会回收。</p>
+  <p><b>评分点：</b>① 知道去 <span class="k">/proc/PID/status</span> 或 <span class="k">smaps_rollup</span> 看；② 区分了 RSS 与私有匿名内存；③ 给出「单调上涨且不回落」这个判据，而不是只看一个时间点。</p>
+
+  <h3>Q11 · 8080 端口被占用，怎么找出是哪个进程？</h3>
+  <pre>ss -lntp 'sport = :8080'
+lsof -i :8080
+fuser -n tcp 8080</pre>
+  <p><b>参考答案要点：</b><span class="k">ss -p</span> 需要权限才能看到别的用户的进程（普通用户只能看到自己的，输出里的进程信息会是空的）。<span class="k">ss</span> 的过滤语法 <span class="k">'sport = :8080'</span> 是精确匹配，而 <span class="k">ss -lntp | grep 8080</span> 会把 18080、80801 一起匹配出来——这是最常见的误判来源之一。<span class="k">lsof -i :8080</span> 更全，连已建立的连接也会列出，能看到是谁在连。<span class="k">fuser -n tcp 8080</span> 直接给 pid，适合脚本里用。</p>
+  <p><b>评分点：</b>① 命令能给到 pid；② 提到权限对可见性的影响；③ 指出 grep 端口会误匹配（这是高分点）。</p>
+
+  <h3>Q12 · 服务端出现大量 TIME_WAIT，怎么判断是谁的问题？</h3>
+  <pre>ss -tan state time-wait | wc -l
+<span class="c"># 本机作为客户端：对端端口是 80，本机在主动关连接</span>
+ss -tan state time-wait '( dport = :80 )' | wc -l
+<span class="c"># 本机作为服务端：本地端口是 80</span>
+ss -tan state time-wait '( sport = :80 )' | wc -l</pre>
+  <p><b>参考答案要点：</b>TIME_WAIT 只出现在<b>主动关闭方</b>。所以判断归属的方法是看这些连接的端口方向：<span class="k">dport</span> 是 80 说明本机是客户端、本机发起了关闭；<span class="k">sport</span> 是 80 说明本机是服务端、服务端主动断了连接。服务端出现大量 TIME_WAIT，通常意味着<b>服务端在主动关连接</b>（短连接、或者 keepalive 设得太短），应该改连接复用，而不是去调 <span class="k">tcp_fin_timeout</span> 这类参数——那个只能缩短本端保留时间，不解决「为什么是我们在关」。</p>
+  <p><b>评分点：</b>① 说出 TIME_WAIT 在主动关闭方；② 用端口方向区分角色；③ 给出「服务端大量 TIME_WAIT = 服务端在主动关」这个结论和对应动作。</p>
+
+  <h3>Q13 · 客户端连服务端超时，写出你的排查顺序</h3>
+  <pre>ping -c 3 10.0.0.11                    <span class="c"># 只证明到 IP 层可达</span>
+nc -zv -w 3 10.0.0.11 8080             <span class="c"># 只证明端口能建连</span>
+ss -lntp | grep -w 8080                <span class="c"># 在服务端确认监听存在</span>
+nstat -az | grep -i -E 'ListenOverflows|ListenDrops'
+tcpdump -i any -nn 'tcp port 8080' -c 20   <span class="c"># 看包到没到</span></pre>
+  <p><b>参考答案要点：</b>顺序是<b>分层证伪</b>，不是从左到右敲一遍。ping 通只说明到 IP 层没问题（而且很多环境禁 ICMP，ping 不通不代表网络不通）；<span class="k">nc -zv</span> 通只说明有人在这个端口 listen、三次握手成功；两者都通而业务失败，问题在应用层。服务端要看的是 accept 队列溢出（<span class="k">ListenOverflows</span>），这种失败在客户端的表现就是「连接超时」，而服务端的 <span class="k">ss</span> 里什么都看不到。最后用 tcpdump 回答一个二元问题：<b>包到底有没有到服务端</b>。到了就是本机处理的问题，没到就是中间链路或策略的问题。</p>
+  <p><b>评分点：</b>① 顺序体现了从下往上分层；② 指出 ping/nc 各自能证明到哪一层；③ 提到 accept 队列溢出这个「端口通但连不上」的原因；④ 有一个能一锤定音的抓包动作。</p>
+
+  <h3>Q14 · 怎么看某进程打开了多少文件描述符、上限是多少、怎么调？</h3>
+  <pre>ls /proc/12345/fd | wc -l
+cat /proc/12345/limits | grep -i 'open files'
+ulimit -n
+<span class="c"># systemd 起的服务要改 unit，改 ulimit 没用</span>
+systemctl show myapp -p LimitNOFILE</pre>
+  <p><b>参考答案要点：</b>「打开了多少」看 <span class="k">/proc/PID/fd</span> 的条目数；「上限」看 <span class="k">/proc/PID/limits</span>，注意里面分 soft 和 hard 两列。<span class="k">ulimit -n</span> 只影响当前 shell 及其子进程，对已经在跑的进程、对 systemd 拉起的服务都不生效——<b>这是这类题最爱考的一句</b>。要改 systemd 服务，得在 unit 里加 <span class="k">LimitNOFILE=</span>，然后 <span class="k">daemon-reload</span> 并重启服务。容器里还要看容器自身的限制，宿主机调大不一定传给容器。</p>
+  <p><b>评分点：</b>① 当前用量与上限各给出正确位置；② 指出 <span class="k">ulimit</span> 的作用域局限；③ 说出 systemd 场景的正确改法。</p>
+
+  <h3>Q15 · 磁盘 IO 很高，怎么定位到具体进程和文件？</h3>
+  <pre>iostat -x 1 3                  <span class="c"># 设备层：await、aqu-sz、%util</span>
+pidstat -d 1 5                 <span class="c"># 进程层：读写 KB/s</span>
+iotop -oPa                     <span class="c"># 需要 root，按累计排序</span>
+lsof -p 12345 | grep -E 'REG|DIR'
+cat /proc/12345/io</pre>
+  <p><b>参考答案要点：</b>这是三层递进：<b>设备层 → 进程层 → 文件层</b>。<span class="k">iostat -x</span> 回答「哪块盘在排队」，看的是 <span class="k">await</span> 和 <span class="k">aqu-sz</span>，而不是只看 <span class="k">%util</span>（对能并行的 SSD 会高估饱和度）。<span class="k">pidstat -d</span> 回答「哪个进程在读写在涨」，比 <span class="k">iotop</span> 更轻量且不依赖内核配置。<span class="k">/proc/PID/io</span> 给的是累计的 read_bytes / write_bytes，看两次采样的差值比看瞬时值可靠。最后用 <span class="k">lsof</span> 看它开了哪些文件，才能知道是数据文件、日志还是临时文件。</p>
+  <p><b>评分点：</b>① 有三层递进的意识；② 设备层指标选得对（await/aqu-sz 而不是只 %util）；③ 用累计值差值而不是瞬时值；④ 落到具体文件。</p>
+
+  <h3>Q16 · 不重启进程，怎么看它的启动参数？怎么让它重新加载配置？</h3>
+  <pre>tr '\0' ' ' &lt; /proc/12345/cmdline; echo
+ls -l /proc/12345/exe /proc/12345/cwd
+tr '\0' '\n' &lt; /proc/12345/environ | grep -i -E 'PATH|JAVA_HOME'
+
+<span class="c"># 是否支持重载取决于程序有没有实现这个信号</span>
+kill -HUP 12345</pre>
+  <p><b>参考答案要点：</b><span class="k">/proc/PID/cmdline</span> 是 NUL 分隔的，所以要用 <span class="k">tr</span> 转一下才看得清，否则整行会粘在一起。<span class="k">environ</span> 同理，注意它只反映进程启动时的环境，之后 <span class="k">export</span> 改的不会出现在里面。<span class="k">exe</span> 如果指向一个带 <span class="k">(deleted)</span> 的路径，说明二进制被替换过但进程还跑着旧版本——这在「升级了但行为没变」的排查里是关键证据。<span class="k">kill -HUP</span> 只是发信号，<b>程序是否重载由它自己实现决定</b>，不能想当然；Nginx 是 <span class="k">-s reload</span>，很多 Java 服务对 HUP 根本没处理。</p>
+  <p><b>评分点：</b>① cmdline 的 NUL 分隔要处理；② 指出 HUP 是否生效取决于程序实现（这是高分点）；③ 提到 <span class="k">exe</span> 指向 deleted 的含义（加分项）。</p>
+
+  <div class="callout">
+    <b>这类题的隐藏考点：</b>几乎每一题都可以用「我在输出里看哪一列、这个列的什么形态代表什么」来加分。比如 <span class="k">ss</span> 的 Recv-Q、<span class="k">iostat</span> 的 aqu-sz、<span class="k">/proc/PID/status</span> 的 RssAnon。写命令只是入场券，说清判据才是分。
+  </div>
+  <p><b>面试落点：</b>「进程和网络的题我都按『现象 → 层 → 进程 → 判据』答。因为命令可以查，判据不能查——判据是你知道这个数在什么范围内算正常。</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Docker / K8s 6 题：考的是「期望状态与实际状态不一致」</h2></div>
+  <p class="lead">这一类题的分水岭很清楚：答「重启一下」的人，和答「先分清是调度失败还是运行失败」的人，差距不在命令，在<b>有没有把系统当成一个状态机来看</b>。</p>
+
+  <h3>Q17 · 容器启动后立刻退出，怎么排查？</h3>
+  <pre>docker ps -a
+docker logs --tail 100 &lt;容器ID&gt;
+docker inspect -f '{{.State.ExitCode}} {{.State.OOMKilled}} {{.State.Error}}' &lt;容器ID&gt;
+docker run --rm -it --entrypoint sh &lt;镜像&gt;</pre>
+  <p><b>参考答案要点：</b>容器的生命周期绑定在<b>主进程（PID 1）</b>上，主进程退出容器就结束。所以「启动即退出」有两类原因：进程自己报错退出，或者它本来就干完了（比如镜像的 CMD 是一个一次性脚本）。<span class="k">ExitCode</span> 是最快的线索：0 通常是「正常跑完」，1 是应用自己抛错，137 等于 128+9，被 SIGKILL（常见于 OOM 或被强制停止），143 是 128+15 被 SIGTERM。<span class="k">OOMKilled</span> 字段能直接确认是不是内存超限。日志可能为空——如果进程在打印之前就挂了，那就用 <span class="k">--entrypoint sh</span> 覆盖入口，进去手工执行一遍原来的命令看报错。</p>
+  <p><b>评分点：</b>① 先看退出码而不是先重启；② 解释 137/143 这类信号码的含义；③ 提到「主进程退出容器即结束」这个机制；④ 有「覆盖 entrypoint 进去手工跑」这个动作。</p>
+
+  <h3>Q18 · 镜像有 1.2GB，怎么瘦身？</h3>
+  <pre>docker history --no-trunc &lt;镜像&gt; | head -30
+docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}'</pre>
+  <p><b>参考答案要点：</b>先看 <span class="k">docker history</span> 找出哪一层最大，不要凭感觉优化。手段按收益排：<b>多阶段构建</b>（编译工具链留在构建阶段，运行镜像只带产物）、<b>换基础镜像</b>（slim / alpine / distroless，代价是 alpine 用 musl，某些二进制和 glibc 依赖会出问题）、<b>合并 RUN 并清理缓存</b>（关键是清理必须和安装在<b>同一层</b>，跨层删除只会多一层，不会变小）、<b>.dockerignore</b>（别把 .git、node_modules、测试数据 COPY 进去）。还有一个容易被忽略的：<b>不要 COPY 整个目录再删</b>，那一层已经把文件写进去了。</p>
+  <p><b>评分点：</b>① 先定位大层再看手段（顺序对）；② 至少三个有效手段；③ 提到「层」这个概念，说明白为什么跨层删除无效（这是核心分）；④ 提到 alpine 的兼容性代价（加分项）。</p>
+
+  <h3>Q19 · Pod 一直 Pending，怎么查？</h3>
+  <pre>kubectl describe pod &lt;pod&gt; -n &lt;ns&gt;
+kubectl get events -n &lt;ns&gt; --sort-by=.lastTimestamp | tail -20
+kubectl describe node &lt;node&gt; | grep -A 8 'Allocated resources'</pre>
+  <p><b>参考答案要点：</b>Pending 的含义很窄：<b>调度器还没把它放到任何节点上</b>。所以排查方向是「为什么没有节点能接」：资源不够（<span class="k">Insufficient cpu/memory</span>，注意这里算的是 requests 不是实际用量）、节点选择器或亲和性不匹配、污点没有对应容忍、PVC 没绑定、超出 ResourceQuota、节点被 cordon。<span class="k">describe</span> 的 Events 段落会直接写出原因，这是第一手证据。<b>把 Pending 和 CrashLoopBackOff 分清是基础分</b>：前者是「没跑起来」，后者是「跑起来又挂了」，两者的排查路径完全不同。</p>
+  <p><b>评分点：</b>① 明确 Pending 是调度阶段的问题；② 用 describe 的 Events 作为第一手证据；③ 列出至少三种原因（资源/亲和性/污点/PVC/配额）；④ 指出资源判断按 requests 算。</p>
+
+  <h3>Q20 · Pod 处于 CrashLoopBackOff，怎么查？</h3>
+  <pre>kubectl logs &lt;pod&gt; -n &lt;ns&gt; --previous
+kubectl describe pod &lt;pod&gt; -n &lt;ns&gt; | grep -A 6 'Last State'
+kubectl get pod &lt;pod&gt; -n &lt;ns&gt; \
+  -o jsonpath='{.status.containerStatuses[*].lastState.terminated.exitCode}'</pre>
+  <p><b>参考答案要点：</b>CrashLoopBackOff 不是一种错误，是<b>一种重试状态</b>：容器启动后退出，kubelet 按指数退避反复重启，间隔越拉越长。所以要查的是「上一次为什么退出」，必须用 <span class="k">--previous</span> 看上一次的日志——直接 <span class="k">logs</span> 看到的可能是当前这次还没输出的空日志。<span class="k">Last State</span> 里的 exitCode 和 reason 是关键：137 通常是 OOMKilled 或被 kill，1 是应用报错。还有一类特别隐蔽：<b>liveness probe 失败</b>导致被杀，日志里完全看不出问题，要去 describe 里看 <span class="k">Liveness probe failed</span> 事件和 <span class="k">initialDelaySeconds</span> 是否小于应用真实启动时间。</p>
+  <p><b>评分点：</b>① 用 <span class="k">--previous</span>（核心分）；② 解释 CrashLoopBackOff 是退避重试而非错误类型；③ 提到 liveness probe 误杀这条路；④ 会读 exitCode。</p>
+
+  <h3>Q21 · 集群内访问某个 Service 不通，怎么查？</h3>
+  <pre>kubectl get endpoints &lt;svc&gt; -n &lt;ns&gt;
+kubectl get svc &lt;svc&gt; -n &lt;ns&gt; -o yaml | grep -E 'port|targetPort|selector'
+kubectl get pod -n &lt;ns&gt; --show-labels
+
+<span class="c"># 起一个临时 Pod 在集群内直连 Service IP，排除外部因素</span>
+kubectl run tmp --rm -it --image=busybox --restart=Never -- sh</pre>
+  <p><b>参考答案要点：</b>顺序是 <b>DNS → Service → Endpoints → Pod</b>，每一层都有明确的判据。第一，Endpoints 是不是空的——空说明 selector 没匹配到任何 Pod，或者匹配到了但 Pod 没 Ready（<b>readinessProbe 失败是最常见的隐性原因</b>，Pod 明明 Running）。第二，<span class="k">targetPort</span> 对不对——Service 的 port 是给调用方看的，targetPort 是容器实际监听的，写错就转发到没人监听的端口。第三，从集群内发起请求（临时 Pod），排除本地网络和代理的干扰。第四，NetworkPolicy 有没有拦、kube-proxy 的规则有没有同步。DNS 这一层单独验证：<span class="k">nslookup svc.ns.svc.cluster.local</span>。</p>
+  <p><b>评分点：</b>① 有明确的分层顺序；② 第一站是 Endpoints 而不是先看 Pod 日志；③ 提到 readinessProbe 导致 Endpoints 为空（核心分）；④ 区分 port 和 targetPort。</p>
+
+  <h3>Q22 · 怎么把容器里的文件拷出来？镜像里没有 shell 怎么办？</h3>
+  <pre>kubectl cp &lt;ns&gt;/&lt;pod&gt;:/var/log/app.log ./app.log
+kubectl exec -it &lt;pod&gt; -n &lt;ns&gt; -- sh
+<span class="c"># distroless 场景：加一个临时容器，共享目标容器的进程命名空间</span>
+kubectl debug -it &lt;pod&gt; -n &lt;ns&gt; --image=busybox --target=&lt;容器名&gt;</pre>
+  <p><b>参考答案要点：</b><span class="k">kubectl cp</span> 依赖容器里有 <span class="k">tar</span>，distroless 或 scratch 镜像里没有，会报错——这时候只能走 <span class="k">kubectl debug</span> 加临时容器，或者把文件所在目录挂成 emptyDir 再拷。<span class="k">--target</span> 的作用是让临时容器共享目标容器的<b>进程命名空间</b>，这样你能在里面看到目标进程、看它的 <span class="k">/proc</span>，否则只是一个同一网络里的空容器。这个区别是这类题的核心考点。</p>
+  <p><b>评分点：</b>① 常规拷贝写法；② 指出 cp 依赖 tar；③ 用 ephemeral container 解决无 shell 场景；④ 说清 <span class="k">--target</span> 共享的是什么（核心分）。</p>
+
+  <div class="callout warn">
+    <b>这一类最容易被扣分的一句话：</b>「删掉重建一下试试」。重建确实能解决很多问题，但它抹掉现场，而且在有状态负载上是危险动作。写在答案里，会让人觉得你只会重启。正确的位置是：<b>把重建放在「已经留完证据、且确认无状态」之后</b>，并且明确说出这个前提。
+  </div>
+  <p><b>面试落点：</b>「K8s 的题我先分清是调度阶段的问题还是运行阶段的问题。Pending 是没被调度，CrashLoopBackOff 是跑起来又挂了，前者看 describe 的 Events，后者看 <span class="k">logs --previous</span> 和 Last State。Service 不通先看 Endpoints 是不是空的，那通常是 readinessProbe 没过。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>Shell 脚本 4 题：考的是边界，不是语法</h2></div>
+  <p class="lead">脚本题的评分几乎不看「能不能跑通正常输入」，看的是<b>空值、失败、超时、重复执行</b>这四件事有没有处理。一个只能跑正常路径的脚本，在运维场景里等于没有。</p>
+
+  <h3>Q23 · 写一个脚本：磁盘使用率超过阈值就告警</h3>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+
+THRESHOLD=${1:-85}
+MOUNT=${2:-/}
+
+use=$(df -P "$MOUNT" | awk 'NR==2{gsub(/%/,"",$5); print $5}')
+
+if [ "${use:-0}" -ge "$THRESHOLD" ]; then
+  echo "CRITICAL: $MOUNT used ${use}%"
+  exit 2
+fi
+echo "OK: $MOUNT used ${use}%"
+exit 0</pre>
+  <p><b>参考答案要点：</b><span class="k">df -P</span> 是为了保证输出格式固定——不加 <span class="k">-P</span> 时，设备名过长会折行，<span class="k">NR==2</span> 就取错了。取第 5 列是 Use%，用 <span class="k">gsub</span> 去掉百分号才能做数值比较。<span class="k">${1:-85}</span> 是默认值写法，避免空参数导致 <span class="k">[ -ge ]</span> 报语法错误（这个报错很隐蔽）。退出码要有区分：0 正常、非 0 异常，很多监控系统只看退出码不看输出。<span class="k">set -euo pipefail</span> 让脚本在命令失败、用到未定义变量、管道中途失败时立刻停，而不是带着脏数据往下跑。</p>
+  <p><b>评分点：</b>① 用 <span class="k">df -P</span>（核心分，很多人不知道）；② 取第 5 列并去百分号；③ 有默认值保护；④ 用退出码表达状态。</p>
+
+  <h3>Q24 · 写一个脚本：批量重启多台机器上的服务，失败的记录下来</h3>
+  <pre>#!/usr/bin/env bash
+set -uo pipefail
+
+fail=0
+while read -r h; do
+  [ -z "$h" ] &amp;&amp; continue
+  if ssh -o BatchMode=yes -o ConnectTimeout=5 "$h" \
+       'systemctl restart myapp &amp;&amp; systemctl is-active myapp' &gt;/dev/null 2&gt;&amp;1; then
+    echo "OK   $h"
+  else
+    echo "FAIL $h" | tee -a failed.txt
+    fail=$((fail+1))
+  fi
+done &lt; hosts.txt
+
+echo "failed=$fail"
+[ "$fail" -eq 0 ]</pre>
+  <p><b>参考答案要点：</b>这里有三个「必须」和一个「必须不」。<span class="k">BatchMode=yes</span>：不能交互输密码，否则脚本会卡死在第一台；<span class="k">ConnectTimeout</span>：机器下线时 ssh 默认会等很久；失败要继续而不是中断，所以<b>不能</b>用 <span class="k">set -e</span>（只开 <span class="k">-uo</span>）。判定条件不能只看 ssh 的退出码——<span class="k">systemctl restart</span> 成功但进程起来就挂的情况很常见，所以后面要跟 <span class="k">is-active</span>。最后用累计的失败数决定整体退出码，这样调用方（CI 或人工）能一眼知道有没有失败。规模大的时候用 <span class="k">xargs -P</span> 并行，但要处理输出交错。</p>
+  <p><b>评分点：</b>① 非交互与超时（核心分）；② 失败不中断、要收集；③ 判定不只看 ssh 退出码；④ 整体退出码汇总。</p>
+
+  <h3>Q25 · 写一个脚本：日志按天保留 7 天，超期的删除</h3>
+  <pre><span class="c"># 第一步：先只打印，确认要删的清单</span>
+find /var/log/myapp -type f -name '*.log' -mtime +7 -print
+
+<span class="c"># 第二步：确认无误后再执行</span>
+find /var/log/myapp -type f -name '*.log' -mtime +7 -delete</pre>
+  <pre><span class="c"># 更标准的做法是交给 logrotate</span>
+/var/log/myapp/*.log {
+    daily
+    rotate 7
+    missingok
+    notifempty
+    compress
+    copytruncate
+}</pre>
+  <p><b>参考答案要点：</b>两个关键点。第一，<span class="k">-mtime +7</span> 是「7 天<b>以前</b>」，不是「7 天内」，方向搞反会删掉最新日志——这是这类题最经典的错误。第二，<b>先 <span class="k">-print</span> 再 <span class="k">-delete</span></b>，把「将要删什么」变成一次人工确认，这是运维脚本的基本纪律。生产上更推荐 logrotate：它处理了「轮转后让进程重新打开文件」这件事。<span class="k">copytruncate</span> 是复制后截断，代价是复制那一刻新写入的几行可能丢；不用它的方案需要程序支持 reopen 信号。</p>
+  <p><b>评分点：</b>① <span class="k">-mtime</span> 符号方向正确；② 有「先看再删」的两步；③ 提到 copytruncate 的取舍或 reopen 的必要性（这是运维和普通脚本作者的分界）。</p>
+
+  <h3>Q26 · 写一个脚本：等待某个 HTTP 接口可用，超时就退出失败</h3>
+  <pre>#!/usr/bin/env bash
+set -uo pipefail
+
+url=${1:?usage: wait_http.sh &lt;url&gt; [tries]}
+tries=${2:-30}
+
+for i in $(seq 1 "$tries"); do
+  if curl -sf -o /dev/null --max-time 3 "$url"; then
+    echo "ready after ${i}s"
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "timeout after ${tries}s: $url" &gt;&amp;2
+exit 1</pre>
+  <p><b>参考答案要点：</b>核心是<b>不要用固定 <span class="k">sleep</span></b>——睡短了不可靠，睡长了拖慢整个流水线。<span class="k">curl -s</span> 静默、<span class="k">-f</span> 让 HTTP 4xx/5xx 返回非 0 退出码（不加 <span class="k">-f</span> 的话，404 也算「成功」，这是最常见的 bug）、<span class="k">-o /dev/null</span> 丢掉响应体、<span class="k">--max-time</span> 防止单次请求挂死（只靠重试次数，遇到不响应的服务会一直等）。必须有最大尝试次数，否则就是一个可能永远不返回的脚本。两个退出码要分开：0 表示就绪，1 表示超时，调用方才能区分。</p>
+  <p><b>评分点：</b>① 轮询而不是固定 sleep；② 用 <span class="k">-f</span> 让 HTTP 错误码变成失败（核心分）；③ 有单次超时和总次数上限；④ 退出码可区分。</p>
+
+  <div class="callout ok">
+    <b>脚本题的加分句式：</b>在答案末尾补一句「这个脚本在 X 情况下会 Y，所以我在 Z 处做了处理」。这一句比多写十行代码有用，因为它证明你考虑过边界。阅卷的人看到这句话，基本就认定你写过生产脚本。
+  </div>
+  <p><b>面试落点：</b>「我写运维脚本固定四件事：空值默认、失败不静默、超时必设、执行前先打印。因为这四件事在测试环境永远不触发，在生产环境每天都触发。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>排障推演 4 题：顺序就是分数</h2></div>
+  <p class="lead">这四道题没有标准答案，但有一个明确的评分标准：<b>你的动作序列能不能被别人执行，能不能收敛</b>。写「检查网络」不算，写「在服务端 tcpdump 看有没有收到 SYN」才算，因为它是一个可以产生结论的动作。</p>
+
+  <h3>Q27 · 网站返回 502，用户说「时好时坏」，写出你的排查顺序</h3>
+  <p><b>参考答案要点：</b>分四段写，每段落到一个动作。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>圈范围。</b>是所有用户还是部分？所有接口还是个别？几点开始？有没有发布或配置变更？这一步不改任何东西，但能把范围砍掉一半。「时好时坏」这四个字已经排除了「后端进程死了」这类全量故障，指向的是<b>概率性</b>的原因：连接复用竞态、部分后端不健康、部分节点网络异常。</div></div>
+    <div class="step"><div class="txt"><b>确定 502 是谁产生的。</b>看 LB 的访问日志和后端的访问日志：后端有这条请求的记录，说明是「响应有问题」；后端一条都没有，说明请求压根没进业务，问题在连接层。</div></div>
+    <div class="step"><div class="txt"><b>按「有日志 / 没日志」分两条路。</b>没日志 → 查连接层：后端 keepalive 是不是比 LB 的空闲超时短（后端先发 FIN，LB 复用到一条已关的连接，收到 RST）；健康检查是不是把部分后端摘了；端口是不是耗尽。有日志 → 查应用：错误码、超时、依赖。</div></div>
+    <div class="step"><div class="txt"><b>验证而不是猜。</b>改一个变量看现象是否变化：把 LB 的空闲超时调到比后端 keepalive 短，观察 502 是否消失；或者临时只留一台后端，看是否还偶发。变了说明假设成立。</div></div>
+  </div>
+  <p><b>评分点：</b>① 先圈范围与变更，而不是先敲命令；② 用「后端有没有日志」把问题劈成两半（核心分，这是这道题的分水岭）；③ 提到连接复用 / keepalive 竞态这条路径；④ 有一个「改一个变量再观察」的验证动作。</p>
+
+  <h3>Q28 · 数据库连接数打满，应用开始报连接超时，怎么推演？</h3>
+  <p><b>参考答案要点：</b>核心判断是<b>「连接被占满」还是「连接被拖住」</b>，这两个的处理方向相反。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>Sleep 多</div><div class="cd">连接建立了但没在干活。说明连接池配置过大、或者有连接泄漏（借了没还）。方向是收敛池大小、查泄漏，而不是加连接数。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>Query 多</div><div class="cd">连接都在跑 SQL。说明有慢查询堆积或锁等待。方向是看慢日志、锁等待、执行计划，加连接数只会让竞争更严重。</div></div>
+  </div>
+  <p>顺序：① 在库里看当前连接的状态分布（Sleep / Query / 等待锁），这一步就定了方向；② 如果是 Query 多，看慢日志和锁等待，找具体语句；③ 如果是 Sleep 多，看应用侧连接池的 max 与 idle 配置，以及有没有「借出不还」的代码路径；④ 应用实例数 × 每实例池大小 是否超过了库的 max_connections——扩容应用时最常撞这条线；⑤ 止血可以是 kill 掉长事务、临时限流，但<b>不要直接调大 max_connections 当作解决方案</b>，它会把内存压力和竞争一起放大。</p>
+  <p><b>评分点：</b>① 先区分「占满」和「拖住」（核心分）；② 用了具体的判据（Sleep/Query 分布）；③ 指出「实例数 × 池大小」这个乘法关系；④ 明确说出「不要无脑调大上限」。</p>
+
+  <h3>Q29 · 凌晨三点磁盘写满，业务变成只读，怎么处理？</h3>
+  <p><b>参考答案要点：</b>分止血和根因两段，止血段要写出优先级。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先分清是哪种「满」。</b><span class="k">df -h</span> 和 <span class="k">df -i</span> 一起看：块满了和 inode 满了报错文案一样，处理方式完全不同。inode 满要找小文件目录，删大文件一点用没有。</div></div>
+    <div class="step"><div class="txt"><b>找增长点。</b>按目录逐层看，注意不要跨挂载点重复统计：<span class="k">du -x -h --max-depth=1</span>，哪一层在涨就往下钻。</div></div>
+    <div class="step"><div class="txt"><b>止血要选对动作。</b>日志类文件用 <span class="k">: &gt; file</span> 截断，不要 <span class="k">rm</span>——文件被删但进程还握着句柄，空间不释放，十分钟后你会再收到一次同样的工单。数据库的 binlog、慢日志、临时文件要单独判断，<b>绝不能为了腾空间去动数据文件</b>。</div></div>
+    <div class="step"><div class="txt"><b>确认恢复。</b>不只是 df 降下来，还要确认写入真的恢复了（业务日志不再报错、可以正常写一条测试记录）。有一种情况是空间够了但文件系统已经进了只读，需要单独处理。</div></div>
+    <div class="step"><div class="txt"><b>根因和防复发。</b>保留策略、日志级别（是不是开了 debug）、告警阈值（80% 就该报，不是 95%）、以及「谁在凌晨写了这么多」。没有这一步，下一周还会再来一次。</div></div>
+  </div>
+  <p><b>评分点：</b>① 先分块满与 inode 满；② 用 truncate 而不是 rm，并说出原因（核心分）；③ 明确不碰数据文件；④ 有恢复验证和根因两段。</p>
+
+  <h3>Q30 · 上线后 P99 从 200ms 涨到 2s，但 CPU 和内存都正常，怎么推演？</h3>
+  <p><b>参考答案要点：</b>「资源正常但变慢」这个组合，把可能性收窄到了<b>等待</b>——等锁、等连接、等下游、等 DNS。所以推演的主线是找「在等什么」。</p>
+  <p>① <b>先确认时间对齐</b>：变慢的起点和发布的时间点是否重合？重合就先怀疑变更，不重合就怀疑流量或依赖。② <b>分段计时</b>：用 curl 拆出 DNS、建连、TLS、首字节、总耗时，先确定慢在哪一段——这一步能省掉一半的排查。③ <b>看应用内部</b>：连接池有没有打满（拿到连接的时间变长）、线程池队列有没有积压、有没有新的锁竞争、GC 暂停有没有变长（GC 不影响平均 CPU，但会让 P99 起尖）。④ <b>看下游</b>：数据库慢查询、缓存命中率下降、第三方接口超时。⑤ <b>看流量结构</b>：是不是只有某一类请求变慢（比如带了新参数的那批），这指向代码路径而不是容量。⑥ <b>决策</b>：能回滚先回滚止血，再在安全的环境里复现。</p>
+  <p><b>评分点：</b>① 先把「资源正常」翻译成「在等待」（核心分）；② 有分段计时这个能定位到层的动作；③ 提到连接池/线程池/GC 这些「不体现在 CPU 上」的等待；④ 有回滚止血的判断。</p>
+
+  <div class="callout danger">
+    <b>排障题的三条减分线：</b>① 一上来就重启（抹掉现场）；② 直接给结论不给过程（阅卷无法判断你的推理）；③ 用「检查一下配置」这种不可执行的动作（检查什么配置、看哪个字段、什么值算异常）。反过来，只要每个动作都能回答「这个动作会产生什么结论」，即便顺序不完美，分数也不会低。
+  </div>
+  <p><b>面试落点：</b>「排障题我按四段写：圈范围、把问题劈成两半、沿一条路走到具体对象、改一个变量验证。因为阅卷和面试官看的都不是我猜得准不准，而是我的过程能不能被别人接手。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>时间分配：别让一道两分题吃掉一道十分题</h2></div>
+  <p class="lead">笔试卷子上最常见的失分不是不会，是<b>分配错了</b>。前面几道命令题因为「想写得更完美」反复涂改，最后一道排障大题只剩五分钟，只能写两行。</p>
+  <p>一个可执行的分配原则：<b>按分值分配时间，再留出一次回扫</b>。总分多少、题量多少、每题大概几分钟，进场就先算一遍。命令题有明确答案，很容易「陷进去」——想到一个更好的写法就想改，改了又怕原来那个对。这种纠结的期望收益极低，因为踩点已经拿到了。</p>
+  <table>
+    <tr><th style="width:150px">题型</th><th>时间策略</th><th>为什么</th></tr>
+    <tr><td><b>命令题</b></td><td>一次写定，不回头改</td><td>踩点是「工具 + 参数 + 判据」，写完就齐了。反复改写的边际收益接近零</td></tr>
+    <tr><td><b>脚本题</b></td><td>先写主干，再补边界</td><td>主干决定能不能跑，边界决定分数高低。时间不够时保住主干</td></tr>
+    <tr><td><b>排障题</b></td><td>先写顺序骨架（四到五步），再往每步里填动作</td><td>骨架本身就有分，而且它保证你不会写偏。填空比从零写快得多</td></tr>
+    <tr><td><b>不会的题</b></td><td>写「我会怎么查」，占位后跳过</td><td>占位能拿过程分，跳过能保住后面的时间。两者都要做</td></tr>
+  </table>
+  <p>还有一个具体的技巧：<b>先在草稿上给排障题列编号</b>。人在紧张时写字速度会下降，但列编号很快。把「① 圈范围 ② 分层 ③ 定位 ④ 验证」这四行先写上去，再逐条扩写，你的答案结构就已经赢了大多数人——因为多数人的答案是想到哪写到哪，读起来像一堆命令的堆叠。</p>
+  <div class="callout">
+    <b>留白比写错更贵。</b>写错一个参数，扣的是那个参数的分；留空，扣的是整题。所以在时间紧张时，正确的策略是<b>把每一题都写上一句</b>，哪怕只是「我会用 X 工具看 Y 指标，判断依据是 Z」。这一句话往往就是一半的分。
+  </div>
+  <p><b>面试落点：</b>这套时间分配在面试里同样适用。面试官问「你怎么排查」，你先给四步骨架，再展开其中一步，比一上来就钻进细节更容易讲清楚——因为听的人需要一个结构才能跟上。</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>答题技巧：不确定的时候，怎么写才拿分</h2></div>
+  <p class="lead">「我不确定这个参数是 <span class="k">-mtime -7</span> 还是 <span class="k">-mtime 7</span>，所以这题我不写了。」这个决定会让你损失整整一题的分，而实际上你只需要写清「我要找 7 天内修改的文件」，就已经拿到了判据那一分。</p>
+  <p>下面四种写法，是按「确定程度递减」排的。每一种都比留空强。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>完全确定</div><div class="cd">直接写命令，后面补一句判据。判据是加分项，很多人只写命令就停了。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>记得工具不记得参数</div><div class="cd">写工具 + 说明要筛什么 + 写「具体参数以 <span class="k">man</span> 为准」。阅卷的人看得出来你是会用工具的，只是没背下来。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>只记得思路</div><div class="cd">写成步骤：「先用 A 找到候选，再用 B 过滤，最后用 C 确认」。这是过程分，通常能拿到一半以上。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>完全不会</div><div class="cd">写「我会先确认 X，再判断是 A 类还是 B 类问题」，把问题定义清楚。有时候出题人就是在考你会不会分类。</div></div>
+  </div>
+  <h3>四个具体话术，可以直接用</h3>
+  <ul>
+    <li><b>参数记不清：</b>「用 find 按修改时间和大小筛，时间用 <span class="k">-mtime</span>（负数为区间内），大小用 <span class="k">-size +100M</span>。」——工具和语义都对，参数细节不扣大分。</li>
+    <li><b>一题多解：</b>给一个主答案，后面加一句「也可以用 X，区别是 Y」。这一句展示的是判断力，不是知识量。</li>
+    <li><b>涉及风险动作：</b>主动加限制条件。「先 <span class="k">-print</span> 确认清单，再执行删除」——这一句经常比命令本身值钱。</li>
+    <li><b>数字不确定：</b>写「具体阈值按环境定」，不要编一个看起来专业的数字。编数字被追问一句就崩。</li>
+  </ul>
+  <div class="callout warn">
+    <b>不要写你不确定的破坏性命令。</b>有一类答案是这样的：题目问「磁盘满了怎么办」，答「<span class="k">rm -rf /var/log/*</span>」。这个答案即便「能腾出空间」，也是负分——它删掉了正在写的日志（空间还不一定释放），而且没有任何确认步骤。宁可写「截断日志文件」，也不要写一条看起来果断的破坏性命令。
+  </div>
+  <p>还有一个心态问题值得说：<b>笔试考的是「可信度」，不是「完美度」。</b>一份每道题都写了、有几处参数不准的卷子，比一份前五题完美、后面全空的卷子分数高得多。因为前者展示的是一个能覆盖全部工作面的工程师，后者展示的是一个只会做熟悉题目的人。</p>
+  <p><b>面试落点：</b>这套写法在面试里就是「先给结论，再给依据，最后说边界」。不确定的时候直接说不确定，然后说你会上哪查——面试官对「我会查」的容忍度，远高于对「编一个答案」的容忍度。</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>送分题与陷阱题：这些地方白丢分最可惜</h2></div>
+  <p class="lead">每年卷子上都有一批「不该错」的题。它们不难，但有一个共同特征：<b>看起来太简单，所以写得很快</b>。快，就是错的开始。</p>
+  <h3>送分题：这几类必须拿满</h3>
+  <table>
+    <tr><th style="width:190px">题型</th><th>必须写出的东西</th></tr>
+    <tr><td>磁盘满 / df 与 du 不一致</td><td><span class="k">df -h</span> 与 <span class="k">df -i</span> 都要提；被删未释放用 <span class="k">lsof +L1</span>；处理用 truncate 不用 rm</td></tr>
+    <tr><td>端口 / 连接状态</td><td><span class="k">ss -lntp</span> 看监听、<span class="k">ss -s</span> 看状态分布、CLOSE_WAIT 是应用没 close</td></tr>
+    <tr><td>进程定位</td><td><span class="k">ps</span> 看状态、<span class="k">/proc/PID</span> 看细节、<span class="k">D</span> 状态是等 IO</td></tr>
+    <tr><td>K8s 排障入口</td><td>永远先 <span class="k">kubectl describe</span> 看 Events，再 <span class="k">logs</span>，再 <span class="k">exec</span></td></tr>
+    <tr><td>容器排查入口</td><td><span class="k">docker ps -a</span> 看状态与退出码、<span class="k">logs</span>、<span class="k">inspect</span></td></tr>
+  </table>
+  <p>这几类题的共同点是：<b>答案有明确的「第一动作」</b>。写对这个第一动作，后面的展开就有了方向。写错的代价很大，因为你会在错误的方向上写一大段。</p>
+  <h3>陷阱题：六个每年都有人踩的坑</h3>
+  <table>
+    <tr><th style="width:180px">陷阱</th><th>错在哪</th><th>正确写法</th></tr>
+    <tr><td><span class="k">-mtime 7</span> 与 <span class="k">-mtime +7</span></td><td>以为 <span class="k">+7</span> 是「7 天内」</td><td>减号是 7 天内，加号是 7 天以前，无符号是正好第 7 天</td></tr>
+    <tr><td><span class="k">uniq -c</span> 前不 sort</td><td>以为 uniq 会全局去重</td><td>uniq 只合并相邻行，必须先 sort</td></tr>
+    <tr><td><span class="k">ss -lntp | grep 8080</span></td><td>会匹配到 18080、80801</td><td>用 <span class="k">'sport = :8080'</span> 精确过滤，或 grep 加词的边界</td></tr>
+    <tr><td>删日志用 <span class="k">rm</span></td><td>句柄未释放，空间不降</td><td><span class="k">: &gt; file</span> 截断，或让进程 reopen</td></tr>
+    <tr><td>Pending 与 CrashLoopBackOff 混为一谈</td><td>都当成「起不来」</td><td>Pending 是没被调度，CrashLoopBackOff 是跑起来又挂了</td></tr>
+    <tr><td>crontab 里的 <span class="k">%</span></td><td>直接写 <span class="k">date +%F</span></td><td>crontab 里 <span class="k">%</span> 有特殊含义，要写成 <span class="k">\%</span>，或者把逻辑放进脚本</td></tr>
+  </table>
+  <pre><span class="c"># crontab 的 % 陷阱：这一行不会按预期工作</span>
+0 2 * * * /usr/bin/tar -czf /backup/$(date +%F).tar.gz /data
+
+<span class="c"># 正确做法一：转义</span>
+0 2 * * * /usr/bin/tar -czf /backup/$(date +\%F).tar.gz /data
+
+<span class="c"># 正确做法二（更推荐）：逻辑放进脚本，crontab 只调脚本</span>
+0 2 * * * /opt/scripts/backup.sh</pre>
+  <p>还有一类「看起来是陷阱其实不是」的题，值得单独提醒：<b>题目问「最简单的方法」时，不要写复杂方案</b>。有人会在「怎么查看文件最后 10 行」上写一段 awk，这不会加分，只会显得你分不清场景。简单题答简单，是专业度的一部分。</p>
+  <div class="callout ok">
+    <b>一句话总结这一节：</b>送分题的分在「第一动作写对」，陷阱题的分在「符号和边界想清楚」。这两类题加起来往往占卷面的一半，而它们不需要任何深度知识，只需要在写之前停两秒。
+  </div>
+  <p><b>面试落点：</b>「我知道自己容易错的地方是参数符号和边界条件，所以写之前会先在心里读一遍『这个参数是包含还是排除』。这个习惯比多背十个命令有用。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：改卷的人一眼就能看出来</h2></div>
+  <p class="lead">下面这些不是知识错误，是<b>习惯错误</b>。它们的共同点是：写的时候很顺手，读的时候很刺眼。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只写命令，不写判据</div><div class="pd">「用 iostat 看一下」——看哪一列？什么值算异常？阅卷的人无法判断你是真会用还是在猜。判据那一分是白送的。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">排障题直接给结论</div><div class="pd">「是连接池满了」——即便猜对了，也拿不到过程分；猜错了，一分没有。排障题的分在顺序和分层上，不在结论上。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把重启、rm、kill -9 写成第一手段</div><div class="pd">这些动作抹掉现场、且不可逆。写在答案里是明确的减分项，因为它说明你没有风险意识。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">find 的时间符号写反</div><div class="pd"><span class="k">-mtime +7</span> 是 7 天以前，不是 7 天内。写反了不但拿不到分，还暴露了没在真实环境删过东西。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">uniq 不 sort 直接用</div><div class="pd">uniq 只合并相邻重复行。少了那一步 sort，统计结果会碎成一堆，看起来像命令写对了其实输出是错的。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把 Pending 和 CrashLoopBackOff 当成一回事</div><div class="pd">一个是调度阶段没被安排，一个是运行阶段反复退出。排查路径完全不同，混着答等于两道题都没答对。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">grep 端口号不加边界</div><div class="pd">grep 8080 会命中 18080 和 80801，然后在错误的进程上查半天。用 ss 的过滤表达式或精确匹配。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">脚本不处理空值和失败</div><div class="pd"><span class="k">[ $x -ge 85 ]</span> 在 x 为空时会报语法错误；命令失败后继续往下跑会带着脏数据。这两点在测试环境永远不出现。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">时间分配失衡，最后一道大题留空</div><div class="pd">前面纠结两分的参数题，后面放弃十分的推演题。这是这类考试最普遍的失分结构，而且完全可以避免。</div></div></div>
+  <p><b>面试落点：</b>被问「你觉得自己哪方面最需要改进」，答一个具体习惯比答「我还在学习」有用得多。比如「我以前写脚本不判空参数，有次在批量脚本里因为一个空变量把整批机器都跳过了，后来固定先写默认值和失败处理」。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. <span class="k">find /var/log -mtime -7</span> 中，<span class="k">-7</span> 的含义是？</div>
+      <button class="opt">正好第 7 天修改过的文件</button>
+      <button class="opt">最近 7 天内修改过的文件</button>
+      <button class="opt">7 天以前（不含最近 7 天）修改过的文件</button>
+      <button class="opt">修改时间超过 7 次的文件</button>
+      <div class="ans">正确答案：<b>7 天内</b>。find 的时间参数用符号表示区间：减号是「小于这个天数」，也就是最近 N 天以内；加号是「大于这个天数」，也就是 N 天以前；不带符号是「正好第 N 天」。这个符号方向是最常见的失分点，写反会导致删除脚本删掉最新的日志。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 统计访问量前 10 的 IP 时，<span class="k">uniq -c</span> 前面必须加 <span class="k">sort</span>，原因是？</div>
+      <button class="opt">sort 能去掉空行，否则 uniq 会报错</button>
+      <button class="opt">uniq 默认区分大小写，sort 可以统一大小写</button>
+      <button class="opt">uniq 只合并相邻的重复行，不排序的话相同的值散落在各处，不会被合并</button>
+      <button class="opt">sort 会把结果按数值排序，uniq 才能正确计数</button>
+      <div class="ans">正确答案：<b>uniq 只合并相邻行</b>。这是 uniq 的设计：它逐行比较当前行和上一行，相同就合并计数。所以输入必须先排序，让相同的值聚在一起。少了 sort，输出会是很多条计数为 1 的记录，看起来命令跑通了，结果是错的——这类「静默错误」在笔试里比报错更危险。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. Pod 处于 Pending 状态，第一步应该做什么？</div>
+      <button class="opt">kubectl logs 看容器日志</button>
+      <button class="opt">kubectl exec 进容器排查</button>
+      <button class="opt">删除 Pod 让它重建</button>
+      <button class="opt">kubectl describe pod 看 Events，确认调度失败的原因</button>
+      <div class="ans">正确答案：<b>看 Events</b>。Pending 的含义是「调度器还没把它放到任何节点上」，所以容器根本没启动，logs 和 exec 都不会有内容。describe 的 Events 会直接写出原因：资源不足、节点选择器不匹配、污点未容忍、PVC 未绑定、超出配额。删除重建只会重复一次同样的失败。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 出现偶发 502，而后端的业务日志里一条对应请求都没有。最可能的原因是？</div>
+      <button class="opt">请求在连接层就失败了，比如复用到一条已被后端关闭的连接，收到 RST，根本没进业务逻辑</button>
+      <button class="opt">后端应用抛了异常，但日志级别设置过高没打出来</button>
+      <button class="opt">客户端在服务端响应前就断开了连接</button>
+      <button class="opt">后端返回了 502 状态码，但被日志过滤掉了</button>
+      <div class="ans">正确答案：<b>连接层失败</b>。「后端没有这条请求的日志」是一个极强的信号：它说明请求没有到达业务代码。最典型的成因是连接复用竞态——后端 keepalive 比 LB 的空闲超时短，后端先发 FIN，LB 恰好从池里取出这条已关闭的连接发请求，内核回 RST，LB 返回 502。这个判断把问题从「应用 bug」直接切到「连接管理」，是这道题的分水岭。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 一个日志文件最后一行没有换行符，<span class="k">wc -l</span> 和 <span class="k">grep -c ''</span> 的结果会怎样？</div>
+      <button class="opt">完全相同，两者都数行</button>
+      <button class="opt">wc -l 比 grep -c 多 1</button>
+      <button class="opt">wc -l 比 grep -c 少 1，因为 wc 数的是换行符个数</button>
+      <button class="opt">两者都报错，必须先补一个换行符</button>
+      <div class="ans">正确答案：<b>wc -l 少 1</b>。wc -l 统计的是换行符的数量，最后一行没有换行符就不被计入；grep -c 统计的是匹配到的记录数，会包含这一行。日志对账时这个差异很致命——行数和业务计数差 1，会让你误以为丢了一条记录。需要精确记录数时用 grep -c 或 awk 的 NR。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 考试时间只剩十分钟，还有一道十分的排障大题没写。最合理的做法是？</div>
+      <button class="opt">把前面命令题的答案再检查一遍，确保不丢分</button>
+      <button class="opt">先用编号列出四到五步排查顺序，再往每步里填一两句动作，能写多少写多少</button>
+      <button class="opt">只写最终结论，省下时间</button>
+      <button class="opt">放弃这题，因为写不完整也拿不到分</button>
+      <div class="ans">正确答案：<b>先列骨架再填</b>。排障题按过程给分，顺序骨架本身就有分，而且它保证你的答案结构清晰、不会写偏。只写结论拿不到过程分；放弃等于零分；回头检查命令题的边际收益极低，因为踩点已经拿到了。这条策略的本质是：把有限的时间投到「每单位时间能换到最多踩点」的地方。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>踩点给分</b></td><td>按答案里命中的关键要素计分，而不是按「是否与标准答案完全一致」</td></tr>
+    <tr><td><b>-mtime</b></td><td>find 的修改时间参数，减号是 N 天以内，加号是 N 天以前，无符号是正好第 N 天</td></tr>
+    <tr><td><b>uniq 相邻性</b></td><td>uniq 只合并相邻的重复行，所以前面必须有 sort</td></tr>
+    <tr><td><b>RssAnon</b></td><td>/proc/PID/status 里的私有匿名内存，是判断内存泄漏最可靠的指标</td></tr>
+    <tr><td><b>TID / nid</b></td><td>线程 id 在内核里就是 pid；jstack 里的 nid 是十六进制，需要转换</td></tr>
+    <tr><td><b>TIME_WAIT</b></td><td>主动关闭方持有的状态，用端口方向（sport / dport）判断本机是什么角色</td></tr>
+    <tr><td><b>ListenOverflows</b></td><td>全连接队列溢出次数，客户端表现为连接超时，服务端 ss 里看不出异常</td></tr>
+    <tr><td><b>ExitCode 137</b></td><td>128+9，被 SIGKILL 终止，容器场景常见于 OOM 或被强制停止</td></tr>
+    <tr><td><b>--previous</b></td><td>kubectl logs 的参数，看上一次容器实例的日志，排查 CrashLoopBackOff 必用</td></tr>
+    <tr><td><b>ephemeral container</b></td><td>临时容器，用于进入没有 shell 的镜像（distroless / scratch）排查</td></tr>
+    <tr><td><b>readinessProbe</b></td><td>就绪探针，失败时 Pod 仍是 Running 但不会被加入 Endpoints，是 Service 不通的常见隐性原因</td></tr>
+    <tr><td><b>set -euo pipefail</b></td><td>命令失败即停、未定义变量报错、管道中任一环失败即失败</td></tr>
+    <tr><td><b>BatchMode</b></td><td>ssh 参数，禁止交互式输入密码，批处理里不加会卡死</td></tr>
+    <tr><td><b>copytruncate</b></td><td>logrotate 的复制后截断模式，不需要程序 reopen，代价是可能丢几行</td></tr>
+    <tr><td><b>分段计时</b></td><td>用 curl 拆出 DNS / 建连 / TLS / 首字节耗时，用于判断「慢在哪一层」</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 把这一篇的 30 道题当成卷子，计时四十分钟手写一遍，不查资料——写完再对照评分点，你会发现失分集中在符号和判据上，而不是「不会」；② 挑五道命令题，在测试机上真的跑一次，包括故意写错参数看报错，报错信息本身也是记忆点；③ 找一个人，把四道排障题口述给他听，让他随时打断问「为什么先做这一步」——答不上的地方就是你的顺序还没理顺。<br><br>
+    <b>之后值得单独学：</b>第 2 期把这篇里的排查动作展开成了完整的五条线；第 3 期讲命令的底层原理（find 为什么比 ls 管道快、awk 的内存行为）；第 11 期是 K8s 排障的完整版，本篇的 Pending 与 CrashLoop 只是入口；第 25 期是 Shell 脚本的进阶，本篇的四道题只覆盖了边界处理这一面。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 36 期 · 笔试的分不在你记住了多少命令，在于你能不能把过程写成别人可以接手的样子</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

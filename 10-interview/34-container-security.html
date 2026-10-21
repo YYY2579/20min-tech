@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>容器安全面试：逃逸、供应链与 RBAC</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 34 期</span>
+    <h1>容器安全面试：逃逸、供应链与 RBAC</h1>
+    <p class="sub">容器不是安全边界，<b>共享内核</b>这四个字决定了它所有的风险面。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>10</b> 个攻击面</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>4</b> 条真实逃逸路径</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：容器里的 root 和宿主机的 root，是同一个 root 吗？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都不是被攻破，是被「配」出来的</h2></div>
+  <p class="lead">「上周排查网络，临时加了个 <span class="k">privileged: true</span>，忘了删。」「CI 要构建镜像，就把宿主机的 docker.sock 挂进去了。」「为了让流水线能部署，给 default 的 ServiceAccount 绑了 cluster-admin。」这三句话在同一次面试里出现，基本就能定性了——<b>真实的容器安全事件，绝大多数不是被 0day 打穿的，是被配置放开的</b>。</p>
+  <table>
+    <tr><th style="width:210px">现场</th><th style="width:170px">直觉答案</th><th>真实后果</th></tr>
+    <tr><td>排查完忘了删 <span class="k">privileged</span></td><td>反正只是内部服务，没人会进去</td><td>特权容器拥有全部 capabilities、seccomp 与 AppArmor 被关闭、能访问所有设备。应用一旦有 RCE，攻击者可以直接 mount 宿主根盘，等于拿到宿主机</td></tr>
+    <tr><td>CI 容器挂了 <span class="k">/var/run/docker.sock</span></td><td>只是让 CI 能 build 镜像</td><td>docker.sock 是 Docker daemon 的控制接口，daemon 以 root 运行。能调这个接口，就能创建一个挂载宿主根目录的特权容器。这等于把宿主机的 root 交给了每一次构建</td></tr>
+    <tr><td>default SA 绑了 cluster-admin</td><td>只是让部署脚本能创建资源</td><td>这个 namespace 里<b>任何一个</b> Pod（包括被攻陷的业务 Pod）都能读到全部 Secret、创建特权 Pod、给自己提权。一个点被突破，整个集群失守</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>共享内核</div><div class="cd">容器和宿主机用同一个内核。namespace 隔离的是「看得见什么」，cgroup 限制的是「能用多少」，都不是「不能越过去」。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>默认值几乎都是宽的</div><div class="cd">K8s 的 Pod 默认允许 root、允许写根文件系统、带着一套默认 capabilities、网络全通。想安全必须显式收紧。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>权限会传递</div><div class="cd">一个能创建 Pod 的身份，等于一个能使用任意 ServiceAccount 的身份。所以「能建 Pod」这个权限，比看起来危险得多。</div></div>
+  </div>
+  <p>这一篇的组织方式是「按攻击面从外到内」：先立威胁模型（哪些是真边界、哪些是假边界），再从镜像供应链（构建时）走到运行时加固（跑起来时），然后是四条真实的逃逸路径（配置给多了会怎样），最后是编排层的三件事——RBAC、Secret、NetworkPolicy，以及检测与响应。</p>
+  <div class="callout danger">
+    <b>先把最容易被误解的一句话纠正：</b>「容器里是 root，但它是被隔离的 root，所以没关系」——这句话在<b>没有</b> user namespace 重映射的情况下是错的。容器内的 UID 0 在宿主机内核看来就是 UID 0。namespace 让这个 root 看不到别的进程，但一旦有任何一条路径能触及宿主资源（挂载、设备、socket、内核漏洞），它立刻就是宿主机的 root。
+  </div>
+  <p><b>面试怎么答：</b>「容器安全我一般从威胁模型讲起：容器共享宿主内核，namespace 和 cgroup 提供的是视图和资源隔离，不是安全边界。所以风险分四层：镜像供应链、运行时配置、编排层权限、集群网络。真实的入侵大部分不是内核漏洞，而是配置放得太开，比如 privileged、hostPath、挂 docker.sock、给 ServiceAccount 绑 cluster-admin。这几条只要有一条存在，基本就等于宿主机权限。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>威胁模型：哪些是真边界，哪些只是「看不见」</h2></div>
+  <p class="lead">安全讨论最容易滑坡的地方，是把「隔离」和「安全边界」当成一回事。虚拟机有 hypervisor 做硬件级隔离，容器只有内核提供的一组机制。<b>这个差别决定了「一个容器被拿下」意味着什么</b>。</p>
+  <table>
+    <tr><th style="width:150px">机制</th><th>它做什么</th><th>它不做什么</th></tr>
+    <tr><td><b>namespace</b></td><td>PID、网络、挂载、UTS、IPC、user、cgroup 的视图隔离：容器里看不到宿主机的其他进程和网卡</td><td>不阻止对内核的调用。内核有漏洞，或者进程有 CAP_SYS_ADMIN，隔离就能被绕过</td></tr>
+    <tr><td><b>cgroup</b></td><td>限制 CPU、内存、IO、PID 数量</td><td>不限制权限。它防的是「把机器吃垮」，不是「越权访问」</td></tr>
+    <tr><td><b>capabilities</b></td><td>把 root 的特权拆成几十项，可以只给需要的</td><td>默认给的那套仍然包含一些危险项；而且 UID 0 本身的文件访问权限不受 capabilities 约束</td></tr>
+    <tr><td><b>seccomp</b></td><td>按 syscall 过滤，挡掉不需要的系统调用</td><td>只挡 syscall，不挡参数里的路径；profile 写宽了等于没写</td></tr>
+    <tr><td><b>LSM（AppArmor / SELinux）</b></td><td>路径级、标签级的强制访问控制</td><td>需要宿主启用并加载 profile，容器里配了但宿主没装模块等于无效</td></tr>
+    <tr><td><b>user namespace</b></td><td>把容器内 UID 映射到宿主的非特权 UID</td><td>默认没有全开；开了之后有些挂载和网络操作会受限，兼容性要测</td></tr>
+  </table>
+  <p>所以「容器是不是安全边界」这个问题，准确的答法是：<b>它是一个很薄的隔离层，能挡住「误操作」和「低水平攻击」，挡不住「有内核漏洞」或「配置给了特权」的场景</b>。需要强隔离的时候，选项是：给 Pod 配 gVisor 这类用户态内核、用 Kata Containers 这类轻量虚拟机、或者干脆把敏感业务放独立集群/独立节点池。</p>
+  <p>威胁模型分四层，这个分层很好用，因为它对应四组不同的控制措施：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>镜像与供应链（构建时）</b>：基础镜像里带了多少漏洞、有没有把密钥打进层里、镜像有没有签名、部署时能不能保证「跑的就是审过的那一个」。</div></div>
+    <div class="step"><div class="txt"><b>运行时（跑起来时）</b>：是不是 root、根文件系统可不可写、有哪些 capabilities、seccomp 和 LSM 有没有开、有没有挂宿主路径。</div></div>
+    <div class="step"><div class="txt"><b>编排层（K8s 配置）</b>：RBAC 给了多少权限、Secret 怎么存、准入控制有没有拦截高危 Pod。</div></div>
+    <div class="step"><div class="txt"><b>网络与集群</b>：Pod 之间是不是全通、能不能出网、控制面（apiserver、kubelet）暴露到什么范围。</div></div>
+  </div>
+  <p>一个很实用的判断方法：<b>假设攻击者已经拿到了你某个业务容器的 shell</b>（这是最常见的现实，通过应用漏洞而不是容器漏洞），然后问「他下一步能做什么」。如果答案是「只能读这个容器里的文件，出网被限制，没有 token 权限」，那你的防护是有效的；如果答案是「能读到 SA token，而那个 SA 能创建 Pod」，那就完蛋了——因为创建 Pod 可以指定任意 SA，也可以开 privileged。</p>
+  <div class="callout warn">
+    <b>别把精力全放在「防逃逸」上。</b>真实事件里更常见的是：容器没逃逸，但攻击者用容器里的 SA token 调 apiserver 横向移动，或者用容器的网络位置访问内网的未授权服务。<b>「不逃逸」不等于「没损失」</b>，这是威胁模型里最容易被漏掉的一层。
+  </div>
+  <p><b>面试怎么答：</b>「容器共享宿主内核，namespace 是视图隔离、cgroup 是资源限制，都不是安全边界。所以我把威胁模型分四层：镜像供应链、运行时配置、编排层权限、网络。真实入侵大部分是应用被 RCE 之后，利用配置里多给的东西——比如挂载、特权、SA token——横向移动，而不是打内核 0day。所以我判断防护是否有效的方法是：假设已经拿到某个容器的 shell，看攻击者下一步还能做什么。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>镜像供应链：从「能跑」到「能证明跑的是哪一个」</h2></div>
+  <p class="lead">供应链安全的目标可以压成一句话：<b>确保线上跑的镜像，就是我审过的那一个字节不差的镜像</b>。这句话拆开是四件事：镜像里东西少、漏洞有人管、来源可信、部署时能被验证。</p>
+  <p>第一件事是<b>最小基础镜像</b>。一个 <span class="k">ubuntu:latest</span> 带进来的是完整的包管理器、shell、curl、各种库，其中任意一个组件有漏洞都算你的。用 distroless、scratch 或者精简过的 alpine，能把攻击面砍掉一大半，而且<b>攻击者进来之后没有工具可用</b>——没有 curl 下载载荷、没有 bash 写脚本、没有包管理器装工具。这一点在应急时价值极高。</p>
+  <p>用 alpine 要注意一个真实的坑：它用 musl libc 而不是 glibc。有些二进制（尤其是预编译的、依赖 glibc 特定行为的）在上面跑不起来，或者 DNS 解析行为不同（musl 的解析器对某些配置的兼容性差）。所以「alpine 更小」不是无脑换，要测。</p>
+  <p>第二件事是<b>多阶段构建</b>：编译工具链、依赖缓存、测试代码都不要进最终镜像。这既是体积问题，也是安全问题——构建期的工具（gcc、git、凭证）留在镜像里，等于给攻击者留了梯子。</p>
+  <pre><span class="c"># 多阶段：构建期有工具链，运行期只有一个二进制</span>
+FROM golang:1.22 AS build
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 go build -o /out/app ./cmd/app
+
+FROM gcr.io/distroless/static:nonroot
+COPY --from=build /out/app /app
+USER nonroot:nonroot
+ENTRYPOINT ["/app"]
+
+<span class="c"># 千万不要这样：密钥写进层里，后续 RUN rm 也删不掉（层还在）</span>
+<span class="c"># ARG TOKEN=xxx</span>
+<span class="c"># RUN git clone https://$TOKEN@git.internal/repo.git</span>
+<span class="c"># docker history 和镜像层解包都能看到它</span>
+
+<span class="c"># 部署时用 digest 而不是 tag：tag 是可变的，digest 才是内容寻址</span>
+<span class="c"># image: registry.internal/app@sha256:&lt;64 位十六进制&gt;</span></pre>
+  <p>第三件事是<b>扫描</b>。Trivy、Grype、Clair 这类工具会解包镜像，比对 OS 包和语言依赖的漏洞库。这里最容易失败的地方不是「扫不出来」，而是「扫出来太多没人看」——一个基础镜像动辄几百个 CVE，团队看两天就放弃了。有效的做法是三条：<b>只卡「有修复版本且严重级别高」的</b>；<b>把扫描结果接到 MR 里，让它在合并前出现</b>；<b>定期重建镜像</b>，因为很多漏洞是「基础镜像里的包升级了，但你的镜像还是半年前构建的」。</p>
+  <table>
+    <tr><th style="width:170px">措施</th><th>防的是什么</th><th>常见的失效方式</th></tr>
+    <tr><td><b>最小基础镜像</b></td><td>减少组件数量和攻击面，去掉攻击者能用的工具</td><td>为了调试又装回 curl、bash、vim；或者用了一个「看着小但依赖一堆」的镜像</td></tr>
+    <tr><td><b>多阶段构建</b></td><td>构建工具和凭证不进运行镜像</td><td>COPY --from 时把整个工作目录拷进去，连带 .git 和测试文件</td></tr>
+    <tr><td><b>漏洞扫描</b></td><td>已知漏洞在部署前被发现</td><td>只在 CI 跑一次、镜像构建后不再重建，半年后漏洞库更新了但镜像没变</td></tr>
+    <tr><td><b>镜像签名</b></td><td>确认镜像来自可信的构建流水线</td><td>签了但部署时不校验，等于没签</td></tr>
+    <tr><td><b>固定 digest</b></td><td>保证「跑的就是审过的那一个」</td><td>用 :latest 或浮动 tag，回滚时拉到的可能是另一个镜像</td></tr>
+    <tr><td><b>私有 registry + 准入校验</b></td><td>挡住从公网直接拉镜像、挡住未签名的镜像</td><td>集群节点能直连公网 registry，绕过所有校验</td></tr>
+  </table>
+  <p>第四件事是<b>签名与准入</b>，这是把「审过」变成「强制」的唯一办法。用 cosign 这类工具在 CI 里对镜像签名（可以基于 OIDC 做 keyless，不用自己管私钥），然后在集群里用准入控制器（Kyverno、OPA Gatekeeper 或者专门的策略引擎）校验：<b>镜像必须来自我们的 registry、必须有有效签名、digest 必须在允许列表里</b>。没有这一层，前面三件事都只是「建议」。</p>
+  <p>签名这件事的常见误解是「签了就安全了」。实际上签名只回答「这个镜像是不是我们的流水线产出的」，不回答「它有没有漏洞」。所以签名和扫描是两件事，缺一不可：扫描管「内容好不好」，签名管「来源是不是我」。</p>
+  <div class="callout">
+    <b>一个能立刻做的检查：</b>翻一下你生产集群里所有镜像的 tag。如果有 <span class="k">:latest</span>、<span class="k">:stable</span>、<span class="k">:prod</span> 这类浮动 tag，就意味着「同一个名字在不同时间可能是不同内容」——出问题时你无法复现，审计时你无法证明。改成 digest 是一行改动，收益是「可复现」和「可审计」。
+  </div>
+  <p><b>面试怎么答：</b>「供应链我按四件事做：基础镜像最小化，用 distroless 或 scratch，减少组件也让攻击者没有工具可用；多阶段构建，构建工具和凭证不进最终镜像；CI 里做漏洞扫描，只卡有修复版本的高危，并且定期重建镜像，因为很多漏洞是基础镜像更新了但镜像没重建；最后是签名加准入控制，用 cosign 签名、用 Kyverno 之类的做校验，确保线上跑的 digest 就是审过的那个。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>运行时加固（一）：非 root、只读根、丢掉 capabilities</h2></div>
+  <p class="lead">这三件事是容器加固的地基，而且它们有一个共同点：<b>默认值全是反的</b>。Pod 默认以 root 跑、默认根文件系统可写、默认带着一套 capabilities。所以「什么都不配」等于「全部放开」。</p>
+  <table>
+    <tr><th style="width:210px">配置</th><th>默认</th><th>该设成</th><th>为什么</th></tr>
+    <tr><td><b>runAsNonRoot</b></td><td>false（可以 root 跑）</td><td>true，并指定 runAsUser</td><td>容器内 UID 0 在宿主看来也是 0，一旦有逃逸路径，直接是宿主 root</td></tr>
+    <tr><td><b>readOnlyRootFilesystem</b></td><td>false</td><td>true，需要的目录挂 emptyDir</td><td>攻击者无法落地 webshell 或工具；也让「镜像不可变」这件事在运行时成立</td></tr>
+    <tr><td><b>allowPrivilegeEscalation</b></td><td>true</td><td>false</td><td>设置 no_new_privs，阻止 setuid 二进制把普通进程提成 root</td></tr>
+    <tr><td><b>capabilities</b></td><td>运行时给的一套默认集</td><td>drop: ALL，按需 add</td><td>默认集里包含 CAP_NET_RAW 等，很多业务根本不需要</td></tr>
+    <tr><td><b>privileged</b></td><td>false</td><td>永远不要 true</td><td>它给全部 capabilities、关闭 seccomp/AppArmor、暴露所有设备</td></tr>
+  </table>
+  <p><b>为什么「drop ALL」还不够？</b>因为 capabilities 只约束「特权操作」，不约束「文件所有权」。一个以 UID 0 运行的进程，即使 capabilities 全被丢掉，仍然拥有它自己创建的文件、仍然能读很多默认对 root 可读的文件（比如某些配置文件、token 文件）。真正的组合是 <b>非 root + drop ALL</b>：非 root 让 UID 不再是 0，drop ALL 让特权操作也不可用。两者缺一，防护就漏一半。</p>
+  <p><b>只读根文件系统</b>的实操难点是「应用要写东西」。常见需要写的位置有：/tmp、日志目录、缓存目录、PID 文件。做法是给每个需要写的位置挂一个 emptyDir（或者用一个可写的挂载点），其余保持只读。这样做的收益是双份的：攻击者无法持久化（写不进镜像层，重启就没），你的镜像也真正变成了「不可变基础设施」。</p>
+  <pre><span class="c"># 一个可以直接抄的 securityContext（Pod 级 + 容器级都要设）</span>
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: api
+      image: registry.internal/api@sha256:...
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+          add: ["NET_BIND_SERVICE"]     <span class="c"># 只有需要绑 80 端口时才加</span>
+      volumeMounts:
+        - {name: tmp,  mountPath: /tmp}
+        - {name: logs, mountPath: /var/log/app}
+  volumes:
+    - {name: tmp,  emptyDir: {}}
+    - {name: logs, emptyDir: {}}
+
+<span class="c"># 用命名空间的标签强制 Pod Security Standards（privileged / baseline / restricted）</span>
+kubectl label ns prod \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/warn=restricted \
+  pod-security.kubernetes.io/audit=restricted</pre>
+  <p>这里有个非常实用的机制：<b>Pod Security Standards</b>。它把「该收紧到什么程度」分成三档——privileged（不管）、baseline（禁止已知的提权手段）、restricted（按当前最佳实践收紧）。你只要给 namespace 打上标签，<span class="k">enforce</span> 会直接拒绝不合规的 Pod，<span class="k">warn</span> 会给警告，<span class="k">audit</span> 会记审计日志。这是把「加固建议」变成「集群强制」最省力的办法，比自己写一堆准入策略快得多。</p>
+  <p>落地顺序建议是：先给所有 namespace 加 <span class="k">audit</span> 和 <span class="k">warn</span>，观察一两周，看清楚有多少负载不合规、分别卡在哪一条；把明显有问题的改掉；再上 <span class="k">enforce=baseline</span>；最后对核心业务上 <span class="k">restricted</span>。直接全量 enforce 会让一批老业务起不来，然后你会被迫回滚，等于白做。</p>
+  <div class="callout ok">
+    <b>一个判断「这个 Pod 有没有被收紧」的快捷方法：</b>看它能不能执行 <span class="k">id</span> 看到 uid=0，看 <span class="k">touch /test</span> 会不会失败，看 <span class="k">cat /proc/self/status | grep Cap</span> 的 CapEff 是不是全零。<b>三条命令就能验证加固是否真的生效</b>，比看 YAML 可靠——因为 YAML 里的字段可能因为版本或准入被忽略。
+  </div>
+  <p><b>面试怎么答：</b>「运行时加固我按四件事做：非 root 运行，因为容器内的 root 在宿主看来也是 root；根文件系统只读，需要写的目录挂 emptyDir，这样攻击者无法持久化；allowPrivilegeEscalation 设 false，挡掉 setuid 提权；capabilities 先 drop ALL 再按需 add。要注意 drop ALL 不等于安全，还必须非 root，因为 capabilities 管的是特权操作，管不了 UID 0 的文件权限。落地用 Pod Security Standards，先 audit 再 enforce。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>运行时加固（二）：seccomp、LSM 与 user namespace</h2></div>
+  <p class="lead">如果说上一节是「别给它身份和权限」，这一节是「就算它有了，也别让它调用那些危险的东西」。seccomp 管系统调用，LSM 管路径和标签，user namespace 管 UID 映射——三个不同层次的减法。</p>
+  <p><b>seccomp</b>（secure computing mode）在内核里按 syscall 号过滤，可以允许、拒绝、或者只记录。容器运行时（Docker、containerd）本来就带一套默认 profile，会挡掉一批明显危险的 syscall（比如直接操作内核模块、修改时钟）。在 K8s 里设 <span class="k">seccompProfile.type: RuntimeDefault</span> 就是用这套默认 profile——<b>这是性价比最高的一步</b>，因为它几乎不影响兼容性，但能挡掉一大类利用。</p>
+  <p>自定义 profile 更严格，但要小心：profile 写得太紧，应用的某个正常功能（比如用 <span class="k">clone</span> 创建线程、用 <span class="k">io_uring</span> 做异步 IO）就会被拒。所以自定义 profile 要靠 <span class="k">SCMP_ACT_LOG</span> 先跑一段观察期，把实际用到的 syscall 收集出来，再收窄。</p>
+  <p><b>LSM（Linux Security Module）</b>是内核的强制访问控制框架，常见实现是 AppArmor（路径为中心，Ubuntu 系默认）和 SELinux（标签为中心，RHEL 系默认）。它们能做的事比 seccomp 更细：比如「这个进程只能读 /app 下的文件，不能读 /etc/shadow」「这个容器只能连 53 端口」。代价是需要宿主机加载对应模块和 profile，容器里配了但宿主没装，等于没配。</p>
+  <p><b>user namespace</b> 解决的是最根本的那个问题：让容器里的 UID 0 映射到宿主机上的一个普通 UID（比如 100000）。这样即使容器内是 root、即使真有逃逸路径，攻击者在宿主机上也只是个无权限用户。Docker 有 userns-remap 选项；K8s 里较新版本提供 <span class="k">hostUsers: false</span>（具体可用性和行为以你集群版本为准）。</p>
+  <table>
+    <tr><th style="width:140px">手段</th><th>控制粒度</th><th>典型配法</th><th>失效/踩坑</th></tr>
+    <tr><td><b>seccomp</b></td><td>syscall 号 + 参数</td><td>RuntimeDefault 起步，核心服务用自定义 profile</td><td>profile 里没写 <span class="k">defaultAction</span> 或写错，整套规则不生效；兼容性问题在冷门 syscall 上</td></tr>
+    <tr><td><b>AppArmor</b></td><td>路径、网络、capability</td><td>宿主加载 profile，Pod 上用 annotation 或较新的 securityContext 字段引用</td><td>宿主没装 apparmor 模块；profile 名写错只在日志里报，Pod 照样起来</td></tr>
+    <tr><td><b>SELinux</b></td><td>标签（type enforcement）</td><td>OpenShift 默认开启，普通 K8s 要宿主配置</td><td>卷的标签不对会导致 Permission denied，看起来像权限 bug</td></tr>
+    <tr><td><b>user namespace</b></td><td>UID/GID 映射</td><td>Docker userns-remap；K8s hostUsers: false</td><td>开了之后部分挂载和网络能力受限，需要改应用的文件属主假设</td></tr>
+  </table>
+  <pre><span class="c"># 一个最小的 seccomp profile 结构（只允许默认动作 + 显式放行的 syscall）</span>
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "architectures": ["SCMP_ARCH_X86_64"],
+  "syscalls": [
+    { "names": ["read", "write", "openat", "close", "futex", "epoll_wait"],
+      "action": "SCMP_ACT_ALLOW" }
+  ]
+}
+
+<span class="c"># K8s 里引用：Pod 级设默认，容器级可以覆盖</span>
+securityContext:
+  seccompProfile:
+    type: Localhost
+    localhostProfile: profiles/api.json     <span class="c"># 相对 kubelet 的 seccomp 目录</span>
+
+<span class="c"># AppArmor：老版本用 annotation，较新版本有 securityContext 字段</span>
+metadata:
+  annotations:
+    container.apparmor.security.beta.kubernetes.io/api: localhost/api-profile
+
+<span class="c"># 在容器里验证这些机制到底有没有生效</span>
+cat /proc/self/status | grep -E 'Seccomp|NoNewPrivs|CapEff'
+capsh --print 2&gt;/dev/null | head -5
+cat /proc/self/attr/current     <span class="c"># AppArmor / SELinux 的当前标签</span></pre>
+  <p>为什么强调「用这三条命令验证」？因为这类机制有个共同特点：<b>配错了不会报错，Pod 照样能起来</b>。AppArmor 的 profile 名写错，只在节点日志里留一行警告；seccomp 的 localhostProfile 路径不对，kubelet 可能直接把 type 降级成 Unconfined。所以「YAML 里写了」和「实际生效了」是两件事，必须进容器里看 <span class="k">/proc/self/status</span>。</p>
+  <p>还有一个务实的判断：<b>这三样里，优先做 seccomp 的 RuntimeDefault</b>。它一行配置、几乎零兼容性成本、能挡掉大量已知利用链；AppArmor/SELinux 需要宿主配合，落地成本高；user namespace 的兼容性影响最大，适合对隔离要求特别高的场景（多租户、跑不可信代码）。</p>
+  <div class="callout warn">
+    <b>不要以为 seccomp 能替代最小权限。</b>它只过滤 syscall，一个被允许的 syscall 依然可以被滥用：允许 <span class="k">openat</span> 就允许打开任意路径（只要文件权限允许），允许 <span class="k">connect</span> 就允许连任意地址。所以 seccomp 是「减少可利用面」，不是「限制能访问什么」——后者要靠 AppArmor、NetworkPolicy 和文件权限。
+  </div>
+  <p><b>面试怎么答：</b>「这三个是不同层次的减法。seccomp 过滤系统调用，最实用的是设 RuntimeDefault，一行配置几乎不影响兼容性但能挡掉很多已知利用链；自定义 profile 要先 log 再收窄。AppArmor 和 SELinux 是路径级或标签级的强制访问控制，能力更强但需要宿主加载模块，配错了不会报错，得进容器看 /proc/self/attr/current。user namespace 是把容器内的 UID 0 映射到宿主的非特权 UID，从根上降低逃逸的后果，但兼容性影响最大。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>逃逸路径（一）：挂了 docker.sock，等于把宿主 root 递出去</h2></div>
+  <p class="lead">这是所有「逃逸」里最真实、最常见、也最容易被当成正常做法的一条。<b>它甚至不算逃逸</b>——因为挂载 docker.sock 的时候，你已经把宿主机的控制接口主动交出去了。</p>
+  <p>原理很直接：<span class="k">/var/run/docker.sock</span> 是 Docker daemon 的 Unix socket 接口。daemon 以 root 运行，能做任何事：创建容器、挂载任意宿主目录、读取任意文件。容器里挂了这个 socket，里面的进程就能通过它调用 Docker API——<b>而 Docker API 的权限等于 daemon 的权限，也就是宿主机 root</b>。</p>
+  <p>从「能调 API」到「拿到宿主文件系统」只有一步：创建一个新容器，把宿主机的 <span class="k">/</span> 挂到容器的 <span class="k">/host</span>，并且以 privileged 模式运行。然后在这个新容器里 <span class="k">chroot /host</span>，或者直接写宿主机的 <span class="k">/etc/cron.d</span>、<span class="k">/root/.ssh/authorized_keys</span>。整个过程不需要任何漏洞，全是 Docker 的正常功能。</p>
+  <pre><span class="c"># 从"能访问 socket"到"能操作宿主机"，用的都是 Docker 的正常 API</span>
+<span class="c"># 1. 确认 socket 在不在（在容器里执行）</span>
+ls -l /var/run/docker.sock
+
+<span class="c"># 2. 直接问 daemon：我是谁、有多少权限</span>
+curl -s --unix-socket /var/run/docker.sock http://localhost/version
+curl -s --unix-socket /var/run/docker.sock http://localhost/info | head -20
+
+<span class="c"># 3. 危险动作的本质：让 daemon 用 root 身份、按你的参数创建一个容器</span>
+<span class="c">#    POST /containers/create 可以指定 Privileged、Binds（宿主路径）、HostConfig</span>
+<span class="c">#    这就是"任意代码以 root 在宿主上执行"的等价物</span>
+
+<span class="c"># 为什么会有人这么挂：CI 里要构建镜像（docker-outside-of-docker）</span>
+<span class="c"># 正确的替代：用不需要 daemon 的构建工具，或者用隔离的构建节点</span>
+<span class="c">#   - kaniko / buildah / img：不需要 docker daemon，可以在非特权容器里构建</span>
+<span class="c">#   - rootless buildkit：以非 root 用户运行构建</span>
+<span class="c">#   - 独立的构建节点 + 短期凭证：构建和运行环境分离</span></pre>
+  <p>为什么这件事在 CI 里特别普遍？因为「在容器里构建镜像」需要一个 daemon。最省事的做法就是把宿主机 socket 挂进去，于是构建脚本能用 <span class="k">docker build</span>。代价是：<b>任何一次构建（包括来自 PR 的构建）都拥有了宿主机的 root</b>。一个恶意 PR 改一行 Dockerfile，就能在构建阶段拿到你的构建机，进而拿到构建机上的一切——包括制品仓库的凭证、部署用的 kubeconfig。</p>
+  <p>同类的接口还有几个，危险程度一样，只是不那么出名：<span class="k">containerd.sock</span>（containerd 的控制接口）、CRI 的 socket、以及 kubelet 的 10250 端口（如果能拿到 token，就能在节点上 exec 进任意容器）。所以「不给业务容器挂宿主 socket」这条规则，要扩展到「不挂任何容器运行时的控制接口」。</p>
+  <table>
+    <tr><th style="width:230px">接口</th><th>挂了之后能做什么</th><th>正确做法</th></tr>
+    <tr><td>/var/run/docker.sock</td><td>创建特权容器、挂载宿主根目录、读任意文件</td><td>换 kaniko/buildah/rootless buildkit；确实需要时用只读 API 代理，并放在隔离节点</td></tr>
+    <tr><td>/run/containerd/containerd.sock</td><td>直接操作容器和镜像，绕过上层编排</td><td>不要挂载；监控用 kubelet 的只读接口或 cAdvisor</td></tr>
+    <tr><td>kubelet 10250 + token</td><td>在节点上 exec、查看 Pod 日志、读挂载的 Secret</td><td>不要把节点 token 给业务；限制 10250 只对控制面开放</td></tr>
+    <tr><td>/proc（宿主）</td><td>读宿主进程内存、环境变量、命令行</td><td>只在明确需要时挂，且配合 hostPID 的替代方案（如 sidecar 采集）</td></tr>
+  </table>
+  <p>检测这件事很简单，但很多人不做：<b>扫一遍集群里所有 Pod 的 volume，看有没有 hostPath 指向 socket 路径</b>。这条规则应该进你的准入策略，因为它的危害是「一次配置，永久后门」——业务代码可能一辈子不碰这个 socket，但只要它在，任何一次 RCE 都直接升级成宿主 root。</p>
+  <div class="callout danger">
+    <b>「只读挂载 socket 就安全了」是错的。</b>Unix socket 的权限靠文件权限位控制，<span class="k">:ro</span> 只影响文件系统层的写，不影响通过 socket 发起的请求。你可以把 <span class="k">/var/run/docker.sock</span> 挂成只读，然后照样通过它创建特权容器——因为「写」发生在 daemon 那边，不在这个文件上。
+  </div>
+  <p><b>面试怎么答：</b>「挂 docker.sock 等于把宿主 root 交出去。因为 daemon 以 root 运行，容器里的进程能通过这个 socket 调 Docker API，而 API 能干的事包括创建一个挂载宿主根目录的特权容器——不需要任何漏洞，全是正常功能。CI 里最常见的场景是为了 build 镜像，正确做法是换 kaniko、buildah 或者 rootless buildkit。检测方法很简单：扫集群里所有 hostPath 挂载，看有没有指向 socket 的。注意挂成只读也没用，因为请求是 daemon 执行的。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>逃逸路径（二）：privileged、hostPath、宿主命名空间、capabilities</h2></div>
+  <p class="lead">这四条的共同点是：<b>它们都是 K8s 的合法配置项</b>。没有人需要「攻破」什么，只要 YAML 里多写一行，隔离就没了。所以面试问「容器怎么逃逸」，正确的答法不是讲漏洞，是讲<b>哪几个配置等于放弃了隔离</b>。</p>
+  <p><b>第一条：privileged: true。</b>它一次性做三件事——给容器全部 capabilities、关闭 seccomp 和 AppArmor 的默认限制、把宿主机所有设备暴露给容器。有了这些，容器里可以直接 <span class="k">mount /dev/sda1 /mnt</span> 把宿主根盘挂进来，然后读写宿主的任何文件。所以特权容器的安全性等于「一个以 root 运行的宿主进程」，唯一剩下的隔离是 namespace——而 namespace 对 mount 和设备的限制在特权模式下基本不成立。</p>
+  <p><b>第二条：hostPath。</b>把宿主的目录挂进容器，本身不是漏洞（很多 agent 需要），但挂什么是关键。挂 <span class="k">/</span> 等于全盘可写；挂 <span class="k">/etc</span> 可以改 crontab、ssh 配置、pam；挂 <span class="k">/var/lib/kubelet</span> 可以读所有 Pod 的挂载和凭据；挂 <span class="k">/proc</span> 或 <span class="k">/sys</span> 可以读内核状态、改内核参数。所以「hostPath 白名单」是必需的：只允许特定的、明确用途的路径，其它一律拒绝。</p>
+  <p><b>第三条：宿主命名空间（hostPID / hostNetwork / hostIPC）。</b>hostPID 让容器能看到宿主所有进程（<span class="k">ps aux</span> 能看到 kubelet、sshd、其他容器）；hostNetwork 让容器直接用宿主网络栈（能监听宿主端口、能访问 127.0.0.1 上的管理接口）；hostIPC 共享共享内存。单独看它们不一定能逃逸，但<b>hostPID 加 CAP_SYS_PTRACE 就能 ptrace 宿主进程、读它的内存、注入代码</b>，这是很经典的组合。</p>
+  <p><b>第四条：capabilities。</b>几十项里，有几项基本等于 root：</p>
+  <table>
+    <tr><th style="width:200px">capability</th><th>能做什么</th><th>为什么危险</th></tr>
+    <tr><td><b>CAP_SYS_ADMIN</b></td><td>mount、unshare、设置各种内核参数、操作 cgroup</td><td>公认的「新 root」，拿到它基本等于拿到宿主控制权</td></tr>
+    <tr><td><b>CAP_SYS_PTRACE</b></td><td>ptrace 任意进程，读内存、改寄存器</td><td>配合 hostPID 可以注入宿主进程</td></tr>
+    <tr><td><b>CAP_DAC_READ_SEARCH</b></td><td>绕过文件读权限检查</td><td>直接读 /etc/shadow、所有 Secret 挂载</td></tr>
+    <tr><td><b>CAP_NET_ADMIN</b></td><td>改路由、iptables、抓包、创建网卡</td><td>能劫持同节点其他 Pod 的流量</td></tr>
+    <tr><td><b>CAP_SYS_MODULE</b></td><td>加载内核模块</td><td>直接在内核里执行代码，等价于完全控制</td></tr>
+    <tr><td><b>CAP_SYS_RAWIO</b></td><td>直接访问设备 IO</td><td>读写裸磁盘，绕过文件系统</td></tr>
+  </table>
+  <p><b>关于内核漏洞这一类</b>，要给一个准确的定位：它是真实存在的，但不是主因。历史上出过 runc 通过 <span class="k">/proc/self/exe</span> 覆盖宿主 runc 二进制的漏洞（2019 年披露，攻击者先让容器内进程以写方式打开 <span class="k">/proc/self/exe</span>，等宿主执行 runc 时把二进制替换掉，从而在宿主上执行代码）；也出过滥用 cgroup 的 <span class="k">release_agent</span> 机制在容器内提权/逃逸的玩法（需要 CAP_SYS_ADMIN 或能写 cgroup 目录）；还有内核网络、文件系统子系统的各类提权问题。共同点是：<b>要么需要容器里有额外的权限，要么需要内核没打补丁</b>。所以「及时升级内核和运行时」是有效的，但优先级低于「别给多余权限」。</p>
+  <pre><span class="c"># 扫一遍集群：哪些 Pod 具备"基本等于宿主权限"的配置</span>
+kubectl get pods -A -o json | jq -r '
+  .items[] | select(
+    (.spec.hostPID == true) or
+    (.spec.hostNetwork == true) or
+    ([.spec.volumes[]?.hostPath.path] | any(. != null)) or
+    ([.spec.containers[]?.securityContext.privileged] | any(. == true)) or
+    ([.spec.containers[]?.securityContext.capabilities.add[]?] |
+       any(. == "SYS_ADMIN" or . == "SYS_PTRACE" or . == "SYS_MODULE" or . == "DAC_READ_SEARCH"))
+  ) | "\(.metadata.namespace)/\(.metadata.name)"'
+
+<span class="c"># 单个 Pod 的权限实况：进容器看，不要只看 YAML</span>
+kubectl exec -it POD -- sh -c 'id; cat /proc/self/status | grep CapEff; ls /dev | head'
+
+<span class="c"># CapEff 解码：把十六进制转成能力列表（需要 capsh）</span>
+capsh --decode=00000000a80425fb</pre>
+  <p>为什么强调「进容器看」？因为 YAML 和实际行为可能不一致：准入控制器可能注入了默认值，运行时可能因为配置错误忽略了某个字段，旧的 API 版本可能不支持某个字段。<b>唯一可信的证据是容器内部的 <span class="k">/proc/self/status</span> 和 <span class="k">id</span> 输出。</b></p>
+  <p>还有一个经常被忽略的组合：<b>hostPath + ServiceAccount token</b>。很多监控、日志 agent 会挂宿主目录并带一个 SA，如果这个 SA 有权读 Secret 或者能创建 Pod，那么「读到宿主文件」和「横向到整个集群」就连起来了。评估风险时不要单看一个配置，要看<b>这条链能走到哪</b>。</p>
+  <div class="callout danger">
+    <b>一句话判断表：</b>privileged = 宿主 root；hostPath 挂 / 或 /etc = 宿主 root；hostPID + CAP_SYS_PTRACE = 宿主 root；CAP_SYS_ADMIN = 基本等于宿主 root；挂 docker.sock = 宿主 root；挂 /var/lib/kubelet = 节点上所有 Pod 的凭据。这六条里出现任何一条，都不该出现在生产的多租户集群里。
+  </div>
+  <p><b>面试怎么答：</b>「逃逸路径我一般讲配置类的，因为它们才是主流。privileged 给全部 capabilities、关 seccomp 和 AppArmor、暴露所有设备，可以直接 mount 宿主盘；hostPath 挂 /、/etc、/var/lib/kubelet 分别对应全盘写、改启动项、拿节点上所有 Pod 的凭据；hostPID 加 CAP_SYS_PTRACE 可以 ptrace 宿主进程；CAP_SYS_ADMIN 等于半个 root，能 mount、能 unshare。内核漏洞这一类真实存在，比如 runc 通过 /proc/self/exe 覆盖宿主二进制，但前提通常是容器里有额外权限或者内核没打补丁，所以优先级低于收紧配置。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>RBAC 与 ServiceAccount：能创建 Pod，就能变成任何身份</h2></div>
+  <p class="lead">K8s 的 RBAC 有一个不明显但极其重要的性质：<b>「创建 Pod」这个权限，隐含了「使用任意 ServiceAccount」的能力</b>。因为 Pod 的 spec 里可以指定 <span class="k">serviceAccountName</span>，而创建 Pod 的人不需要对这个 SA 有额外权限。所以一个看起来无害的 <span class="k">create pods</span>，实际上是权限提升的入口。</p>
+  <p>先把四个对象说清，这是所有 RBAC 问题的基础：<b>Role</b> 是命名空间内的一组权限规则；<b>ClusterRole</b> 是集群范围的规则（也可以被 RoleBinding 引用来授予命名空间内的权限）；<b>RoleBinding</b> 把 Role 或 ClusterRole 绑到「主体」（User、Group、ServiceAccount），作用域是它所在的命名空间；<b>ClusterRoleBinding</b> 把 ClusterRole 绑到主体，作用域是整个集群。</p>
+  <table>
+    <tr><th style="width:200px">权限</th><th>看起来</th><th>实际能做什么</th></tr>
+    <tr><td><b>create pods</b></td><td>只是建个 Pod</td><td>可以指定任意 serviceAccountName、可以挂 hostPath、可以开 privileged（如果准入不拦）。等于「用别人的身份运行代码」</td></tr>
+    <tr><td><b>create pods/exec</b></td><td>只是进容器排查</td><td>能进任何 Pod 执行命令，读到它的环境变量、挂载的 token 和 Secret</td></tr>
+    <tr><td><b>get / list secrets</b></td><td>只是读配置</td><td>全命名空间的所有凭证，包括数据库密码、第三方 API key</td></tr>
+    <tr><td><b>create rolebindings</b></td><td>只是分配权限</td><td>可以把自己或自己的 SA 绑到 cluster-admin，等于自助提权</td></tr>
+    <tr><td><b>escalate / bind</b></td><td>看起来是元权限</td><td>绕过「不能授予超过自己权限」的检查，直接创建更高权限的 Role</td></tr>
+    <tr><td><b>impersonate</b></td><td>只是"以某人身份调试"</td><td>可以变成 system:admin 或任何 SA，完全绕过 RBAC</td></tr>
+    <tr><td><b>create daemonsets</b></td><td>只是部署 agent</td><td>在每个节点上跑特权容器，等于拿到所有节点</td></tr>
+  </table>
+  <p>ServiceAccount 的机制也要说清：每个 namespace 都有一个 <span class="k">default</span> SA；Pod 不指定就用它；它的 token 会被自动挂载到容器里（新版本用 projected volume，token 有时效、绑定 audience，比老版本的长效 Secret 好很多）。所以「Pod 里能读到 token」是默认行为，要关掉得显式设 <span class="k">automountServiceAccountToken: false</span>。</p>
+  <p>这就带来一条很硬的规则：<b>不要给 default SA 任何权限</b>。因为所有没显式指定 SA 的 Pod 都用它，一旦它有权，等于整个 namespace 的每个 Pod 都有权。正确的做法是每个工作负载一个专用 SA，权限精确到需要的资源和动词，最好用 <span class="k">resourceNames</span> 精确到具体对象。</p>
+  <pre><span class="c"># 专用 SA + 最小权限 + 关闭自动挂载</span>
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: api-sa, namespace: prod}
+automountServiceAccountToken: false      <span class="c"># 不需要调 apiserver 就别挂</span>
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: config-reader, namespace: prod}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["api-config"]         <span class="c"># 精确到具体对象，不要用 *</span>
+    verbs: ["get"]
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: api-config-reader, namespace: prod}
+subjects:
+  - {kind: ServiceAccount, name: api-sa, namespace: prod}
+roleRef: {kind: Role, name: config-reader, apiGroup: rbac.authorization.k8s.io}
+
+<span class="c"># 审计：这个 SA 到底能干什么（比读 YAML 可靠）</span>
+kubectl auth can-i --list --as=system:serviceaccount:prod:api-sa -n prod
+kubectl auth can-i create pods --as=system:serviceaccount:prod:api-sa -n prod
+
+<span class="c"># 找集群里所有 cluster-admin 的绑定（应该非常少）</span>
+kubectl get clusterrolebindings -o json | jq -r '
+  .items[] | select(.roleRef.name=="cluster-admin") |
+  "\(.metadata.name): \([.subjects[]? | "\(.kind)/\(.namespace // "-")/\(.name)"])"'</pre>
+  <p><span class="k">kubectl auth can-i --list --as=...</span> 这个命令的价值很高，因为它<b>走的是真实的鉴权链路</b>，会把 Role、ClusterRole、aggregation、内置的 system 规则全部算进去，比人肉读 YAML 准确得多。审计 RBAC 的时候，先跑这个，再决定要不要改。</p>
+  <p>多租户隔离是另一个常见问题。namespace 本身<b>不是</b>安全边界：默认情况下，跨 namespace 的网络是通的，Pod 能访问的 API 取决于 RBAC，节点是共享的（所以 hostPath 能跨租户读文件）。要做真正的多租户，至少需要：每个租户独立的 namespace + ResourceQuota + 默认拒绝的 NetworkPolicy + 严格的 RBAC + 禁止 hostPath/privileged/host 命名空间（靠准入策略）；要求更高就得独立集群或独立节点池。</p>
+  <div class="callout warn">
+    <b>「CI 的 SA 需要能部署，所以给 cluster-admin 吧」——这是最常见的错误决定。</b>部署需要的是「对特定 namespace 的 Deployment、Service、ConfigMap 有 create/update/patch」，不是全集群。给 cluster-admin 之后，这个 SA 能读所有 Secret、能创建特权 Pod、能改 RBAC；而它的 token 就存在 CI 系统的环境变量里，是整条链上最容易泄露的东西。
+  </div>
+  <p><b>面试怎么答：</b>「RBAC 有个关键性质：create pods 隐含了使用任意 ServiceAccount 的能力，所以它等于权限提升的入口。审计时我会看几类高危权限：create pods、pods/exec、get secrets、create rolebindings、escalate/bind、impersonate，这几个任意一个有，基本就是集群级风险。实践上不给 default SA 任何权限、每个工作负载一个专用 SA、不需要调 apiserver 就关掉 automountServiceAccountToken、用 resourceNames 精确到对象。审计用 kubectl auth can-i --list --as=... 走真实鉴权链路，比读 YAML 准。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>Secret：默认只是 base64，不是加密</h2></div>
+  <p class="lead">这一节只有一句必须记住的话：<b>K8s 的 Secret 默认只是 base64 编码，etcd 里存的是明文。</b>base64 是编码不是加密，一行命令就能解开。所以「用了 Secret 就安全了」这个假设是错的。</p>
+  <p>为什么默认不加密？因为加密要配密钥、要管密钥轮换、要考虑性能，而 K8s 希望开箱可用。加密需要显式开启：给 apiserver 配 <span class="k">EncryptionConfiguration</span>，指定哪些资源要加密、用什么 provider。注意 provider 列表的顺序很重要——<b>第一个是写入用的，所有列出的都用于读</b>，所以加密 provider 必须排在 <span class="k">identity</span> 前面，否则新写入的数据还是明文。</p>
+  <pre><span class="c"># apiserver 的加密配置（provider 顺序就是优先级，identity 必须放最后）</span>
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+resources:
+  - resources: ["secrets"]
+    providers:
+      - kms:
+          apiVersion: v2
+          name: app-key
+          endpoint: unix:///var/run/kms-plugin/socket
+      - aescbc:
+          keys:
+            - {name: key1, secret: &lt;base64 的 32 字节密钥&gt;}
+      - identity: {}          <span class="c"># 兜底：读旧数据用，绝不能放第一个</span>
+
+<span class="c"># 验证 etcd 里到底是不是明文（在控制面节点上，用 etcdctl 读原始值）</span>
+ETCDCTL_API=3 etcdctl get /registry/secrets/prod/db-password \
+  --cacert=ca.crt --cert=server.crt --key=server.key | head -c 200
+
+<span class="c"># Secret 就是 base64，解开就是明文</span>
+kubectl get secret db-password -n prod -o jsonpath='{.data.password}' | base64 -d</pre>
+  <p>「谁能读到 Secret」这个问题，答案比大多数人想的宽：有 <span class="k">get secrets</span> 权限的 SA；能访问 etcd 的人（包括 etcd 的备份文件）；能 <span class="k">exec</span> 进任何挂了该 Secret 的 Pod 的人；能创建 Pod 并挂载该 Secret 的人（这条最容易被忽略，因为它绕过了对 Secret 的直接读权限）；以及能读节点上 kubelet 目录的人。</p>
+  <p>另一个细节是<b>环境变量 vs 卷挂载</b>。把 Secret 注入成环境变量很方便，但环境变量会出现在 <span class="k">/proc/1/environ</span>（同容器内其他进程可读）、会被子进程继承、可能被打进崩溃 dump 或错误日志。用卷挂载更好：文件权限可控、更新时能自动刷新（有一定延迟）、不会被子进程继承。当然最好的方式是<b>根本不让应用看到长期凭证</b>——用工作负载身份（如云上的 IAM 角色绑定到 SA）换取短期凭证。</p>
+  <table>
+    <tr><th style="width:200px">做法</th><th>解决什么</th><th>局限</th></tr>
+    <tr><td><b>开启 etcd 静态加密</b></td><td>etcd 磁盘或备份被拿走时，内容不可读</td><td>不防「有 API 读权限」和「能 exec 进 Pod」</td></tr>
+    <tr><td><b>RBAC 收紧到 resourceNames</b></td><td>只允许读某一个 Secret，而不是全部</td><td>很多 operator 需要 list，收紧会破坏功能</td></tr>
+    <tr><td><b>外部密钥管理（Vault + CSI / External Secrets）</b></td><td>密钥不落在 etcd 里，支持轮换和审计</td><td>多一个依赖，故障时可能起不来（要设计降级）</td></tr>
+    <tr><td><b>Sealed Secrets / SOPS</b></td><td>可以安全地把加密后的 Secret 提交到 Git</td><td>解密密钥仍在集群里，属于「换了个地方存」</td></tr>
+    <tr><td><b>工作负载身份（短期凭证）</b></td><td>应用根本不持有长期密钥</td><td>依赖云厂商或 SPIFFE 这类体系，改造成本高</td></tr>
+    <tr><td><b>审计日志</b></td><td>记录「谁在什么时候读了哪个 Secret」</td><td>只能事后发现，不能阻止；而且审计日志本身要保护</td></tr>
+  </table>
+  <p>还有一个经常被忽略的泄露渠道：<b>Secret 会出现在 kubectl 的输出、CI 的日志、以及各种「一键导出集群配置」的脚本里</b>。所以除了技术控制，还要有流程控制：CI 日志里禁止打印 Secret、导出配置的脚本要过滤 Secret、审计日志要单独存储并限制访问。</p>
+  <div class="callout danger">
+    <b>「我们用了 Secret，所以密码是加密的」这句话在面试里是扣分项。</b>准确说法是：Secret 是「把凭证和镜像解耦、便于挂载和 RBAC 控制」的对象，默认不加密；要加密必须开 EncryptionConfiguration 或引入外部密钥管理；而且加密只保护「存储介质被拿走」这一种场景，不保护「有人有读权限」。
+  </div>
+  <p><b>面试怎么答：</b>「Secret 默认只是 base64，etcd 里是明文。要加密得配 EncryptionConfiguration，注意 provider 的顺序——第一个用于写，identity 必须放最后，否则新数据还是明文。谁能读到 Secret 这件事比想象的宽：有 get 权限的 SA、能访问 etcd 的人、能 exec 进 Pod 的人、能创建 Pod 挂载它的人。实践上用卷挂载而不是环境变量，RBAC 用 resourceNames 精确到对象，更好的做法是用外部密钥管理或者工作负载身份，让应用根本不持有长期凭证。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>NetworkPolicy：写了不等于生效，默认是全通</h2></div>
+  <p class="lead">K8s 的网络默认是<b>全通</b>：任何 Pod 能访问任何 Pod，能访问任何外部地址。这符合「先能跑起来」的设计目标，也意味着「零信任」必须手动建。而建的第一步，是先确认你的 CNI 到底支不支持。</p>
+  <p>NetworkPolicy 是 K8s 的 API 对象，但<b>它只是声明，执行在网络插件里</b>。Calico、Cilium、Antrea、Weave 这些支持；flannel 不支持（旧版本会静默忽略，Pod 照常全通）。所以「我写了 NetworkPolicy，为什么还是能通」的第一嫌疑永远是 CNI。</p>
+  <p>策略的语义有三个容易搞错的点。<b>第一，它是白名单</b>：一旦某个 Pod 被某个策略的 <span class="k">podSelector</span> 选中，并且策略里声明了 <span class="k">Ingress</span>，那么只有被 <span class="k">ingress.from</span> 允许的来源才能进，其他一律拒绝。<b>第二，多个策略是并集</b>：如果两个策略都选中同一个 Pod，允许的集合是两者之和，不是交集——所以「加一个更严的策略」不会让访问变少，只会变多。<b>第三，egress 默认也是全允许</b>：只配 ingress 不配 egress，Pod 照样能把数据传出去。</p>
+  <table>
+    <tr><th style="width:170px">常见写法</th><th>效果</th><th>坑</th></tr>
+    <tr><td>podSelector: {} + policyTypes: [Ingress]</td><td>选中命名空间内所有 Pod，拒绝所有入站</td><td>这是「默认拒绝」的标准写法，但会把 DNS 之外的探测也拒掉，要先放行必要流量</td></tr>
+    <tr><td>namespaceSelector + podSelector</td><td>只允许特定命名空间的特定 Pod</td><td>两个 selector 写在同一个 from 元素里是「与」，写在两个元素里是「或」——差一个缩进就是完全不同的语义</td></tr>
+    <tr><td>ipBlock</td><td>按 CIDR 放行外部地址</td><td>它不受 namespace 约束；云上的 NAT 会让来源 IP 变成节点 IP，规则可能失效</td></tr>
+    <tr><td>只配 Ingress</td><td>挡住了进来的</td><td>出去的没管：被攻陷的 Pod 照样能把数据传到公网，或者扫内网</td></tr>
+  </table>
+  <pre><span class="c"># 第一步：默认拒绝所有入站（选中命名空间里所有 Pod）</span>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny-ingress, namespace: prod}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+
+<span class="c"># 第二步：放行 DNS（拒绝 egress 之后最容易忘的一步）</span>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-dns, namespace: prod}
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+
+<span class="c"># 第三步：只允许 api 这个 Pod 接受来自 web 的 8080 端口</span>
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: api-from-web, namespace: prod}
+spec:
+  podSelector:
+    matchLabels: {app: api}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: web}     <span class="c"># 同命名空间内的 web</span>
+      ports:
+        - {protocol: TCP, port: 8080}
+
+<span class="c"># 验证：策略是否真的下发到了数据面（各 CNI 工具不同，以你环境为准）</span>
+kubectl get networkpolicy -A
+kubectl describe networkpolicy api-from-web -n prod</pre>
+  <p>那个「DNS 忘了放行」的坑值得单独说，因为它的现象很有迷惑性：Pod 起来了、日志里全是「dial tcp: lookup db.internal: no such host」，看起来像 DNS 服务坏了或者 Service 名字写错了，实际上是 egress 被拒。而且如果应用有本地缓存，可能要过一会儿才暴露，更难排查。<b>所以拒绝 egress 的第一条放行规则，一定是 DNS。</b></p>
+  <p>还有一个容易被忘的限制：<b>NetworkPolicy 管不到 hostNetwork 的 Pod</b>。因为这类 Pod 直接用宿主网络栈，流量不经过 CNI 的策略点。所以「我的策略很严」这句话，在存在 hostNetwork Pod 的时候要打个折扣。同理，节点上的 kubelet、apiserver 到 Pod 的流量（比如 exec、logs）也可能绕开策略。</p>
+  <div class="callout ok">
+    <b>落地顺序：</b>① 先确认 CNI 支持（不支持就换 CNI，别浪费时间）；② 全集群上 <span class="k">default-deny-ingress</span>，观察一两天，看哪些流量断了——断掉的每一条都是「你原来不知道存在的依赖」，这是很好的资产梳理；③ 逐条放行，用「谁需要访问谁」的模型，而不是「先全通再收紧」；④ 加 egress 的默认拒绝，先放行 DNS 和必要的出网；⑤ 把策略写进 Helm chart 或者 Kustomize，让它和 Deployment 一起版本化。
+  </div>
+  <p><b>面试怎么答：</b>「K8s 网络默认全通，NetworkPolicy 是白名单语义，一旦某个 Pod 被选中，只有显式允许的流量能进。三个容易错的地方：多个策略是并集不是交集，所以加策略只会放宽；egress 默认也全允许，只配 ingress 等于没管出网；拒绝 egress 之后必须放行 DNS，否则现象是域名解析失败，看起来像 DNS 故障。另外 NetworkPolicy 需要 CNI 支持，flannel 不支持只是静默忽略，还有它对 hostNetwork 的 Pod 无效。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>审计与运行时检测：从「防不住」到「发现得快」</h2></div>
+  <p class="lead">前面九节都在讲「怎么让它进不来」。这一节讲另一半：<b>假设它已经进来了，你怎么在十分钟内知道</b>。安全能力的成熟度，很大程度体现在这一半上。</p>
+  <p>K8s 的审计日志在 apiserver 侧，记录每一个 API 请求：谁（user/SA）、做了什么（verb + resource）、对什么对象、结果如何。审计策略（AuditPolicy）决定记录级别：<span class="k">None</span> 不记、<span class="k">Metadata</span> 只记元信息、<span class="k">Request</span> 记请求体、<span class="k">RequestResponse</span> 连响应体也记。级别越高越有用，也越贵（尤其是 Secret 的响应体，等于把明文写进日志）。</p>
+  <table>
+    <tr><th style="width:230px">该重点监控的事件</th><th>为什么</th></tr>
+    <tr><td>pods/exec 和 pods/attach</td><td>「进容器」是横向移动的第一步，正常情况下应该很少，且集中在少数人</td></tr>
+    <tr><td>创建 privileged / hostPath / hostPID 的 Pod</td><td>这是逃逸的前置动作，正常业务几乎不需要</td></tr>
+    <tr><td>get / list secrets（尤其是批量）</td><td>凭证窃取的典型特征，正常应用不应该 list 全量 Secret</td></tr>
+    <tr><td>创建 ClusterRoleBinding、修改 Role</td><td>提权的直接手段</td></tr>
+    <tr><td>匿名或异常 User-Agent 的请求</td><td>扫描器、未授权访问的探测</td></tr>
+    <tr><td>ServiceAccount token 在集群外被使用</td><td>token 泄露的最强信号（需要结合 source IP 判断）</td></tr>
+  </table>
+  <p><b>运行时检测</b>是另一半。审计日志只看得到「对 apiserver 的动作」，看不到「容器里发生了什么」。要看容器内部行为，需要在节点上采集系统调用。Falco 是这类工具里最有代表性的：它用内核模块或 eBPF 采集 syscall，用规则做匹配，命中就告警。Tetragon 也是 eBPF 路线，能力更偏「可观测 + 阻断」。</p>
+  <pre><span class="c"># Falco 规则的形状：条件 + 输出 + 优先级</span>
+- rule: Shell Spawned in Container
+  desc: 容器里出现交互式 shell，正常业务镜像不应该有
+  condition: &gt;
+    evt.type = execve and evt.dir = &lt;
+    and container.id != host
+    and proc.name in (bash, sh, dash, zsh)
+  output: "Shell in container (user=%user.name container=%container.name cmd=%proc.cmdline)"
+  priority: WARNING
+  tags: [container, shell]
+
+<span class="c"># 另外几条高价值规则（思路，不是完整配置）</span>
+<span class="c"># - 写入 /etc、/bin、/usr/bin（容器内不该写这些路径）</span>
+<span class="c"># - 读取 /etc/shadow 或 SA token 目录</span>
+<span class="c"># - 在容器内 mount、ptrace、加载内核模块</span>
+<span class="c"># - 容器进程发起对外连接（尤其是非常规端口）</span>
+
+<span class="c"># 主机侧基线：CIS 检查（kube-bench），看控制面和节点配置是否符合基线</span>
+kube-bench run --targets master,node
+
+<span class="c"># 审计日志里捞"谁 exec 进了 Pod"</span>
+<span class="c"># jq 过滤 audit log：verb=create, resource=pods/exec</span>
+jq -r 'select(.verb=="create" and .objectRef.subresource=="exec")
+       | "\(.requestReceivedTimestamp) \(.user.username) \(.objectRef.namespace)/\(.objectRef.name)"' audit.log</pre>
+  <p>检测的难点不是「装不上工具」，是<b>告警疲劳</b>。一个规则如果每天报 500 次，一周之后所有人都会忽略它。所以有效的做法是：<b>先上高置信度的少数规则</b>（容器里起 shell、写 /etc、特权容器启动、读 shadow），把误报调到接近零；再逐步加规则。同时要给规则分优先级，<b>真正能自动响应的只有极少数</b>，其余进工单或者日报。</p>
+  <p>应急响应的顺序也值得背下来，因为它和普通故障排查不一样：<b>先隔离，再取证，最后清理</b>。隔离包括：把节点 cordon 掉、给 Pod 加一条拒绝所有流量的 NetworkPolicy、吊销相关 SA 的 token（删掉 SA 或者轮换 bound token）。取证包括：<b>不要直接删 Pod</b>，先 <span class="k">kubectl debug</span> 或者对容器做快照、导出日志、导出 <span class="k">/proc</span> 信息。<b>删掉 Pod 等于销毁现场</b>，这是应急里最常见的错误。</p>
+  <div class="callout warn">
+    <b>一个反直觉的点：容器被攻陷后，重启不一定能清除。</b>如果攻击者写的是挂载的宿主目录（hostPath）、或者用了 SA token 在集群里创建了新的后门资源（新的 SA、新的 CronJob、新的 webhook），那你重启业务 Pod 完全没用。所以应急时要检查的不只是这个容器，还有<b>它的身份做过什么</b>——用审计日志把这个 SA 最近的所有 API 调用拉出来。
+  </div>
+  <p><b>面试怎么答：</b>「审计和检测是两个面。apiserver 的审计日志能回答『谁对集群做了什么』，重点看 pods/exec、创建特权 Pod、批量读 Secret、改 RBAC 这几类。容器内部的行为要靠运行时检测，Falco 这类工具用 eBPF 或内核模块采集 syscall，规则比如『容器里起 shell』『写 /etc』『读 shadow』。落地时先上高置信度的少量规则，避免告警疲劳。应急顺序是先隔离、再取证、最后清理，特别注意不要直接删 Pod——那等于销毁现场，而且如果攻击者用 SA token 在集群里留了后门，重启业务容器是没用的。」</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">模块 11</span><h2>9 个坑：都是「多给了一点」</h2></div>
+  <p class="lead">这一节的坑有一个统一的形状：<b>为了方便，多给了一项权限</b>。而容器安全的特点是这个「一点」会被放大——因为共享内核，一个配置项的后果往往是整台机器，而不是一个进程。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">排查问题时加 privileged，事后忘了删</div><div class="pd">特权容器等于宿主 root：全部 capabilities、seccomp 和 AppArmor 关闭、所有设备可见。这类「临时配置」必须有到期机制，或者干脆用 ephemeral container 代替改 spec。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">给 CI 挂 docker.sock 来 build 镜像</div><div class="pd">等于把构建机的 root 交给每一次构建，包括来自外部 PR 的构建。用 kaniko、buildah、rootless buildkit 替代；确实需要 daemon 就用独立的一次性构建节点。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">给 default ServiceAccount 绑权限</div><div class="pd">namespace 里所有没指定 SA 的 Pod 都用它，等于每个 Pod 都有这个权限。每个工作负载一个专用 SA，权限精确到 resourceNames。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">镜像用 :latest 或浮动 tag</div><div class="pd">同一个名字在不同时间是不同内容，出问题无法复现，审计无法证明跑的是哪个版本，回滚也可能回到一个陌生的镜像。用 digest。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把密钥写进 Dockerfile，再用 RUN rm 删掉</div><div class="pd">镜像层是不可变的，后续删除只是在上面加一层「白障」，原层里的密钥还在，docker history 和解包都能看到。用构建期 secret 挂载或运行时注入。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">只 drop 了 capabilities，但仍然以 root 运行</div><div class="pd">capabilities 管的是特权操作，管不了 UID 0 的文件所有权和读权限。必须 runAsNonRoot 加 drop ALL 一起用，缺一半等于漏一半。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">写了 NetworkPolicy，但 CNI 不支持</div><div class="pd">flannel 会静默忽略策略对象，Pod 照常全通。你会以为网络已经隔离了，实际上一点没变。上线前用「应该被拒的访问」验证一次。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">拒绝 egress 之后忘了放行 DNS</div><div class="pd">现象是域名解析失败，看起来像 DNS 或 Service 名字的问题，实际是策略拦的。拒绝 egress 的第一条放行规则必须是 kube-system 的 53 端口。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">以为 Secret 是加密的</div><div class="pd">默认只是 base64，etcd 里明文。要加密得开 EncryptionConfiguration（注意 identity 放在最后），而且加密只防「介质被拿走」，不防「有人有读权限」。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个「发现到修复」的完整故事。比如「我们做集群审计，扫出来 17 个 Pod 挂了 hostPath 到 /var/lib/kubelet，都是早期部署的日志 agent。这个路径能读到节点上所有 Pod 的挂载和 token，等于一个有特权的旁路。做法是先给这些 agent 换成专用的只读接口，然后上准入策略禁止除白名单外的 hostPath，最后把 default SA 的权限全清掉，改成每个工作负载独立 SA。这件事之后我在评审新服务时会固定问一句：这个 Pod 需要哪些权限，能不能再少一点。」</p>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 为什么说「容器不是安全边界」？</div>
+      <button class="opt">因为容器的镜像可以被篡改</button>
+      <button class="opt">因为容器与宿主机共享同一个内核，namespace 和 cgroup 提供的是视图与资源隔离，不阻止通过内核或特权路径访问宿主</button>
+      <button class="opt">因为容器的网络默认是通的</button>
+      <button class="opt">因为 Docker 的默认配置不安全</button>
+      <div class="ans">正确答案：<b>共享内核</b>。容器不是虚拟化，它没有 hypervisor 那一层硬件隔离，所有容器和宿主机跑在同一个内核上。namespace 只隔离「看得见什么」，cgroup 只限制「能用多少」，两者都不阻止进程通过内核接口、设备、挂载等路径触及宿主资源。所以一旦容器内有额外权限（privileged、CAP_SYS_ADMIN、hostPath）或者内核有漏洞，隔离就可以被绕过。需要强隔离时用 gVisor、Kata 这类方案。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 把一个容器的 /var/run/docker.sock 挂进容器，最严重的后果是什么？</div>
+      <button class="opt">容器内的进程可以删除宿主上的镜像，浪费磁盘</button>
+      <button class="opt">容器内的进程可以通过 Docker API 创建挂载宿主根目录的特权容器，等价于获得宿主机 root</button>
+      <button class="opt">容器的启动速度会变慢</button>
+      <button class="opt">会导致 docker daemon 崩溃</button>
+      <div class="ans">正确答案：<b>等价宿主 root</b>。docker.sock 是 daemon 的控制接口，daemon 以 root 运行，而 API 支持指定 privileged、Binds（宿主路径）等参数。所以「能调 API」直接等于「能以 root 在宿主上执行任意操作」，不需要任何漏洞。挂成只读也没用，因为请求是由 daemon 执行的。正确替代是 kaniko、buildah、rootless buildkit 这类不需要 daemon 的构建方式。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 关于 privileged: true，下面哪个描述是准确的？</div>
+      <button class="opt">它只是把 CPU 和内存限制放开</button>
+      <button class="opt">它只影响容器的网络权限</button>
+      <button class="opt">它只给 CAP_SYS_ADMIN 一项能力</button>
+      <button class="opt">它给容器全部 capabilities、关闭 seccomp 与 AppArmor 的默认限制、并暴露宿主机所有设备</button>
+      <div class="ans">正确答案：<b>三件事一起发生</b>。特权容器获得全部 capabilities、绕过 LSM 的默认限制、能访问 /dev 下所有设备，因此可以直接 mount 宿主磁盘、读写宿主文件系统。它不是「资源限制放开」，而是「隔离基本失效」。这也是为什么临时加 privileged 排查问题后必须删掉——它留下的不是便利，是一个宿主级的后门。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于 NetworkPolicy，下面哪个说法是对的？</div>
+      <button class="opt">它是白名单语义，一旦某 Pod 被策略选中并声明了 Ingress，只有显式允许的来源能进；多个策略之间是并集，且需要 CNI 支持才生效</button>
+      <button class="opt">它是黑名单语义，写了 deny 才会拒绝</button>
+      <button class="opt">多个策略叠加时取交集，所以加策略一定更安全</button>
+      <button class="opt">它是 K8s 内置功能，任何 CNI 都能执行</button>
+      <div class="ans">正确答案：<b>白名单 + 并集 + 依赖 CNI</b>。NetworkPolicy 是声明式对象，实际执行在网络插件里，flannel 不支持时会静默忽略，Pod 照常全通。它的语义是：被选中且声明了 Ingress 的 Pod，只接受 from 里允许的来源。多个策略作用于同一 Pod 时取并集，所以「再加一条更严的策略」不会让访问更少。另外 egress 默认也是全允许，只配 ingress 等于没管出网。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 关于 Kubernetes Secret，下面哪个说法是对的？</div>
+      <button class="opt">Secret 默认在 etcd 中是加密存储的，只有有权限的人能解密</button>
+      <button class="opt">Secret 默认只是 base64 编码，etcd 中是明文；要加密需要配置 EncryptionConfiguration，且 identity provider 应放在列表最后</button>
+      <button class="opt">Secret 一旦创建就无法被任何 ServiceAccount 读取</button>
+      <button class="opt">把 Secret 注入成环境变量比挂载成卷更安全</button>
+      <div class="ans">正确答案：<b>base64 不是加密</b>。默认情况下 Secret 的 data 只是 base64 编码，etcd 里存的是明文，一行 base64 -d 就能解开。开启静态加密要配 EncryptionConfiguration，其中 provider 的顺序很关键：第一个用于写入，列出的都用于读，所以 identity 必须放最后，否则新写入的数据仍然是明文。另外环境变量会出现在 /proc/1/environ 并被子进程继承，卷挂载更可控。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 一个 ServiceAccount 只有 <span class="k">create pods</span> 权限（在某个 namespace 内），为什么这仍然是高风险？</div>
+      <button class="opt">因为创建 Pod 会消耗大量 CPU</button>
+      <button class="opt">因为 create pods 可以删除其他 Pod</button>
+      <button class="opt">因为 Pod 的 spec 里可以指定任意 serviceAccountName，也可以挂 hostPath 或开 privileged（若准入不拦），等于用别人的身份运行代码</button>
+      <button class="opt">因为 create pods 会自动获得 cluster-admin</button>
+      <div class="ans">正确答案：<b>它是权限提升的入口</b>。创建 Pod 时不需要对目标 ServiceAccount 有任何权限，所以只要能建 Pod，就能以任意 SA 的身份运行代码，从而拿到那个 SA 的 token 和权限；同时还能指定 hostPath、hostPID、privileged（如果准入控制不拦）。这也是为什么 create daemonsets 更危险——它能在每个节点上这么做。审计 RBAC 时，create pods、pods/exec、get secrets、create rolebindings、escalate/bind、impersonate 都属于高危权限。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:210px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>共享内核</b></td><td>容器与宿主用同一个内核，这是容器所有风险面的根源</td></tr>
+    <tr><td><b>namespace</b></td><td>视图隔离（PID、网络、挂载、IPC、user），不阻止对内核的调用</td></tr>
+    <tr><td><b>capabilities</b></td><td>把 root 特权拆成细项；CAP_SYS_ADMIN 基本等于半个 root</td></tr>
+    <tr><td><b>seccomp</b></td><td>按 syscall 过滤；RuntimeDefault 是性价比最高的一步</td></tr>
+    <tr><td><b>AppArmor / SELinux</b></td><td>路径级 / 标签级的强制访问控制，需要宿主加载模块才生效</td></tr>
+    <tr><td><b>user namespace</b></td><td>把容器内 UID 0 映射到宿主非特权 UID，从根上降低逃逸后果</td></tr>
+    <tr><td><b>privileged</b></td><td>全部 capabilities + 关闭 LSM 默认限制 + 暴露所有设备，等于宿主 root</td></tr>
+    <tr><td><b>hostPath</b></td><td>把宿主目录挂进容器；挂 /、/etc、/var/lib/kubelet 都是高危</td></tr>
+    <tr><td><b>docker.sock</b></td><td>Docker daemon 控制接口，挂进容器等于交出宿主 root</td></tr>
+    <tr><td><b>Pod Security Standards</b></td><td>privileged / baseline / restricted 三档，用命名空间标签强制</td></tr>
+    <tr><td><b>ServiceAccount token</b></td><td>Pod 访问 apiserver 的身份凭证，默认自动挂载，可关掉</td></tr>
+    <tr><td><b>cluster-admin</b></td><td>全集群最高权限，能读所有 Secret、创建特权 Pod、改 RBAC</td></tr>
+    <tr><td><b>EncryptionConfiguration</b></td><td>apiserver 的静态加密配置，provider 顺序决定写入用哪个</td></tr>
+    <tr><td><b>NetworkPolicy</b></td><td>白名单语义的网络策略，多策略取并集，需要 CNI 支持</td></tr>
+    <tr><td><b>审计日志</b></td><td>apiserver 记录谁做了什么，重点看 exec、特权 Pod、读 Secret、改 RBAC</td></tr>
+    <tr><td><b>Falco</b></td><td>基于 syscall 的运行时检测，规则如「容器里起 shell」「写 /etc」</td></tr>
+    <tr><td><b>kube-bench</b></td><td>按 CIS 基线检查控制面和节点配置</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个 kind 或 minikube 集群，部署一个普通 Pod，进容器执行 <span class="k">id</span>、<span class="k">cat /proc/self/status | grep CapEff</span>、<span class="k">touch /test</span>，然后把 securityContext 按这一篇配一遍，再执行同样的三条命令，对比差异——这个对比会让「加固到底改了什么」变得具体。② 给一个 Pod 加 hostPath 挂 /etc，试试能不能写进去，再写一条准入策略拦住它，体会「配置 vs 强制」的区别。③ 用审计日志 + 一条 Falco 规则，观察「kubectl exec 进 Pod」会不会被记录下来，把「检测链路」自己走通一次。<br><br>
+    <b>之后值得单独学：</b>第 08 期讲 Docker 的镜像分层与 namespace/cgroup 原理，是这一篇的地基；第 10 期讲 K8s 的核心对象与控制器，能解释为什么 RBAC 的权限会在控制器之间传递；第 12 期讲 K8s 网络，会把 NetworkPolicy 的执行点（CNI、kube-proxy、iptables/eBPF）讲清楚；第 21 期讲故障处理，其中的应急流程可以直接套用到安全事件的响应上。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 34 期 · 真实的安全事件很少是「被攻破」，多数是「本来就没锁」</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

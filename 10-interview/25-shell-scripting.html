@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shell 脚本面试：手写题、健壮性与那些致命坑</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 25 期</span>
+    <h1>Shell 脚本面试：手写题、健壮性与那些致命坑</h1>
+    <p class="sub"><span class="k">set -euo pipefail</span> 不是万能药，<span class="k">$@</span> 和 <span class="k">$*</span> 差一个引号就能吃掉你的参数——脚本题的分数，全在边界上。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>8</b> 道手写题</span>
+      <span class="chip"><b>3</b> 个必考真坑</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先写一行：统计 access.log 里访问量前 10 的 IP。写完再问自己——文件 10G 呢？IP 里有空格呢？中途失败了呢？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>20 秒写完的答案，被三个追问打穿</h2></div>
+  <p class="lead">面试官出题：把 <span class="k">/var/log/app</span> 下超过 7 天的 <span class="k">.log</span> 删掉。候选人 20 秒写完一行：</p>
+  <pre>find /var/log/app -name "*.log" -mtime +7 | xargs rm -f</pre>
+  <p>语法没错，日常也这么用。然后面试官问了三个问题，一个都没答上来：<b>文件名里有空格会怎样？目录不存在呢？删错了能回滚吗？</b></p>
+  <p>这就是脚本题的真实评分方式。它不考你记不记得 <span class="k">-mtime</span> 的单位是天，它考的是——<b>你在写之前，有没有想过这段代码会在什么情况下出错。</b>上面那一行有三个洞：文件名带空格会被 <span class="k">xargs</span> 拆成多个参数；目录不存在时 <span class="k">find</span> 报错但管道整体可能仍然「成功」；<span class="k">rm -f</span> 删完没有回滚路径，也没有先打印一遍确认。</p>
+  <p>更常见的版本是统计题。写完 <span class="k">awk '{print $1}' access.log | sort | uniq -c | sort -rn | head</span>，面试官接着问：日志 10G 的时候这个命令有什么问题？<span class="k">head</span> 提前退出会不会让前面的 <span class="k">sort</span> 收到 SIGPIPE？加了 <span class="k">pipefail</span> 之后整条管道会不会变成失败？这三个问题的答案，决定了你是「会背命令」还是「运维过东西」。</p>
+  <table>
+    <tr><th style="width:70px">边界</th><th style="width:200px">具体形态</th><th>不处理的后果</th></tr>
+    <tr><td><b>空</b></td><td>没传参数、文件为空、目录里没有匹配项</td><td>变量为空导致命令作用到错误的路径；通配符不匹配时把字面量 <span class="k">*.log</span> 当成文件名</td></tr>
+    <tr><td><b>怪</b></td><td>文件名含空格、换行、引号、以 <span class="k">-</span> 开头</td><td>被拆成多个参数、被当成选项、被 glob 展开成一片</td></tr>
+    <tr><td><b>错</b></td><td>中途某个命令失败、磁盘满、网络断</td><td>脚本继续往下跑，产出一个「看起来成功」的半成品</td></tr>
+    <tr><td><b>重</b></td><td>重复执行、并发执行、cron 重叠</td><td>数据被切两次、备份互相覆盖、日志被截断两遍</td></tr>
+  </table>
+  <div class="callout">
+    <b>这篇的组织方式：</b>先把骨架和三个必考真坑讲透（<span class="k">set -e</span> 失效、<span class="k">while read</span> 的 subshell、<span class="k">$@</span> 不加引号），再给 8 道能直接跑的手写题，每题都有完整脚本、逐行解释和「面试官会怎么追问」。<b>脚本是可以背的，边界感背不出来，只能靠一遍遍踩。</b>
+  </div>
+  <p><b>面试落点：</b>拿到题先说一句「我先确认三个前提：输入从哪来、失败能不能重试、要不要并发」，然后再动手。这句话本身就是加分项，因为它证明你知道脚本的难点不在语法。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>面试为什么爱考脚本：它是一道压缩过的系统设计题</h2></div>
+  <p class="lead">一道「写个日志切割脚本」的题，看起来在考 <span class="k">for</span> 循环，实际上在考五件事：你怎么定义输入、怎么处理失败、怎么保证能重跑、怎么让别人看懂、怎么验证它真的干了该干的事。这五件事，和设计一个备份系统没有区别，只是规模小到能在一张纸上写完。</p>
+  <p>所以评分点非常固定，几乎每个面试官心里都有一张这样的表：</p>
+  <table>
+    <tr><th style="width:110px">维度</th><th>及格线</th><th>加分项</th></tr>
+    <tr><td><b>能跑</b></td><td>复制下来贴进终端，能产出正确结果</td><td>不依赖当前目录、不依赖交互输入</td></tr>
+    <tr><td><b>边界</b></td><td>没参数时给出用法而不是报一堆错</td><td>空输入、怪字符、缺目录都有明确行为</td></tr>
+    <tr><td><b>失败</b></td><td>关键命令失败时停下，退出码非 0</td><td>失败时清理临时文件，日志里有原因</td></tr>
+    <tr><td><b>幂等</b></td><td>跑两次不会把数据搞坏</td><td>第二次跑能识别「已经做过」并跳过</td></tr>
+    <tr><td><b>可读</b></td><td>有函数、有变量名、不写一行 200 字符的管道</td><td>有 usage、有注释说清「为什么这么写」</td></tr>
+  </table>
+  <p>写之前先问三个问题，这三个问题决定脚本的形态：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>输入从哪来？</b>命令行参数、环境变量、还是读一个文件？参数就要处理缺省；读文件就要处理文件不存在和格式错误。</div></div>
+    <div class="step"><div class="txt"><b>失败了能不能重试？</b>能重试的（拉取、探测）就加重试和退避；不能重试的（删除、覆盖）就必须先 dry-run，把要做的动作打印出来。</div></div>
+    <div class="step"><div class="txt"><b>要不要并发？</b>要并发就得考虑输出交错、失败聚合、以及「并发写同一个文件」这种会互相踩的情况。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>面试怎么说：</b>「我先确认几个前提：这个脚本是手工跑还是 cron 跑？输入是参数还是配置文件？失败之后是重跑整个脚本，还是只重跑失败的那部分？这三点会影响我要不要加锁、要不要 dry-run。」——问完再写，你的稿子会比别人短，但分数更高。
+  </div>
+  <p>还有一个现实建议：<b>边写边说。</b>很多人闷头写三分钟，写完再解释，面试官全程只能看到你的头顶。正确的节奏是写一行说一句「这里我用 <span class="k">${1:?}</span>，没传参数就直接退出，避免后面拿空变量去 rm」——你的思考过程本身就是评分内容。</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>脚本骨架：五行开头，挡住一半的坑</h2></div>
+  <p class="lead">一个能被别人接手、能进 cron、出事能查的脚本，开头是固定的。这不是风格问题，是<b>把最容易忘的几件事，变成不用记的默认值</b>。</p>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+readonly SCRIPT_NAME="${0##*/}"
+readonly WORK_DIR="$(cd "$(dirname "$0")" &amp;&amp; pwd)"
+
+usage() {
+  printf '用法: %s &lt;目录&gt; [-n 保留天数]\n' "$SCRIPT_NAME" &gt;&amp;2
+  exit 2
+}
+log()  { printf '[%s] %s\n' "$(date '+%F %T')" "$*" &gt;&amp;2; }
+die()  { log "错误: $*"; exit 1; }
+
+TMP_DIR=""
+cleanup() { [[ -n "$TMP_DIR" ]] &amp;&amp; rm -rf -- "$TMP_DIR"; }
+trap cleanup EXIT</pre>
+  <table>
+    <tr><th style="width:200px">行</th><th>作用与注意点</th></tr>
+    <tr><td><span class="k">#!/usr/bin/env bash</span></td><td>用环境里的 bash，而不是写死 <span class="k">/bin/bash</span>。凡是用了 <span class="k">[[ ]]</span>、数组、<span class="k">${var,,}</span> 的脚本，都不能用 <span class="k">sh</span> 跑</td></tr>
+    <tr><td><span class="k">set -euo pipefail</span></td><td>三件事：<b>-e</b> 命令失败就退出；<b>-u</b> 用未定义变量报错；<b>pipefail</b> 让管道的退出码取最后一个非零值，而不是永远看最后一个命令</td></tr>
+    <tr><td><span class="k">IFS=$'\n\t'</span></td><td>把默认的「空格 Tab 换行」收窄成「换行 Tab」，让 <span class="k">for</span> 循环不会因为文件名带空格被拆开。<b>代价见下面的警告</b></td></tr>
+    <tr><td><span class="k">${0##*/}</span></td><td>从路径里取脚本名，报错时显示 <span class="k">backup.sh</span> 而不是 <span class="k">/opt/x/y/backup.sh</span></td></tr>
+    <tr><td><span class="k">cd "$(dirname "$0")" &amp;&amp; pwd</span></td><td>取脚本自己所在的绝对路径，避免脚本依赖「你在哪个目录执行它」。<b>这一行是 cron 里最常见的翻车点</b></td></tr>
+    <tr><td><span class="k">usage / log / die</span></td><td>三个小函数：用法、带时间戳的日志、失败退出。日志写 <span class="k">&gt;&amp;2</span>，让它进 stderr，不污染正常输出</td></tr>
+    <tr><td><span class="k">trap cleanup EXIT</span></td><td>无论正常退出、报错退出还是被 Ctrl-C，都执行清理。用单引号是<b>延迟展开</b>，双引号会立刻展开成空字符串</td></tr>
+  </table>
+  <div class="callout warn">
+    <b><span class="k">IFS</span> 的副作用，几乎没人第一次就想到：</b>设成 <span class="k">$'\n\t'</span> 之后，<span class="k">while read -r a b</span> 就<b>不再按空格分列</b>了，整行会全塞进 <span class="k">a</span>。所以凡是按空格解析的地方（比如读 <span class="k">df</span> 的输出），必须显式写 <span class="k">while IFS=' ' read -r a b</span>。想省事，就别全局改 <span class="k">IFS</span>，改成在 <span class="k">read</span> 前面局部指定。
+  </div>
+  <p>还有一个常被问到的点：<b>为什么日志要写 stderr？</b>因为 stdout 可能要拿去做管道输入或者被重定向成结果文件。日志混进 stdout，会让「脚本的输出」变成一锅粥——下游 <span class="k">awk</span> 解析到一行「[2026-01-01] 开始备份」就报错了。</p>
+  <p><b>面试怎么说：</b>「我一般固定用 <span class="k">set -euo pipefail</span> 加 <span class="k">trap ... EXIT</span> 做清理，参数用 <span class="k">${1:?用法}</span> 兜住，日志走 stderr。但我不会完全依赖 <span class="k">set -e</span>，因为它在几种情况下是失效的。」——最后半句会直接引出下一个问题，而那个问题你已经在下面准备好了。</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>引号：<span class="k">$@</span> 不加引号，参数会被吃掉</h2></div>
+  <p class="lead">先看一个实验。三个写法，看着只差一对引号，行为完全不同：</p>
+  <pre>set -- "a b" c
+
+printf '[%s]\n' "$@"     <span class="c"># [a b]  [c]        两个参数，空格被保住</span>
+printf '[%s]\n' $@       <span class="c"># [a]  [b]  [c]     被按空格拆成三个</span>
+printf '[%s]\n' "$*"     <span class="c"># [a b c]           全部合成一个</span></pre>
+  <p><span class="k">"$@"</span> 是「每个位置参数各算一个词」，<span class="k">$@</span>（不加引号）则先做<b>分词</b>（按 IFS 拆）再做<b>通配符展开</b>（glob），然后才传给命令。<span class="k">"$*"</span> 是把所有参数用 IFS 的第一个字符连起来，当成一个词。</p>
+  <p>为什么这是「真坑」而不是「细节」？因为它在正常输入下完全看不出问题，只在两种情况下爆炸：<b>参数带空格</b>（文件名、路径、带空格的参数值），以及<b>参数里含 <span class="k">*</span> 或 <span class="k">?</span></b>（会被当前目录的文件名替换掉）。看这段：</p>
+  <pre><span class="c"># 反例：看起来人畜无害</span>
+for f in $@; do
+  rm -rf "$f"
+done
+
+<span class="c"># 如果调用是 ./clean.sh "*"，那么 $@ 不加引号会先做 glob，</span>
+<span class="c"># 展开成当前目录的所有文件，于是 rm -rf 删掉了整个目录</span>
+<span class="c"># 加引号之后，它就是一个字面量 "*"，rm 只会报「没有这个文件」</span></pre>
+  <p>正确姿势只有一条：<b>转发参数一律用 <span class="k">"$@"</span>，遍历参数也一律用 <span class="k">"$@"</span>。</b>函数里转发也是同理：</p>
+  <pre>main() {
+  parse_args "$@"        <span class="c"># 对：原样转发</span>
+  parse_args $@          <span class="c"># 错：参数在这里已经被拆过一遍了</span>
+}</pre>
+  <h3>变量与数组：加引号是默认动作</h3>
+  <p>除了 <span class="k">"$@"</span>，其他变量也一律加双引号。经典错误是 <span class="k">[ $x = "ok" ]</span>——当 <span class="k">x</span> 为空时，这一行会变成 <span class="k">[ = "ok" ]</span>，直接报 <span class="k">unary operator expected</span>。加了 <span class="k">"$x"</span> 就永远是一个参数，不会消失。</p>
+  <table>
+    <tr><th style="width:230px">写法</th><th>含义</th></tr>
+    <tr><td><span class="k">${var:-默认值}</span></td><td>为空或未定义时用默认值（不改变 var）</td></tr>
+    <tr><td><span class="k">${var:=默认值}</span></td><td>为空或未定义时赋默认值并返回</td></tr>
+    <tr><td><span class="k">${var:?错误信息}</span></td><td>为空或未定义时打印错误并退出——读必填参数就用它</td></tr>
+    <tr><td><span class="k">${var%后缀}</span> / <span class="k">${var#前缀}</span></td><td>最短匹配删除。取文件名 <span class="k">${f##*/}</span>、取扩展名 <span class="k">${f##*.}</span> 都是这个家族</td></tr>
+    <tr><td><span class="k">${#arr[@]}</span></td><td>数组长度；遍历用 <span class="k">"${arr[@]}"</span>，同样必须加引号</td></tr>
+    <tr><td><span class="k">${var,,}</span> / <span class="k">${var^^}</span></td><td>转小写 / 大写，bash 4 起支持。用 <span class="k">sh</span> 跑会直接报错</td></tr>
+  </table>
+  <p><span class="k">set -u</span> 是这一切的保险：开了它，用了未定义变量会立刻报错退出，而不是安静地展开成空字符串。<b>安静的空字符串是脚本里最难查的 bug</b>，因为它让 <span class="k">rm -rf "$DIR"/*</span> 变成 <span class="k">rm -rf /*</span>。</p>
+  <div class="callout danger">
+    <b>一个血亏的写法：</b><span class="k">rm -rf $DIR/*</span>。当 <span class="k">DIR</span> 为空时，它等于 <span class="k">rm -rf /*</span>。正确写法是 <span class="k">rm -rf -- "${DIR:?}"/</span> 后面再跟明确的子目录，并且先用 <span class="k">[[ -n "$DIR" &amp;&amp; "$DIR" != "/" ]]</span> 挡一道。<b>凡是 <span class="k">rm -rf</span> 加上变量，都要先问一句「它为空会怎样」。</b>
+  </div>
+  <p><b>面试落点：</b>「参数转发我用 <span class="k">"$@"</span>，不用 <span class="k">$@</span> 也不拼字符串。因为不加引号会先分词再 glob，参数带空格就被拆开，参数里含星号会被展开成文件名——这两种在正常测试里都看不出来。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>判断与测试：一个 <span class="k">&gt;</span> 就能让你的脚本创建文件</h2></div>
+  <p class="lead">先看一段能跑、但是错的代码：</p>
+  <pre>a=10
+b=9
+if [ $a &gt; $b ]; then
+  echo "a 更大"
+fi
+<span class="c"># 结果：不打印，且当前目录多了一个叫 9 的空文件</span></pre>
+  <p>原因是 <span class="k">[ ]</span> 里的 <span class="k">&gt;</span> 是<b>重定向</b>，不是比较。这一行被解析成「执行 <span class="k">[ 10 ]</span>，同时把 stdout 重定向到文件 <span class="k">9</span>」。于是判断永远为真（非空字符串），文件被创建，而你什么都看不到。<b>正确的写法是 <span class="k">-gt</span>，或者用 <span class="k">(( a &gt; b ))</span>。</b></p>
+  <h3><span class="k">[ ]</span> 和 <span class="k">[[ ]]</span> 的差别</h3>
+  <table>
+    <tr><th style="width:150px">能力</th><th><span class="k">[ ]</span>（POSIX test）</th><th><span class="k">[[ ]]</span>（bash 关键字）</th></tr>
+    <tr><td>变量为空</td><td>不加引号就语法错误</td><td>不做分词，空值安全</td></tr>
+    <tr><td>字符串通配</td><td>不支持，要配合 case</td><td><span class="k">[[ $f == *.log ]]</span> 直接可用</td></tr>
+    <tr><td>正则</td><td>不支持</td><td><span class="k">[[ $s =~ ^[0-9]+$ ]]</span></td></tr>
+    <tr><td>逻辑组合</td><td><span class="k">-a</span> / <span class="k">-o</span>（已不推荐）</td><td><span class="k">&amp;&amp;</span> / <span class="k">||</span>，短路求值</td></tr>
+    <tr><td>大小比较</td><td>只能用 <span class="k">-gt -lt -ge -le</span></td><td>同左，或直接用 <span class="k">(( ))</span></td></tr>
+  </table>
+  <p>结论很简单：<b>写 bash 就用 <span class="k">[[ ]]</span>，只有在必须兼容 <span class="k">sh</span> 时才用 <span class="k">[ ]</span>，且每个变量都加引号。</b>面试里被问「两者的区别」，答「<span class="k">[[ ]]</span> 是 bash 的关键字，不做词分割和 glob，所以空变量安全，还支持通配和正则；<span class="k">[ ]</span> 是普通命令，参数会先被 shell 处理」就够完整了。</p>
+  <h3>数值、字符串、文件</h3>
+  <table>
+    <tr><th style="width:110px">类别</th><th>写法</th><th>注意</th></tr>
+    <tr><td><b>数值</b></td><td><span class="k">(( a &gt; b ))</span>、<span class="k">[ "$a" -gt "$b" ]</span></td><td>别用 <span class="k">&gt;</span>；<span class="k">(( ))</span> 的结果为 0 时返回 1，所以 <span class="k">set -e</span> 下 <span class="k">(( 0 ))</span> 会直接退出</td></tr>
+    <tr><td><b>字符串</b></td><td><span class="k">[[ -z "$s" ]]</span> 为空、<span class="k">[[ -n "$s" ]]</span> 非空</td><td><span class="k">-z</span> 和 <span class="k">-n</span> 是最容易记反的一对，记法：<b>z 是 zero</b></td></tr>
+    <tr><td><b>文件</b></td><td><span class="k">-e</span> 存在、<span class="k">-f</span> 普通文件、<span class="k">-d</span> 目录、<span class="k">-s</span> 非空、<span class="k">-r/-w/-x</span> 权限、<span class="k">-L</span> 软链</td><td><span class="k">-e</span> 会跟随软链，软链断了要用 <span class="k">-L</span> 判断</td></tr>
+    <tr><td><b>比较新旧</b></td><td><span class="k">f1 -nt f2</span>、<span class="k">f1 -ot f2</span></td><td>按 mtime 比较，做增量备份时常用</td></tr>
+  </table>
+  <p>还有一个 <span class="k">case</span> 的用法值得记，处理「子命令」特别干净，比一长串 <span class="k">if/elif</span> 可读：</p>
+  <pre>case "${1:-}" in
+  start|stop|restart) systemctl "$1" myapp ;;
+  status)             systemctl is-active myapp ;;
+  *)                  usage ;;
+esac</pre>
+  <p><b>面试落点：</b>「数值比较我用 <span class="k">(( ))</span>，字符串和文件用 <span class="k">[[ ]]</span>。因为 <span class="k">[ $a &gt; $b ]</span> 里的 <span class="k">&gt;</span> 会被当成重定向，不报错，但会悄悄创建一个文件——这个坑我在自己机器上踩过。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2><span class="k">while read</span> 的 subshell：计数器永远是 0</h2></div>
+  <p class="lead">这是 shell 里最经典的一道题，也是面试官最爱看的一道——因为它没法靠背，只能靠理解进程模型。看代码：</p>
+  <pre>count=0
+printf 'a\nb\nc\n' | while read -r line; do
+  count=$((count + 1))
+done
+echo "$count"
+<span class="c"># 期望 3，实际输出 0</span></pre>
+  <p>原因：<b>管道的每一段都在独立的子 shell 里执行</b>。右边的 <span class="k">while</span> 跑在子进程里，它对 <span class="k">count</span> 的修改只发生在子进程的内存里；子进程一退出，这个值就没了。父 shell 里的 <span class="k">count</span> 从头到尾都是 0。</p>
+  <p>四种修法，各有适用场景：</p>
+  <table>
+    <tr><th style="width:170px">修法</th><th>写法</th><th>适用与代价</th></tr>
+    <tr><td><b>进程替换</b></td><td><span class="k">done &lt; &lt;(command)</span></td><td>最常用，bash 专有。循环跑在当前 shell，变量能带出来</td></tr>
+    <tr><td><b>重定向文件</b></td><td><span class="k">done &lt; file</span></td><td>最稳，不启动额外进程。能读文件就别用管道</td></tr>
+    <tr><td><b>lastpipe</b></td><td><span class="k">shopt -s lastpipe</span></td><td>让管道最后一段在当前 shell 执行。<b>要求 job control 关闭</b>，交互式 shell 里默认不生效，容易时灵时不灵</td></tr>
+    <tr><td><b>换工具</b></td><td>直接用 <span class="k">awk</span> 统计</td><td>最省事，也是面试官最想看到的答案之一</td></tr>
+  </table>
+  <pre><span class="c"># 修法 A：进程替换（推荐）</span>
+count=0
+while read -r line; do
+  count=$((count + 1))
+done &lt; &lt;(printf 'a\nb\nc\n')
+echo "$count"        <span class="c"># 3</span>
+
+<span class="c"># 修法 B：直接读文件</span>
+count=0
+while IFS= read -r line; do
+  count=$((count + 1))
+done &lt; /etc/hosts
+echo "$count"
+
+<span class="c"># 修法 C：换 awk，一行搞定（大文件也更快）</span>
+awk 'END { print NR }' /etc/hosts</pre>
+  <p>顺带说清三个 <span class="k">read</span> 的细节，这三个都是真实会咬人的：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>一定要写 <span class="k">-r</span></b>：不加 <span class="k">-r</span>，反斜杠会被当成转义符吃掉。处理 Windows 换行、正则、JSON 时，不加 <span class="k">-r</span> 就是灾难。</div></div>
+    <div class="step"><div class="txt"><b>一定要写 <span class="k">IFS=</span></b>：默认 <span class="k">read</span> 会吃掉行首行尾的空白。读配置文件、读缩进过的 YAML 片段时，缩进会消失，导致你后面判断全错。</div></div>
+    <div class="step"><div class="txt"><b>最后一行没有换行符会漏读</b>：<span class="k">read</span> 读到 EOF 但没有换行时返回非零，循环直接结束，最后一行被丢掉。稳妥写法是 <span class="k">while read -r line || [[ -n "$line" ]]</span>。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>同一个坑的另一个变体：</b><span class="k">for f in $(find . -name '*.log')</span> 也是子 shell 加分词的双重问题——先被命令替换拼成一个字符串，再按 IFS 拆开，文件名带空格就散架。<b>遍历文件名只能用 glob（<span class="k">for f in ./*.log</span>）或 <span class="k">find -print0</span> 配 <span class="k">read -d ''</span>。</b>
+  </div>
+  <p><b>面试落点：</b>「<span class="k">while read</span> 接管道的话，循环体在子 shell 里，变量改不回父 shell。我一般改成 <span class="k">done &lt; &lt;(...)</span>，或者干脆用 <span class="k">awk</span> 做聚合，因为 <span class="k">awk</span> 处理大文件还快一个量级。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2><span class="k">set -e</span> 的六个失效场景，和 <span class="k">trap</span> 的正确写法</h2></div>
+  <p class="lead">很多人以为加了 <span class="k">set -e</span> 就万事大吉。实际上它有六种情况完全不生效，其中两种几乎每个脚本都会遇到。面试官问「<span class="k">set -e</span> 有什么坑」，能答出三个以上的人不多。</p>
+  <table>
+    <tr><th style="width:60px">#</th><th style="width:250px">场景</th><th>说明</th></tr>
+    <tr><td>1</td><td>命令出现在 <span class="k">if</span> / <span class="k">while</span> / <span class="k">until</span> 的条件里</td><td>条件本来就要允许失败，所以整条命令的失败被忽略</td></tr>
+    <tr><td>2</td><td>命令是 <span class="k">&amp;&amp;</span> / <span class="k">||</span> 链里非最后一个</td><td><span class="k">cmd || true</span> 就是靠这个吞掉失败，用多了等于关掉了 <span class="k">-e</span></td></tr>
+    <tr><td>3</td><td>管道里非最后一个命令失败</td><td>没有 <span class="k">pipefail</span> 时，只看最后一个命令的退出码</td></tr>
+    <tr><td>4</td><td>函数在条件上下文里被调用</td><td><b>最坑的一个</b>：函数体内所有命令的 <span class="k">-e</span> 全部失效</td></tr>
+    <tr><td>5</td><td><span class="k">local x=$(cmd)</span></td><td><span class="k">local</span> 自己的返回值是 0，掩盖了命令替换的失败</td></tr>
+    <tr><td>6</td><td><span class="k">(( 表达式 ))</span> 结果为 0</td><td>算术结果为 0 时返回 1，<span class="k">-e</span> 会让脚本退出——<b>反向误伤</b></td></tr>
+  </table>
+  <pre><span class="c"># 场景 4：函数在 if 里被调用，函数内部的 set -e 集体失效</span>
+set -e
+check() {
+  false                      <span class="c"># 期望在这里退出</span>
+  echo "不该执行到这里"
+}
+if check; then
+  echo ok
+fi
+echo "脚本继续往下跑"        <span class="c"># 实际会打印：两个 echo 都执行了</span>
+
+<span class="c"># 场景 5：local 掩盖失败</span>
+f() {
+  local out="$(false)"       <span class="c"># local 返回 0，-e 不触发</span>
+  echo "还在继续"
+}
+f
+
+<span class="c"># 场景 6：反向误伤</span>
+set -e
+n=0
+(( n++ ))                    <span class="c"># 自增前的值是 0 → 返回 1 → 脚本直接退出</span>
+echo "永远到不了这里"</pre>
+  <p>所以正确的做法是<b>不把 <span class="k">set -e</span> 当唯一保险</b>。关键命令显式判断，用 <span class="k">||</span> 加 <span class="k">die</span> 收口，比依赖隐式行为可靠得多：</p>
+  <pre>cp -- "$src" "$dst" || die "复制失败: $src"
+tar -czf "$out" -C "$dir" . || die "打包失败: $dir"
+<span class="c"># 一定要拿到返回值，就别用 local 直接接</span>
+out="$(curl -fsS "$url")" || die "请求失败: $url"
+<span class="c"># 算术自增要写成不会返回非零的形式</span>
+n=$((n + 1))</pre>
+  <h3>trap：清理、以及被打断时留下证据</h3>
+  <p><span class="k">trap</span> 有两个常用信号：<span class="k">EXIT</span>（任何原因退出都触发）和 <span class="k">INT TERM</span>（Ctrl-C 与被 kill）。清理逻辑必须挂在 <span class="k">EXIT</span> 上，因为脚本可能从任何一行退出。</p>
+  <pre>WORK="$(mktemp -d)"
+trap 'rm -rf -- "$WORK"' EXIT
+trap 'echo "被中断，退出码 130" &gt;&amp;2; exit 130' INT TERM
+<span class="c"># 注意单引号：变量在触发时才展开。写成双引号会在 trap 那一刻就展开成空</span>
+
+<span class="c"># 想在出错时打印「是哪一行挂的」，用 ERR 加 set -E</span>
+set -E
+trap 'echo "第 $LINENO 行失败，命令: $BASH_COMMAND" &gt;&amp;2' ERR</pre>
+  <table>
+    <tr><th style="width:90px">退出码</th><th>含义</th></tr>
+    <tr><td><b>0</b></td><td>成功</td></tr>
+    <tr><td><b>1</b></td><td>通用错误。自己写脚本时，用它表示「跑了但结果不对」</td></tr>
+    <tr><td><b>2</b></td><td>用法错误（参数缺失、参数非法）。区分它和 1，调用方才能决定要不要重试</td></tr>
+    <tr><td><b>126</b></td><td>找到了文件但没有执行权限</td></tr>
+    <tr><td><b>127</b></td><td>命令不存在（常见于 cron 里 PATH 不全）</td></tr>
+    <tr><td><b>130</b></td><td>被 Ctrl-C 中断（128 + 2）</td></tr>
+    <tr><td><b>137</b></td><td>被 SIGKILL 杀掉（128 + 9），容器里常见于 OOM</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>面试怎么说：</b>「<span class="k">set -e</span> 我当成默认保险，不当成唯一保险。它至少在四种情况下不生效：命令在条件里、在 <span class="k">&amp;&amp;</span> 链里、函数被条件调用时整个函数体失效、还有 <span class="k">local x=$(cmd)</span> 会掩盖失败。所以我关键步骤都显式 <span class="k">|| die</span>，清理统一挂在 <span class="k">trap ... EXIT</span> 上。」
+  </div>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>文本处理组合：空格、换行、和那个 141</h2></div>
+  <p class="lead">文件名的两大杀手是空格和换行。前者让参数被拆开，后者让「一行一个文件」的假设直接失效。所有「把 find 的输出喂给另一个命令」的写法，都要先回答一个问题：<b>文件名里如果有空格，会怎样？</b></p>
+  <pre><span class="c"># 反例：文件名 "my report.log" 会被拆成两个参数</span>
+find . -name '*.log' | xargs rm -f
+
+<span class="c"># 正例：用 NUL 分隔，任何字符都不会被误拆</span>
+find . -name '*.log' -print0 | xargs -0 rm -f --
+
+<span class="c"># 正例：不用 xargs，直接交给 find 自己执行（更稳）</span>
+find . -name '*.log' -exec rm -f -- {} +
+
+<span class="c"># 正例：确实要循环时，用 read -d ''</span>
+while IFS= read -r -d '' f; do
+  printf '处理 %s\n' "$f"
+done &lt; &lt;(find . -name '*.log' -print0)</pre>
+  <table>
+    <tr><th style="width:150px">写法</th><th>行为</th><th>什么时候用</th></tr>
+    <tr><td><span class="k">-exec cmd {} \;</span></td><td>每个文件启动一次进程</td><td>文件少，或需要单文件独立失败</td></tr>
+    <tr><td><span class="k">-exec cmd {} +</span></td><td>批量传参，一次启动</td><td>文件多，追求速度。<b>首选</b></td></tr>
+    <tr><td><span class="k">xargs -0</span></td><td>按 NUL 分隔读参数</td><td>上游能输出 <span class="k">-print0</span> 时</td></tr>
+    <tr><td><span class="k">xargs -r</span></td><td>输入为空时不执行命令（GNU）</td><td>防止空输入时命令裸跑。<b>BSD/macOS 不支持，注意环境</b></td></tr>
+    <tr><td><span class="k">xargs -n1</span> / <span class="k">-P8</span></td><td>每次一个参数 / 并发 8 个</td><td>并发场景，见下一节</td></tr>
+  </table>
+  <h3>管道提前关闭：141 是怎么来的</h3>
+  <p>这条命令在日志很大时会偶发失败：</p>
+  <pre>set -euo pipefail
+zcat access.log.gz | awk '{print $1}' | sort | uniq -c | sort -rn | head -n 10
+<span class="c"># 偶尔返回 141，脚本直接退出</span></pre>
+  <p>原因是 <span class="k">head</span> 读够 10 行就退出并关闭读端，上游的 <span class="k">sort</span> 再往管道里写就会收到 <span class="k">SIGPIPE</span>，退出码是 128 + 13 = 141。没开 <span class="k">pipefail</span> 时整条管道只看 <span class="k">head</span> 的状态，返回 0；开了 <span class="k">pipefail</span>，141 就浮上来，<span class="k">set -e</span> 立刻让脚本退出。<b>这不是 bug，是 <span class="k">pipefail</span> 和「提前退出」的正常互动。</b></p>
+  <p>三种处理：把限量交给 <span class="k">awk</span>（它读完整个输入但只打印前 N 行，不产生 SIGPIPE）；用 <span class="k">|| true</span> 显式接受；或者对这个管道关掉 <span class="k">pipefail</span>（不推荐，容易连别的问题一起吞掉）。</p>
+  <pre><span class="c"># 推荐：让 awk 负责限量，管道里没人提前退出</span>
+awk '{ c[$1]++ } END { for (ip in c) printf "%d\t%s\n", c[ip], ip }' access.log \
+  | sort -k1,1nr \
+  | awk -v n=10 'NR &lt;= n { printf "%6d  %s\n", $1, $2 }'</pre>
+  <p><b>面试落点：</b>「<span class="k">find | xargs</span> 我不用，因为文件名带空格会被拆开，改成 <span class="k">-print0</span> 配 <span class="k">xargs -0</span>，或者干脆 <span class="k">-exec {} +</span>。另外开了 <span class="k">pipefail</span> 之后，<span class="k">| head</span> 会通过 SIGPIPE 让上游返回 141，这一条我一般用 <span class="k">awk</span> 限量来避开。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>并发：<span class="k">xargs -P</span>、<span class="k">wait</span>、和防止自己踩自己</h2></div>
+  <p class="lead">批量操作 200 台机器，串行跑要一小时，面试官一定问「能不能快点」。并发在 shell 里只有两种实现：<span class="k">xargs -P</span>，或者 <span class="k">&amp;</span> 加 <span class="k">wait</span>。两种都有各自的坑。</p>
+  <h3><span class="k">xargs -P</span>：最省事，但拿不到细粒度结果</h3>
+  <pre>printf '%s\n' host1 host2 host3 \
+  | xargs -P 8 -n 1 -I{} ssh -o ConnectTimeout=5 {} uptime</pre>
+  <p>三个必须知道的行为：<b>输出会交错</b>（多个进程同时写 stdout，一行可能被另一行插进来，所以最好让每个任务写自己的文件）；<b>退出码只有 123</b>（任何一个子命令失败，xargs 返回 123，你无法知道是哪个失败，除非把结果写下来）；<b>函数不能直接用</b>（子进程是新 shell，除非 <span class="k">export -f</span>）。</p>
+  <h3><span class="k">&amp;</span> 加 <span class="k">wait</span>：能聚合结果，但要自己管并发数</h3>
+  <pre>pids=()
+for h in "${HOSTS[@]}"; do
+  while (( $(jobs -rp | wc -l) &gt;= MAX )); do
+    sleep 0.2
+  done
+  check "$h" &amp;
+  pids+=("$!")
+done
+
+fail=0
+for p in "${pids[@]}"; do
+  wait "$p" || fail=1
+done
+exit "$fail"</pre>
+  <p>这段里有三个关键点。<b><span class="k">$!</span> 是刚启动的后台进程 pid</b>，必须马上存下来，否则后面没法 <span class="k">wait</span> 到具体某一个。<b><span class="k">wait "$p"</span> 的返回值就是那个任务的退出码</b>，所以可以精确聚合失败。<b><span class="k">jobs -rp</span> 统计正在跑的后台任务数</b>，用来限制并发。</p>
+  <p>如果 bash 是 4.3 以上，可以用 <span class="k">wait -n</span> 等「任意一个结束」，比轮询更优雅；5.1 以上还有 <span class="k">wait -n -p var</span>，能把结束的 pid 存进变量。<b>写之前先看一眼版本，面试时说明版本依赖，是加分项。</b></p>
+  <table>
+    <tr><th style="width:180px">问题</th><th>表现</th><th>解法</th></tr>
+    <tr><td>输出交错</td><td>两行日志粘在一起</td><td>每个任务写独立文件，最后合并</td></tr>
+    <tr><td>并发写同一文件</td><td>内容被覆盖、行被截断</td><td>加 <span class="k">flock</span>，或改成追加并保证单行原子写</td></tr>
+    <tr><td>cron 重叠</td><td>上一次没跑完，下一次又起来</td><td><span class="k">flock -n</span> 加锁，拿不到锁就退出</td></tr>
+    <tr><td>把机器打满</td><td>并发 50 个 <span class="k">tar</span>，IO 直接饱和</td><td>并发数按资源定，不是越大越好</td></tr>
+  </table>
+  <pre><span class="c"># cron 防重叠：拿不到锁就安静退出，退出码 0 避免报警刷屏</span>
+exec 9&gt;/var/lock/backup.lock
+flock -n 9 || { echo "已有实例在跑，退出"; exit 0; }
+
+<span class="c"># 或者写在 crontab 里，一行搞定</span>
+<span class="c"># */30 * * * * flock -n /var/lock/backup.lock /opt/scripts/backup.sh</span></pre>
+  <div class="callout warn">
+    <b>并发最容易忽略的一条：</b>子进程改不了父进程的变量。所有 <span class="k">&amp;</span> 起来的任务，对全局变量的修改都会在结束时消失。要收集结果，只能靠返回值、临时文件、或者管道——这也是为什么并发脚本最后总有一段「汇总」代码。
+  </div>
+  <p><b>面试落点：</b>「简单批量我用 <span class="k">xargs -P</span>，但它只能告诉我 123；需要知道哪台失败就用 <span class="k">&amp;</span> 加 <span class="k">wait</span> 逐个收退出码。另外 cron 里一律加 <span class="k">flock -n</span>，否则任务一慢就会叠起来。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>手写题 1 到 4：日志切割、批量改名、健康检查、备份轮转</h2></div>
+  <p class="lead">这四道是出现频率最高的。每道都给完整脚本、逐行解释、以及面试官接下来会问什么。<b>把脚本敲一遍再改坏一遍，比读十遍有用。</b></p>
+  <h3>题 1：按天切割日志，并清理过期文件</h3>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+
+LOG_DIR="${1:?用法: $0 &lt;日志目录&gt; [保留天数]}"
+KEEP_DAYS="${2:-7}"
+STAMP="$(date +%Y%m%d)"
+
+[[ -d "$LOG_DIR" ]] || { echo "不是目录: $LOG_DIR" &gt;&amp;2; exit 2; }
+
+shopt -s nullglob
+for f in "$LOG_DIR"/*.log; do
+  target="$f.$STAMP"
+  if [[ -e "$target" ]]; then
+    echo "跳过（今日已切）: $f" &gt;&amp;2
+    continue
+  fi
+  mv -- "$f" "$target"
+done
+
+if [[ -f /run/myapp.pid ]]; then
+  kill -USR1 "$(cat /run/myapp.pid)" || true
+fi
+
+find "$LOG_DIR" -maxdepth 1 -type f -name '*.log.[0-9]*' -mtime +"$KEEP_DAYS" -delete</pre>
+  <table>
+    <tr><th style="width:44%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">${1:?用法: ...}</span></td><td>必填参数，缺失时打印用法并以非零码退出，不会带着空变量往下跑</td></tr>
+    <tr><td><span class="k">${2:-7}</span></td><td>可选参数，默认保留 7 天</td></tr>
+    <tr><td><span class="k">[[ -d "$LOG_DIR" ]] || { ...; exit 2; }</span></td><td>先挡一道：目录不存在就退出。退出码 2 表示用法/环境错误，便于上层区分</td></tr>
+    <tr><td><span class="k">shopt -s nullglob</span></td><td>没有匹配文件时，循环体执行零次，而不是把字面量 <span class="k">*.log</span> 当成文件名去 mv</td></tr>
+    <tr><td><span class="k">target="$f.$STAMP"</span></td><td>切成 <span class="k">app.log.20261021</span>，沿用 logrotate 的命名习惯，后面好清理</td></tr>
+    <tr><td><span class="k">[[ -e "$target" ]] &amp;&amp; continue</span></td><td><b>幂等</b>：同一天跑第二次时跳过，不会覆盖已有的归档</td></tr>
+    <tr><td><span class="k">mv -- "$f" "$target"</span></td><td><span class="k">--</span> 结束选项解析，防止文件名以 <span class="k">-</span> 开头被当成参数</td></tr>
+    <tr><td><span class="k">kill -USR1</span></td><td>通知进程重新打开日志文件。<b>只 mv 不重开，进程仍然写旧 inode，磁盘空间不会释放</b></td></tr>
+    <tr><td><span class="k">find ... -mtime +7 -delete</span></td><td>清理 N 天前的归档。<span class="k">-mtime +7</span> 是「修改时间早于 7 个 24 小时」</td></tr>
+  </table>
+  <p><b>追问：没有 USR1 怎么办？</b>用 <span class="k">copytruncate</span> 的思路——先 <span class="k">cp</span> 再 <span class="k">: &gt; "$f"</span> 清空原文件。代价是复制和清空之间会丢一小段写入，所以能重开就重开。</p>
+  <h3>题 2：批量改名，默认只打印不执行</h3>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+
+DIR="${1:?用法: $0 &lt;目录&gt; [--apply]}"
+APPLY=0
+[[ "${2:-}" == "--apply" ]] &amp;&amp; APPLY=1
+
+[[ -d "$DIR" ]] || { echo "不是目录: $DIR" &gt;&amp;2; exit 2; }
+
+shopt -s nullglob nocaseglob
+n=0
+for f in "$DIR"/*.jpg; do
+  n=$((n + 1))
+  base="${f##*/}"
+  ext="${base##*.}"
+  ext="${ext,,}"
+  new="$(printf '%s/img-%03d.%s' "$DIR" "$n" "$ext")"
+  if [[ -e "$new" ]]; then
+    echo "跳过，目标已存在: $new" &gt;&amp;2
+    continue
+  fi
+  if (( APPLY )); then
+    mv -- "$f" "$new"
+  else
+    printf 'mv %q %q\n' "$f" "$new"
+  fi
+done
+echo "扫描 $n 个文件" &gt;&amp;2</pre>
+  <table>
+    <tr><th style="width:44%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">APPLY=0; [[ ... ]] &amp;&amp; APPLY=1</span></td><td>默认 <b>dry-run</b>，只有显式传 <span class="k">--apply</span> 才真改。批量改名不 dry-run 是不负责任</td></tr>
+    <tr><td><span class="k">nocaseglob</span></td><td>让 <span class="k">*.jpg</span> 也能匹配 <span class="k">.JPG</span>，避免两套扩展名写两遍</td></tr>
+    <tr><td><span class="k">${f##*/}</span></td><td>去掉目录前缀，只留文件名（<span class="k">##</span> 是最长匹配删除）</td></tr>
+    <tr><td><span class="k">${base##*.}</span></td><td>取最后一个点之后的部分作为扩展名</td></tr>
+    <tr><td><span class="k">${ext,,}</span></td><td>转小写，bash 4 起支持。<b>用 <span class="k">sh</span> 跑会报错</b></td></tr>
+    <tr><td><span class="k">printf '%s/img-%03d.%s'</span></td><td>生成补零的序号，保证排序稳定（<span class="k">img-001</span> 不会排到 <span class="k">img-010</span> 后面）</td></tr>
+    <tr><td><span class="k">[[ -e "$new" ]] &amp;&amp; continue</span></td><td>目标已存在就跳过，<b>不覆盖</b>。这一条能救回一次误操作</td></tr>
+    <tr><td><span class="k">printf 'mv %q %q\n'</span></td><td><span class="k">%q</span> 会把带空格的路径转义成可复制的形式，dry-run 的输出可以直接拿去执行</td></tr>
+  </table>
+  <p><b>追问：为什么不用 <span class="k">rename</span>？</b>因为 <span class="k">rename</span> 有两个互不兼容的版本（Perl 版和 util-linux 版），语法完全不同，换台机器就跑不了。<b>面试里写可移植的脚本，比写最短的脚本得分高。</b></p>
+  <h3>题 3：HTTP 健康检查，带重试和退避</h3>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+
+URL="${1:?用法: $0 &lt;url&gt; [重试次数]}"
+RETRIES="${2:-3}"
+TIMEOUT="${TIMEOUT:-5}"
+
+for ((i = 1; i &lt;= RETRIES; i++)); do
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time "$TIMEOUT" "$URL" || true)"
+  if [[ "$code" == "200" ]]; then
+    echo "OK   $URL (第 $i 次)"
+    exit 0
+  fi
+  echo "第 $i 次失败 http_code=$code" &gt;&amp;2
+  if (( i &lt; RETRIES )); then
+    sleep $((i * 2))
+  fi
+done
+
+echo "FAIL $URL 连续 $RETRIES 次未通过" &gt;&amp;2
+exit 1</pre>
+  <table>
+    <tr><th style="width:44%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">TIMEOUT="${TIMEOUT:-5}"</span></td><td>允许用环境变量覆盖，比再加一个位置参数更灵活</td></tr>
+    <tr><td><span class="k">curl -s -o /dev/null -w '%{http_code}'</span></td><td>丢弃响应体，只取状态码。<span class="k">-sS</span> 是「静默但保留错误信息」</td></tr>
+    <tr><td><span class="k">--max-time</span></td><td>硬超时，防止一个卡住的连接把整个检查拖死</td></tr>
+    <tr><td><span class="k">|| true</span></td><td><b>必须加</b>：curl 连不上时返回非零，命令替换的赋值会继承这个状态，<span class="k">set -e</span> 会让脚本在第一轮就退出，重试逻辑根本跑不到</td></tr>
+    <tr><td><span class="k">[[ "$code" == "200" ]]</span></td><td>只认 200。要接受 2xx/3xx 就写 <span class="k">[[ "$code" == 2* || "$code" == 3* ]]</span></td></tr>
+    <tr><td><span class="k">sleep $((i * 2))</span></td><td>线性退避（2s、4s）。要更稳就改成指数：<span class="k">$(( 2 ** i ))</span></td></tr>
+    <tr><td><span class="k">exit 1</span></td><td>全部失败用 1，和参数错误的 2 区分开，监控才能分清「服务挂了」和「脚本写错了」</td></tr>
+  </table>
+  <p><b>追问：如果返回 200 但内容是错的呢？</b>那就不是健康检查，是业务校验。加一个内容断言：<span class="k">curl -fsS "$URL" | grep -q '"status":"ok"'</span>，或者检查关键字段。<b>只查状态码的健康检查，会被一个「200 但数据库连不上」的接口骗过去。</b></p>
+  <h3>题 4：备份并只保留最近 N 份</h3>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+
+SRC="${1:?用法: $0 &lt;源目录&gt; &lt;备份目录&gt; [保留份数]}"
+DST="${2:?用法: $0 &lt;源目录&gt; &lt;备份目录&gt; [保留份数]}"
+KEEP="${3:-7}"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+[[ -d "$SRC" ]] || { echo "源目录不存在: $SRC" &gt;&amp;2; exit 2; }
+mkdir -p -- "$DST"
+
+WORK="$(mktemp -d)"
+trap 'rm -rf -- "$WORK"' EXIT
+
+tar -czf "$WORK/backup-$STAMP.tar.gz" -C "$SRC" .
+mv -f -- "$WORK/backup-$STAMP.tar.gz" "$DST/"
+
+count="$(find "$DST" -maxdepth 1 -name 'backup-*.tar.gz' | wc -l)"
+if (( count &gt; KEEP )); then
+  find "$DST" -maxdepth 1 -name 'backup-*.tar.gz' -printf '%T@\t%p\n' \
+    | sort -rn \
+    | tail -n +$((KEEP + 1)) \
+    | cut -f2- \
+    | while IFS= read -r old; do
+        rm -f -- "$old"
+      done
+fi</pre>
+  <table>
+    <tr><th style="width:46%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">mkdir -p -- "$DST"</span></td><td>目录不存在就建，已存在不报错</td></tr>
+    <tr><td><span class="k">WORK="$(mktemp -d)"</span></td><td>先在临时目录打包，成功后再移入目标目录。<b>否则打包失败会留下一个半截的 tar，看起来像备份成功</b></td></tr>
+    <tr><td><span class="k">trap 'rm -rf -- "$WORK"' EXIT</span></td><td>单引号延迟展开，任何方式退出都清理临时目录</td></tr>
+    <tr><td><span class="k">tar -czf ... -C "$SRC" .</span></td><td><span class="k">-C</span> 先切换目录再打包，避免归档里出现一长串绝对路径</td></tr>
+    <tr><td><span class="k">mv -f</span></td><td>同一文件系统内是原子操作，所以不会出现「一半的备份文件」</td></tr>
+    <tr><td><span class="k">-printf '%T@\t%p\n'</span></td><td>输出「mtime 时间戳 + Tab + 路径」。用 Tab 分隔，是为了后面 <span class="k">cut -f2-</span> 能完整保留带空格的路径</td></tr>
+    <tr><td><span class="k">sort -rn</span> 加 <span class="k">tail -n +$((KEEP+1))</span></td><td>按时间倒序，跳过最新的 KEEP 个，剩下的就是要删的。<b>用 tail 而不是 head，是为了避开 SIGPIPE</b></td></tr>
+    <tr><td><span class="k">cut -f2-</span></td><td>去掉第一列，还原纯路径</td></tr>
+    <tr><td><span class="k">while IFS= read -r old</span></td><td>逐行删除，路径带空格也不会被拆开</td></tr>
+  </table>
+  <p><b>追问：<span class="k">-printf</span> 在 macOS 上没有怎么办？</b>BSD 版 find 没有 <span class="k">-printf</span>。可移植的写法是用 <span class="k">ls -1t</span> 配 <span class="k">tail</span>（但文件名带空格时会出问题），或者干脆用 <span class="k">stat</span> 加排序。<b>面试时说清「这个脚本假定 GNU coreutils」，比假装跨平台可信。</b></p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>手写题 5 到 8：端口探测、TopN、磁盘巡检、并发执行</h2></div>
+  <p class="lead">这四道偏「运维实战」，考的是并发、聚合和退出码设计。共同点是：<b>单个失败不应该中断整轮</b>，所以这几道脚本都故意不开 <span class="k">set -e</span>。</p>
+  <h3>题 5：批量探测 host:port 是否可达</h3>
+  <pre>#!/usr/bin/env bash
+set -uo pipefail
+
+LIST="${1:?用法: $0 &lt;host:port 列表文件&gt; [并发数]}"
+JOBS="${2:-8}"
+
+probe() {
+  local target="$1" host port
+  host="${target%:*}"
+  port="${target##*:}"
+  if timeout 2 bash -c "exec 3&lt;&gt;/dev/tcp/$host/$port" 2&gt;/dev/null; then
+    printf 'UP   %s\n' "$target"
+    return 0
+  fi
+  printf 'DOWN %s\n' "$target"
+  return 1
+}
+export -f probe
+
+grep -v '^[[:space:]]*$' "$LIST" \
+  | xargs -P "$JOBS" -n 1 bash -c 'probe "$1"' _</pre>
+  <table>
+    <tr><th style="width:46%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">set -uo pipefail</span></td><td><b>故意不写 <span class="k">-e</span></b>：探测失败是正常结果，不该让脚本中途退出</td></tr>
+    <tr><td><span class="k">local target="$1" host port</span></td><td>一行声明多个 local。<span class="k">local</span> 只能在函数内用</td></tr>
+    <tr><td><span class="k">${target%:*}</span></td><td>去掉最后一个冒号之后的部分，得到 host</td></tr>
+    <tr><td><span class="k">${target##*:}</span></td><td>去掉最后一个冒号之前的部分，得到 port。<b>用 <span class="k">##</span> 而不是 <span class="k">#</span>，是为了兼容 IPv6 写法里带多个冒号的情况</b></td></tr>
+    <tr><td><span class="k">timeout 2 bash -c "exec 3&lt;&gt;/dev/tcp/..."</span></td><td>用 bash 的 /dev/tcp 伪设备建立连接。三层嵌套：timeout 限时、bash 提供 /dev/tcp、exec 打开文件描述符</td></tr>
+    <tr><td><span class="k">export -f probe</span></td><td>把函数导出到环境变量，子 bash 才能调用。<b>不加这行，xargs 起的进程会报 command not found</b></td></tr>
+    <tr><td><span class="k">xargs ... bash -c 'probe "$1"' _</span></td><td><span class="k">_</span> 占住 <span class="k">$0</span>，参数才从 <span class="k">$1</span> 开始。<span class="k">-n 1</span> 保证每次只传一个目标</td></tr>
+  </table>
+  <p><b>追问：为什么不用 <span class="k">nc -z</span>？</b>因为 <span class="k">nc</span> 的实现有多个版本（netcat-openbsd 和传统版），参数不兼容，而且不少生产机根本没装。<span class="k">/dev/tcp</span> 是 bash 内建的，只要有 bash 就能用——<b>但要注意 <span class="k">sh</span> 里没有这个特性</b>。</p>
+  <h3>题 6：统计访问量 TopN 的 IP</h3>
+  <pre>#!/usr/bin/env bash
+set -euo pipefail
+
+LOG="${1:?用法: $0 &lt;access.log&gt; [N]}"
+N="${2:-10}"
+
+[[ -r "$LOG" ]] || { echo "读不到: $LOG" &gt;&amp;2; exit 2; }
+
+awk '{ c[$1]++ } END { for (ip in c) printf "%d\t%s\n", c[ip], ip }' "$LOG" \
+  | sort -k1,1nr \
+  | awk -v n="$N" 'NR &lt;= n { printf "%6d  %s\n", $1, $2 }'</pre>
+  <table>
+    <tr><th style="width:46%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">[[ -r "$LOG" ]]</span></td><td>可读性检查。<b>不要用 <span class="k">-f</span> 就完事</b>，管道输入、软链、权限不足都要考虑</td></tr>
+    <tr><td><span class="k">{ c[$1]++ }</span></td><td>用第一列（客户端 IP）做关联数组的键，计数。<span class="k">$1</span> 的具体位置取决于你的 log_format</td></tr>
+    <tr><td><span class="k">END { for (ip in c) ... }</span></td><td>遍历顺序是哈希序，不可依赖，所以后面必须排序</td></tr>
+    <tr><td><span class="k">sort -k1,1nr</span></td><td>按第 1 个字段、数值、倒序。<b>写 <span class="k">-k1,1</span> 而不是只写 <span class="k">-k1</span></b>，否则会把第二列（IP）也带进比较</td></tr>
+    <tr><td><span class="k">awk -v n="$N" 'NR &lt;= n'</span></td><td>用 awk 限量，<b>不用 head</b>：head 提前退出会让 sort 收到 SIGPIPE，开了 pipefail 就变成 141</td></tr>
+  </table>
+  <p><b>追问：日志 10G 怎么办？</b>三点：<span class="k">awk</span> 是流式的，内存只跟「不同 IP 的数量」有关，不跟文件大小有关，所以这道题本身能扛；瓶颈在 <span class="k">sort</span>，它要读完全部输入，可以改成堆或 <span class="k">sort -S</span> 调缓冲区；真要更快就 <span class="k">zcat</span> 加 <span class="k">split</span> 分段并行，再合并。<b>能把「内存跟什么有关」说清楚，比背参数值钱。</b></p>
+  <h3>题 7：磁盘使用率巡检，用退出码区分告警级别</h3>
+  <pre>#!/usr/bin/env bash
+set -uo pipefail
+
+WARN="${WARN:-80}"
+CRIT="${CRIT:-90}"
+rc=0
+
+while read -r fs total used avail pct mount; do
+  pct="${pct%\%}"
+  [[ "$pct" =~ ^[0-9]+$ ]] || continue
+  if (( pct &gt;= CRIT )); then
+    printf 'CRIT %3s%%  %s  (%s)\n' "$pct" "$mount" "$fs"
+    rc=1
+  elif (( pct &gt;= WARN )); then
+    printf 'WARN %3s%%  %s  (%s)\n' "$pct" "$mount" "$fs"
+    [[ "$rc" -eq 0 ]] &amp;&amp; rc=2
+  fi
+done &lt; &lt;(df -P -x tmpfs -x devtmpfs -x overlay 2&gt;/dev/null | awk 'NR&gt;1')
+
+exit "$rc"</pre>
+  <table>
+    <tr><th style="width:46%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">WARN="${WARN:-80}"</span></td><td>阈值从环境变量来，脚本不用改就能在别的机器上调</td></tr>
+    <tr><td><span class="k">while read ... done &lt; &lt;(...)</span></td><td><b>用进程替换而不是管道</b>，循环在当前 shell 跑，<span class="k">rc</span> 才能带出来</td></tr>
+    <tr><td><span class="k">pct="${pct%\%}"</span></td><td>去掉百分号。<span class="k">%</span> 要转义，否则被当成模式的一部分</td></tr>
+    <tr><td><span class="k">[[ "$pct" =~ ^[0-9]+$ ]]</span></td><td>非数字就跳过，防止 <span class="k">df</span> 的某些行（比如表头）把算术判断搞崩</td></tr>
+    <tr><td><span class="k">(( pct &gt;= CRIT ))</span></td><td>数值比较用 <span class="k">(( ))</span>，不用 <span class="k">-ge</span> 也不会有 <span class="k">&gt;</span> 重定向的坑</td></tr>
+    <tr><td><span class="k">df -P -x tmpfs ...</span></td><td><span class="k">-P</span> 强制单行输出（防止长设备名换行），<span class="k">-x</span> 排除不需要管的伪文件系统</td></tr>
+    <tr><td><span class="k">exit "$rc"</span></td><td>退出码即结论：0 正常、2 警告、1 严重。监控系统直接读退出码就能分级</td></tr>
+  </table>
+  <p><b>追问：<span class="k">df</span> 和 <span class="k">du</span> 对不上怎么办？</b>三种常见原因：文件被删除但进程还握着句柄（<span class="k">lsof +L1</span> 能看到）、inode 满了（<span class="k">df -i</span>）、挂载点被覆盖（新目录挂上去，原来的文件还在下面）。<b>这一问其实是 Linux 排障题，答得好能顺手把话题带到你熟的地方。</b></p>
+  <h3>题 8：并发在多个主机上执行命令，并汇总失败</h3>
+  <pre>#!/usr/bin/env bash
+set -uo pipefail
+
+HOSTS="${1:?用法: $0 &lt;hosts.txt&gt; [并发数]}"
+MAX="${2:-4}"
+fail=0
+pids=()
+
+check() {
+  local h="$1"
+  if ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new \
+        "$h" true 2&gt;/dev/null; then
+    printf 'OK   %s\n' "$h"
+    return 0
+  fi
+  printf 'FAIL %s\n' "$h" &gt;&amp;2
+  return 1
+}
+
+while read -r h; do
+  [[ -z "$h" || "$h" == "#"* ]] &amp;&amp; continue
+  while (( $(jobs -rp | wc -l) &gt;= MAX )); do
+    sleep 0.2
+  done
+  check "$h" &amp;
+  pids+=("$!")
+done &lt; "$HOSTS"
+
+for p in "${pids[@]}"; do
+  wait "$p" || fail=1
+done
+
+exit "$fail"</pre>
+  <table>
+    <tr><th style="width:46%">行</th><th>说明</th></tr>
+    <tr><td><span class="k">pids=()</span></td><td>先声明数组，后面存每个后台任务的 pid</td></tr>
+    <tr><td><span class="k">BatchMode=yes</span></td><td>禁止交互式输入密码。不加这个，脚本会卡在密码提示上永远不返回</td></tr>
+    <tr><td><span class="k">ConnectTimeout=5</span></td><td>连接超时，防止一台坏机器拖住整个并发池</td></tr>
+    <tr><td><span class="k">[[ -z "$h" || "$h" == "#"* ]] &amp;&amp; continue</span></td><td>跳过空行和注释行，让 hosts 文件可以带说明</td></tr>
+    <tr><td><span class="k">jobs -rp | wc -l</span></td><td>统计正在运行的后台任务数。<span class="k">-r</span> 只列运行中的，<span class="k">-p</span> 只输出 pid</td></tr>
+    <tr><td><span class="k">done &lt; "$HOSTS"</span></td><td><b>重定向而不是管道</b>，否则 <span class="k">while</span> 在子 shell 里，<span class="k">pids</span> 数组出了循环就空了</td></tr>
+    <tr><td><span class="k">check "$h" &amp;</span> 加 <span class="k">pids+=("$!")</span></td><td>后台启动并立刻记下 pid。<span class="k">$!</span> 只保留最后一个后台进程的 pid，所以必须马上存</td></tr>
+    <tr><td><span class="k">wait "$p" || fail=1</span></td><td>逐个收尸，任何一个是非零就标记失败。<b>不要只写一个 <span class="k">wait</span></b>——那拿不到单个任务的返回值</td></tr>
+  </table>
+  <p><b>追问：200 台机器、每台 30 秒，怎么在 2 分钟内跑完？</b>并发数至少 50。但真正的瓶颈通常是 ssh 握手和 DNS，所以更实际的做法是用 <span class="k">pssh</span> 之类的批量工具，或者先预热连接复用（<span class="k">ControlMaster</span>）。<b>面试时先算一遍数：「200 台乘 30 秒是 100 分钟，除以 2 分钟需要 50 并发」，把算术说出来，比给一个数字更有说服力。</b></p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">模块 11</span><h2>10 个坑：脚本题的失分全在这</h2></div>
+  <p class="lead">这十条不是语法错误，是<b>语法正确但行为错误</b>——所以它们能通过你的自测，然后在生产上炸。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt"><span class="k">set -e</span> 当成万能保险</div><div class="pd">命令在 <span class="k">if</span> 条件里、在 <span class="k">&amp;&amp;</span> 链里、函数被条件调用时整个函数体失效、<span class="k">local x=$(cmd)</span> 掩盖失败、<span class="k">(( 0 ))</span> 反向误伤。关键步骤一律显式 <span class="k">|| die</span>。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt"><span class="k">while read</span> 接管道，变量带不出来</div><div class="pd">管道每段都在子 shell 里，循环体内的赋值出了循环就没了。改成 <span class="k">done &lt; &lt;(cmd)</span> 或 <span class="k">done &lt; file</span>，或者干脆用 <span class="k">awk</span> 聚合。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt"><span class="k">$@</span> 不加引号</div><div class="pd">会先按 IFS 分词、再做 glob 展开。参数带空格被拆开，参数里含 <span class="k">*</span> 被替换成文件名。转发和遍历一律用 <span class="k">"$@"</span>。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt"><span class="k">[ $a &gt; $b ]</span> 做数值比较</div><div class="pd"><span class="k">&gt;</span> 在 <span class="k">[ ]</span> 里是重定向，不报错但会创建一个以数字命名的文件，判断还永远为真。用 <span class="k">-gt</span> 或 <span class="k">(( ))</span>。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt"><span class="k">find | xargs</span> 处理文件名</div><div class="pd">空格和换行会把一个路径拆成几个参数，<span class="k">rm</span> 删错文件。用 <span class="k">-print0</span> 配 <span class="k">xargs -0</span>，或者直接 <span class="k">-exec {} +</span>。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt"><span class="k">rm -rf $DIR/*</span></div><div class="pd"><span class="k">DIR</span> 为空时等于 <span class="k">rm -rf /*</span>。用 <span class="k">${DIR:?}</span> 挡空值，再加一道「不能是根目录」的判断，变量前后都加引号。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">管道里 <span class="k">| head</span> 配 <span class="k">pipefail</span></div><div class="pd">head 读够就退出，上游收到 SIGPIPE 返回 141，整条管道失败。用 <span class="k">awk 'NR&lt;=n'</span> 限量，或显式接受这个退出码。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">脚本依赖「在哪个目录执行」</div><div class="pd">cron 的工作目录和你登录时不一样，相对路径全部失效。开头用 <span class="k">cd "$(dirname "$0")"</span> 定位，或者全程用绝对路径。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">cron 里不写出完整 PATH</div><div class="pd">cron 的 PATH 通常只有 <span class="k">/usr/bin:/bin</span>，<span class="k">/usr/local/bin</span> 下的命令直接 127。要么在脚本里显式 <span class="k">export PATH</span>，要么全部写绝对路径。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">cron 任务不加锁</div><div class="pd">上一次没跑完，下一次又起来，两份备份互相覆盖、日志被切两次。用 <span class="k">flock -n</span>，拿不到锁就安静退出。</div></div></div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. <span class="k">printf 'a\nb\n' | while read -r l; do n=$((n+1)); done; echo $n</span> 输出 0，正确的原因和修法是？</div>
+      <button class="opt">因为 <span class="k">n</span> 没有用 <span class="k">export</span> 导出，加上 export 就好</button>
+      <button class="opt">管道右侧在子 shell 里执行，赋值带不回父 shell；改成 <span class="k">done &lt; &lt;(...)</span> 或 <span class="k">done &lt; file</span></button>
+      <button class="opt">因为 <span class="k">read</span> 少了 <span class="k">-n</span> 参数，读不到行</button>
+      <div class="ans">正确答案：<b>子 shell 隔离</b>。管道的每一段都在独立进程里，<span class="k">n</span> 的修改只存在于子进程内存。改成进程替换或输入重定向，循环就跑在当前 shell；用 <span class="k">awk</span> 聚合也可以。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 下面哪种情况下 <span class="k">set -e</span> 不会让脚本退出？</div>
+      <button class="opt">单独一行执行 <span class="k">false</span></button>
+      <button class="opt">赋值语句 <span class="k">x="$(false)"</span></button>
+      <button class="opt">函数在 <span class="k">if</span> 条件里被调用，函数体内部有一条 <span class="k">false</span></button>
+      <div class="ans">正确答案：<b>函数在条件上下文里被调用</b>。此时函数体内所有命令的 <span class="k">-e</span> 全部失效。单独 <span class="k">false</span> 会退出；<span class="k">x="$(false)"</span> 的赋值会继承命令替换的状态，同样会退出。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. <span class="k">set -- "a b" c</span> 之后，<span class="k">printf '[%s]\n' $@</span> 和 <span class="k">printf '[%s]\n' "$@"</span> 的区别是？</div>
+      <button class="opt">前者输出三个方括号（被按空格拆开），后者输出两个，<span class="k">a b</span> 保持完整</button>
+      <button class="opt">两者完全一样，引号在 bash 里对 <span class="k">$@</span> 没有影响</button>
+      <button class="opt">前者输出一个，后者输出两个</button>
+      <div class="ans">正确答案：<b>不加引号会被分词</b>。不加引号的 <span class="k">$@</span> 先按 IFS 拆分再做 glob 展开，<span class="k">"a b"</span> 变成 <span class="k">a</span> 和 <span class="k">b</span> 两个词；加了引号才是「每个位置参数一个词」。参数里含 <span class="k">*</span> 时还会被展开成文件名。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. <span class="k">[ $a &gt; $b ]</span> 这种写法的问题是什么？</div>
+      <button class="opt">没有问题，就是数值比较的标准写法</button>
+      <button class="opt"><span class="k">&gt;</span> 被当成输出重定向，会创建一个以 <span class="k">$b</span> 值命名的文件，判断结果也不对</button>
+      <button class="opt">只在 <span class="k">sh</span> 里有问题，bash 里完全正常</button>
+      <div class="ans">正确答案：<b>重定向</b>。这一行被解析成「执行 <span class="k">[ $a ]</span> 并把输出重定向到文件 <span class="k">$b</span>」，所以判断永远为真、文件被悄悄创建。数值比较要用 <span class="k">-gt</span> 或 <span class="k">(( a &gt; b ))</span>。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 文件名叫 <span class="k">my report.log</span> 时，下面哪种写法最安全？</div>
+      <button class="opt"><span class="k">find . -name '*.log' | xargs rm -f</span></button>
+      <button class="opt"><span class="k">for f in $(find . -name '*.log'); do rm -f $f; done</span></button>
+      <button class="opt"><span class="k">find . -name '*.log' -print0 | xargs -0 rm -f --</span></button>
+      <div class="ans">正确答案：<b>用 NUL 分隔</b>。前两种都会把带空格的路径拆成两个参数，第一种还可能连错文件。第三种用 <span class="k">-print0</span> 加 <span class="k">-0</span>，任何字符都不会被误拆；<span class="k">-exec {} +</span> 也可以。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 一个每 30 分钟跑一次的备份脚本，怎么防止两次执行重叠？</div>
+      <button class="opt">在脚本开头 <span class="k">sleep 30</span> 等一下</button>
+      <button class="opt">用 <span class="k">flock -n</span> 加文件锁，拿不到锁就退出</button>
+      <button class="opt">把脚本改成后台运行 <span class="k">&amp;</span></button>
+      <div class="ans">正确答案：<b>文件锁</b>。<span class="k">flock -n</span> 拿不到锁立即返回非零，可以让脚本安静退出（退出码 0，避免刷告警）。<span class="k">sleep</span> 只是推迟冲突，后台运行会让重叠更严重——上一次还没跑完，下一次已经在跑了。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>子 shell</b></td><td>由当前 shell fork 出来的新进程，变量互不影响。管道每段、<span class="k">$( )</span>、<span class="k">( )</span> 都会产生</td></tr>
+    <tr><td><b>进程替换</b></td><td><span class="k">&lt;(cmd)</span>，把命令输出变成一个可读的文件路径，循环在当前 shell 执行</td></tr>
+    <tr><td><b>pipefail</b></td><td>让管道的退出码取最后一个非零值，而不是永远取最后一个命令的</td></tr>
+    <tr><td><b>SIGPIPE / 141</b></td><td>下游提前关闭管道时上游收到 SIGPIPE，退出码 141（128 + 13）</td></tr>
+    <tr><td><b>IFS</b></td><td>内部字段分隔符，决定 <span class="k">read</span> 和分词怎么切。改它会影响所有 <span class="k">read</span></td></tr>
+    <tr><td><b>glob / nullglob</b></td><td>通配符展开。开了 <span class="k">nullglob</span>，没有匹配时展开成空而不是保留字面量</td></tr>
+    <tr><td><b>trap</b></td><td>信号处理器。<span class="k">EXIT</span> 在任何退出时触发，用来做清理</td></tr>
+    <tr><td><b>幂等</b></td><td>重复执行结果一致。脚本幂等，才能安全地重跑</td></tr>
+    <tr><td><b>dry-run</b></td><td>只打印将要执行的动作，不真正执行。批量删除、改名必须先跑一遍</td></tr>
+    <tr><td><b>flock</b></td><td>文件锁工具，用来防止 cron 任务重叠、并发写同一文件</td></tr>
+    <tr><td><b>退出码语义</b></td><td>0 成功、1 通用错误、2 用法错误、126 无执行权限、127 命令不存在、130 中断、137 被杀</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 把本篇 8 个脚本抄进一个目录，每个都跑一遍，再故意传空参数、带空格的路径、不存在的目录，看它们怎么崩；② 写一行 <span class="k">printf | while read</span> 复现计数为 0，然后换三种修法各试一次；③ 用 <span class="k">bash -x</span> 跑一遍你的脚本，看执行顺序和你以为的是否一致；④ 把 <span class="k">set -euo pipefail</span> 加到一个旧脚本上，看它在哪里突然退出——那多半就是一个一直存在但没被发现的 bug。<br><br>
+    <b>之后值得单独学：</b>第 3 篇讲 Linux 命令的追问（awk / sed / find 的组合），第 2 篇讲排障顺序（脚本里要判断的那些现象都在那儿），第 36 篇讲笔试题的答题技巧。脚本是运维的手，排障思路才是脑——两者要一起练。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 25 期 · 脚本题的分水岭不在语法，在你写之前有没有想过它会怎么坏</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

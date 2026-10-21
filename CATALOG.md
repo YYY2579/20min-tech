@@ -1,8 +1,8 @@
-# 20分钟速学 · 完整目录（198 份）
+# 20分钟速学 · 完整目录（234 份）
 
-> 9 个分类，每类 **20~24 份**。`✅` 已完成 ｜ `⬜` 待写
-> 分类编号 01~09 已定死，未来新增分类追加为 10、11……
-> **当前进度：198 / 198** ✅ 全部完成
+> 10 个分类，每类 **20~36 份**。`✅` 已完成 ｜ `⬜` 待写
+> 分类编号 01~10 已定死，未来新增分类追加为 11、12……
+> **当前进度：234 / 234** ✅ 全部完成
 
 ---
 
@@ -284,7 +284,52 @@
 
 ---
 
-## 执行顺序（按依赖关系排）
+## 10 求职冲刺 · interview（36 份 · 完成 36）
+
+> 面向面试的专栏，不是知识科普：每篇按「现象 → 原因 → 命令/话术 → 面试怎么答」组织，覆盖 Linux/网络/Docker/K8s/监控/MySQL/Redis 的技术追问，以及事故复盘、行为面、谈薪、简历、笔试题。
+
+| # | 文件 | 标题 | 状态 |
+|---|---|---|---|
+| 01 | `01-battle-map.html` | 求职冲刺：运维 / SRE 面试全景与 30 天打法 | ✅ |
+| 02 | `02-linux-troubleshooting.html` | Linux 故障排查：CPU / 内存 / IO / 磁盘 / 网络五条线 | ✅ |
+| 03 | `03-linux-commands.html` | Linux 命令追问：不只问你怎么用，还问你为什么 | ✅ |
+| 04 | `04-os-io-model.html` | 进程 / 线程 / 协程与五种 IO 模型 | ✅ |
+| 05 | `05-tcp.html` | TCP 面试：握手、挥手、状态机与那些追问 | ✅ |
+| 06 | `06-network-troubleshoot.html` | 网络排障 12 个经典现象：从「ping 得通」到「就是打不开」 | ✅ |
+| 07 | `07-dns-http-https.html` | DNS 与 HTTP/HTTPS 高频问：从解析到握手 | ✅ |
+| 08 | `08-docker.html` | Docker 八股：namespace、cgroup、分层与网络 | ✅ |
+| 09 | `09-docker-troubleshoot.html` | Docker 排障手册：容器起不来、磁盘爆了、网络不通 | ✅ |
+| 10 | `10-k8s-core.html` | Kubernetes 核心八股：对象、控制循环与声明式 | ✅ |
+| 11 | `11-k8s-troubleshoot.html` | Pod 排障决策树：Pending、CrashLoop、OOM、Evicted | ✅ |
+| 12 | `12-k8s-network.html` | K8s 网络全链路：Pod、Service、Ingress 与 DNS | ✅ |
+| 13 | `13-k8s-scheduling.html` | 调度、QoS、扩缩容与优雅发布 | ✅ |
+| 14 | `14-prometheus.html` | Prometheus 八股：指标类型、PromQL 与基数爆炸 | ✅ |
+| 15 | `15-slo-alerting.html` | SLO、错误预算与告警设计 | ✅ |
+| 16 | `16-observability.html` | 可观测性三支柱：指标、日志、链路怎么配合 | ✅ |
+| 17 | `17-mysql.html` | MySQL 面试：索引、事务、锁与慢查询的追问链 | ✅ |
+| 18 | `18-redis.html` | Redis 面试：三大缓存问题、持久化与集群 | ✅ |
+| 19 | `19-cicd-release.html` | CI/CD 与发布策略：怎么发才不出事 | ✅ |
+| 20 | `20-system-design-ops.html` | 运维场景系统设计题：监控、日志、发布、配置中心 | ✅ |
+| 21 | `21-incident.html` | 线上事故：前 5 分钟做什么，事后怎么讲 | ✅ |
+| 22 | `22-behavioral.html` | 行为面与心理博弈：自我介绍、离职原因、压力面 | ✅ |
+| 23 | `23-salary.html` | 薪资谈判：总包、锚点与不踩坑 | ✅ |
+| 24 | `24-resume.html` | 简历与项目表达：把 198 篇知识变成故事 | ✅ |
+| 25 | `25-shell-scripting.html` | Shell 脚本面试：手写题、健壮性与那些致命坑 | ✅ |
+| 26 | `26-nginx.html` | Nginx 面试：配置、反向代理与 502 家族 | ✅ |
+| 27 | `27-git.html` | Git 面试：分支模型、reset 与救火 | ✅ |
+| 28 | `28-linux-tuning.html` | Linux 内核参数调优：面试爱问的那几个 sysctl | ✅ |
+| 29 | `29-load-balancing.html` | 负载均衡：LVS、Nginx、HAProxy 怎么选 | ✅ |
+| 30 | `30-mq.html` | 消息队列面试：Kafka 与 RabbitMQ 的必答题 | ✅ |
+| 31 | `31-distributed-tx.html` | 分布式事务与一致性面试 | ✅ |
+| 32 | `32-resilience.html` | 限流、熔断、降级：讲清触发条件才算会 | ✅ |
+| 33 | `33-storage-fs.html` | 存储与文件系统面试：ext4、XFS、NFS 与对象存储 | ✅ |
+| 34 | `34-container-security.html` | 容器安全面试：逃逸、供应链与 RBAC | ✅ |
+| 35 | `35-cloud-cost.html` | 云成本与容量：FinOps 面试题 | ✅ |
+| 36 | `36-written-test.html` | 运维笔试题 30 道：手写命令与排障推演 | ✅ |
+
+---
+
+## 执行顺序（历史记录，已全部完成）
 
 | 批次 | 分类 | 份数 | 理由 |
 |---|---|---|---|

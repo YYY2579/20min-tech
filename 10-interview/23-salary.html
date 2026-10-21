@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>薪资谈判：总包、锚点与不踩坑</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 23 期</span>
+    <h1>薪资谈判：总包、锚点与不踩坑</h1>
+    <p class="sub">谈薪不是讨价还价，是<b>把信息差补齐</b>。先问清结构，再谈数字——你随口报出的第一个数，会变成对方心里的天花板。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>6</b> 大结构维度</span>
+      <span class="chip"><b>8</b> 句可直接用的话术</span>
+      <span class="chip"><b>1</b> 张总包拆解表</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先算一遍：你现在的「年现金收入」是多少？含年终、含补贴、税前。算不出来，这篇就是为你写的。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>他报了 25K，最后 23K 成交，还觉得自己赢了</h2></div>
+  <p class="lead">一个很典型的场景。HR 在电话里问「你期望多少」，候选人想了两秒说「25 左右吧」。HR 停了一下，说「我们这个岗位的预算大概在 20 到 23 之间」，然后问「23 你能接受吗」。候选人心里快速算了一下，比现在多 3K，说可以。挂了电话还挺高兴。</p>
+  <p>复盘一下这个回合里到底发生了什么。<b>他并没有被压价，他是自己把天花板钉在了 23。</b>整个过程里，他没有得到任何一条新信息，却主动交出了三样东西：一个单点数字（没有解释空间，只能往下谈）、一个自己都不知道是否低于市场的锚（他连对方带宽是多少都没问）、一个错误的口径（他说的是月薪，对方算的是年包）。</p>
+  <p>还有一个更隐蔽的版本，两个人同岗同级：一个 22K 乘 14 个月，年现金 30.8 万；一个 20K 乘 16 个月，年现金 32 万。<b>月薪低的那个，一年反而多拿 1.2 万。</b>如果你只在群里问「你多少 K」，你连比较的单位都错了。</p>
+  <div class="callout warn">
+    <b>这篇的边界：</b>不写任何一家公司的具体数字。公司会调薪、岗位会变化，写死的数字第二天就过期，而且会误导你拿别人的带宽套自己。这里给的是——<b>结构怎么拆、区间怎么估、判断怎么做、话怎么说</b>。这四样不会过期。
+  </div>
+  <p>先把一件事说清楚：谈薪的能力，大部分不在「敢不敢要」，而在「知不知道自己值多少、对方能给多少、以及除了钱还有什么可以换」。前两件事靠信息，第三件事靠准备。所以这篇的顺序是：先拆结构（你连总包有几个格子都不知道，谈什么都是虚的），再谈时机（什么时候开口决定你有没有筹码），再谈锚点和压价（这是话术最密集的部分），最后是签字前后的实务。</p>
+  <p><b>先说一句可以直接用的话：</b>「薪资这块我想先了解一下这个岗位的预算区间和级别，因为不同级别对应的带宽差别挺大的，我先知道自己在对的位置上，再谈数字会比较有效率。」——这句话的作用不是要数字，是让你从「被审问的人」变成「一起对齐信息的人」。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>总包有六个格子，你只盯着第一个</h2></div>
+  <p class="lead">绝大多数人谈薪时脑子里只有一个数：月薪。但一份 offer 是一张有六个格子的表，月薪只是其中最显眼的那一格。不懂这张表的人，会在「月薪多 1K」上争半小时，却对「公积金按 5% 还是 12% 缴」这种一年差几万的条款毫无感觉。</p>
+  <table>
+    <tr><th style="width:120px">格子</th><th style="width:210px">通常包含什么</th><th>必须问清的一句话</th></tr>
+    <tr><td><b>现金固定</b></td><td>月 base 乘月数（12 / 13 / 14 / 15 / 16 个月都有）</td><td>「年薪是按几个月算的？去年实际发了几个月？」</td></tr>
+    <tr><td><b>现金浮动</b></td><td>绩效奖金、年终奖、项目奖、销售提成</td><td>「绩效系数的分布大概是什么样？大多数人落在哪一档？」</td></tr>
+    <tr><td><b>长期激励</b></td><td>期权、限制性股票（RSU）、员工持股</td><td>「行权价多少、归属节奏怎么排、离职后还有多久能行权？」</td></tr>
+    <tr><td><b>补贴</b></td><td>餐补、交通、通讯、房补、驻场补贴、值班补贴</td><td>「这些是发现金、打进卡里，还是只能内部消费？」</td></tr>
+    <tr><td><b>法定与福利</b></td><td>公积金比例与基数、社保基数、商业保险、年假、体检</td><td>「公积金按什么比例、按哪个基数缴？」</td></tr>
+    <tr><td><b>一次性</b></td><td>签字费、搬家费、安家费、入职即授的股票</td><td>「有没有签字费？如果有，什么条件下要退回？」</td></tr>
+  </table>
+  <h3>月数：最容易出错的一格</h3>
+  <p>「按 14 个月发」和「去年实发 14 个月」是两件不同的事。前者是制度上限，后者是实际结果。有的公司写 14 个月，其中 2 个月是绩效，绩效系数 0.6 到 1.2 浮动，你实际可能拿到 12.8 个月。所以你问的时候要分两步：先问制度（几个月、几月发），再问事实（上一批人实际拿到多少、绩效按什么比例分布）。<b>只问制度，你拿到的是一个上限；只问事实，你不知道明年会不会变。</b></p>
+  <h3>公积金：一年能差出一台电脑</h3>
+  <p>公积金有两个变量，很多人只问了第一个。比例通常是 5% 到 12%（各地政策不同，以当地公积金中心口径为准），基数则是另一个变量——按全额工资缴、按基本工资缴、按最低基数缴，三种做法完全不同。用一个月薪 20000 的例子算：</p>
+  <pre><span class="c"># 只算比例差：5% vs 12%，个人 + 公司双边</span>
+月缴存差额 = 20000 × (12% - 5%) × 2 = 2800 元
+年差额     = 2800 × 12 = 33600 元
+
+<span class="c"># 再叠加基数差（按 20000 vs 按 8000 缴）</span>
+双边差额 = (20000 - 8000) × 12% × 2 = 2880 元/月
+
+<span class="c"># 注意：公积金是你自己的钱，可提取可用于贷款，不是「福利」</span>
+<span class="c"># 而社保基数低，短期到手多，长期影响医保报销与养老金</span></pre>
+  <p>这段计算里没有任何一家公司的数据，全是公式。你可以拿自己手上两个 offer 的数字代进去，五分钟就能看出哪一份真的更高。<b>把口径统一成「年现金」和「年总包」两个数，写在一张纸上</b>，这是谈薪前必须做的功课，比任何话术都重要。</p>
+  <h3>期权：不要自己乘估值</h3>
+  <p>期权最容易让人上头。看到「授予 10 万股」就自动乘上一个新闻里的估值，算出一个天文数字。正确的问法是四个：行权价是多少、当前公允价值是多少、归属节奏怎么排、离职后多久内必须行权。归属上常见的是四年分期加一年 cliff，意思是干满一年才拿到第一批，不满一年通常一股都拿不到。<b>早期公司的期权，本质是一张「公司未来愿意回购或上市」的彩票</b>，你可以在谈判里争取数量，但不该在决策里给它全额估值。</p>
+  <div class="callout ok">
+    <b>面试怎么答（当被反问「你怎么看薪资」）：</b>「我看总包，主要分三块：现金、股权、福利。现金我会按年算，把月数和绩效的浮动考虑进去；股权我会看行权价和归属节奏，不会按估值折算成现金；福利里我会特别看公积金的比例和基数。因为同样写着 25K，这三块的结构不一样，实际到手能差不少。」
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>谈薪时机：太早开口，你把自己变成了成本项</h2></div>
+  <p class="lead">技术一面聊得很好，面试官问「你对薪资有什么期望」，候选人很实在地报了数。从这一刻起，面试官脑子里的评价维度就多了一条：这个人多少钱。而他本来应该在评估的是：这个人能不能解决我的问题。</p>
+  <p>这不是玄学。人在同时评估「能力」和「价格」时，会不自觉地用价格去反推能力——「他要 30K，我们这个岗位 25K，那他可能不太合适」，或者反过来「他只要 18K，是不是水平一般」。<b>你越早报价，你的能力就越早被价格替代。</b></p>
+  <table>
+    <tr><th style="width:150px">阶段</th><th>该不该谈</th><th>理由</th></tr>
+    <tr><td><b>HR 电话初筛</b></td><td>不给数字，但也不硬拒</td><td>对方常常只是填表，你给数字等于免费提供了筛选依据</td></tr>
+    <tr><td><b>技术一面 / 二面</b></td><td>不谈</td><td>面试官可能没有定价权，谈了也白谈，还污染评价</td></tr>
+    <tr><td><b>HR 面 / 明确说「准备发 offer」</b></td><td>正式谈</td><td>此时对方已经决定要你，你的筹码最大</td></tr>
+    <tr><td><b>收到口头 offer 后</b></td><td>谈结构、谈补充项</td><td>这是最后能改条款的窗口，签字之后就只剩下一年的等待</td></tr>
+  </table>
+  <p>但现实是，HR 初筛那一通电话里，对方大概率会问。你不能说「我不方便说」——那会被记成「沟通不配合」。你要做的是<b>把问题往后推，同时给出一个不冒犯的理由</b>。</p>
+  <pre><span class="c"># 话术 1：第一次被问期望（推后，不拒绝）</span>
+「我现在的重点是想先弄清楚这个岗位具体负责什么、对应什么级别。
+ 薪资我相信贵司有自己的体系，如果方便的话，能不能先告诉我这个岗位的预算区间？
+ 这样我们双方都省时间，也避免后面因为预期差太多白跑流程。」
+
+<span class="c"># 话术 2：对方坚持「你必须给个数」（给现状，不给承诺）</span>
+「理解。我目前的年现金大概在 X 左右，我看新机会主要看整体，
+ 期望不低于现在，具体还要看岗位级别和总包结构。
+ 如果这个岗位的带宽和我预期差得比较远，我也想早点知道，不浪费您的时间。」
+
+<span class="c"># 话术 3：对方还是不给区间（设一个软边界）</span>
+「那我先按我了解的市场情况说个范围，如果超出贵司带宽，您直接告诉我就行，
+ 我们不一定要在这儿对上，可以先看岗位是不是匹配。」</pre>
+  <p>注意话术 2 里的关键动作：<b>给的是「现状」，不是「期望」。</b>现状是一个可以被验证的事实（离职证明、流水、背调都能对上），期望是一个承诺（说出来就变成了你的报价）。这两个词在你嘴里只差两个字，在对方耳朵里差的是「可谈判」和「已定价」。</p>
+  <div class="callout">
+    <b>一个反直觉的判断：</b>如果对方从头到尾都不肯说预算区间，通常是两种情况——预算确实低于你的预期，或者接电话的人没有权限。两种情况你都应该在技术面之前就知道，而不是等到最后。所以「问不到区间」本身就是一个信号，别忽略它。
+  </div>
+  <p><b>面试怎么说：</b>「薪资我一般在 HR 或 offer 阶段谈，前面更想聊清楚岗位和团队。如果初筛一定会问到，我会说目前的年现金水平，但不会先给一个期望数字——因为那时候我还不知道这个岗位的级别。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>锚点：先开口的人定锚，后开口的人定区间</h2></div>
+  <p class="lead">「先开口的人吃亏」这句老话只对了一半。准确的说法是：<b>先开口的人负责定锚，后开口的人负责定区间。</b>如果你完全不知道对方的带宽，先开口就是把锚定权免费送人；如果你已经知道这个级别大概在什么范围，先开口反而有利——因为你把谈判的起点拉到了你想要的位置。</p>
+  <p>所以第一个动作不是「要不要报」，是「我有没有信息」。信息从哪来：JD 里写的级别、招聘平台上同岗位的公开区间、同行的口径、以及最可靠的一条——直接问 HR「这个岗位对应的级别和带宽是多少」。这三条你至少要有两条，才有资格先开口。</p>
+  <h3>报区间，不报单点</h3>
+  <p>单点数字的死穴是它只能往一个方向走：下。你报 25，对方的动作只有「给 25」或「往下砍」，没有「往上加」这个选项。区间就不一样，它给了对方一个可以「落在里面」的动作，而人会倾向于把结果落在区间内。</p>
+  <table>
+    <tr><th style="width:150px">报法</th><th>对方的反应</th><th>结果</th></tr>
+    <tr><td>「25K」（单点）</td><td>「预算 23，能不能接受」</td><td>你只能答是或否，没有第三个选项</td></tr>
+    <tr><td>「20 到 30 之间」（过宽）</td><td>「那 20 可以吗」</td><td>等于报了你的下限，区间白报</td></tr>
+    <tr><td>「25 到 28」（窄区间，下限即目标）</td><td>「我们争取 26」</td><td>落在区间内，双方都有台阶</td></tr>
+    <tr><td>「25 到 28，14 个月」（带口径）</td><td>「我们是 13 个月，折算一下」</td><td>避免口径错位，谈的是同一件事</td></tr>
+  </table>
+  <p>三个技术细节。<b>第一，区间宽度别超过 20%。</b>25 到 28 是 12%，可信；20 到 35 会让人觉得你自己都不知道值多少。<b>第二，下限要设成你的真实目标，不是你的底线。</b>因为对方几乎必然从下限开始谈，你把下限设成底线，等于开局就退到底线。<b>第三，一定要带口径。</b>「25 到 28」这句话在有 12 个月和有 16 个月的公司里，含义能差 30%。</p>
+  <pre><span class="c"># 话术 4：报区间的完整版（一句话里塞进三件事）</span>
+「按我了解的这个级别，我的预期是月薪 25 到 28、14 个月这个口径，
+ 折成年的现金大概 35 到 39。
+ 我说区间是因为具体定在哪一档，还要看岗位职责和汇报关系，
+ 这两块我还没完全了解，不太想先把自己框死在一个数字上。」
+
+<span class="c"># 为什么这句话有效：给了区间（可落地）+ 给了口径（可换算）+ 给了理由（不贪）</span></pre>
+  <div class="callout warn">
+    <b>别做的一件事：</b>虚报一个高得离谱的数字来「留还价空间」。这套在菜市场有用，在招聘里会直接触发两种结果——对方判断你预期不可控，流程终止；或者对方真的给了，但把你的级别定得很高，入职后三个月发现你接不住。<b>报价虚高的代价不是被砍，是被记住。</b>
+  </div>
+  <p><b>面试怎么说：</b>「我一般会给区间而不是单点，因为定在哪一档取决于职责范围。区间下限是我的真实预期，不是我的底线——这句话我会明说，省得双方猜。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>被压价的四种说法，和四种不吵架的回应</h2></div>
+  <p class="lead">压价这件事，多数时候不是对方坏，是流程如此：HR 的考核指标里有一项叫「人力成本控制」，你的报价就是他的工作量。所以不要把压价理解成对你能力的否定，它只是一个谈判动作。你要做的是识别它属于哪一类，然后用对应的方式回应。</p>
+  <table>
+    <tr><th style="width:190px">对方的说法</th><th style="width:150px">真实含义</th><th>你的回应（可直接说）</th></tr>
+    <tr><td>「我们预算就这个数，超不了」</td><td>级别定低了，或者你还没让他觉得值这个价</td><td>不争数字，争级别：「如果预算卡在 22，这个岗位对应的级别能不能再核一下？我可以先按 22 入职，但希望把级别和 6 个月后的调薪节点写进 offer。」</td></tr>
+    <tr><td>「你上家才 18，给你 24 已经涨很多了」</td><td>用你的过去给你定价</td><td>换基准：「我理解涨幅这个说法，不过我更希望按这个岗位的价值来定。上家那个数字对应的是我当时的级别和职责，这次面的是另一个级别。」</td></tr>
+    <tr><td>「你还有别的 offer 吗？」</td><td>探你有没有退路</td><td>有就说，没有别编：「目前有两个在流程里，贵司是我的优先项。」——前提是这句是真的。</td></tr>
+    <tr><td>「我们只能给你降一级」</td><td>大厂卡带宽的常规操作</td><td>接级别，问位置：「级别我可以接受，因为它对应的是职责范围。那这个级别的薪资中位大概是多少？我想知道自己在这个带宽里的位置。」</td></tr>
+  </table>
+  <h3>让步必须换东西</h3>
+  <p>四种回应有一个共同点：<b>不白让。</b>你可以接受对方的数字，但每一次接受都要换回一样东西。能换的清单不长，但每一样都比「多 500 块月薪」实在：</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>签字费</div><div class="cd">最容易被批的一项，因为它不进 base、不影响你的薪酬带宽、不参与普调。<b>最适合用来补「入职当年拿不到年终」的缺口</b>，通常按 1 到 3 个月 base 谈，记得问清退还条件。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>调薪时点</div><div class="cd">「入职 6 个月做一次 review，达标按 X 调整」——写进 offer 才有意义。口头说的「我们一年调两次」不算承诺。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>级别与 title</div><div class="cd">级别比当月工资更值钱，因为它决定你下一份工作的起点。宁可少要 1K，换一个更高的级别。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>时间与远程</div><div class="cd">报到日期往后挪两周、每周一天远程、值班补贴——这些成本对公司在预算之外，反而好谈。</div></div>
+  </div>
+  <pre><span class="c"># 话术 5：接受数字，同时换条件（一次只提一个，别打包）</span>
+「22 这个数我可以接受，我理解预算的限制。
+ 有一个小请求：我入职是在 X 月，当年的年终大概率拿不到，
+ 能不能在签字费上补一下这部分？如果签字费不好批，
+ 那把入职后的第一次调薪 review 放在 6 个月，写进 offer 里，我也可以。」
+
+<span class="c"># 为什么拆成两个选项：给对方一个「更容易批」的出口，成功率比死磕高</span></pre>
+  <div class="callout danger">
+    <b>绝对不要在电话里当场答应。</b>不管对方说得多诚恳、多急，标准句是：「我理解，我回去把这个数算一下，明天下午之前给您答复。」这句话给你十几个小时，让你把总包算清楚、和家里人商量、甚至等另一个流程的结果，而且完全不冒犯任何人。<b>当场答应的人，事后 80% 会后悔。</b>
+  </div>
+  <p><b>面试怎么说（如果被问「你怎么处理被压价」）：</b>「我一般不会在数字上硬顶，会先确认是预算问题还是级别问题。预算问题就换非现金项，级别问题就谈级别。两个都动不了，那说明这个岗位本来就不匹配，早点知道是好事。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>多 offer 比较：用矩阵，不用感觉</h2></div>
+  <p class="lead">手上两个 offer 的时候，人最容易犯的错是「算总包，然后选大的那个」。但真正决定你未来两年过得怎么样的，往往不是那 5% 的差额，而是——你的直属上级是谁、这个业务会不会被砍、你在这里能不能长出新能力。</p>
+  <p>不是让你不算钱，是让你<b>把钱算准，再把别的也量化</b>。给每个维度打 1 到 5 分，乘权重，加总。这个方法的价值不在于最后那个分数，而在于它逼你把「我觉得这家更有前途」拆成具体的判断依据。</p>
+  <table>
+    <tr><th style="width:160px">维度</th><th style="width:70px">建议权重</th><th>怎么打分（1 到 5）</th></tr>
+    <tr><td><b>年现金</b></td><td>30%</td><td>按「第二年稳态现金」算，不含签字费。5 分 = 明显高于另一个，1 分 = 明显低</td></tr>
+    <tr><td><b>股权确定性</b></td><td>10%</td><td>上市可流通 4 到 5；已上市有锁定期 3；晚期未上市 2 到 3；早期 1</td></tr>
+    <tr><td><b>级别与成长</b></td><td>25%</td><td>能不能接触到你想学的系统、级别是否高于现职、团队有没有比你强的人</td></tr>
+    <tr><td><b>业务稳定性</b></td><td>15%</td><td>业务是否在收缩、这个团队半年内有没有裁撤传闻、HC 是补缺还是新增</td></tr>
+    <tr><td><b>直属上级</b></td><td>10%</td><td>面试时他问的问题有没有深度、他能不能说清团队的目标、你愿不愿意跟他干两年</td></tr>
+    <tr><td><b>强度与通勤</b></td><td>10%</td><td>on-call 频率、发布窗口、单程通勤时间。这一项在长期里杀伤力最大</td></tr>
+  </table>
+  <p>两个必须提醒的地方。<b>第一，算「第二年」。</b>第一年有签字费、有入职即授的股票、有按比例折算的年终，数字会虚高。第二年才是你要长期过的日子。<b>第二，股权的折算要打折。</b>已上市且有流动性的可以按 0.8 到 1.0 折，有锁定期的按 0.7 左右，晚期未上市按 0.5，早期按 0.2 到 0.3。这是一套经验折价口径，不是估值方法，但它能防止你把一张彩票当成现金。</p>
+  <div class="callout">
+    <b>一个更狠的问法：</b>假设两份 offer 的现金完全一样，你选哪个？如果答案很明确，那说明钱不是你的决策因素，你只是在用钱给自己找理由。反过来，如果现金差 30% 以上还能犹豫，那说明另一份在某个维度上给了你很强的东西——把它找出来，那才是你真正在买的东西。
+  </div>
+  <pre><span class="c"># 一个能直接抄的比较表（A / B 两个 offer，自己填分）</span>
+维度            权重    A 分   B 分   A 加权   B 加权
+年现金          30%     4      5      1.20     1.50
+股权确定性      10%     3      2      0.30     0.20
+级别与成长      25%     5      3      1.25     0.75
+业务稳定性      15%     3      4      0.45     0.60
+直属上级        10%     4      4      0.40     0.40
+强度与通勤      10%     5      2      0.50     0.20
+合计                                  4.10     3.65
+
+<span class="c"># 结论不是「选 A」，而是「B 要多给多少现金，你才愿意接受它的强度」</span>
+<span class="c"># 这个数字才是你谈判时可以拿去说的东西</span></pre>
+  <p><b>面试怎么说：</b>「我比较 offer 会做一张表，现金按第二年稳态算，股权按确定性打折，再给成长、稳定性、强度各一个权重。这样做的目的不是选分数高的，是让我知道自己在为什么付代价。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>口头 offer、背调、竞业：签字前的三道关</h2></div>
+  <p class="lead">「我们决定要你了，回头 HR 会联系你发 offer，你先去提离职吧。」——这句话是整场求职里风险最高的一句。<b>口头 offer 在法律上几乎不构成可执行的承诺</b>，而你已经把唯一的筹码（还在职）交出去了。流程冻结、HC 被砍、组织调整，任何一个发生，你都是裸奔状态。</p>
+  <p>所以有一条不能破的顺序：<b>书面 offer 到手 → 提离职 → 交接 → 入职。</b>没有例外。你可以用很客气的方式让对方知道这个顺序：</p>
+  <pre><span class="c"># 话术 6：催书面 offer（同时立边界，不显得不信任）</span>
+「谢谢您的认可。有个情况想跟您同步一下：我这边提离职需要走一个流程，
+ 拿到正式的书面 offer 之后我才能启动，这样对现在的团队也好交代。
+ 想问一下 offer 大概什么时候能发？我按这个时间来安排。」
+
+<span class="c"># 关键：把「我要书面」包装成「我对现在团队负责」，而不是「我不信你们」</span></pre>
+  <h3>背调：不是只查学历</h3>
+  <p>正规背调会核这几项：在职起止时间（精确到月）、职位名称、离职原因、是否有竞业限制或未了结的劳动纠纷、学历学位、以及部分岗位的绩效评价。<b>最常见的不一致不是学历造假，是入职离职时间差一两个月</b>，以及职位名称写得比实际高。</p>
+  <p>两个动作：授权前问清核查范围（这是你的权利）；简历上的时间线和职位名称，和你将提供的证明人说法必须一致。如果和前公司有过不愉快，提前想好一句中性的事实描述，别在背调电话里被问出情绪。</p>
+  <h3>竞业：看三件事，别自己下结论</h3>
+  <p>竞业限制协议要看清三件事：<b>限制范围</b>（列了哪些公司、什么业务）、<b>期限</b>（常见 6 到 24 个月，法定上限是两年）、<b>补偿</b>（按月给多少、什么时候开始给）。</p>
+  <p>关于补偿，有一个很多人不知道的点：如果协议里没约定补偿标准，司法实践中的口径大致是按劳动者离职前十二个月平均工资的 30% 计算，且不低于劳动合同履行地的最低工资标准；如果因为用人单位的原因三个月没支付补偿，劳动者可以请求解除竞业限制约定。<b>但具体认定各地裁判口径有差异，这类事不要自己拍脑袋，问律师或当地仲裁机构的咨询窗口。</b></p>
+  <div class="callout warn">
+    <b>别忽略的一条：</b>有些公司的竞业协议是入职时签的「格式条款」，范围写得很宽（「所有互联网公司」）。这种条款的效力在实务中经常被 challenge，但 challenge 的成本是你的时间和钱。所以最省事的做法是——<b>在提离职前就把协议翻出来看一遍</b>，而不是等新公司背调问了才发现。
+  </div>
+  <p><b>面试怎么说（被问「你什么时候能到岗」）：</b>「我需要拿到书面 offer 之后启动离职流程，交接大概两到三周，所以最快是 X 月 X 日。如果业务需要更早，我们可以商量，但我不希望在没拿到书面文件前就提离职，这一点想请您理解。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>涨幅的现实预期：别把百分比当目标</h2></div>
+  <p class="lead">「我这次想涨 30%」——这句话在心里想想可以，说出来就变成了一个把自己框死的目标。因为涨幅是结果，不是原因。对方给你多少，取决于三件事：这个岗位的带宽、你在带宽里的位置、以及你有没有别的选择。你的期望值不在这个公式里。</p>
+  <p>先把两个市场分清楚。<b>内部调薪</b>是在你现有薪酬的基础上，按带宽、普调比例和晋升结果来定，天花板是这个级别的上限；<b>外部跳槽</b>是按新岗位的带宽重新定价，你的历史薪酬只是参考之一。<b>大部分人的薪资跃升发生在后者</b>，因为换了一个定价体系，而不是因为在原来的体系里更能干。</p>
+  <table>
+    <tr><th style="width:170px">情形</th><th>现实口径</th><th>你该关注什么</th></tr>
+    <tr><td>同级平移</td><td>涨幅空间最小，因为对方按你的现状加一点定</td><td>结构（月数、公积金、股权），而不是月薪数字</td></tr>
+    <tr><td>跨一个级别</td><td>这才是主要涨幅来源，幅度由带宽决定</td><td>级别是否写进 offer、下一级的晋升周期</td></tr>
+    <tr><td>平薪换赛道</td><td>短期亏，长期可能赚，取决于新赛道的市场价</td><td>两年后你的技能在市场值多少，不是第一年拿多少</td></tr>
+    <tr><td>降薪进大厂</td><td>常见路径，但风险在「进去之后能不能升」</td><td>级别、团队是否核心、有没有明确的晋升通道</td></tr>
+  </table>
+  <p>这里必须说清一件事：<b>具体的涨幅百分比没有普适答案，任何告诉你「今年行情是 X%」的说法都不可靠</b>——它随行业、城市、级别、岗位稀缺度变化，而且往往是拿个别案例倒推出来的。你能做的不是记住一个数字，而是记住三个判断：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>判断一：你的涨幅来源是什么。</b>是级别变了、赛道变了、还是只是换了个老板？只有前两个能支撑明显上浮，第三个通常只能拿到平移。</div></div>
+    <div class="step"><div class="txt"><b>判断二：对方的带宽在哪。</b>同级别的人拿多少，比你上一份拿多少更有说服力。问不到具体数字，就问「这个级别的中位大概在什么位置」。</div></div>
+    <div class="step"><div class="txt"><b>判断三：你有没有第二个选择。</b>这是唯一真正的杠杆。没有第二个流程在跑的时候，所有话术都只是礼貌用语。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>一句能救场的话：</b>当对方问「你期望涨多少」时，不要说百分比，说绝对值加口径：「我期望的年现金是 X，比我现在的 Y 高一些，主要是因为这次是跨了一个级别。如果级别能对上，数字上我可以灵活。」
+  </div>
+  <p><b>面试怎么说：</b>「我不太用涨幅来谈，因为涨幅是相对我过去的，而我更关心这个岗位的绝对定价。同一级别在市场上的位置，比我从上一份涨了多少更能说明问题。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>离职交接与入职时间：最后一段最容易出错</h2></div>
+  <p class="lead">签完字到入职之间，有一到两个月。这段时间看起来是走流程，实际上是风险最集中的一段：交接没做完被卡离职证明、年终奖差几天没拿到、社保断缴一个月、公积金转移没办。这些事情单看都小，凑在一起能让你在新公司第一个月就心态崩掉。</p>
+  <p>交接不是「把手上的事说一遍」，是<b>让接的人能独立跑起来</b>。所以交接清单要按「他需要什么」列，不是按「我记得什么」列：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>文档与图纸</b>：架构图、部署路径、域名与证书清单、定时任务清单、账号密码的保管方式（不是密码本身）。</div></div>
+    <div class="step"><div class="txt"><b>未闭环的事</b>：在跑的工单、待上线的变更、答应了别人但还没做的事。这一项最容易被漏，也最容易在你走后变成「他交接没做好」。</div></div>
+    <div class="step"><div class="txt"><b>权限与密钥</b>：你名下的所有权限要移交或回收，尤其是云账号、CI/CD、堡垒机、生产库。走之前主动提这件事，是最能建立口碑的动作。</div></div>
+    <div class="step"><div class="txt"><b>值班与告警</b>：把 on-call 从你身上摘掉，把告警接收人改掉。否则你入职新公司第一周还在收上一家的告警。</div></div>
+    <div class="step"><div class="txt"><b>外部对接人</b>：供应商、合作方、云厂商的对接窗口，列一张名单加一句「这个人负责什么」。</div></div>
+  </div>
+  <h3>入职时间是可以谈的</h3>
+  <p>如果年终奖在一月发，而 offer 要求你十二月到岗，这中间的钱是可以谈的——要么报到日往后挪，要么用签字费补。这是最常见也最容易成功的「时间换钱」。</p>
+  <pre><span class="c"># 话术 7：谈报到时间</span>
+「我个人希望 X 月 X 日到岗，因为手上有个项目要到那个节点才能收尾，
+ 我也想把它完整交出去，不想留个半截。
+ 如果业务需要更早，我们可以商量，但希望能留出两周做交接。」
+
+<span class="c"># 话术 8：年终奖窗口（注意不要说成「我在等钱」）</span>
+「我现在的年终奖是按年度考核在 X 月发放，如果我在那之前离职，
+ 这部分就相当于放弃了。所以想问一下，报到时间有没有弹性？
+ 如果必须早到，签字费这块能不能覆盖一部分？」</pre>
+  <p>还有一串实务清单，建议直接抄下来对着做：离职证明（必须拿到原件，新公司入职要用）、社保和公积金的衔接（当月 15 日前后的规则各地不同，问清 HR 当月是否缴纳，避免断缴）、公积金异地转移（现在多数城市可以通过全国公积金小程序办理）、个税专项附加扣除的扣缴单位变更、商业保险的生效时间、竞业协议的书面确认。</p>
+  <div class="callout warn">
+    <b>一条职场常识：</b>不要在离职时说「我拿到了多少」。薪酬保密是双向的，你说出去的数字会传回新公司，也会让还在原公司的同事难做。有人问就说「还不错，主要是方向更合适」。
+  </div>
+  <p><b>面试怎么说（被问「你什么时候能到岗」）：</b>「我手上的项目在 X 月有一个节点，我希望把它交完再走，所以最快 X 月 X 日。这段时间我也能把文档和权限整理清楚，对下一个人更友好。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>8 句话术速查：存在手机备忘录里</h2></div>
+  <p class="lead">下面这八句覆盖了谈薪流程里 80% 的对话场景。不要背，理解它为什么这么说，然后用自己的话说出来——背出来的话术，语气是假的，对方听得出来。</p>
+  <table>
+    <tr><th style="width:130px">场景</th><th style="width:52%">说这句</th><th>为什么有效</th></tr>
+    <tr><td><b>初筛被问期望</b></td><td>「我想先了解岗位的预算区间和级别，这样双方都省时间。」</td><td>把「被审问」变成「对齐信息」，没有拒绝对方</td></tr>
+    <tr><td><b>对方坚持要数字</b></td><td>「我目前年现金在 X 左右，期望不低于现在。」</td><td>给事实不给承诺，留出了谈判空间</td></tr>
+    <tr><td><b>正式报价</b></td><td>「我的预期是 25 到 28、14 个月这个口径。」</td><td>区间可落地，口径防错位</td></tr>
+    <tr><td><b>预算卡死</b></td><td>「如果预算卡在 22，级别能不能再核一下？」</td><td>把「数字之争」转成「级别之争」，后者有解法</td></tr>
+    <tr><td><b>拿上家压价</b></td><td>「上家那个数对应的是我当时的级别，这次面的是另一个级别。」</td><td>换掉定价基准，不否定对方</td></tr>
+    <tr><td><b>问你有几个 offer</b></td><td>「目前有两个在流程里，贵司是我的优先项。」</td><td>有筹码但表态，前提是这句是真的</td></tr>
+    <tr><td><b>要你当场决定</b></td><td>「我回去算一下，明天下午之前答复您。」</td><td>争取十几个小时，且完全不冒犯</td></tr>
+    <tr><td><b>催书面 offer</b></td><td>「拿到书面文件我才能启动离职流程，这样对现在团队也好交代。」</td><td>把「我要保障」说成「我负责」</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>怎么练：</b>把这八句念一遍，然后合上，用自己的话说一遍，录音。回放的时候只检查一件事——<b>有没有出现「大概」「可能」「都行」「您看呢」这类把决定权交出去的话</b>。谈薪里，模糊不是礼貌，是让位。
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：每一个都让人少拿过钱</h2></div>
+  <p class="lead">这些坑的共同点是——踩的时候不觉得疼，过三个月才反应过来。而且它们几乎都和「不懂结构」有关，和「不敢要」关系不大。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只比月薪，不比年现金</div><div class="pd">22K 乘 14 是 30.8 万，20K 乘 16 是 32 万。月薪高的那份一年少拿 1.2 万。谈之前先把每份 offer 折成「年现金」和「年总包」两个数写下来。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">第一批就问薪资，还报了个单点</div><div class="pd">单点数字只能往下走，而且让你在面试官眼里从「候选人」变成「成本项」。真要报，报区间加口径。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把「按 14 个月发」当成「能拿 14 个月」</div><div class="pd">前者是制度上限，后者是实际结果。中间隔着一个绩效系数。要问「上一批人实际拿到多少」，而不是「你们是不是 14 薪」。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">忽略公积金的基数</div><div class="pd">只问比例不问基数，等于只查了一半。按全额工资缴和按最低基数缴，一年能差出几万——这部分是你自己的钱，不是福利。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把期权按估值乘出一个天文数字</div><div class="pd">「授予 10 万股」不等于钱。要看行权价、公允价值、归属节奏、离职行权窗口。早期公司的期权在决策里最多按两三折计入。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">口头 offer 就去提离职</div><div class="pd">这是唯一无法挽回的错误。流程冻结、HC 被砍、组织调整，任何一个发生你都裸奔。书面到手再提，没有例外。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">在电话里当场答应</div><div class="pd">「好的没问题」说出口，你就放弃了所有后续空间。标准动作是「我算一下，明天下午答复」，这句话不冒犯任何人，还能让你多等一个流程的结果。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">编一个不存在的 competing offer</div><div class="pd">「我还有一家给到 35」——对方只要问一句「哪家、什么级别、什么时候发」，你就得继续编。而且这类信息在圈子里传得很快，被识破的代价是整场流程作废。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">只谈钱，不谈级别和调薪时点</div><div class="pd">级别决定你下一份工作的起点，调薪时点决定你什么时候能修正这次的结果。这两样都比「多 500 块月薪」值钱，而且更容易谈成。</div></div></div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 两份 offer，其他条件相同：A 是 22K 乘 14 个月，B 是 20K 乘 16 个月。只看年现金，哪份更高？</div>
+      <button class="opt">A 更高，因为月薪高 2K</button>
+      <button class="opt">B 更高，年现金 32 万，A 是 30.8 万</button>
+      <button class="opt">一样高，月薪乘月数都是套路</button>
+      <div class="ans">正确答案：<b>B 更高</b>。22 乘 14 等于 30.8 万，20 乘 16 等于 32 万，差 1.2 万。这就是为什么谈薪前必须先把每份 offer 折成「年现金」和「年总包」两个统一口径的数。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. HR 在初筛电话里问「你期望多少」，最合适的回应是？</div>
+      <button class="opt">直接报一个比预期高 30% 的数字，留还价空间</button>
+      <button class="opt">说「按公司标准来就行」，不给任何信息</button>
+      <button class="opt">先问岗位的预算区间和级别，同时说明自己按年包看</button>
+      <div class="ans">正确答案：<b>先问区间和级别</b>。虚报会被直接筛掉或埋下级别错配的雷；说「按公司标准」等于放弃了所有信息。先问区间既没有拒绝对方，又把对话从「审问」变成「对齐」。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 期权「四年归属、一年 cliff」是什么意思？</div>
+      <button class="opt">干满一年才归属第一批，不满一年通常一股都拿不到</button>
+      <button class="opt">满一年后一次性拿到全部四年份额</button>
+      <button class="opt">四年内可以随时按任意比例行权</button>
+      <div class="ans">正确答案：<b>一年 cliff 是门槛</b>。cliff 指最短服务期，满一年才归属第一批（常见为总量的四分之一），之后按月或按季归属剩余部分。不满一年离职，通常一股都拿不到——这也是早期公司用期权留人的核心机制。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 对方口头说「我们要你了，你去提离职吧」，你应该？</div>
+      <button class="opt">立刻提离职，显得有诚意</button>
+      <button class="opt">先要书面 offer，拿到后再启动离职流程</button>
+      <button class="opt">先提离职，同时催对方尽快发 offer</button>
+      <div class="ans">正确答案：<b>先要书面</b>。口头 offer 在流程冻结、HC 被砍时几乎没有约束力，而你已经交出了唯一的筹码。可以客气地说「拿到正式文件我才能启动流程，这样对现在团队也好交代」。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 报薪资区间的时候，下限应该设成什么？</div>
+      <button class="opt">你的心理底线，这样最差也能接受</button>
+      <button class="opt">比目标高 30%，留出被砍的空间</button>
+      <button class="opt">你的真实目标，因为对方通常从下限开始谈</button>
+      <div class="ans">正确答案：<b>真实目标</b>。区间下限在实践中几乎必然成为谈判起点，你把它设成底线，等于开局就退到底线。同时区间宽度别超过 20%，过宽等于没报。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 关于竞业限制的补偿，下面哪个说法符合司法实践的一般口径？</div>
+      <button class="opt">只要签了协议就必须遵守，和给不给钱无关</button>
+      <button class="opt">因用人单位原因三个月未支付补偿，劳动者可以请求解除竞业限制约定</button>
+      <button class="opt">补偿金额由劳动者自己提出，单位必须接受</button>
+      <div class="ans">正确答案：<b>三个月未付可请求解除</b>。协议未约定补偿标准时，一般按离职前十二个月平均工资的 30% 计算且不低于当地最低工资；因单位原因三个月未支付，劳动者可请求解除约定。但各地裁判口径有差异，实际处理请咨询律师或当地仲裁机构。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>总包（TC）</b></td><td>Total Compensation，一年内所有形式的报酬之和：现金 + 股权年化 + 补贴 + 一次性收入</td></tr>
+    <tr><td><b>年现金</b></td><td>base 乘实发月数 + 保底年终 + 补贴乘 12。这是最硬的一个口径，谈薪时用它对齐</td></tr>
+    <tr><td><b>月数</b></td><td>一年发几个月工资。注意区分「制度上按 N 个月」和「去年实发 N 个月」</td></tr>
+    <tr><td><b>签字费</b></td><td>入职一次性给付的现金，通常用来补「当年拿不到年终」的缺口，可能带退还条件</td></tr>
+    <tr><td><b>行权价</b></td><td>期权约定好的买入价格。行权价越低、公允价值越高，期权才越有价值</td></tr>
+    <tr><td><b>归属（vesting）</b></td><td>股权按时间逐步变成你的。常见四年分期加一年 cliff</td></tr>
+    <tr><td><b>cliff</b></td><td>最短服务门槛，不满这个时间通常一股都拿不到</td></tr>
+    <tr><td><b>带宽（range）</b></td><td>某个级别对应的薪资区间。谈薪本质是在带宽里找位置</td></tr>
+    <tr><td><b>锚定</b></td><td>先给出的数字会成为后续谈判的参照点。谁先给，谁定锚</td></tr>
+    <tr><td><b>竞业限制</b></td><td>离职后一定期限内不得去竞争单位，单位需按月支付补偿</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 现在就算出你当前的「年现金」，含年终、含补贴，税前，写在一张纸上；② 把手上或目标公司的 offer 按六个格子拆一遍，特别是公积金的比例和基数；③ 打开手机录音，用话术 4 报一次区间，回放检查有没有出现「大概」「都行」；④ 准备三个让步条件（签字费、调薪时点、报到日），每个都配一句可以立刻说出口的话。<br><br>
+    <b>之后值得单独学：</b>第 22 篇讲行为面的话术结构（离职原因、反问环节），第 24 篇讲简历怎么写才能支撑你报出的数字，第 1 篇有 30 天冲刺的整体节奏。谈薪的前提永远是——你手上有一个让对方愿意破预算的理由。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 23 期 · 你报出的第一个数字会变成天花板：先拆结构，再谈数字</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

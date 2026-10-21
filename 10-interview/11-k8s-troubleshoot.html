@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pod 排障决策树：Pending、CrashLoop、OOM、Evicted</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 11 期</span>
+    <h1>Pod 排障决策树：Pending、CrashLoop、OOM、Evicted</h1>
+    <p class="sub"><span class="k">kubectl describe</span> 的 Events 能解决 80% 的问题，剩下 20% 才需要进容器。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 类状态</span>
+      <span class="chip"><b>25</b> 条命令</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>1</b> 张决策树</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：一个 Pod 卡在 Pending，你第一眼看 describe 的哪一段？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个 Pod，三种看起来一样的病</h2></div>
+  <p class="lead">凌晨一点，值班的同学在群里发了一句「集群挂了，Pod 都起不来」。实际上一共有三个 Pod 出事：一个 Pending，一个 CrashLoopBackOff，一个 Running 但 READY 是 0/1。它们的共同点只有一个——<b>你在 <span class="k">kubectl get pod</span> 里看到的都是一个不正常的状态词</b>。但这个状态词背后是完全不同的三条链路。</p>
+  <p>很多人排障慢，不是因为不懂原理，是因为<b>把三个不同的问题当成了一个</b>。看到 Pending 就去加机器，看到 CrashLoop 就去翻应用日志，看到 Running 就去查网络——方向都对一半，但顺序错了，一半就是零。</p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>Pod 一直 Pending，加了节点还是 Pending</td><td>资源不够，再扩一台机器</td><td>调度器根本没在看资源：可能是 PVC 没绑定、硬性反亲和让副本互相排斥、或者节点带了不容忍的污点</td></tr>
+    <tr><td>CrashLoopBackOff，日志里只有一行 connection refused</td><td>下游挂了，让运维去查数据库</td><td>这行日志是<b>上一次</b>容器的输出。容器可能连启动参数都没走完就退出，真正的原因在退出码和上一次的完整日志里</td></tr>
+    <tr><td>Running 但 READY 0/1，Service 没有后端</td><td>网络插件坏了，或者探针写错了要重启</td><td>探针失败导致 Pod 不进 Endpoints。<b>进程一直活着，只是被判定「不能接流量」</b>，重启它一点用没有</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>先看阶段</div><div class="cd">Pending 是「还没被安排」，Running 是「已经在跑」。这两个词一出来，后面要查的组件就完全不同：前者是调度器和存储，后者是 kubelet 和容器。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>再看 reason</div><div class="cd">waiting reason 比 phase 有用得多。ImagePullBackOff、CrashLoopBackOff、CreateContainerConfigError 分别指向仓库、进程、配置三个地方。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>最后看 Events</div><div class="cd">控制器和 kubelet 把自己的判断写在这里。它不解释原理，只告诉你「我为什么没做成这件事」，而这通常就是答案。</div></div>
+  </div>
+  <p>这一篇的组织方式是：先给一条不会漏项的排查顺序，再按 Pending、镜像、CrashLoop、OOM、不 Ready、Evicted、Terminating、Service 八类现象各拆一层，最后收成十个坑。每一节都落一句可以直接说出口的话，因为面试问「Pod 起不来怎么办」，想听的是你的<b>分叉逻辑</b>，不是你背了多少个状态名。</p>
+  <div class="callout">
+    <b>一个必须先建立的观念：</b>Kubernetes 里没有「Pod 坏了」这件事，只有「某一层没有达成期望」。调度器没选节点、kubelet 没拉起容器、容器起来了但探针不过、节点资源不够把 Pod 赶走——这四件事的日志出现在四个不同的地方。你看到的那个状态词，只是告诉你该去哪个地方找。
+  </div>
+  <p><b>面试怎么答：</b>「我不会看到 Pod 不正常就直接 exec 进去。先看 phase 和 waiting reason 把问题切成四类：没调度、拉不起镜像、起来了又退出、起来了但不 Ready。这四类的下一个命令完全不同，混着查就是浪费时间。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>排障顺序：get 定相，describe 定因，logs 定细节</h2></div>
+  <p class="lead">这条顺序的价值不是「全面」，是<b>便宜</b>。前两步都只是读 apiserver 里的数据，不碰节点、不进容器、不影响线上。你花二十秒就能拿到方向，再决定要不要动更重的工具。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>get 定相</b>：<span class="k">kubectl get pod -o wide</span> 看 STATUS、READY、RESTARTS、AGE、NODE。NODE 是 <span class="k">&lt;none&gt;</span> 就说明压根没调度，后面所有容器层面的排查都不用做。</div></div>
+    <div class="step"><div class="txt"><b>describe 定因</b>：Events 从下往上看，最后几条是最近发生的。看三样：Reason、Message、Count。Count 一直在涨说明问题还在持续，Count 停在某个数说明是一次性事件。</div></div>
+    <div class="step"><div class="txt"><b>logs 定细节</b>：<span class="k">kubectl logs</span> 默认只给当前容器。重启过的必须加 <span class="k">--previous</span>，否则你看到的是新容器刚启动的那几行，很可能什么都没有。</div></div>
+    <div class="step"><div class="txt"><b>exec 验证假设</b>：进容器不是为了「看看」，是为了验证一个具体判断——端口有没有监听、配置文件在不在、能不能解析到下游。带着问题进去，三十秒能出来。</div></div>
+    <div class="step"><div class="txt"><b>节点兜底</b>：前三步都正常但容器就是起不来，问题在 kubelet、运行时、CNI 或磁盘。这时候才登节点看 <span class="k">journalctl -u kubelet</span> 和 <span class="k">crictl ps -a</span>。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:200px">STATUS / 现象</th><th>先去哪</th><th>大概率是什么</th></tr>
+    <tr><td><b>Pending</b>，NODE 是 <span class="k">&lt;none&gt;</span></td><td>describe 的 Events（FailedScheduling）</td><td>资源、亲和、污点、PVC、配额</td></tr>
+    <tr><td><b>Pending</b>，NODE 已经有值</td><td>describe 的 Events（FailedMount / FailedAttachVolume）</td><td>卷挂不上：PVC 绑定错、多挂、Secret/ConfigMap 缺失</td></tr>
+    <tr><td><b>ContainerCreating</b> 长时间不动</td><td>describe 的 Events + 节点上的 CNI 日志</td><td>网络插件分配 IP 失败、镜像层下载慢、卷挂载卡住</td></tr>
+    <tr><td><b>ImagePullBackOff</b></td><td>describe 的 Events 里那条 Failed to pull</td><td>镜像名/tag 错、私有仓库没凭证、节点出不去外网</td></tr>
+    <tr><td><b>CrashLoopBackOff</b></td><td>logs --previous + lastState.terminated</td><td>进程自己退出：配置错、依赖没就绪、退出码非 0</td></tr>
+    <tr><td><b>Running 但 0/1</b></td><td>describe 的 Readiness probe failed</td><td>探针路径/端口/阈值不对，或依赖不通</td></tr>
+    <tr><td><b>Evicted</b></td><td>describe 的 Message</td><td>节点内存、磁盘、PID 压力，按 QoS 排序被赶走</td></tr>
+    <tr><td><b>Terminating</b> 卡住</td><td>finalizers + describe 的卷相关事件</td><td>finalizer 没人摘、卷卸载失败、webhook 不通</td></tr>
+  </table>
+  <pre><span class="c"># 一屏看完所有 Pod 的关键列，先分清「没调度」和「起来了又挂」</span>
+kubectl get pod -A -o wide --sort-by=.status.startTime | tail -30
+
+<span class="c"># 只看异常：非 Running 非 Completed 的</span>
+kubectl get pod -A --field-selector=status.phase!=Running,status.phase!=Succeeded
+
+<span class="c"># Events 单独拉出来，按时间排序（describe 里只保留最近一批）</span>
+kubectl get events -n prod --sort-by=.lastTimestamp | tail -30
+kubectl get events -n prod --field-selector involvedObject.name=web-0
+
+<span class="c"># 容器退出的真实原因、退出码、重启次数，比 STATUS 精确得多</span>
+kubectl get pod web-0 -o jsonpath='{range .status.containerStatuses[*]}{.name}{" restarts="}{.restartCount}{" last="}{.lastState.terminated.reason}{" code="}{.lastState.terminated.exitCode}{"\n"}{end}'</pre>
+  <div class="callout warn">
+    <b>别在 describe 里从第一条 Events 读起。</b>Events 是按时间累积的，最上面可能是三天前的正常调度事件。要从下往上读，先看最后三到五条。另一个细节：Events 在 apiserver 里默认只保留一小时（<span class="k">--event-ttl</span>，以你集群为准），所以「昨天出过什么问题」在 Events 里是查不到的，得靠日志或监控。
+  </div>
+  <p>还有一个容易被忽视的动作：<b>先确认这是不是「只有一个 Pod」</b>。同一个 Deployment 的五个副本里只有一个 Pending，说明是节点或调度层面的个别问题；五个全 Pending，说明是模板层面（PVC、亲和、配额）的问题。这个判断不花时间，但能把排查量砍掉一大半。</p>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get pod -o wide</code><span class="desc">STATUS 与 NODE 两列就能把问题切成「没调度」和「起来了」两类</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl describe pod NAME</code><span class="desc">Events 从下往上读，重点看 Reason、Message 和 Count</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs NAME --previous</code><span class="desc">重启过的容器必须看上一轮日志，当前日志往往什么都没写</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get events --sort-by=.lastTimestamp</code><span class="desc">按时间排序的全量事件流，describe 里被截断的部分在这里</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec -it NAME -- sh</code><span class="desc">带着具体假设进去验证，别进去乱翻</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -u kubelet -n 100 --no-pager</code><span class="desc">节点侧兜底：卷挂载、CNI、运行时错误都在这里</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试怎么答：</b>「我的顺序是 get 看 phase 和 NODE，describe 看 Events，logs 加 --previous 看上一轮，然后才 exec 验证假设，最后才登节点。前三步都只读 apiserver，成本最低。如果 describe 的 Events 里已经有明确的 Reason，我基本不会再多花时间。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Pending：调度器在 Events 里已经说了原因</h2></div>
+  <p class="lead">Pending 是唯一一个「原因写在明面上」的状态。调度失败时，scheduler 会把所有节点的过滤结果拼成一句话放进 Events，格式固定：<b>「0/5 nodes are available: 5 Insufficient memory」</b>。读懂这句话，比翻十个博客有用。</p>
+  <p>先说调度器为什么拒绝。<b>它是逐节点做过滤的</b>，一个节点可能同时因为三个原因被排除。所以那句话里，数字加起来通常等于节点总数：<span class="k">2 Insufficient cpu, 2 node(s) had untolerated taint, 1 node(s) didn't match Pod's node affinity</span>——这说明五个节点各有一个理由，不是「有五个节点都不够」。<b>读懂这个「分项统计」，才知道该修哪一个</b>：把污点去掉了，Pod 还是可能因为 CPU 不够被剩下两个节点拒绝。</p>
+  <table>
+    <tr><th style="width:230px">Events 里的关键句</th><th>含义</th><th>怎么处理</th></tr>
+    <tr><td>Insufficient cpu / memory</td><td>节点上「已分配的 requests」加起来放不下这个 Pod</td><td>看节点的 Allocated resources。注意是 requests 不够，不是实际用量高</td></tr>
+    <tr><td>node(s) had untolerated taint</td><td>节点带了这个 Pod 不容忍的污点</td><td>加 toleration，或者给节点去污点。先问「这个污点是谁加的、为什么加」</td></tr>
+    <tr><td>node(s) didn't match Pod's node affinity</td><td>硬性 nodeAffinity 匹配不上</td><td>核对标签。硬性亲和写错一个 key，Pod 就永远 Pending</td></tr>
+    <tr><td>node(s) didn't match pod anti-affinity rules</td><td>硬性反亲和让副本互相排斥</td><td>副本数大于可用拓扑域数量时必然发生。改成 preferred 或加节点</td></tr>
+    <tr><td>pod has unbound immediate PersistentVolumeClaims</td><td>PVC 没绑定，调度器不敢放</td><td>看 PVC 的 Events、StorageClass 是否存在、容量是否够</td></tr>
+    <tr><td>node(s) didn't find available persistent volumes to bind</td><td>没有匹配的 PV</td><td>本地盘场景常见：PV 的 nodeAffinity 把可用节点限死了</td></tr>
+    <tr><td>exceeded quota</td><td>命名空间的 ResourceQuota 满了</td><td>看 quota 的 used 与 hard。这个原因在 describe 里不一定显眼，容易被漏</td></tr>
+    <tr><td>node(s) had volume node affinity conflict</td><td>Pod 被多个卷的节点约束夹住了</td><td>两个 PV 在不同可用区，Pod 只有一个，永远满足不了</td></tr>
+  </table>
+  <pre><span class="c"># 1. 先读那句话，别猜</span>
+kubectl describe pod web-0 | sed -n '/Events/,$p'
+
+<span class="c"># 2. 如果是资源不够：看节点「已分配」而不是「实际使用」</span>
+kubectl describe node node-1 | sed -n '/Allocated resources/,/Events/p'
+kubectl get pod -A --field-selector spec.nodeName=node-1 -o wide
+
+<span class="c"># 3. 如果是 PVC：一路往下看，别停在 Pod 这一层</span>
+kubectl get pvc -n prod
+kubectl describe pvc data-web-0 -n prod
+kubectl get storageclass
+kubectl get pv | grep -i available
+
+<span class="c"># 4. 如果是污点/亲和：把节点的标签和污点摊开看</span>
+kubectl get node --show-labels
+kubectl describe node node-1 | grep -A3 Taints
+kubectl get pod web-0 -o jsonpath='{.spec.affinity}{"\n"}{.spec.tolerations}'</pre>
+  <p>资源不够这条要特别说清一个语义：<b>调度看的是 requests 的累加，不是 top 出来的实际用量</b>。节点上 CPU 实际只有 20%，但所有 Pod 的 requests 加起来已经等于可分配量，新 Pod 就是放不进去。这就是为什么「节点很闲，Pod 却 Pending」——不是监控错了，是这两套数字本来就不是一回事。反过来说，如果 requests 定得虚高（比如一律写 2 核），节点会被"账面"占满，实际利用率却很低，这是容量规划里最常见的浪费。</p>
+  <p>PVC 那条也值得单独记：<b>Pod 卡在 Pending 且 NODE 是 <span class="k">&lt;none&gt;</span>，但 Events 里提到 volume，说明问题在存储不在计算</b>。这时候去看 PVC 是不是 Pending、StorageClass 的 provisioner 有没有在跑、容量够不够。如果是 <span class="k">volumeBindingMode: WaitForFirstConsumer</span>，PVC 在 Pod 调度前本来就是 Pending，这是正常行为——很多人在这里误判成「存储坏了」。</p>
+  <div class="callout danger">
+    <b>硬性反亲和 + 副本数大于节点数 = 永久 Pending。</b>这是最常见的自伤：为了「每个节点只放一个」，写了 <span class="k">requiredDuringSchedulingIgnoredDuringExecution</span> 加 <span class="k">topologyKey: kubernetes.io/hostname</span>，然后把副本数从 3 改成 6，集群只有 4 个节点。多出来的两个副本永远没有位置，而且不会报错，只是一直 Pending。这类约束要么改成 preferred，要么用 topologySpreadConstraints 表达「尽量均匀」而不是「绝不共存」。
+  </div>
+  <p><b>面试怎么答：</b>「Pending 我先看 describe 里 FailedScheduling 那句话，它是按节点分项统计的，能直接告诉我是资源、污点、亲和还是 PVC。资源类要注意调度看的是 requests 累加而不是实际用量，所以会出现节点很闲但 Pod 放不进去。如果是硬性反亲和导致的，那是设计问题，得改成 preferred 或者用拓扑分布。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>ImagePullBackOff：镜像名对，也可能是没权限</h2></div>
+  <p class="lead">「镜像肯定没问题，我在本地 docker run 过。」这句话在排障现场出现的频率极高，而它通常是对的——<b>本地能跑，恰恰说明问题在「这台节点能不能拉到这个镜像」</b>，而不是镜像本身。</p>
+  <p>先把两个状态分开。<b>ErrImagePull</b> 是这次拉取失败了，是即时结果；<b>ImagePullBackOff</b> 是 kubelet 决定「先等一会儿再试」，是退避状态。退避间隔从十秒开始翻倍，上限大约五分钟（以你集群版本为准）。所以你看到 ImagePullBackOff 时，真正的错误信息在<b>上一次</b>的 Failed 事件里，describe 的 Events 会有若干条交替出现。</p>
+  <table>
+    <tr><th style="width:250px">Events 里的错误片段</th><th>原因</th><th>验证方式</th></tr>
+    <tr><td>not found / manifest unknown</td><td>tag 打错，或者这个 tag 在仓库里不存在</td><td>去仓库页面上确认 tag。别信 YAML 里的注释</td></tr>
+    <tr><td>unauthorized / authentication required</td><td>私有仓库没凭证，或凭证不对</td><td>看 Pod 的 imagePullSecrets，再看 Secret 里的 dockerconfigjson</td></tr>
+    <tr><td>pull access denied</td><td>仓库存在但账号没有这个 repo 的读权限</td><td>用同一个账号在节点上手动 docker pull / crictl pull</td></tr>
+    <tr><td>dial tcp ... i/o timeout</td><td>节点出不去外网，或者仓库域名解析不了</td><td>在节点上 curl 仓库地址，注意是<b>节点</b>不是你的笔记本</td></tr>
+    <tr><td>x509: certificate signed by unknown authority</td><td>私有仓库用了自签证书，节点没信任</td><td>把 CA 放到节点的信任目录，或配置 runtime 的 insecure-registries</td></tr>
+    <tr><td>toomanyrequests / rate limit</td><td>公共仓库的匿名拉取限流</td><td>配凭证，或用内网镜像缓存/同步仓库</td></tr>
+    <tr><td>no space left on device</td><td>节点磁盘满，镜像层写不进去</td><td>df -h 看 /var/lib/containerd 所在分区，清理无用镜像</td></tr>
+  </table>
+  <p>私有仓库的凭证有个非常常见的坑：<b>imagePullSecrets 是命名空间级的</b>。你在 default 里建了 Secret，Pod 在 prod 里，就是拉不到。而且这个错误不会说「你少了个 secret」，它只会说 unauthorized，看起来像密码错了。要么每个命名空间都建一份，要么把 Secret 挂到 ServiceAccount 上，让该命名空间所有 Pod 自动继承。</p>
+  <pre><span class="c"># 1. 看 kubelet 到底报了什么（用 describe，不要只看 STATUS）</span>
+kubectl describe pod web-0 | grep -A3 -i 'failed to pull\|errimagepull'
+
+<span class="c"># 2. 看 Pod 引用的 secret 名字，以及 secret 是否真的存在</span>
+kubectl get pod web-0 -o jsonpath='{.spec.imagePullSecrets}{"\n"}'
+kubectl get secret regcred -n prod -o jsonpath='{.type}{"\n"}'
+kubectl get secret regcred -n prod -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | head -c 200
+
+<span class="c"># 3. 在节点上复现一次，这才是节点视角</span>
+crictl pull registry.example.com/app/web:v1.2.3
+<span class="c"># docker 环境用：docker login registry.example.com &amp;&amp; docker pull ...</span>
+
+<span class="c"># 4. 用 digest 固定版本，避免 tag 被覆盖导致的「昨天还能拉」</span>
+kubectl set image deploy/web web=registry.example.com/app/web@sha256:&lt;digest&gt;
+
+<span class="c"># 5. 拉取策略：Always 每次都要问仓库，IfNotPresent 有缓存就用</span>
+kubectl get pod web-0 -o jsonpath='{.spec.containers[*].imagePullPolicy}'</pre>
+  <p>还有一种情况：<b>镜像拉下来了，但容器起不来，状态却是 CreateContainerConfigError</b>。这已经不是拉取问题，而是「配置缺失」——引用的 ConfigMap 或 Secret 里某个 key 不存在。这个状态的误导性很强，因为它也是 waiting 状态，很多人继续在镜像上找原因，其实要看 Events 里那句 <span class="k">couldn't find key XXX in ConfigMap</span>。</p>
+  <div class="callout">
+    <b>为什么 imagePullPolicy 值得单独记：</b>tag 是 <span class="k">latest</span> 时默认 Always，其他 tag 默认 IfNotPresent（以你集群版本为准）。所以同一个 YAML，写 <span class="k">:v1</span> 的会复用节点缓存，写 <span class="k">:latest</span> 的每次都去问仓库。生产上更稳的做法是用 digest：digest 不可变，节点上有没有缓存、仓库有没有被覆盖，都不会影响你拉到的东西。
+  </div>
+  <p><b>面试怎么答：</b>「ImagePullBackOff 我只信 describe 里那条 Failed to pull 的原文，因为它把仓库返回的错误带出来了：not found 是 tag 问题，unauthorized 是凭证问题，timeout 是节点网络问题。还有一个高频坑是 imagePullSecrets 只对当前命名空间生效，跨命名空间就拉不到，报错还是一样的 unauthorized。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>CrashLoopBackOff：退出码比日志更早说出真相</h2></div>
+  <p class="lead">CrashLoopBackOff 这个名字经常被误解成一种错误。它不是错误，是<b>一种节奏</b>：容器启动、退出、kubelet 等一会儿再起、又退出，等待时间逐次翻倍，最长到五分钟。你看到的 BackOff，是「正在等下一次重试」，不是「正在崩溃」。</p>
+  <p>所以第一件事不是看日志，是看<b>上一次容器怎么死的</b>：退出码、信号、结束时间。这些信息在 <span class="k">lastState.terminated</span> 里，比日志可靠——因为有些容器还没来得及写日志就被杀了，日志是空的，但退出码一定有。</p>
+  <table>
+    <tr><th style="width:100px">退出码</th><th>等于</th><th>含义</th><th>典型场景</th></tr>
+    <tr><td><b>0</b></td><td>正常退出</td><td>进程干完活自己退了</td><td>把一次性任务写成了 Deployment；CMD 是脚本，跑完就结束</td></tr>
+    <tr><td><b>1</b></td><td>应用自定义错误</td><td>进程主动退出，原因写在日志里</td><td>配置解析失败、端口被占、必填环境变量没给</td></tr>
+    <tr><td><b>2</b></td><td>shell 用法错误</td><td>命令或参数写错</td><td>entrypoint 拼错、参数少了一个</td></tr>
+    <tr><td><b>126</b></td><td>不可执行</td><td>文件在，但没有执行权限</td><td>挂载进来的脚本权限不对</td></tr>
+    <tr><td><b>127</b></td><td>命令找不到</td><td>PATH 里没有这个可执行文件</td><td>镜像里没装 bash 却写了 <span class="k">command: ["bash","-c",...]</span></td></tr>
+    <tr><td><b>137</b></td><td>128 + 9（SIGKILL）</td><td>被强杀</td><td>OOMKilled、liveness 失败、节点压力驱逐</td></tr>
+    <tr><td><b>139</b></td><td>128 + 11（SIGSEGV）</td><td>段错误</td><td>原生库崩溃、架构不匹配（arm 镜像跑在 x86 上）</td></tr>
+    <tr><td><b>143</b></td><td>128 + 15（SIGTERM）</td><td>收到优雅终止信号</td><td>被删除、滚动更新、kubelet 正常停容器。<b>不是崩溃</b></td></tr>
+  </table>
+  <pre><span class="c"># 1. 直接拿结构化字段，比看 STATUS 精确</span>
+kubectl get pod web-0 -o jsonpath='{.status.containerStatuses[0].lastState.terminated}'
+kubectl get pod web-0 -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}'
+
+<span class="c"># 2. 上一轮日志：这次很可能一行都没有，因为进程没活到写日志</span>
+kubectl logs web-0 --previous
+kubectl logs web-0 --previous --tail=100 -c sidecar
+
+<span class="c"># 3. 如果日志是空的，看事件里的启动失败原因</span>
+kubectl describe pod web-0 | sed -n '/Events/,$p'
+
+<span class="c"># 4. 分不清是崩溃还是被删：看时间线</span>
+kubectl get pod web-0 -o jsonpath='{.metadata.creationTimestamp}{" "}{.status.containerStatuses[0].lastState.terminated.finishedAt}{"\n"}'
+
+<span class="c"># 5. 临时绕开重启循环，进容器看现场（不加 restartPolicy 改动）</span>
+kubectl debug -it web-0 --image=busybox:1.36 --target=web -- sh</pre>
+  <p>日志为空是常态，不是异常。原因有几类：进程在 main 之前就崩了（缺动态库、架构不对）；日志写到了文件而不是 stdout（kubectl logs 只读 stdout/stderr）；日志系统初始化就失败了。这时候 <b>退出码 127 和 139 的信息量远大于日志</b>，前者是「命令不存在」，后者基本等于「二进制不兼容或原生库崩了」。</p>
+  <p>还有一类「看起来像 CrashLoop，其实不是」：<b>容器里跑的是前台进程没错，但启动了子进程后主进程退出</b>。比如 <span class="k">CMD service nginx start</span> 这种写法，脚本执行完就返回 0，容器立刻结束，Kubernetes 认为它「完成任务」，如果 restartPolicy 是 Always 就重启，形成循环。这类问题的日志通常很干净，甚至显示启动成功，唯一的线索是退出码 0 加存活时间只有一两秒。</p>
+  <div class="callout warn">
+    <b>不要把 CrashLoopBackOff 和「探针杀容器」混为一谈，但要看得出它们的关系。</b>liveness 连续失败也会杀掉容器，退出码同样是 137，重启次数同样上涨，STATUS 同样会显示 CrashLoopBackOff。区别在 describe 的 Events：探针杀的有大量 <span class="k">Liveness probe failed</span>，而且通常在容器稳定运行几十秒之后才发生；应用自己崩的，事件里只有 BackOff，时间点紧贴启动。
+  </div>
+  <p><b>面试怎么答：</b>「CrashLoopBackOff 是退避重试的节奏，不是错误本身。我先看 lastState 的退出码：137 要分是 OOM 还是探针杀，143 是被正常终止，127 是命令不存在，1 才是应用自己的错误。日志一定要加 --previous，因为当前容器可能还没写出任何东西就被杀了。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>OOMKilled：杀你的是 cgroup，不是节点</h2></div>
+  <p class="lead">「内存才用了 60%，怎么会被 OOMKilled？」因为你看的是节点的内存，杀你的是<b>容器自己的 cgroup 限额</b>。这两个数字没有关系：容器只要碰到自己的 limit，就会被内核在 cgroup 层面杀掉，无论节点还剩多少内存。</p>
+  <p>确认这件事只需要一个字段：<span class="k">lastState.terminated.reason</span> 等于 <span class="k">OOMKilled</span>，退出码 137。注意 137 只是「被 SIGKILL」，它不等于 OOM——探针失败、节点驱逐、<span class="k">kubectl delete --force</span> 也都产生 137。<b>reason 是 OOMKilled 才是内存问题</b>，这是面试里很容易被追问的一个区分。</p>
+  <table>
+    <tr><th style="width:170px">现象</th><th>是谁动的手</th><th>看哪里</th></tr>
+    <tr><td>reason=OOMKilled，exitCode=137</td><td>cgroup 内存限额，内核 OOM killer</td><td>容器的 memory limit、cgroup memory.events</td></tr>
+    <tr><td>reason=Error，exitCode=137，有 Liveness probe failed</td><td>kubelet 按探针结果重启</td><td>Events 里的探针失败记录</td></tr>
+    <tr><td>reason=Evicted</td><td>kubelet 因节点压力驱逐</td><td>Pod 的 Message，节点 Conditions</td></tr>
+    <tr><td>reason=Completed，exitCode=0</td><td>进程正常结束</td><td>不是故障，检查 workload 类型选错没有</td></tr>
+    <tr><td>reason=ContainerStatusUnknown</td><td>节点失联，状态丢了</td><td>节点状态，kubelet 是否恢复</td></tr>
+  </table>
+  <p>接下来是最容易被忽略的一层：<b>limit 杀掉的是整个进程，不是「堆」</b>。所以「我把 JVM 堆设成 limit 的 70%，怎么还会 OOM」这个问题，答案在堆外：Metaspace、直接内存（NIO/Netty 的 DirectByteBuffer）、线程栈、JIT 代码缓存、glibc 的 malloc arena，全都不在堆里，但都算在 cgroup 的内存里。Go 程序也一样，GOGC 控制的是堆的增长比例，运行时的额外开销、cgo 分配、大量 goroutine 的栈都会让 RSS 超过预期。</p>
+  <pre><span class="c"># 1. 确认是不是 cgroup OOM（不是节点 OOM）</span>
+kubectl get pod web-0 -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+
+<span class="c"># 2. 容器内的 cgroup 计数：oom_kill 增长就是它</span>
+kubectl exec web-0 -- cat /sys/fs/cgroup/memory.events
+kubectl exec web-0 -- cat /sys/fs/cgroup/memory.max
+kubectl exec web-0 -- cat /sys/fs/cgroup/memory.peak
+<span class="c"># cgroup v1 的路径是 /sys/fs/cgroup/memory/memory.oom_control 等，以你节点为准</span>
+
+<span class="c"># 3. 看实际用量与 limit 的距离（需要 metrics-server）</span>
+kubectl top pod web-0 --containers
+
+<span class="c"># 4. JVM：让堆按容器限额算，而不是按宿主机物理内存</span>
+<span class="c">#    -XX:MaxRAMPercentage=70 -XX:+UseContainerSupport（新版本默认开启容器感知）</span>
+<span class="c">#    堆外还要留：Metaspace、DirectBuffer、线程栈、CodeCache</span>
+
+<span class="c"># 5. 节点级 OOM 与容器级 OOM 的日志在不同地方</span>
+dmesg -T | grep -i -E 'oom|killed process' | tail
+journalctl -k --since "30 min ago" | grep -i oom</pre>
+  <p>参数怎么给，有个能落地的原则：<b>内存 limit 不要贴着稳态用量设</b>。因为内存不可压缩，一次流量尖峰、一个大查询、一次批量导入就会顶到天花板，而重启后的冷启动会让下一次尖峰更容易顶到——这就是「OOM 循环」。常见的做法是 limit 给到峰值的 1.3 到 1.5 倍，requests 按稳态给；如果这样节点放不下，问题应该在副本数和节点规格上解决，而不是继续压 limit。</p>
+  <div class="callout danger">
+    <b>调大 limit 之前，先确认没有泄漏。</b>如果内存曲线是锯齿状（涨到 limit 被杀、重启后重新爬），那是正常的缓存或预热；如果是持续单调上升、周期越来越短，那是泄漏，加 limit 只是把爆炸时间往后推。判断方法很简单：看 <span class="k">memory.peak</span> 和重启间隔，间隔在缩短就是泄漏。
+  </div>
+  <p><b>面试怎么答：</b>「OOMKilled 一定是容器 cgroup 限额触发的，和节点剩多少内存无关，所以节点内存 60% 也会被杀。确认要看 reason 而不是只看 137，因为 137 也可能是探针杀或驱逐。limit 卡的是整个进程的 RSS，包含堆外内存，所以 JVM 不能按『堆等于 limit』来配。如果重启间隔在缩短，那就是泄漏，加 limit 没用。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Running 但不 Ready：进程活着，只是不被信任</h2></div>
+  <p class="lead">这个状态最容易被误判成「容器有问题」。它其实在说一件很具体的事：<b>容器在跑，但 readiness 探针没过，所以它被从 Endpoints 里摘掉了</b>。进程没死，重启它是纯损失。</p>
+  <p>先分清三种「起来了但不能用」：<b>ContainerCreating</b> 是容器还没创建（卷、镜像、CNI）；<b>Running 但 0/1</b> 是容器起来了但探针不过；<b>Running 且 1/1 但请求失败</b> 是流量通了、应用返回错误。这三种的排查入口完全不同，第一种在节点，第二种在探针配置和应用启动逻辑，第三种才轮到应用日志和链路。</p>
+  <table>
+    <tr><th style="width:250px">describe 里的探针事件</th><th>含义</th><th>往哪查</th></tr>
+    <tr><td>Readiness probe failed: HTTP probe failed with statuscode: 404</td><td>路径不对，或者应用把探针路径路由到了别处</td><td>从容器内 curl 一次探针路径，确认返回码</td></tr>
+    <tr><td>connection refused</td><td>端口没监听，或探针打的端口和实际监听的不一致</td><td>容器内 ss -lntp 看真实端口，注意监听在 127.0.0.1 和 0.0.0.0 的差别</td></tr>
+    <tr><td>context deadline exceeded（timeout）</td><td>timeoutSeconds 太短，或应用在 GC/预热时响应慢</td><td>手动计时一次，把 timeoutSeconds 放到 P99 之上</td></tr>
+    <tr><td>exec probe failed: command timed out</td><td>exec 探针本身开销大（起 shell、连数据库）</td><td>换成 httpGet，或把检查逻辑做成轻量端点</td></tr>
+    <tr><td>Readiness probe errored: tls: handshake failure</td><td>探针用 http 打了 https 端口</td><td>加 scheme: HTTPS，或换一个明文健康检查端口</td></tr>
+  </table>
+  <pre><span class="c"># 1. 看清是哪个探针失败、失败了几次</span>
+kubectl describe pod web-0 | grep -i -E 'readiness|liveness|startup' | tail -10
+
+<span class="c"># 2. 在容器内自己打一次探针端点，别靠猜</span>
+kubectl exec -it web-0 -- sh -c 'wget -S -qO- http://127.0.0.1:8080/ready 2&gt;&amp;1 | head -20'
+kubectl exec -it web-0 -- ss -lntp
+
+<span class="c"># 3. 确认这个 Pod 有没有进 Endpoints（没进就是没 Ready）</span>
+kubectl get endpointslice -l kubernetes.io/service-name=web -o yaml | grep -A5 endpoints
+
+<span class="c"># 4. 如果 Pod 根本没到 Running，看的是另一条线</span>
+kubectl describe pod web-0 | grep -A5 -i 'FailedMount\|FailedCreatePodSandBox\|FailedAttachVolume'
+
+<span class="c"># 5. init 容器卡住也会表现成「一直起不来」</span>
+kubectl get pod web-0 -o jsonpath='{.status.initContainerStatuses[*].state}'</pre>
+  <p>探针配错之外，还有两个真实的「不 Ready」原因值得知道。第一个是<b>应用启动很慢但配了 liveness</b>：容器在预热，liveness 在打它，连续失败就被重启，重启后又重新预热，永远到不了 Ready。这种的正确解法是 startupProbe，把启动预算单独给出来，成功之前屏蔽 liveness。第二个是<b>readiness 里查了下游</b>：数据库慢查询时所有副本同时不 Ready，流量瞬间归零——这比让请求变慢更糟，因为客户端收到的是连接失败而不是慢响应。</p>
+  <p>还有一种情况需要单独提：<b>Pod 是 1/1 Ready，但 Service 访问仍然失败</b>。这时候问题不在这个 Pod，在 Service 的 selector、端口映射或者网络策略。区分方法很直接：<span class="k">kubectl get endpointslice</span> 看后端地址在不在。在，说明服务发现是好的，问题在转发；不在，说明 Pod 压根没被认领。</p>
+  <div class="callout ok">
+    <b>一个实用习惯：</b>把 readiness 的失败次数和耗时打到监控里，而不是只看 Pod 的 Ready 状态。因为「偶尔失败一次又恢复」在状态上看不出来，但它会让这个 Pod 在 Endpoints 里反复进出，客户端表现为间歇性 502。这类抖动只有计数能发现。
+  </div>
+  <p><b>面试怎么答：</b>「Running 但 0/1，说明容器活着但 readiness 没过，这时候重启是错的。我先看 describe 里探针失败的原文：404 是路径错，connection refused 是端口或监听地址错，超时是 timeoutSeconds 太短。然后进容器自己打一次那个端点。另外如果应用启动慢，应该用 startupProbe 而不是把 liveness 的阈值调大。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Evicted：赶你走的常常是磁盘，不是内存</h2></div>
+  <p class="lead">「Pod 被 Evicted 了，是不是内存不够？」不一定。节点压力有三种：内存、磁盘（本地存储）、PID。而在容器场景里，<b>被本地磁盘赶走的情况比想象中多得多</b>——日志没轮转、emptyDir 写了几个 G、镜像层堆满，都会触发。</p>
+  <p>机制是这样的：kubelet 周期性检查节点资源，触到硬阈值就给节点打上 <span class="k">MemoryPressure</span> / <span class="k">DiskPressure</span> / <span class="k">PIDPressure</span> 的 Condition，然后开始驱逐 Pod。驱逐顺序按 QoS：<b>BestEffort 先走，Burstable 按「超出 requests 的程度」排序，Guaranteed 最后</b>。所以同一台节点上，最先被赶走的往往是你最不在意的那些没有设 resources 的 Pod。</p>
+  <table>
+    <tr><th style="width:200px">Message 里的关键片段</th><th>含义</th><th>怎么处理</th></tr>
+    <tr><td>The node was low on resource: memory</td><td>节点内存压力，按 QoS 排序驱逐</td><td>看谁在吃内存、requests 是否失真、是否有 DaemonSet 没设 limit</td></tr>
+    <tr><td>The node was low on resource: ephemeral-storage</td><td>节点本地磁盘压力（日志、emptyDir、镜像层）</td><td>df -h 看 /var/lib/kubelet 和 /var/lib/containerd；配日志轮转；清镜像</td></tr>
+    <tr><td>The node was low on resource: pid</td><td>PID 耗尽</td><td>查线程/进程泄漏，看 pid 上限</td></tr>
+    <tr><td>Container image ... is not used by any container</td><td>镜像回收，不是 Pod 驱逐</td><td>属于 kubelet 的镜像 GC，正常行为</td></tr>
+  </table>
+  <pre><span class="c"># 1. 逐字读 Message，它写清了是哪种资源</span>
+kubectl get pod web-0 -o jsonpath='{.status.message}{"\n"}{.status.reason}{"\n"}'
+
+<span class="c"># 2. 节点 Conditions：Pressure 是什么时候开始的</span>
+kubectl describe node node-1 | sed -n '/Conditions/,/Addresses/p'
+
+<span class="c"># 3. 磁盘到底被谁占了（在节点上执行）</span>
+df -h /var/lib/kubelet /var/lib/containerd
+du -x -h --max-depth=1 /var/lib/kubelet/pods 2&gt;/dev/null | sort -h | tail
+crictl images | awk '{print $3, $4}' | sort -h | tail
+
+<span class="c"># 4. emptyDir 的体积上限：不设就会一直写</span>
+kubectl get pod web-0 -o jsonpath='{.spec.volumes[?(@.emptyDir)].emptyDir}{"\n"}'
+
+<span class="c"># 5. 清理被驱逐的 Pod 对象（它们不会自己消失，会一直占着列表）</span>
+kubectl get pod -A --field-selector status.phase=Failed | grep Evicted
+kubectl delete pod -A --field-selector status.phase=Failed</pre>
+  <p>有个细节很多人不知道：<b>被驱逐的 Pod 不会自动删除</b>。它的 phase 变成 Failed、reason 是 Evicted，对象留在那里，因为控制器（ReplicaSet）已经补了新 Pod，旧对象只是记录。所以你会看到一堆 Evicted 的壳子挂在 <span class="k">kubectl get pod</span> 里，看起来像「还在故障」，其实早就没进程了。</p>
+  <p>真正要修的是产生压力的原因。日志是最常见的：容器的 stdout 由 kubelet 写到节点的文件里，默认有大小和数量上限（<span class="k">containerLogMaxSize</span> 与 <span class="k">containerLogMaxFiles</span>，以你集群 kubelet 配置为准），但如果应用往 emptyDir 或者容器可写层里写文件，那是不受这个限制的——容器可写层写在节点的 <span class="k">/var/lib/containerd</span> 下，写多少占多少，直到节点 DiskPressure。</p>
+  <div class="callout warn">
+    <b>Evicted 和 OOMKilled 是两件事，别混着答。</b>OOMKilled 是容器的 cgroup 限额到了，容器被杀、Pod 还在、原地重启；Evicted 是节点整体资源不够，整个 Pod 被赶走、换节点重建。前者的修复点在 limit，后者的修复点在节点容量和 QoS。面试里把这两个说成一个，等于没分清内核层和 kubelet 层。
+  </div>
+  <p><b>面试怎么答：</b>「Evicted 我先读 Message，因为它直接写了是 memory、ephemeral-storage 还是 pid。磁盘这一种在容器场景特别常见，来源是日志、emptyDir 和镜像层。驱逐顺序是 BestEffort 先走，Burstable 按超 requests 的程度排，Guaranteed 最后，所以 requests 定得离谱的 Pod 反而更安全，但那是靠浪费换来的。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>Terminating 卡住：谁在等谁</h2></div>
+  <p class="lead">删 Pod 之后状态一直是 Terminating，等了二十分钟还在。这时候最常见的动作是 <span class="k">--force --grace-period=0</span>，而这一步在多数情况下只是把问题藏起来，还顺手制造了孤儿容器和挂不上的卷。</p>
+  <p>正常删除是一条有顺序的链：标记 deletionTimestamp → 从 Endpoints 摘除（并行）→ 执行 preStop → 发 SIGTERM → 等 terminationGracePeriodSeconds → SIGKILL。这条链上任何一环没有回音，Pod 就停在 Terminating。所以判断的方法很简单：<b>看它卡在哪一环</b>。</p>
+  <table>
+    <tr><th style="width:210px">卡在哪</th><th>怎么看出来</th><th>处理</th></tr>
+    <tr><td>finalizer 没人摘</td><td><span class="k">metadata.finalizers</span> 非空，且对应控制器没在跑</td><td>恢复控制器；确认无副作用后再手工去掉 finalizer</td></tr>
+    <tr><td>卷卸载/挂载失败</td><td>Events 里有 FailedUnmount、Multi-Attach error</td><td>等节点恢复；确认 RWO 卷没有被另一个节点占着</td></tr>
+    <tr><td>kubelet 无响应</td><td>节点 NotReady，Pod 状态停在旧值</td><td>恢复节点；必要时从 apiserver 侧强制删除并清理节点上的残留</td></tr>
+    <tr><td>准入 webhook 超时</td><td>Events 里 failed calling webhook</td><td>修 webhook 服务，或临时把 failurePolicy 改成 Ignore</td></tr>
+    <tr><td>进程不退（忽略 SIGTERM）</td><td>grace 期到了才被杀，日志里有收到 SIGTERM 但不退出</td><td>改应用的信号处理；这类不是「卡住」，只是慢</td></tr>
+  </table>
+  <pre><span class="c"># 1. 看对象本身：deletionTimestamp 有没有、finalizers 还剩什么</span>
+kubectl get pod web-0 -o jsonpath='{.metadata.deletionTimestamp}{"\n"}{.metadata.finalizers}{"\n"}'
+
+<span class="c"># 2. 看事件：卷、网络、webhook 的失败都会写在这里</span>
+kubectl describe pod web-0 | sed -n '/Events/,$p'
+
+<span class="c"># 3. RWO 卷被别的节点占着，是「删不掉」的经典原因</span>
+kubectl get volumeattachment | grep -i web
+kubectl get pv | grep -i released
+
+<span class="c"># 4. 确认节点是不是还活着，Pod 的真实状态只有 kubelet 知道</span>
+kubectl get node node-1
+kubectl get pod web-0 -o wide
+
+<span class="c"># 5. 最后手段：先从 apiserver 移除对象，再去节点上清残留容器</span>
+kubectl delete pod web-0 --grace-period=0 --force
+crictl ps -a | grep web-0</pre>
+  <div class="callout danger">
+    <b>强制删除不会真的删掉容器。</b>它只是把 apiserver 里的对象标记为删除，节点上的容器和卷仍然在。如果这个 Pod 还持有一个 RWO 的 PVC，新 Pod 调度到另一个节点时会报 Multi-Attach，你会从「一个 Pod 删不掉」升级成「一组 Pod 起不来」。所以在按 force 之前，先确认卡住的原因，尤其是卷相关的那几行事件。
+  </div>
+  <p>还有一类「假卡住」值得说：Pod 已经进入 Terminating，但你的应用要跑完一个很长的收尾（刷缓冲、等在途请求、上传日志），terminationGracePeriodSeconds 又设得很大（比如 300 秒）。这时候它不是卡住，是在按设计等待。分辨方法是看 Events 里有没有 <span class="k">Killing</span> 的记录，以及 describe 里 grace 期还剩多久——没有异常事件、时间在走，就等着。</p>
+  <p><b>面试怎么答：</b>「Terminating 卡住我先看 finalizers 和 Events。finalizer 是控制器没摘，卷相关的是卸载失败或多挂，节点 NotReady 的是 kubelet 不回报。force delete 我只能当最后手段，因为它不清理节点上的容器和挂载，容易把一个 Pod 的问题变成一组 Pod 起不来。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>Service 访问不到：先证明「有没有后端」</h2></div>
+  <p class="lead">「服务不通」这四个字涵盖的范围太大了。有一个动作能立刻把范围劈成两半：<b>看这个 Service 有没有后端地址</b>。有后端不通，是转发和网络的问题；没后端，是标签、端口和探针的问题，跟网络一点关系都没有。</p>
+  <p>后端的载体是 EndpointSlice（老版本是 Endpoints）。它由控制器根据 Service 的 selector 和 Pod 的 Ready 状态维护。所以「没有后端」只有三种可能：selector 没匹配上、Pod 不 Ready、端口名对不上。<b>三种都在 apiserver 里能看出来，不需要登任何节点</b>。</p>
+  <table>
+    <tr><th style="width:170px">现象</th><th>原因</th><th>一条命令验证</th></tr>
+    <tr><td>EndpointSlice 里没有地址</td><td>selector 与 Pod 的 label 不匹配</td><td><span class="k">kubectl get svc web -o jsonpath='{.spec.selector}'</span> 对比 Pod 的 labels</td></tr>
+    <tr><td>Pod 存在但不在后端列表</td><td>readiness 没过</td><td><span class="k">kubectl get pod --show-labels</span> 看 READY 列</td></tr>
+    <tr><td>有后端但连不上</td><td>targetPort 与容器实际监听端口不一致</td><td><span class="k">kubectl exec -- ss -lntp</span> 看真实端口</td></tr>
+    <tr><td>targetPort 写的是名字，后端为空</td><td>Service 的 targetPort 名字与容器的 ports.name 不一致</td><td>两边都 <span class="k">-o yaml</span> 对一遍名字，注意大小写</td></tr>
+    <tr><td>ClusterIP 通、Pod IP 不通</td><td>kube-proxy 规则没下发，或节点上的规则没同步</td><td>节点上 <span class="k">iptables -t nat -L KUBE-SERVICES -n</span></td></tr>
+    <tr><td>Pod IP 通、Service 名解析不了</td><td>CoreDNS 或 search 域问题</td><td>容器内 <span class="k">nslookup web</span> 与 <span class="k">nslookup web.prod.svc.cluster.local</span></td></tr>
+    <tr><td>同命名空间通、跨命名空间不通</td><td>用了短名，跨 ns 必须写全名或至少 svc 后缀</td><td>短名只在同 ns 的 search 域里成立</td></tr>
+  </table>
+  <pre><span class="c"># 1. 有没有后端——这一步决定后面查什么</span>
+kubectl get endpointslice -l kubernetes.io/service-name=web -o wide
+kubectl get endpoints web
+
+<span class="c"># 2. 名字、端口、targetPort 三个字段一次看全</span>
+kubectl get svc web -o jsonpath='{.spec.selector}{" | "}{.spec.ports}{"\n"}'
+kubectl get pod -l app=web -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.labels}{" "}{.spec.containers[*].ports}{"\n"}{end}'
+
+<span class="c"># 3. 从 Pod 内部分层验证：名字 → ClusterIP → Pod IP</span>
+kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- sh
+<span class="c"># nslookup web.prod.svc.cluster.local</span>
+<span class="c"># wget -qO- --timeout=3 http://web.prod.svc.cluster.local:8080/healthz</span>
+<span class="c"># wget -qO- --timeout=3 http://&lt;pod-ip&gt;:8080/healthz</span>
+
+<span class="c"># 4. 节点侧兜底：规则在不在、有没有被策略拦</span>
+iptables -t nat -L KUBE-SERVICES -n | grep &lt;cluster-ip&gt;
+ipvsadm -Ln | grep -A3 &lt;cluster-ip&gt;</pre>
+  <p>「端口名」这个坑值得单独讲，因为它几乎不报错。<span class="k">targetPort</span> 可以写数字，也可以写名字；写名字时，它必须和容器 <span class="k">ports[].name</span> 完全一致。改了个名字、或者新版本把端口名从 http 改成 web，Service 就再也找不到对应的端口，EndpointSlice 里的端口变成空的或者不对，表现是连接被拒。<b>这类问题在滚动更新里最容易出现：新旧 Pod 的端口名不一样，一半能通一半不通。</b></p>
+  <p>另一类容易被误判的是 NetworkPolicy。Pod 之间默认全通，但只要有一个策略「选中」了目标 Pod，那个方向的流量就变成默认拒绝，必须显式放行。而策略不生效时也没有任何报错——你的 YAML 写对了，CNI 不支持，就是一张废纸。判断方法只有一个：<b>起两个 Pod 实测一次本该被拒绝的流量</b>，别相信配置看起来对不对。</p>
+  <div class="callout ok">
+    <b>一条能省很多时间的习惯：</b>不要从「网络不通」开始查，从「层次」开始查。名字能不能解析（DNS）→ ClusterIP 通不通（kube-proxy 规则）→ Pod IP 通不通（CNI）→ 端口通不通（应用监听）。四步里每一步都有独立的命令，跳过任何一步都会让你在错误的层里打转。
+  </div>
+  <p><b>面试怎么答：</b>「Service 不通我先看 EndpointSlice 有没有地址。没有就是 selector、Ready 状态或者端口名的问题，跟网络无关。有地址但连不上，才轮到 targetPort、kube-proxy 规则和 NetworkPolicy。我会用名字、ClusterIP、Pod IP 三层分别打一次，哪一层断了一眼就出来。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：方向错了，动作越快越糟</h2></div>
+  <p class="lead">下面这些不是知识盲区，是<b>动作比判断快</b>。它们的共同点是：看起来很果断，实际把一次可解释的故障变成了一次不可解释的故障。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">Pod Pending 就加节点</div><div class="pd">Pending 的原因里，资源只是一类。PVC 没绑定、硬性反亲和、污点不容忍，加多少节点都没用。先读 FailedScheduling 那句话，它是分项统计的。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">用 kubectl top 判断能不能调度</div><div class="pd">调度看的是 requests 累加，top 给的是实际用量。节点 CPU 20% 但 requests 已满，Pod 照样 Pending。这两个数字永远不要混着看。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">镜像拉不下来就怀疑镜像坏了</div><div class="pd">先读 Failed to pull 的原文。unauthorized 是凭证和命名空间的问题，timeout 是节点出网问题，x509 是证书信任问题——只有 not found 才是镜像名或 tag 的事。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">跨命名空间复用同一个 imagePullSecret</div><div class="pd">Secret 是命名空间级的资源。在 default 建了，prod 的 Pod 用不到，报错还是一句 unauthorized，看起来像密码错。要么每个 ns 建一份，要么挂到 ServiceAccount 上。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">看 CrashLoop 只看当前日志</div><div class="pd">当前容器可能刚起来几十秒，日志里什么都没有。真正的原因在上一轮，必须加 --previous，同时看 lastState 的退出码。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到 137 就说是 OOM</div><div class="pd">137 只说明被 SIGKILL。OOM 要看 reason 是不是 OOMKilled；探针失败杀容器、节点驱逐、force delete 都会产生 137，处理方向完全不同。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把 JVM 堆设成 limit 的 100%</div><div class="pd">cgroup 卡的是整个进程的 RSS，堆外还有 Metaspace、直接内存、线程栈、CodeCache。堆吃满之前，堆外就把 limit 顶穿了，表现是「堆看着才 70% 却被 OOM」。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">Pod 不 Ready 就重启它</div><div class="pd">0/1 说明进程活着但探针不过，重启不改变探针配置。真正要做的是看探针失败的原文：404 是路径、refused 是端口、超时是阈值。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">Evicted 当成 OOM 处理</div><div class="pd">Evicted 是节点整体压力，Pod 被赶走重建；OOMKilled 是容器限额，原地重启。而且 Evicted 里最常见的是本地磁盘，不是内存。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">Terminating 卡住直接 force delete</div><div class="pd">force 只删 apiserver 里的对象，节点上的容器、挂载都还在。占着 RWO 卷时，新 Pod 会 Multi-Attach 起不来——一个删不掉变成一个组起不来。</div></div></div>
+  <p><b>面试怎么答：</b>挑一条讲成三段：当时的判断、造成的后果、后来改成了什么。比如「有次 Pod 一直 Pending，我以为是资源不够，直接扩了两台节点，还是 Pending。后来读 Events 才发现是 PVC 没绑定，StorageClass 的 provisioner 挂了。从那以后我先读那句话再决定动不动集群。」第三段最重要，它证明你改的是判断方式，不是运气。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 一个 Pod 一直 Pending，describe 的 Events 显示 <span class="k">0/5 nodes are available: 5 Insufficient memory</span>。最该先做什么？</div>
+      <button class="opt">立刻调大这个 Pod 的 memory limit，让它能跑起来</button>
+      <button class="opt">对比 Pod 的 requests 与节点的 Allocated resources，确认是 requests 加不进去</button>
+      <button class="opt">重启 kube-scheduler，让它重新调度一次</button>
+      <button class="opt">给所有节点去掉污点，扩大可选范围</button>
+      <div class="ans">正确答案：<b>对比 requests 与节点已分配量</b>。调度看的是 requests 的累加，不是实际用量，也不是 limits。消息里明确写的是 Insufficient memory，说明五个节点都因为内存 requests 放不下。调 limits 不影响调度；重启 scheduler 不会改变可用量；这题里根本没有污点相关的信息。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 镜像名和 tag 都确认过是对的，Pod 仍是 ImagePullBackOff，Events 里写 <span class="k">unauthorized: authentication required</span>。最可能的原因是？</div>
+      <button class="opt">节点到镜像仓库的网络不通</button>
+      <button class="opt">imagePullSecrets 缺失，或者 Secret 建在了别的命名空间</button>
+      <button class="opt">节点磁盘满，镜像层写不进去</button>
+      <button class="opt">镜像太大，超过了 kubelet 的拉取超时</button>
+      <div class="ans">正确答案：<b>凭证问题</b>。unauthorized 是仓库明确拒绝了认证，不是网络不通（那会报 timeout 或 i/o timeout），也不是磁盘（那会报 no space left）。最容易踩的是 Secret 的命名空间作用域：在 default 建了 regcred，prod 的 Pod 引用不到，报错文案还是一模一样的 unauthorized。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. 某容器反复重启，<span class="k">lastState.terminated</span> 显示 reason=OOMKilled、exitCode=137。下面哪个判断是对的？</div>
+      <button class="opt">节点内存耗尽，应该给节点扩容</button>
+      <button class="opt">137 说明收到了 SIGTERM，是优雅退出的正常结果</button>
+      <button class="opt">容器触碰了自己的 cgroup 内存限额，与节点剩余内存多少无关；要看 limit 和实际 RSS</button>
+      <button class="opt">探针连续失败导致的强杀，应该调大 failureThreshold</button>
+      <div class="ans">正确答案：<b>容器 cgroup 限额</b>。reason=OOMKilled 明确指向内存限额，触发点是容器自己的 limit，不是节点总量，所以节点内存只用了 60% 也会被杀。137 是 128+9（SIGKILL），只能说明被强杀，必须靠 reason 区分是 OOM 还是探针杀或驱逐。143 才是 SIGTERM。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. Pod 是 Running，READY 显示 0/1，describe 里有 <span class="k">Readiness probe failed: HTTP probe failed with statuscode: 404</span>。正确的判断是？</div>
+      <button class="opt">liveness 配错了，容器马上会被重启</button>
+      <button class="opt">探针路径与实际不符，Pod 被摘出 Endpoints，但进程本身正常运行</button>
+      <button class="opt">容器已经 OOM，需要调大 memory limit</button>
+      <button class="opt">镜像拉取失败，需要检查仓库凭证</button>
+      <div class="ans">正确答案：<b>路径不符导致被摘流量</b>。404 说明请求到达了应用但路由不存在，是探针路径（或 contextPath）写错。readiness 失败的动作是从 Endpoints 摘除，不重启容器；所以重启或改 limit 都不会有任何效果。修法是把探针路径改成应用真实提供的健康检查端点。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">5. 某个 Pod 的 status 是 Failed、reason=Evicted，Message 是 <span class="k">The node was low on resource: ephemeral-storage</span>。这说明什么？</div>
+      <button class="opt">容器内存超过 limit，被 cgroup 杀掉</button>
+      <button class="opt">节点 CPU 超卖严重，需要降低 requests</button>
+      <button class="opt">PVC 没有绑定成功，Pod 无法挂载存储</button>
+      <button class="opt">节点的本地存储被占满，常见原因是日志、emptyDir 或镜像层</button>
+      <div class="ans">正确答案：<b>本地存储压力</b>。ephemeral-storage 指节点的本地可用存储，来源包括容器 stdout 日志、emptyDir、容器可写层和镜像层。内存超限是 OOMKilled（容器被杀、Pod 留在原地），不是 Evicted；Evicted 是 kubelet 把整个 Pod 赶走、换节点重建。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 删掉一个 Pod 后状态一直是 Terminating，二十分钟没变化，节点本身是 Ready。下一步最合适的是？</div>
+      <button class="opt">直接 kubectl delete --force --grace-period=0</button>
+      <button class="opt">看 metadata.finalizers 和 Events，确认是 finalizer 没摘、卷卸载失败还是 webhook 超时</button>
+      <button class="opt">重启 kube-apiserver，让对象状态刷新</button>
+      <button class="opt">把这个节点标记为不可调度，让 Pod 迁走</button>
+      <div class="ans">正确答案：<b>定位卡在哪一环</b>。Terminating 是删除链上某一环没有回音：finalizer 没人摘、卷卸载或多挂失败、准入 webhook 不通、kubelet 不响应。force delete 只移除 apiserver 里的对象，节点上的容器和挂载仍然存在；如果它还占着 RWO 卷，新 Pod 会 Multi-Attach 起不来，把单点问题放大成一组问题。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>phase</b></td><td>Pod 的宏观阶段：Pending / Running / Succeeded / Failed / Unknown，只说明「到哪一步」，不说明原因</td></tr>
+    <tr><td><b>waiting reason</b></td><td>容器没跑起来时的原因词：ContainerCreating、ImagePullBackOff、CrashLoopBackOff、CreateContainerConfigError</td></tr>
+    <tr><td><b>FailedScheduling</b></td><td>调度器写进 Events 的拒绝理由，按节点分项统计，能直接指向资源、污点、亲和或 PVC</td></tr>
+    <tr><td><b>Allocated resources</b></td><td>节点上 requests 的累加，是调度依据；与 top 出来的实际用量是两套数字</td></tr>
+    <tr><td><b>ErrImagePull / ImagePullBackOff</b></td><td>前者是本次拉取失败，后者是退避重试中；真正的错误在上一条 Failed 事件里</td></tr>
+    <tr><td><b>imagePullSecrets</b></td><td>拉私有镜像用的凭证，命名空间级资源，跨命名空间必须各建一份或挂到 ServiceAccount</td></tr>
+    <tr><td><b>lastState.terminated</b></td><td>上一次容器结束的结构化记录，含 reason、exitCode、finishedAt，比日志更可靠</td></tr>
+    <tr><td><b>OOMKilled</b></td><td>容器触碰 cgroup 内存限额被内核杀死，exitCode 137，与节点剩余内存无关</td></tr>
+    <tr><td><b>ephemeral-storage</b></td><td>节点本地可用存储，包含日志、emptyDir、可写层、镜像层，是 Evicted 的常见原因</td></tr>
+    <tr><td><b>QoS 驱逐顺序</b></td><td>节点压力时 BestEffort 先走，Burstable 按超 requests 的程度排序，Guaranteed 最后</td></tr>
+    <tr><td><b>finalizer</b></td><td>对象上的「删除前必须先做完这件事」标记，控制器不摘掉，对象就停在 Terminating</td></tr>
+    <tr><td><b>Multi-Attach error</b></td><td>RWO 卷还被旧节点占着，新 Pod 挂不上；常见于节点失联后强制删除 Pod</td></tr>
+    <tr><td><b>EndpointSlice</b></td><td>Service 的后端地址列表，由控制器按 selector 和 Ready 状态维护，Endpoints 是它的前身</td></tr>
+    <tr><td><b>targetPort</b></td><td>Service 转发到的容器端口，可写数字或名字；写名字时必须与容器 ports.name 完全一致</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个 Deployment，把镜像 tag 改成一个不存在的版本，用 <span class="k">kubectl get pod -w</span> 看着它从 ErrImagePull 走到 ImagePullBackOff，再改回来，记住两个状态的切换节奏；② 给容器设一个明显偏小的 memory limit（比如 64Mi），跑一个分配内存的循环，观察 reason 从 Error 变成 OOMKilled、重启次数上涨、BackOff 间隔翻倍的全过程；③ 把 readiness 探针路径改成一个不存在的地址，看着 READY 变 0/1、EndpointSlice 里这个地址消失、Service 返回 503，然后改回来确认自动恢复。<br><br>
+    <b>之后值得单独学：</b>第 12 期把这个过程里所有「网络相关」的分支展开——Service 的规则怎么下发、跨节点一个包要经过哪些设备、DNS 为什么会有 5 秒延迟；第 13 期讲调度与优雅发布，把 Pending 里的亲和性、以及「发布时为什么会 502」讲透；第 9 期讲 Docker 侧的退出码和 OOM，和这一期是同一套语义在不同层的表现。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 11 期 · 排障不是把状态词背下来，是看到状态词就知道该去谁的日志里找答案</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

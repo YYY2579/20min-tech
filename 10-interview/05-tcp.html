@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP 面试：握手、挥手、状态机与那些追问</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 5 期</span>
+    <h1>TCP 面试：握手、挥手、状态机与那些追问</h1>
+    <p class="sub"><span class="k">TIME_WAIT</span> 多不是问题，<span class="k">CLOSE_WAIT</span> 多才是<b>你的代码没关连接</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>11</b> 个连接状态</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>12</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：那条停在 TIME_WAIT 的连接，是客户端留的还是服务端留的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>两张截图，两个完全不同的病</h2></div>
+  <p class="lead">值班群先弹出一条：「网关的 TIME_WAIT 三万二了，是不是要调内核参数？」过了十分钟又弹一条：「订单服务 CLOSE_WAIT 一万八，也在涨。」两个人分别去翻 <span class="k">tcp_tw_reuse</span> 和 <span class="k">tcp_fin_timeout</span>，改完重启，第二天同样的数字照旧。</p>
+  <p>这两个状态看起来都像「连接堆积」，实际一个是<b>协议的正常收尾</b>，一个是<b>代码没关连接</b>。前者调参数只是把症状藏起来，后者调参数完全无效——因为 CLOSE_WAIT 在内核里根本没有超时定时器，只要应用不调 <span class="k">close()</span>，它能躺到进程退出。</p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>短连接网关 TIME_WAIT 3 万</td><td>内核参数没优化，连接回收太慢</td><td>每条主动关闭的连接都会留 60 秒。堆积量约等于「每秒新建连接数 × 60」，是算得出来的，不是故障</td></tr>
+    <tr><td>应用机 CLOSE_WAIT 1.8 万</td><td>对端不关连接，或者网络有问题</td><td>对端已经关了，本端内核回了 ACK，但应用始终没调 close。异常分支漏了释放、连接池只借不还，都会这样</td></tr>
+    <tr><td>新服务偶发连接超时，服务端 <span class="k">ss</span> 看不出异常</td><td>网络丢包，或者带宽打满</td><td>accept 队列满了。握手在服务端内核里完成，但没进到应用层，所以 <span class="k">ss -lntp</span> 看不到任何异常连接</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>先看状态</div><div class="cd">TIME_WAIT、CLOSE_WAIT、SYN_RECV 各有多少。这一步只回答一个问题：这是正常收尾、代码泄漏，还是被打了。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>再看队列</div><div class="cd">半连接队列和全连接队列的水位。前者满是被打，后者满是应用 accept 太慢，两个方向的处理完全相反。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>最后看计数</div><div class="cd">重传、超时、溢出这些计数器。它们不给结论，只给量级——但量级决定了这事要不要现在处理。</div></div>
+  </div>
+  <p>这一篇按「一个连接从出生到死亡」的顺序走：先看报文头里真正决定行为的那几个字段，再拆三次握手和它背后的队列，然后是四次挥手和 11 个状态的来龙去脉，接着是 TIME_WAIT、CLOSE_WAIT 这两个必考状态，最后落到重传、keepalive 和抓包判读。</p>
+  <div class="callout">
+    <b>为什么从状态机切入：</b>面试官问「为什么四次挥手」「为什么 TIME_WAIT 要等 2MSL」，标准答案谁都会背。真正区分人的是他能不能指着某个状态说「我现在看到这个状态，说明卡在哪一步、下一步该看什么」。状态机不是用来背的，是用来定位的。
+  </div>
+  <p><b>面试落点：</b>被问到连接类故障时，先给一句定性：「我先看状态分布，是 TIME_WAIT 多还是 CLOSE_WAIT 多。前者多半是短连接 + 主动关闭，属于容量问题；后者一定是应用没释放，属于代码问题。两个方向的处理完全相反。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>报文头里真正重要的六个字段</h2></div>
+  <p class="lead">「TCP 报文头有哪些字段」这题，从源端口背到紧急指针，背完面试官一个也记不住。真正会被追问的只有六个，因为它们分别决定了<b>寻址、有序、生命周期、流控、协商、校验</b>这六件事。</p>
+  <table>
+    <tr><th style="width:120px">字段</th><th style="width:88px">长度</th><th>它决定什么</th><th>面试怎么追问</th></tr>
+    <tr><td><b>源/目的端口</b></td><td>各 16 位</td><td>找到两端的进程。IP 定位主机，端口定位进程</td><td>「一个端口能有多少连接」——取决于四元组的组合数，不是端口号本身</td></tr>
+    <tr><td><b>序号 seq</b></td><td>32 位</td><td>字节流里每个字节的编号。SYN 和 FIN 各占一个序号</td><td>「为什么 ISN 要随机」——防止旧报文混入，也提高序列号可预测的门槛</td></tr>
+    <tr><td><b>确认号 ack</b></td><td>32 位</td><td>「这个序号之前的字节我都收到了」，累积确认</td><td>「ack 是累计的，那丢了中间一段怎么办」——重复 ACK + 快速重传 + SACK</td></tr>
+    <tr><td><b>标志位</b></td><td>6 个经典位</td><td>SYN 建连、FIN 关方向、RST 强拆、PSH 催上层读、ACK 确认、URG 基本不用</td><td>「收到 RST 说明什么」——说明包到了，只是对方不认这个连接</td></tr>
+    <tr><td><b>窗口</b></td><td>16 位</td><td>接收方还能收多少字节，这是<b>流控</b>，防的是「发得比对方处理得快」</td><td>「窗口和拥塞控制是一回事吗」——不是，窗口管接收方能力，拥塞窗口管网络能力</td></tr>
+    <tr><td><b>选项</b></td><td>最多 40 字节</td><td>MSS、窗口扩大因子、SACK、时间戳，握手时协商</td><td>「MSS 怎么来的」——MTU 减去 IP 头和 TCP 头，以太网 1500 时典型是 1460</td></tr>
+  </table>
+  <p>固定头 20 字节，选项最多 40 字节，所以整个 TCP 头最长 60 字节。这个数字在算 MSS 和抓包偏移时会用到，值得记住。</p>
+  <p>流量控制用的是<b>接收窗口</b>：接收方在 ACK 里告诉对方「我缓冲区还剩多少」。窗口变成 0 时发送方停止发送，靠窗口探测（window probe）定期问一句「现在有空间了吗」。这就是所谓的零窗口，抓包里表现为一串长度 0 的 ACK，随后是探测包。<b>零窗口通常不是网络问题，是接收方应用读得太慢。</b></p>
+  <p>拥塞控制用的是<b>拥塞窗口 cwnd</b>，它只存在于发送方内核里，报文头上看不到。实际发送量取两者的较小值。面试里把这两个混为一谈，是很典型的减分点。</p>
+  <pre><span class="c"># -S 显示绝对序号，方便和日志对齐；默认显示的是相对序号</span>
+tcpdump -i eth0 -nn -S -c 6 'tcp port 8080 and host 10.0.0.12'
+
+<span class="c"># 输出（节选，箭头表示方向）</span>
+<span class="c"># 10.0.0.5.51234 &gt; 10.0.0.12.8080: Flags [S],  seq 1000001, win 64240,</span>
+<span class="c">#     options [mss 1460,sackOK,TS val 1 ecr 0,nop,wscale 7]</span>
+<span class="c"># 10.0.0.12.8080 &gt; 10.0.0.5.51234: Flags [S.], seq 2000001, ack 1000002,</span>
+<span class="c">#     options [mss 1460,sackOK,TS val 2 ecr 1,nop,wscale 7]</span>
+<span class="c"># 10.0.0.5.51234 &gt; 10.0.0.12.8080: Flags [.],  ack 2000002, win 502</span>
+
+<span class="c"># 看单个连接的实时内核指标：rtt、cwnd、重传、零窗口</span>
+ss -tin dst 10.0.0.12:8080</pre>
+  <p>上面这段输出里有三个细节值得盯：第三次握手的 <span class="k">win 502</span> 是压缩后的值，wscale 7 表示真实窗口要左移 7 位，也就是 502 乘 128；SYN-ACK 里的 <span class="k">ack 1000002</span> 比客户端的 seq 大 1，因为 SYN 自己占掉一个序号，同理 FIN 也占一个；两边的 MSS 都是 1460，说明路径 MTU 是 1500，中间没有隧道封装。</p>
+  <p><b>面试落点：</b>「TCP 的可靠不是『不丢』，是丢了能发现、能重传、能排序、能去重。它给你的是有序的字节流，不保证送达时间，也不保证消息边界——所以应用层还得自己做长度前缀或者分隔符，这就是常说的粘包。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>三次握手：为什么两次不够，第三次又在确认什么</h2></div>
+  <p class="lead">抓包里看到客户端发了 SYN，服务端回了 SYN-ACK，客户端没回 ACK，一秒后客户端又发了一次 SYN。这种现场八成不是「网络丢包」四个字能解释的，得看第三次握手到底在确认什么。</p>
+  <p>先把每一步的实质说清。SYN 带的是「我想建的连接，我的初始序号是 X」。SYN-ACK 带的是「我同意，我的初始序号是 Y，我确认你的 X」。最后的 ACK 带的是「我确认你的 Y」。<b>两次握手只能让发起方确认对方的收发能力，没法让对方确认发起方的接收能力。</b></p>
+  <p>更硬的理由是历史连接。客户端发出一个 SYN，它在网络里滞留了很久，客户端早就超时重发、通信、关闭了。这个迟到的 SYN 到达服务端，如果只握两次手，服务端就直接建连、分配缓冲区，然后一直等一个永远不会来的数据。<b>第三次握手让服务端在收到确认之前不分配完整资源</b>，迟到的 SYN 就废在 SYN_RECV 里，超时自己消失。</p>
+  <table>
+    <tr><th style="width:150px">丢的是哪个包</th><th>客户端状态</th><th>服务端状态</th><th>现象</th></tr>
+    <tr><td>SYN</td><td>SYN_SENT，超时重传（间隔指数增长）</td><td>什么都没收到，无感</td><td>客户端报连接超时，服务端日志干净</td></tr>
+    <tr><td>SYN-ACK</td><td>SYN_SENT，重传 SYN</td><td>SYN_RECV，重传 SYN-ACK</td><td>两边都在重试，最后一起超时</td></tr>
+    <tr><td>最后一个 ACK</td><td>认为已 ESTABLISHED，开始发数据</td><td>停在 SYN_RECV，重传 SYN-ACK</td><td>最阴的一种：客户端发数据收到 RST，但如果 SYN-ACK 重传被客户端补了 ACK，又能救回来</td></tr>
+  </table>
+  <p>初始序号（ISN）不是从 0 或 1 开始，而是随机化。原因有两个层面：一是避免上一次连接残留在网络里的报文被这次连接当成有效数据；二是让外部攻击者难以猜出序列号去伪造报文。<b>说自己「从 1 开始数」的答案，会被直接判定为只背过教材。</b></p>
+  <p>还有一个常被忽略的点：三次握手意味着<b>一个 RTT 的纯等待</b>，这段时间一个字节的业务数据都发不出去。跨地域机房 RTT 30ms，就是 30ms 的固定延迟成本——这也是长连接、连接池、TFO 这类优化存在的理由。TFO 把数据放进 SYN 里，但需要两端和中间设备都支持，实际落地要评估。</p>
+  <pre><span class="c"># 看握手到底卡在哪一步：抓 20 个包，只看 SYN/SYN-ACK/ACK</span>
+tcpdump -i eth0 -nn -c 20 'tcp[tcpflags] &amp; (tcp-syn|tcp-fin|tcp-rst) != 0 and port 8080'
+
+<span class="c"># 内核层面的握手失败计数</span>
+nstat -az | grep -E 'TcpAttemptFails|TcpOutRsts|TcpExtTCPTimeouts|ListenOverflows'
+
+<span class="c"># 当前有多少连接卡在 SYN_RECV（半连接）</span>
+ss -tan state syn-recv | wc -l</pre>
+  <p><b>面试落点：</b>「三次握手的第三次不是为了『再确认一次』这么空，它解决两件事：让服务端确认客户端真的收到了自己的 SYN，也就是双方收发能力都被验证过；同时让服务端在确认之前不把连接当完整连接，迟到的历史 SYN 就建不起来。ISN 随机化是为了防止旧报文混入和序列号被猜。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>两个队列：SYN Flood 打的是哪一个</h2></div>
+  <p class="lead">一台机器 <span class="k">ss -tan state syn-recv</span> 常年几千，CPU 不高，带宽也没满，但新用户就是连不上。这种「资源看起来都够，就是接不进来」的现场，答案在队列里。</p>
+  <p>服务端有<b>两个</b>队列，很多人只知道一个：</p>
+  <ul>
+    <li><b>半连接队列（SYN queue）</b>：收到 SYN、回了 SYN-ACK、还没收到最后 ACK 的连接，状态是 SYN_RECV。长度上限受 <span class="k">tcp_max_syn_backlog</span> 影响。</li>
+    <li><b>全连接队列（accept queue）</b>：三次握手完成、等着应用调 <span class="k">accept()</span> 取走的连接。长度上限取 <span class="k">listen(fd, backlog)</span> 和 <span class="k">somaxconn</span> 的<b>较小值</b>。</li>
+  </ul>
+  <p>SYN Flood 打的是第一个：只发 SYN 不回 ACK，把半连接队列塞满，正常用户的 SYN 进来没地方放，直接被丢。服务端看起来「活着」，但新连接全超时。</p>
+  <p>syncookies 的思路是「干脆不存状态」：队列满了以后，服务端不回 SYN-ACK 就完事，而是把连接的必要信息（比如 MSS、时间戳的低位）编码进初始序号里发出去。客户端回 ACK 时，把这些信息带回来，服务端校验一下就知道这是不是自己发出去的，<b>全程不需要在半连接队列里占一个槽</b>。</p>
+  <p><span class="k">net.ipv4.tcp_syncookies</span> 有三个取值：0 关闭；1 只在 SYN 队列溢出时启用；2 无条件启用。大多数发行版默认是 1。代价是编码空间有限，部分选项信息会丢失（比如窗口扩大因子在早期实现里没法带），所以它是<b>应急手段而不是常态配置</b>。</p>
+  <table>
+    <tr><th style="width:210px">计数器</th><th>含义</th><th>往哪查</th></tr>
+    <tr><td><b>ListenOverflows</b></td><td>全连接队列满，握手完成的连接被丢弃的次数</td><td>nstat -az | grep ListenOverflows</td></tr>
+    <tr><td><b>ListenDrops</b></td><td>因队列满被丢的 SYN 总数，含上面那一项</td><td>同上</td></tr>
+    <tr><td><b>SyncookiesSent</b></td><td>发出了多少个 syncookie，说明半连接队列已经在溢出</td><td>nstat -az | grep Syncookies</td></tr>
+    <tr><td><b>TcpExtTCPReqQFullDrop</b></td><td>请求队列满导致的丢弃</td><td>nstat -az | grep ReqQFull</td></tr>
+    <tr><td><b>ss -lnt 的 Recv-Q</b></td><td>当前全连接队列里有几个连接在等 accept</td><td>和 Send-Q（即 backlog 上限）对比</td></tr>
+  </table>
+  <pre><span class="c"># 一眼看队列水位：Recv-Q 贴近 Send-Q 就是应用 accept 太慢</span>
+ss -lnt
+<span class="c"># State   Recv-Q  Send-Q  Local Address:Port</span>
+<span class="c"># LISTEN  128     128     0.0.0.0:8080        &lt;-- 满了</span>
+
+<span class="c"># 队列上限由两边取小：应用 backlog 与内核 somaxconn</span>
+cat /proc/sys/net/core/somaxconn
+cat /proc/sys/net/ipv4/tcp_max_syn_backlog
+
+<span class="c"># 溢出计数（看增量，不看绝对值）</span>
+nstat -az TcpExtListenOverflows TcpExtListenDrops TcpExtSyncookiesSent
+watch -n1 'nstat TcpExtListenOverflows TcpExtListenDrops | tail -2'</pre>
+  <div class="callout warn">
+    <b>全连接队列溢出时，客户端的现象是「超时」而不是「拒绝」。</b>因为队列满时内核默认把最后一个 ACK 丢掉（<span class="k">tcp_abort_on_overflow=0</span>，以你环境为准），客户端以为自己已经 ESTABLISHED，发数据过去才吃到 RST 或者干脆没回应。所以「连接被拒」和「连接超时」这两个现象，指向的是完全不同的位置：前者通常是端口没监听（内核回 RST），后者往往是队列满或防火墙 DROP。
+  </div>
+  <p>调参的正确顺序是：先确认是哪个队列溢出；再看是应用 accept 太慢（线程池小、accept 后做了重活）还是流量真的超了；最后才是调 <span class="k">somaxconn</span> 和应用 backlog，两边要一起调，只改一边等于没改。</p>
+  <p><b>面试落点：</b>「SYN Flood 打的是半连接队列，防御手段是 syncookies 加连接数限制；全连接队列满则是应用 accept 太慢。这两个队列的溢出计数器不一样，一个看 SyncookiesSent，一个看 ListenOverflows，排查时先分清是哪个，再决定调内核还是改应用。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>四次挥手与 11 个状态：每个状态都是一个卡点</h2></div>
+  <p class="lead">抓包里看到 FIN、ACK、FIN、ACK 四行，候选人说「因为 TCP 是全双工」，然后就没词了。追问一句「那为什么有时候只看到三个包」，场面就冷了。</p>
+  <p>四次的本质是<b>两个方向各自独立关闭</b>。A 发 FIN，只表示「我这边的数据发完了」，不代表 B 也发完了。B 收到后先回 ACK（我知道了），等自己剩下的数据发完，再发一个 FIN（我也发完了）。两个 ACK 和两个 FIN，就是四次。</p>
+  <p>只看到三个包的情况是真实存在的：如果 B 收到 FIN 时手上没有待发数据，它的 ACK 和 FIN 可以合并成一个包发出去，抓包上就是 FIN、ACK、FIN+ACK、ACK——看起来像三次。<b>四次是逻辑上的四次，物理上可以合并。</b>能说出这一点，说明你真的抓过包而不是背过图。</p>
+  <table>
+    <tr><th style="width:130px">状态</th><th style="width:90px">谁在这</th><th>怎么进来的</th><th>卡在这里说明什么</th></tr>
+    <tr><td><b>LISTEN</b></td><td>服务端</td><td>调了 listen()</td><td>正常。Recv-Q 满就是 accept 跟不上</td></tr>
+    <tr><td><b>SYN_SENT</b></td><td>客户端</td><td>发了 SYN</td><td>等不到 SYN-ACK：对端没监听、被防火墙 DROP、或者回程不通</td></tr>
+    <tr><td><b>SYN_RECV</b></td><td>服务端</td><td>收到 SYN、发出 SYN-ACK</td><td>大量堆积就是 SYN Flood，或者客户端侧回程被丢</td></tr>
+    <tr><td><b>ESTABLISHED</b></td><td>双方</td><td>握手完成</td><td>正常。数量异常要结合业务量看</td></tr>
+    <tr><td><b>FIN_WAIT_1</b></td><td>主动关闭方</td><td>发了 FIN</td><td>等对方 ACK。堆积说明对端不回包</td></tr>
+    <tr><td><b>FIN_WAIT_2</b></td><td>主动关闭方</td><td>收到 ACK，等对方 FIN</td><td>对端迟迟不关。<b>这个状态没有强制超时</b>，只有孤儿连接才受 tcp_fin_timeout 约束</td></tr>
+    <tr><td><b>CLOSE_WAIT</b></td><td>被动关闭方</td><td>收到 FIN、回了 ACK</td><td>应用没调 close。堆积就是连接泄漏，跟内核参数无关</td></tr>
+    <tr><td><b>LAST_ACK</b></td><td>被动关闭方</td><td>发了 FIN，等最后 ACK</td><td>少见。等不到就重传 FIN，对端可能已经没了</td></tr>
+    <tr><td><b>CLOSING</b></td><td>双方</td><td>同时发 FIN（都先进 FIN_WAIT_1）</td><td>少见。两边几乎同时关闭才会出现</td></tr>
+    <tr><td><b>TIME_WAIT</b></td><td>主动关闭方</td><td>发完最后一个 ACK</td><td>正常收尾，等 2MSL。堆积看数量与增速</td></tr>
+    <tr><td><b>CLOSED</b></td><td>—</td><td>连接彻底消失</td><td>不占资源，也查不到</td></tr>
+  </table>
+  <p>这 11 个状态里，面试最爱追问的是 <b>FIN_WAIT_2</b> 和 <b>CLOSING</b>。前者因为「主动关闭方发完 FIN、收到 ACK 后就在这等，如果对端一直不发 FIN，它能等多久」——答案要分层：连接还被应用引用时，内核不设超时；应用已经 close 掉、只剩内核持有的孤儿连接，才受 <span class="k">tcp_fin_timeout</span>（默认 60 秒，以你环境为准）约束。后者是双方同时关闭的产物，出现的概率低，但能证明你理解「两个方向独立」。</p>
+  <pre><span class="c"># 按状态聚合，一眼看分布</span>
+ss -tan | awk 'NR&gt;1 {print $1}' | sort | uniq -c | sort -rn
+
+<span class="c"># 只数某个状态（注意内核里的状态名用连字符）</span>
+ss -tan state close-wait | wc -l
+ss -tan state fin-wait-2 | wc -l
+ss -tan state time-wait | wc -l
+
+<span class="c"># 看 CLOSE_WAIT 集中在哪个对端——这一步决定了去查哪段代码</span>
+ss -tan state close-wait | awk 'NR&gt;1 {print $5}' | cut -d: -f1 | sort | uniq -c | sort -rn | head</pre>
+  <p><b>面试落点：</b>「四次挥手是因为全双工，两个方向要各自关。但物理上 ACK 和 FIN 可以合并，所以抓包有时只看到三个包。状态机里我最关注 FIN_WAIT_2 和 CLOSE_WAIT：前者说明对端不关，后者说明本端不关，一个在等别人，一个是自己的 bug。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>TIME_WAIT：2MSL 到底在等什么</h2></div>
+  <p class="lead">「客户端报 Cannot assign requested address，一查是本地端口用完了，机器上三万个 TIME_WAIT。」这是短连接高并发场景里最常见的自伤，而它的成因是一条完全正常的协议规则。</p>
+  <p>谁进 TIME_WAIT？<b>主动关闭的那一方</b>。发完最后一个 ACK 之后，它不立刻销毁连接，而是等 2 倍报文最大生存时间（2MSL）。理由有两个，缺一不可：</p>
+  <ul>
+    <li><b>给最后一个 ACK 一次重来的机会。</b>如果这个 ACK 丢了，对端会重传 FIN。这时候本端还在 TIME_WAIT，能再回一个 ACK；要是已经 CLOSED，收到 FIN 只能回 RST，对端就会认为「连接异常终止」而不是「正常关闭」。</li>
+    <li><b>让这条连接的老报文在网络里自然消亡。</b>同一个四元组（源 IP、源端口、目的 IP、目的端口）如果马上被新连接复用，上一轮滞留的报文可能被新连接当成有效数据收下，造成数据错乱。等 2MSL，就是等这些报文过期。</li>
+  </ul>
+  <p>数字要说准：RFC 里 MSL 的建议值是 2 分钟，但 <b>Linux 的实现把 TIME_WAIT 固定成 60 秒</b>，不是严格按 2×MSL 算出来的，也没有 sysctl 能改它。有人拿 <span class="k">tcp_fin_timeout</span> 去调 TIME_WAIT，那是改错了对象——这个参数管的是孤儿 FIN_WAIT_2。</p>
+  <table>
+    <tr><th style="width:210px">手段</th><th>实际作用</th><th>适用边界</th></tr>
+    <tr><td><b>改成短连接变长连接</b></td><td>从源头减少连接建立/关闭的次数</td><td>最有效，但要评估中间设备的空闲超时和内存占用</td></tr>
+    <tr><td><b>让对端先关</b></td><td>TIME_WAIT 落在被动方，把包袱转移出去</td><td>只在你控制两端时可选，本质是把问题挪走</td></tr>
+    <tr><td><b>扩大 ip_local_port_range</b></td><td>可用端口变多，端口耗尽推迟</td><td>治标。默认范围以你环境为准，扩大后要同步检查 conntrack 和防火墙规则</td></tr>
+    <tr><td><b>tcp_tw_reuse=1</b></td><td>允许<b>主动发起连接</b>的一方复用 TIME_WAIT 的四元组</td><td>只对出方向生效，且需要时间戳开启（tcp_timestamps=1）。服务端作为被动关闭方，用不上它</td></tr>
+    <tr><td><b>tcp_max_tw_buckets</b></td><td>限制 TIME_WAIT 总数，超了直接销毁</td><td>只是把状态藏起来，超限时内核会打日志，属于掩盖而不是解决</td></tr>
+    <tr><td><b>tcp_tw_recycle</b></td><td>已从 Linux 内核移除（4.12 起）</td><td>不要再提。它在 NAT 环境下会误判时间戳、导致大量连接被丢</td></tr>
+  </table>
+  <p>算一笔账，你就知道为什么短连接撑不住：假设本地端口范围给了约 2.8 万个端口，TIME_WAIT 60 秒，那么理论上的新建连接速率上限大约是 28000 ÷ 60 ≈ 470 次/秒。超过这个量，端口就会开始不够用，报错是 <span class="k">Cannot assign requested address</span>。这个数字是粗算，实际还要看目的地址有几个（四元组里目的 IP 不同也能复用同一个源端口）。</p>
+  <pre><span class="c"># 端口范围与 TIME_WAIT 现状</span>
+cat /proc/sys/net/ipv4/ip_local_port_range
+ss -s | grep -i timewait
+ss -tan state time-wait | wc -l
+
+<span class="c"># 按远端聚合，看是不是集中在某几个下游（说明是短连接打同一个服务）</span>
+ss -tan state time-wait | awk 'NR&gt;1 {print $5}' | sort | uniq -c | sort -rn | head
+
+<span class="c"># 复用开关（改之前先确认时间戳是开的，否则不生效）</span>
+cat /proc/sys/net/ipv4/tcp_tw_reuse
+cat /proc/sys/net/ipv4/tcp_timestamps</pre>
+  <div class="callout danger">
+    <b>「TIME_WAIT 三万个」本身不是告警项。</b>它在告诉你「这个进程每秒新建了几百个连接」。真要处理，先问三个问题：为什么是短连接、能不能改成连接池、下游能不能接受长连接。把 60 秒改成 5 秒、把 reuse 打开，都只是把定时炸弹的引信剪短一截，连接数该涨还是涨。
+  </div>
+  <p><b>面试落点：</b>「TIME_WAIT 出现在主动关闭方，等 2MSL 是为了让最后一个 ACK 有机会重发、同时让旧报文过期。Linux 上是固定 60 秒，调不了。堆积量约等于 QPS 乘 60，所以它是容量信号，不是故障信号。真要解决就从长连接和连接池入手，tcp_tw_reuse 只对客户端出方向有用。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>CLOSE_WAIT：唯一一个「没有超时」的状态</h2></div>
+  <p class="lead">应用机的 CLOSE_WAIT 从 200 涨到 1.8 万，内存跟着涨，重启后半小时复发。运维把 <span class="k">tcp_fin_timeout</span> 从 60 调到 10，把 <span class="k">tcp_keepalive_time</span> 从 7200 调到 600，一点变化都没有——因为这个状态压根没有定时器。</p>
+  <p>CLOSE_WAIT 的形成过程很短：对端发来 FIN，本端内核回一个 ACK，然后<b>把这件事交给应用，等应用调 close()</b>。在应用调 close 之前，这个连接的 fd 一直开着，内核不会主动回收它，也不会因为它待太久而报警。所以它堆多少，就说明你的代码漏了多少。</p>
+  <p>这也是它和 TIME_WAIT 最本质的差别：TIME_WAIT 是内核在收尾，有明确的 60 秒；CLOSE_WAIT 是应用没收尾，<b>没有期限</b>。前者会自己消失，后者只会越来越多，直到 fd 耗尽，报 Too many open files。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先确认集中在谁身上。</b><span class="k">ss -tan state close-wait</span> 按对端 IP 聚合。如果九成连的是同一个下游，说明是「调这个下游的那段代码」有问题；如果分散，更像是框架层的连接池泄漏。</div></div>
+    <div class="step"><div class="txt"><b>再确认增长曲线。</b>每 10 秒采一次数量。线性增长对应「每来一个请求漏一个」，阶梯式增长对应「某个定时任务或批量任务漏一批」，这两种的排查入口完全不同。</div></div>
+    <div class="step"><div class="txt"><b>看 fd 指向什么。</b><span class="k">lsof -p &lt;pid&gt;</span> 里找 socket，对照对端端口，能确认是 HTTP 客户端、数据库连接池还是消息队列的长连接。</div></div>
+    <div class="step"><div class="txt"><b>看线程卡在哪。</b>jstack / py-spy / pprof 抓一次栈，找阻塞在 read、wait 或者业务方法上的线程，往往能直接看到漏掉 close 的那个分支。</div></div>
+    <div class="step"><div class="txt"><b>最后才看配置。</b>连接池的 maxIdle、maxTotal、borrow 超时、泄漏检测阈值。很多「泄漏」其实是池子配置成了「只借不还」，比如拿到的连接在异常路径上没有归还。</div></div>
+  </div>
+  <p>代码层面的高频原因，按出现频率排：HTTP 客户端拿到响应后没关 body（Java 的 <span class="k">CloseableHttpResponse</span>、Go 的 <span class="k">resp.Body</span>）；数据库连接在 try 里借出、异常直接抛出，没有 finally 归还；异步回调里抛异常，跳过了收尾；自己写的 socket 长连接，重连时只建新的不关旧的；连接池的「空闲检测」把连接从池里摘掉了，但没有真正 close。</p>
+  <pre><span class="c"># 数量与增速</span>
+ss -tan state close-wait | wc -l
+while true; do echo "$(date +%T) $(ss -tan state close-wait | wc -l)"; sleep 10; done
+
+<span class="c"># 这个进程开了多少 fd，上限是多少</span>
+ls /proc/12345/fd | wc -l
+grep 'open files' /proc/12345/limits
+
+<span class="c"># 这些 fd 指向哪些远端</span>
+lsof -p 12345 -a -i TCP | awk '{print $9}' | sort | uniq -c | sort -rn | head</pre>
+  <div class="callout warn">
+    <b>把 CLOSE_WAIT 说成「对端不关连接」，是把因果搞反了。</b>对端已经关了（FIN 都发过来了），是本端不回 close。面试里这句话一出，后面讲什么参数都没用了。正确的说法是：「CLOSE_WAIT 说明我这边收到了 FIN 但应用没释放，属于连接泄漏，要去查代码里的释放路径。」
+  </div>
+  <p><b>面试落点：</b>「CLOSE_WAIT 堆积我第一步是按对端聚合，先定位到是哪一段调用；然后看增速是线性还是阶梯；再用 lsof 和线程栈找到具体的代码路径。它跟内核参数无关，因为内核在这个状态不设超时，就等应用 close。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>重传与拥塞控制：RTO 是猜的，快重传是赌的</h2></div>
+  <p class="lead">nstat 显示每秒几百个重传段，业务 P99 开始抖。有人第一反应是「网络抖动」，然后去 ping，ping 出来 0% 丢包，于是断定「网络没问题，是应用慢」。这个推理链条每一步都错。</p>
+  <p>先说重传怎么触发。发送方发一个段，启动一个定时器，超时没收到 ACK 就重发。这个超时时间叫 RTO，它<b>不是固定值</b>，而是根据往返时间 RTT 的采样动态估算的——经典算法用平滑 RTT 加一个与方差相关的项，RTT 抖得厉害时 RTO 就放大。<b>Linux 上 RTO 有一个下限（约 200 毫秒），初始值约 1 秒</b>，具体以你环境的内核为准。超时之后按指数退避，1 秒、2 秒、4 秒地翻倍，这就是为什么一次丢包会演变成几秒的卡顿。</p>
+  <p>另一条路是快速重传：接收方收到乱序的段，会立刻重复发上一个按序收到的 ACK。发送方连续收到<b>三个重复 ACK</b>，就判断「中间那个段丢了」，不等超时直接重传。SACK 选项让接收方能明确告诉对方「我收到了哪些区间」，避免一次重传一大片。</p>
+  <table>
+    <tr><th style="width:130px">机制</th><th>触发条件</th><th>代价</th></tr>
+    <tr><td><b>超时重传</b></td><td>RTO 到期没收到 ACK</td><td>最贵。要等一个 RTO，还会把拥塞窗口打回起点</td></tr>
+    <tr><td><b>快速重传</b></td><td>收到 3 个重复 ACK</td><td>便宜。不用等超时，窗口只减半</td></tr>
+    <tr><td><b>SACK</b></td><td>接收方通告已收到的区间</td><td>减少不必要的重传，但选项占头部空间</td></tr>
+    <tr><td><b>DSACK</b></td><td>告知对方「你重传的这个我早就收到了」</td><td>用于推断是不是乱序而非丢包，帮助算法判断</td></tr>
+  </table>
+  <p>拥塞控制的四段，用一句话各说清：<b>慢启动</b>是探路，窗口从很小开始指数增长（Linux 现在初始窗口是 10 个 MSS 量级）；<b>拥塞避免</b>是收敛，过了阈值改成线性增长；<b>快重传/快恢复</b>是纠错，三个重复 ACK 就重传并把窗口减半，不回到起点；<b>超时</b>是最坏情况，窗口直接回到最小，重新慢启动。</p>
+  <p>把丢包等同于拥塞，是传统算法的假设，也是它在弱网和无线场景下表现差的原因。BBR 换了个思路：不去猜「丢了就是堵了」，而是持续测量<b>瓶颈带宽</b>和<b>最小 RTT</b>，用这两个量估算应该发多快。它不把丢包当拥塞信号，所以在有一定随机丢包的链路上通常更稳，代价是更容易抢占带宽，多流共存时的公平性需要看具体版本和场景。</p>
+  <pre><span class="c"># 全局重传与超时计数（看增量）</span>
+nstat -az | grep -E 'TcpRetransSegs|TcpExtTCPTimeouts|TcpExtTCPLostRetransmit'
+
+<span class="c"># 单连接的细节：rtt、cwnd、重传次数、是否在用 SACK</span>
+ss -tin dst 10.0.0.12:8080
+<span class="c"># 关注 rtt:0.312/0.05、cwnd:10、retrans:0/3、sack_ok</span>
+
+<span class="c"># 当前可用的拥塞控制算法（内核里编进去的）</span>
+sysctl net.ipv4.tcp_available_congestion_control
+sysctl net.ipv4.tcp_congestion_control</pre>
+  <p>判断重传健不健康，别只看绝对值。业务量翻倍，重传数跟着翻倍是正常的。要看的是<b>重传率</b>（重传段 ÷ 总发送段）和它跟延迟的相关性。重传率在千分之几以内通常可以接受，具体阈值取决于链路类型；<b>但如果你看到 P99 和重传率同时抬起来，那基本可以确定是同一件事。</b></p>
+  <p><b>面试落点：</b>「RTO 是根据 RTT 采样动态算的，有下限，超时后指数退避；快速重传靠三个重复 ACK，代价比超时小得多。拥塞控制里慢启动是指数探路、拥塞避免是线性收敛。BBR 的区别是不把丢包当拥塞信号，改用带宽和最小 RTT 建模。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>keepalive 有三层，混着说一定被追问</h2></div>
+  <p class="lead">服务端把空闲连接回收设成 5 分钟，客户端连接池的 idle 也是 5 分钟，两边几乎同时动手。结果每隔一段时间，就有一批请求报 connection reset by peer——两边都在关，谁也不知道对方先关。</p>
+  <p>「keepalive」这个词被用在三个完全不同的地方，面试里混着说，追问一句就塌：</p>
+  <table>
+    <tr><th style="width:170px">名字</th><th>在哪一层</th><th>做什么</th><th>默认/常见值</th></tr>
+    <tr><td><b>TCP keepalive</b></td><td>内核</td><td>连接空闲到阈值后发探测包，判断对端主机还在不在</td><td>Linux 默认空闲 7200 秒才开始探，间隔 75 秒，探 9 次；以你环境为准</td></tr>
+    <tr><td><b>HTTP keep-alive</b></td><td>应用（协议头）</td><td>一个 TCP 连接上跑多个请求，减少握手开销</td><td>HTTP/1.1 默认持久连接，靠 Connection 头协商</td></tr>
+    <tr><td><b>应用层心跳</b></td><td>业务协议</td><td>定期发一个业务可识别的包，确认<b>对方进程</b>还能处理请求</td><td>间隔由业务定，通常几秒到几十秒</td></tr>
+  </table>
+  <p>关键区别在这：<b>TCP keepalive 探测的是主机，不是进程。</b>对端进程卡死、线程池打满、GC 停了 30 秒，只要内核还活着，它就会替进程回 ACK。所以你看到 keepalive 一切正常，业务请求却全部超时——这是完全可能发生的。要发现「进程假死」，只能靠应用层心跳或者业务探针。</p>
+  <p>反过来，应用层心跳也替代不了 TCP keepalive 的一个作用：<b>维持中间设备的连接状态</b>。NAT 网关、四层负载均衡、云安全组，都有各自的空闲超时表项，常见是几分钟。超时后它们静默删表，两端都不知道，直到下一次发包才吃到 RST 或者直接不通。所以心跳间隔必须小于链路上<b>最短</b>的那个空闲超时，而不是随便设个 30 秒。</p>
+  <p>两边同时关连接的问题，解决办法不是「谁别关」，而是<b>让关闭有先后</b>：客户端的 idle 时间要比服务端短一截（比如服务端 300 秒、客户端 240 秒），这样总是客户端先发现连接空闲、主动关掉，服务端那边收到的是一次正常的 FIN，而不是「我以为还活着、结果发过去被 RST」。这个技巧在连接池配置里非常实用。</p>
+  <pre><span class="c"># 内核 keepalive 的三个参数（秒）</span>
+sysctl net.ipv4.tcp_keepalive_time    <span class="c"># 空闲多久开始探测</span>
+sysctl net.ipv4.tcp_keepalive_intvl   <span class="c"># 探测间隔</span>
+sysctl net.ipv4.tcp_keepalive_probes  <span class="c"># 探测几次后判定死亡</span>
+
+<span class="c"># 应用可以按连接覆盖（SO_KEEPALIVE 只是开关，细粒度要靠 TCP_KEEPIDLE 等）</span>
+ss -tino | grep -A1 ESTAB</pre>
+  <div class="callout">
+    <b>关于 HTTP/2 的一个细节：</b>HTTP/2 有 PING 帧，可以在一个多路复用的连接上做应用层探测，但它探测的仍然是「对端协议栈是否响应」，不是「你的业务线程有没有被堵住」。所以做健康检查时，还是得有一个真正打到业务逻辑的接口。
+  </div>
+  <p><b>面试落点：</b>「keepalive 分三层：内核的 TCP keepalive 探主机，HTTP 的 keep-alive 是连接复用，业务心跳探进程。TCP keepalive 发现不了进程假死，因为内核会替它回 ACK。另外心跳间隔要小于中间设备的空闲超时，否则连接会被静默删掉。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>抓包：带着问题抓，带着判读看</h2></div>
+  <p class="lead">「你抓个包看看。」很多人抓完打开分析工具，看到几千行，然后不知道从哪一行开始看。抓包的价值不在抓，在于你<b>抓之前已经想好要看什么</b>。</p>
+  <p>抓之前先定三件事：<b>抓哪个点</b>（客户端还是服务端，两端都抓才能判断单向不通）、<b>抓什么</b>（host + port 精确过滤，别抓全量）、<b>抓多少</b>（<span class="k">-c</span> 限包数，<span class="k">-w</span> 落文件而不是刷屏）。生产上还要加一句 <span class="k">timeout 30</span>，防止忘了停。</p>
+  <pre><span class="c"># 精确过滤 + 限数量 + 落文件（-s 0 抓完整包，-S 用绝对序号）</span>
+timeout 30 tcpdump -i eth0 -nn -s 0 -S -c 200 \
+  'tcp port 8080 and host 10.0.0.12' -w /tmp/tcp-8080.pcap
+
+<span class="c"># 只看握手和挥手（过滤标志位）</span>
+tcpdump -i eth0 -nn 'tcp[tcpflags] &amp; (tcp-syn|tcp-fin|tcp-rst) != 0'
+
+<span class="c"># 只看重传：同一个序号出现两次（需要先落文件再分析更方便）</span>
+tcpdump -r /tmp/tcp-8080.pcap -nn | awk '{print $1,$3,$5,$7}' | sort | uniq -c | sort -rn | head
+
+<span class="c"># 回来再看时，先看统计再看明细</span>
+tcpdump -r /tmp/tcp-8080.pcap -nn -q | tail -5</pre>
+  <table>
+    <tr><th style="width:110px">标志</th><th>含义</th><th>判读要点</th></tr>
+    <tr><td><b>[S]</b></td><td>SYN</td><td>只有它没有 [S.]，说明对端没回，问题在去程或对端没监听</td></tr>
+    <tr><td><b>[S.]</b></td><td>SYN + ACK</td><td>对端同意建连。同一个 SYN 对应多个 [S.] 就是重传</td></tr>
+    <tr><td><b>[.]</b></td><td>纯 ACK</td><td>长度 0 的 ACK 很常见。成串出现要警惕零窗口或 ACK 风暴</td></tr>
+    <tr><td><b>[P.]</b></td><td>PSH + ACK</td><td>带数据。看 len 和 seq 是否连续，不连续就是丢包或乱序</td></tr>
+    <tr><td><b>[F.]</b></td><td>FIN + ACK</td><td>一方开始关闭。谁先发 FIN，谁就是主动关闭方</td></tr>
+    <tr><td><b>[R]</b> / <b>[R.]</b></td><td>RST</td><td><b>收到 RST 说明包到了</b>。要么端口没监听，要么连接已不存在（比如服务端重启）</td></tr>
+  </table>
+  <p>判读的顺序建议固定成四步：<b>握手有没有完成</b>（看 [S] [S.] [.] 三行是否成对）→ <b>谁先发 RST 或 FIN</b>（定主动权）→ <b>seq 有没有重复</b>（看重传）→ <b>窗口有没有变 0</b>（看接收方处理能力）。这四步走完，八成问题已经有结论了。</p>
+  <div class="cmds">
+    <div class="crow"><code>tcpdump -i any -nn -S -c 20 'host H and tcp port P'</code><span class="desc">抓一条流的握手，-S 用绝对序号方便和日志对齐</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -tin dst H:P</code><span class="desc">单连接的内核指标：rtt、cwnd、重传次数，比抓包更快看到拥塞状态</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nstat -az | grep -E 'RetransSegs|TCPTimeouts'</code><span class="desc">全局重传和超时计数，看增量不看绝对值</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -tan state close-wait | wc -l</code><span class="desc">连接泄漏的直接指标，配合对端聚合定位是哪段调用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -lnt</code><span class="desc">Recv-Q 贴近 Send-Q 就是 accept 队列满了</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>三个抓包的现实约束：</b>① 高流量下 tcpdump 会丢包，结尾那行「packets dropped by kernel」就是证据，要减小过滤范围或者加大缓冲区；② 容器里抓包要进对应的网络命名空间，抓宿主机网卡看到的可能是 NAT 之后的地址；③ 开了网卡多队列或 GRO/LRO 时，抓到的「大包」是网卡聚合出来的，和线路上真实传输的包不一样，算 MTU 问题时要注意。
+  </div>
+  <p><b>面试落点：</b>「我抓包前先定过滤条件和抓点，两端都抓，这样才能区分是去程不通还是回程不通。判读按四步走：握手完成没有、谁先 RST、seq 有没有重复、窗口有没有变 0。看到 RST 我不会说被防火墙拦了，因为 RST 恰恰证明包到了对方。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：每一个都能在面试里直接翻车</h2></div>
+  <p class="lead">下面这些不是知识点错误，是<b>判断方向错误</b>。它们的共同点是「听起来很有经验」，实际上会把排查带偏，或者把参数改出事故。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">TIME_WAIT 多就开 tcp_tw_recycle</div><div class="pd">这个参数已经从 Linux 内核移除（4.12 起），在 NAT 环境下它会按时间戳判断、把正常连接当成旧包丢掉。现在还提它，等于自报「我的知识停在几年前」。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把 CLOSE_WAIT 当成内核参数问题</div><div class="pd">这个状态在内核里没有超时定时器，就等应用调 close。调 tcp_fin_timeout 一点用没有，因为那个参数管的是孤儿 FIN_WAIT_2。方向错了，调什么都白调。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为 tcp_tw_reuse 能救服务端</div><div class="pd">它只对「主动发起连接」的一方生效，服务端作为被动关闭方，TIME_WAIT 是客户端留下的。服务端开了也没用，而且它依赖时间戳，关掉时间戳就失效。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">认为握手成功就代表服务可用</div><div class="pd">握手只证明「有人在这个端口 listen」，队列满、应用不 accept、TLS 握手失败、业务返回 500，全都能在握手成功的前提下发生。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把 TCP keepalive 当业务心跳</div><div class="pd">它探的是主机存活，对端进程卡死时内核照样回 ACK。要发现进程假死只能靠应用层心跳或者打到业务逻辑的健康检查。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到 RST 就说「被防火墙拦了」</div><div class="pd">防火墙 DROP 的结果是超时，不是 RST。收到 RST 说明包已经到达对方协议栈，只是对方不认这个连接——端口没监听，或者连接已经被回收。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">用 ping 的丢包率判断 TCP 质量</div><div class="pd">ICMP 可能被限速、被单独调度，和 TCP 的路径、队列、拥塞状态都不是一回事。ping 0% 丢包而 TCP 大量重传，是常见的组合。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">只在一端抓包，没看到回包就断定对方没回</div><div class="pd">回程可能走了另一条链路、被策略路由带走，或者在容器环境里根本没经过你抓的那块网卡。抓不到回包只能说「这个点没看到」，不能说「对方没发」。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">拿 ping 测端口和 MTU</div><div class="pd">ping 通只覆盖到 IP 层，和端口监听无关。测 MTU 要用带 DF 标志、指定包长的 ping，而且中间设备不一定会回 ICMP 不可达，黑洞就是这么来的。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">认为 TCP 会保留消息边界</div><div class="pd">TCP 是字节流，一次 send 可能被拆成多个段，多个 send 也可能被合并。应用层必须自己定长度前缀或者分隔符，这就是粘包/拆包问题的根源。</div></div></div>
+  <p><b>面试落点：</b>这 10 条里挑一条讲，讲法固定三段：当时的判断、造成的后果、后来改成了什么。第三段最重要——只说「踩过坑」不说明你改了判断方式，面试官会认为你还会再踩一次。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一条连接正常关闭后，TIME_WAIT 出现在哪一方？</div>
+      <button class="opt">总是在服务端，因为服务端要等所有客户端断开</button>
+      <button class="opt">总是在客户端，因为客户端先发起连接</button>
+      <button class="opt">主动关闭的那一方，也就是先发 FIN 的一方</button>
+      <button class="opt">双方都会进入，各自等 2MSL</button>
+      <div class="ans">正确答案：<b>主动关闭方</b>。TIME_WAIT 是「发完最后一个 ACK 之后」的状态，只有主动关闭的一方才需要等 2MSL：一是让最后一个 ACK 丢失时还能重发，二是让这条连接的老报文在网络中过期，避免被同一四元组的新连接误收。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 服务端 <span class="k">ss -s</span> 显示 CLOSE_WAIT 一万多条且持续增长，正确的判断是？</div>
+      <button class="opt">对端一直不关连接，应该让对端改成长连接</button>
+      <button class="opt">本端收到了对端的 FIN，但应用没有调用 close，属于连接泄漏，要改代码</button>
+      <button class="opt">主动关闭太多，应该调小 tcp_fin_timeout</button>
+      <button class="opt">说明正在遭受 SYN Flood，应该开启 syncookies</button>
+      <div class="ans">正确答案：<b>应用没 close</b>。CLOSE_WAIT 表示本端已经回了 FIN 的 ACK，正在等本端应用关闭。对端该做的都做完了，剩下的是本端的事。这个状态在内核里没有超时定时器，堆多少就漏多少，直到 fd 耗尽。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 关于三次握手「为什么不能是两次」，下面哪个说法最站得住？</div>
+      <button class="opt">两次握手无法分配端口，端口必须在第三次握手时才分配</button>
+      <button class="opt">两次握手会让 TCP 头部的校验和算不出来</button>
+      <button class="opt">两次握手无法协商 MSS，会导致分片</button>
+      <button class="opt">两次握手时，网络中滞留的历史 SYN 会让服务端建立一个永远不会被使用的连接</button>
+      <div class="ans">正确答案：<b>历史 SYN</b>。如果只握两次，一个早已失效、在网络里滞留很久的 SYN 到达服务端后，服务端会直接建连并分配资源，然后一直等数据。第三次握手让服务端在收到确认之前不把连接当成完整连接，迟到的 SYN 就废在 SYN_RECV 里自己超时。另外两次握手也无法让服务端确认客户端的接收能力。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 客户端大量报 <b>Cannot assign requested address</b>，机器上 TIME_WAIT 三万条，最合理的处置是？</div>
+      <button class="opt">先确认是不是短连接打同一个下游，从连接池或长连接入手，参数只是辅助</button>
+      <button class="opt">把 net.ipv4.tcp_tw_recycle 设为 1，立刻回收</button>
+      <button class="opt">把 tcp_fin_timeout 调到 5 秒，缩短 TIME_WAIT</button>
+      <button class="opt">把 tcp_max_tw_buckets 调到 100，强制内核销毁</button>
+      <div class="ans">正确答案：<b>从连接模型入手</b>。端口耗尽的根因是「短连接频率 × 60 秒」超过了可用端口数，参数只能治标。tcp_tw_recycle 已被内核移除；tcp_fin_timeout 管的是孤儿 FIN_WAIT_2，不是 TIME_WAIT；tcp_max_tw_buckets 只是把状态藏起来，超限时仍会丢连接。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 抓包里看到客户端发了 SYN，服务端回了 SYN-ACK，之后没有第三次握手，而是客户端重发 SYN。最不可能的原因是？</div>
+      <button class="opt">服务端的 SYN-ACK 在回程被丢弃</button>
+      <button class="opt">客户端到服务端的去程正常，但回程路由不通</button>
+      <button class="opt">服务端没有监听这个端口</button>
+      <button class="opt">中间设备只放行了单向流量</button>
+      <div class="ans">正确答案：<b>服务端没监听</b>。没监听时内核会直接回 RST，抓包上是一条 [R] 而不是 [S.]。既然已经看到 SYN-ACK，说明服务端协议栈收到了 SYN 并且愿意建连，问题出在回程或者第三次握手的 ACK 没到达，属于路径问题而不是监听问题。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 对端进程卡死（线程池打满，不再处理请求），但主机和内核都正常。哪种机制能发现这个问题？</div>
+      <button class="opt">TCP keepalive，因为它会定时发探测包</button>
+      <button class="opt">应用层心跳，因为 TCP keepalive 的探测由内核代答，只能证明主机存活</button>
+      <button class="opt">调小 tcp_keepalive_time 就行，探测频率高了自然能发现</button>
+      <button class="opt">都不行，只能等连接超时</button>
+      <div class="ans">正确答案：<b>应用层心跳</b>。TCP keepalive 的探测包由对端内核处理并回 ACK，进程是否还能干活它完全不知道。把 tcp_keepalive_time 调小只是让探测更频繁，结论还是一样——主机活着。要发现进程假死，只能有一个真正走到业务逻辑的健康检查。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>ISN</b></td><td>初始序号。随机化是为了防止旧报文混入，也提高序列号被猜中的门槛</td></tr>
+    <tr><td><b>MSS</b></td><td>最大段长度，等于 MTU 减去 IP 头和 TCP 头，以太网 1500 时典型 1460</td></tr>
+    <tr><td><b>MSL</b></td><td>报文在网络中的最大生存时间。TIME_WAIT 等 2MSL，Linux 实现直接固定为 60 秒</td></tr>
+    <tr><td><b>半连接队列</b></td><td>存放 SYN_RECV 连接的队列，受 tcp_max_syn_backlog 影响，是 SYN Flood 的攻击目标</td></tr>
+    <tr><td><b>全连接队列</b></td><td>存放已完成握手、等应用 accept 的连接，长度取 listen backlog 与 somaxconn 的较小值</td></tr>
+    <tr><td><b>syncookies</b></td><td>队列满时不保存状态，把连接信息编码进 ISN，收到 ACK 再校验重建</td></tr>
+    <tr><td><b>RTO</b></td><td>重传超时时间，根据 RTT 采样动态估算，有下限，超时后指数退避</td></tr>
+    <tr><td><b>快速重传</b></td><td>收到三个重复 ACK 就立即重传，不必等 RTO 到期</td></tr>
+    <tr><td><b>SACK</b></td><td>选择性确认，让接收方告诉发送方「我收到了哪些区间」，减少无谓重传</td></tr>
+    <tr><td><b>cwnd</b></td><td>拥塞窗口，只存在于发送方内核，报文头看不到；实际发送量取它与接收窗口的较小值</td></tr>
+    <tr><td><b>零窗口</b></td><td>接收方缓冲区满，通告窗口为 0，发送方停止发送并定期探测</td></tr>
+    <tr><td><b>CLOSE_WAIT</b></td><td>被动关闭方收到 FIN 并回 ACK 后的状态，等应用 close，内核不设超时</td></tr>
+    <tr><td><b>TIME_WAIT</b></td><td>主动关闭方发完最后一个 ACK 后的状态，Linux 固定 60 秒</td></tr>
+    <tr><td><b>粘包</b></td><td>TCP 是字节流没有消息边界，应用层要自己用长度前缀或分隔符切分</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在测试机上用 <span class="k">nc -l</span> 起一个监听，客户端连上去后直接 kill 掉服务端，用 <span class="k">ss -tan</span> 看客户端停在哪个状态，再对照状态表确认；② 写一个循环建连不关连接的脚本，看着 CLOSE_WAIT 一路涨，然后用 <span class="k">lsof -p</span> 找出是哪个 fd；③ 用 <span class="k">tcpdump -S</span> 抓一次完整的握手和挥手，把每一行的 seq 和 ack 手算一遍，确认 SYN 和 FIN 各占一个序号。<br><br>
+    <b>之后值得单独学：</b>第 6 期把这套东西放进真实排障场景——同一条「网络不通」，可能是 DNS、防火墙、MTU 或 TLS，得先分层；第 7 期讲 DNS 解析和 HTTP/HTTPS 握手，那里会把「一个请求要过几次 RTT」算清楚；第 28 期专门讲内核参数，包括 <span class="k">somaxconn</span>、<span class="k">tcp_tw_reuse</span> 这些参数在什么条件下才该动。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 5 期 · 面试问 TCP，考的不是你背了几个状态，是你看到一个状态能不能说出它在等谁</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

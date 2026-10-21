@@ -17,6 +17,8 @@ DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__fi
 # 递归扫描，支持分类子目录
 FILES = []
 for root, _, files in os.walk(DIR):
+    if "tpl" in os.path.relpath(root, DIR).replace("\\", "/").split("/"):
+        continue  # tpl/ 是构建脚手架（内容片段），不是交付页面
     for fn in files:
         if fn.endswith(".html"):
             FILES.append(os.path.relpath(os.path.join(root, fn), DIR))

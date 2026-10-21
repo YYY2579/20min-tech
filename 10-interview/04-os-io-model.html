@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>进程 / 线程 / 协程与五种 IO 模型</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 4 期</span>
+    <h1>进程 / 线程 / 协程与五种 IO 模型</h1>
+    <p class="sub">epoll 为什么快、协程到底省了什么，这两个问题答不清，<b>高并发就只是背名词</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>5</b> 种 IO 模型</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>1</b> 条追问链</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先算一笔账：一个线程默认栈多大，开一万个要多少内存？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一个所有人都遇到过的现场</h2></div>
+  <p class="lead">8 核机器，QPS 三千，每个请求要查两次 Redis、调一次下游 HTTP。CPU 使用率 25%，看着很闲，但接口 P99 从 80ms 抖到 900ms，高峰期还偶发超时。</p>
+  <p>翻代码：线程池 500 个线程，用的是阻塞 IO。看上去「线程多、能扛并发」，实际上 500 个线程在同一时刻能处理的请求就是 500 个，超出的全部排在队列里等。CPU 闲着，线程全在等网络——这就是典型的<b>用线程数硬扛 IO 等待</b>。</p>
+  <p>面试官问「你怎么优化」，如果你答「加到 2000 个线程」，他会接着问「一台机器最多能开多少线程，为什么」。这时候答不上来，前面讲的架构就全是空中楼阁。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>省内存</div><div class="cd">线程栈是 MB 级预留，协程栈是 KB 级起点。这是「十万并发」在内存上的第一道门槛。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>省切换</div><div class="cd">线程切换要进内核、保存上下文；协程切换在用户态完成，只换栈和寄存器。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>省等待</div><div class="cd">IO 多路复用让一个线程同时盯住上万个连接，谁就绪处理谁，不再一对一死等。</div></div>
+  </div>
+  <p>这一篇就按这三条线索走：先讲清进程与线程在内存和调度上到底差什么，再讲协程省的是哪部分开销，然后是五种 IO 模型和 epoll 的真实边界，最后收在「线程池开多大」这条从应用问到内核的追问链上。</p>
+  <p><b>面试落点：</b>面试官问「你怎么优化这个接口」时，别急着报技术名词。先说「它是 IO 密集还是 CPU 密集」，再说「瓶颈在等还是算」，最后才说方案。这一句话的顺序，本身就是判断力的展示。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>进程与线程：隔离的是地址空间，共享的也是它</h2></div>
+  <p class="lead">「进程和线程的区别」几乎每场必问，但大部分人背的是「进程是资源分配单位、线程是调度单位」。这句话没错，却不足以支撑追问。<b>真正该说的是：哪些东西被复制了，哪些被共享了，代价分别是什么。</b></p>
+  <table>
+    <tr><th style="width:170px">资源</th><th>进程之间</th><th>同一进程内的线程之间</th></tr>
+    <tr><td><b>虚拟地址空间</b></td><td>各自独立，互相看不见</td><td>共享（代码段、数据段、堆、mmap 区）</td></tr>
+    <tr><td><b>页表 / TLB</b></td><td>各自一套，切换要换页表</td><td>共用一套，切换不刷 TLB</td></tr>
+    <tr><td><b>栈</b></td><td>各自独立</td><td><b>各自独立</b>（这是线程唯一的大块私有内存）</td></tr>
+    <tr><td><b>寄存器上下文</b></td><td>独立</td><td>独立（切换时要保存/恢复）</td></tr>
+    <tr><td><b>打开的文件描述符</b></td><td>独立（fork 时复制一份指向同一文件的 fd 表）</td><td>共享同一张 fd 表</td></tr>
+    <tr><td><b>当前工作目录、umask</b></td><td>独立</td><td>共享</td></tr>
+    <tr><td><b>信号处理函数</b></td><td>独立</td><td>共享（进程级设置）</td></tr>
+    <tr><td><b>信号屏蔽字、errno</b></td><td>—</td><td>每个线程一份</td></tr>
+  </table>
+  <p>这张表里最容易被追问的两行：<b>栈是私有的</b>，所以线程里的局部变量天然不共享，不需要加锁；<b>fd 表是共享的</b>，所以一个线程 close 了 fd，另一个线程手里的同一个 fd 立刻失效——这类 bug 极难查，因为看起来完全无辜。</p>
+  <h3>切换到底贵在哪</h3>
+  <p>线程切换要做的事：保存当前线程的寄存器到内核栈、切换内核栈、更新调度信息、恢复目标线程的寄存器。这中间不换地址空间，所以 TLB 基本不用刷（同一进程的虚拟地址映射没变）。</p>
+  <p>进程切换多做一步：<b>换页表</b>。换页表意味着 TLB 里的缓存大部分失效，接下来的一小段时间里，每次内存访问都可能要重新走多级页表。现代 CPU 有 PCID/ASID 这类标记来减少刷新，但代价依然比线程切换高。</p>
+  <div class="callout warn">
+    <b>不要背具体数字。</b>「线程切换几微秒、进程切换几十微秒」这类说法在面试里很容易被反问「在什么硬件上、有没有跨核、缓存热不热」。稳妥的表述是：<b>都是微秒量级，比一次函数调用贵三个数量级左右，进程切换因为要换地址空间所以更贵，实际值取决于硬件和缓存状态。</b>
+  </div>
+  <p>还有个反向的坑：<b>线程不是越多越好，也不是越少越好。</b>线程太多会带来三类开销——栈内存（每个线程默认预留 MB 级虚拟空间，实际按需提交）、调度开销（就绪线程多，每个时间片分到的 CPU 变少，缓存局部性变差）、锁竞争（临界区被更多线程争抢，上下文切换反而增加）。</p>
+  <pre><span class="c"># 看一个进程到底有多少线程、每个线程在干什么</span>
+ps -L -p 12345 -o pid,tid,stat,pcpu,comm
+top -H -p 12345
+cat /proc/12345/status | grep -E 'Threads|VmRSS'
+
+<span class="c"># 线程的栈大小（默认值各发行版不同，以 ulimit -s 为准）</span>
+ulimit -s
+
+<span class="c"># 系统级上限：这两个数决定了「最多能开多少线程」</span>
+cat /proc/sys/kernel/threads-max
+cat /proc/sys/vm/max_map_count</pre>
+  <p>「一台机器最多能开多少线程」的正确答法是分三个约束：<b>内存</b>（每线程栈 + 内核 task_struct）、<b>内核参数</b>（threads-max、pid_max、max_map_count）、<b>实际收益</b>（超过某个点，吞吐不再涨，延迟反而升）。前两个是硬上限，第三个才是你该关心的。</p>
+  <p><b>面试落点：</b>「进程和线程的核心差别是地址空间是否独立。线程共享堆和 fd 表，各有自己的栈和寄存器，所以切换不用换页表，比进程切换便宜。但线程数受栈内存和调度开销约束，靠加线程扛 IO 是线性外推，迟早撞墙。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>协程：省的不是 CPU，是「等」的成本</h2></div>
+  <p class="lead">「协程比线程快」这句话是错的，而且错得很典型。协程不会让计算变快，它让<b>等待</b>变得便宜——便宜到你可以用同步的写法，开出十万个并发单元。</p>
+  <p>先把机制说清楚：协程是<b>用户态的、协作式的</b>执行单元。调度由运行时（Go runtime、libco、Python 的 asyncio）负责，切换时不进内核，只做两件事——保存当前协程的少量寄存器到它自己的栈上，把栈指针换到目标协程。没有系统调用、没有页表切换、没有内核调度器参与。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>线程</th><th>协程</th></tr>
+    <tr><td>调度者</td><td>内核调度器</td><td>用户态运行时</td></tr>
+    <tr><td>切换开销</td><td>微秒量级，要陷入内核</td><td>百纳秒量级，纯用户态</td></tr>
+    <tr><td>栈大小</td><td>MB 级预留（以 ulimit -s 为准）</td><td>KB 级起步，按需增长</td></tr>
+    <tr><td>切换时机</td><td>时间片用完或被抢占</td><td>协程自己让出（遇到 IO、显式 yield）</td></tr>
+    <tr><td>并行能力</td><td>可真正多核并行</td><td>单协程不并行，靠 M:N 映射到多个线程</td></tr>
+    <tr><td>阻塞的后果</td><td>只阻塞自己</td><td><b>阻塞了整个底层线程</b>，同线程上其他协程全被拖住</td></tr>
+  </table>
+  <p>最后一行是协程最大的陷阱。协程的调度是协作式的：只要有一个协程做了阻塞系统调用（比如同步的文件读写、没设超时的 DNS 查询），它所在的 OS 线程就卡住了，这个线程上排队的其他协程一个都跑不了。<b>所以「协程 + 阻塞调用」是比「纯线程」更糟的组合</b>，因为线程至少还能被内核切走。</p>
+  <pre><span class="c"># 直观对比：一万个并发单元需要多少栈内存</span>
+<span class="c"># 线程：默认栈 8MB（虚拟地址预留，实际按需提交，但地址空间要占）</span>
+<span class="c"># 10000 × 8MB = 80GB 虚拟地址 —— 64 位地址空间撑得住，物理内存和内核结构撑不住</span>
+<span class="c"># 协程：初始栈 KB 级，按需增长</span>
+<span class="c"># 10000 × 几 KB = 几十 MB —— 这才是「十万并发」能落地的原因</span>
+
+<span class="c"># Go 里看当前 goroutine 数量（pprof 或 runtime 指标）</span>
+<span class="c"># go tool pprof http://localhost:6060/debug/pprof/goroutine</span>
+<span class="c"># runtime.NumGoroutine()</span></pre>
+  <h3>两种协程实现，问法不一样</h3>
+  <ul>
+    <li><b>有栈协程</b>（Go 的 goroutine、C 的 libco）：每个协程有独立栈，可以随意嵌套调用，写起来和同步代码几乎一样。代价是栈内存和栈扩容时的搬迁。</li>
+    <li><b>无栈协程</b>（C# / Rust / Python 的 async）：编译器把函数改写成状态机，靠一个 future/promise 链推进，没有独立栈。省内存，但会「染色」——调用链上每一层都得是 async。</li>
+  </ul>
+  <p>面试里如果被问「Go 的协程为什么能开十万个」，标准答案是三层：<b>栈小且可增长</b>（KB 级起步，不是 MB 级预留）、<b>调度在用户态</b>（M:N 模型，G 挂在 P 上，P 绑定 M，切换不陷内核）、<b>网络 IO 由 runtime 的 netpoller 接管</b>（协程发起网络读写时不阻塞线程，而是被挂起，等 epoll 通知再恢复）。三条缺一条，「十万」就不成立。</p>
+  <div class="callout">
+    <b>一个常被忽略的成本：</b>协程不是免费的，每个协程仍有栈、有调度结构体、有 GC 需要扫描的根。开一千万个协程一样会把内存吃光。所谓「十万并发」通常是「十万个连接」而不是「十万个同时在算的任务」——大部分协程在等 IO，真正在跑的只有核数那么多。
+  </div>
+  <p><b>面试落点：</b>「协程不是更快，是更省。它省掉了内核调度和 MB 级栈，让每个并发单元的成本从 MB 降到 KB，所以能开很多。但它是协作式的，一个协程做阻塞调用会拖住整个线程，所以协程必须配非阻塞 IO 或者 runtime 接管网络。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>四个词的两两组合：同步/异步、阻塞/非阻塞</h2></div>
+  <p class="lead">这四个词被混用得一塌糊涂。有人把「非阻塞」当「异步」，有人觉得「用了 epoll 就是异步 IO」。先把定义钉死，后面的五种模型才不会乱。</p>
+  <table>
+    <tr><th style="width:120px">维度</th><th>在问什么</th><th>两个取值</th></tr>
+    <tr><td><b>阻塞 / 非阻塞</b></td><td>发起调用后，<b>调用方线程</b>会不会被挂起</td><td>阻塞：挂起直到有结果；非阻塞：立刻返回，用返回值告诉你「还没好」</td></tr>
+    <tr><td><b>同步 / 异步</b></td><td>整个 IO 操作由谁完成、结果怎么通知</td><td>同步：调用方自己等或自己查；异步：内核做完再通知你，中间你完全不用管</td></tr>
+  </table>
+  <p>关键在于：<b>IO 有两个阶段</b>——第一阶段「等数据就绪」（网卡收到包、磁盘读完），第二阶段「把数据从内核缓冲区拷到用户缓冲区」。判断同步还是异步，看的是<b>第二阶段谁来做</b>。只要还需要你自己调一次 read 去拷数据，它就是同步 IO，哪怕你等的时候用的是 epoll。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>同步阻塞</div><div class="cd">read() 一调用就卡住，等数据到了、拷完了才返回。最简单，一个连接一个线程。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>同步非阻塞</div><div class="cd">read() 立刻返回 EAGAIN，你自己循环重试。轮询，CPU 空转，通常要配多路复用才有意义。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>异步非阻塞</div><div class="cd">你只提交请求，内核把数据拷完后通知你，全程没有一次「等」。POSIX AIO、io_uring 属于这一类。</div></div>
+  </div>
+  <p>至于「异步阻塞」这个格子，常见的解释是「用 select 阻塞等待，但等的是『就绪』而不是『完成』」——严格说它仍是同步 IO，只是把「等」从每个连接挪到了一个线程上。这个格子存在的意义，是提醒你<b>「阻塞在等就绪」和「阻塞在等数据」是两件事</b>。</p>
+  <pre><span class="c"># 非阻塞 fd 的典型用法：read 立刻返回，靠 errno 判断</span>
+fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+n = read(fd, buf, sizeof(buf));
+if (n == -1 &amp;&amp; (errno == EAGAIN || errno == EWOULDBLOCK)) {
+    <span class="c">/* 还没数据，等下次通知；注意这两个常量在 Linux 上是同一个值 */</span>
+}</pre>
+  <div class="callout warn">
+    <b>最常见的错误表述：</b>「我们用了 epoll，所以是异步非阻塞 IO」。epoll 只解决第一阶段——告诉你哪个 fd 就绪了。真正读数据时你还是要调 read，这一步是同步拷贝。所以准确说法是「<b>IO 多路复用 + 非阻塞 fd</b>，属于同步非阻塞模型」。
+  </div>
+  <p><b>面试落点：</b>「阻塞非阻塞看调用方线程会不会挂起，同步异步看数据拷贝由谁完成。IO 多路复用把等待集中到一个线程，但它仍然是同步 IO，因为最后那次 read 还是要自己拷。真正的异步 IO 是内核拷完再通知你，Linux 上早期是 POSIX AIO，现在是 io_uring。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>五种 IO 模型：一张表看完，两阶段一刀切</h2></div>
+  <p class="lead">五种模型的名字很好背，难的是说清「它们都在哪个阶段阻塞」。记住一句话：<b>前四种都卡在第二阶段，只有第五种两个阶段都不卡。</b></p>
+  <table>
+    <tr><th style="width:130px">模型</th><th>第一阶段（等数据）</th><th>第二阶段（拷贝）</th><th>典型系统调用</th></tr>
+    <tr><td><b>阻塞 IO</b></td><td>阻塞</td><td>阻塞</td><td>默认的 read / recv</td></tr>
+    <tr><td><b>非阻塞 IO</b></td><td>轮询，不阻塞</td><td>阻塞</td><td>O_NONBLOCK + read 循环</td></tr>
+    <tr><td><b>IO 多路复用</b></td><td>阻塞在 select/poll/epoll_wait 上（一次等多个 fd）</td><td>阻塞</td><td>select / poll / epoll_wait</td></tr>
+    <tr><td><b>信号驱动 IO</b></td><td>不阻塞，内核用 SIGIO 通知</td><td>阻塞</td><td>fcntl 设 O_ASYNC + signal handler</td></tr>
+    <tr><td><b>异步 IO</b></td><td>不阻塞</td><td><b>不阻塞</b>，内核拷完再通知</td><td>POSIX aio_*、io_uring</td></tr>
+  </table>
+  <p>为什么信号驱动用得少？因为信号处理函数里能做的事非常有限（不能随便调非异步信号安全的函数），而且信号会丢、会合并，高并发下很难管理。教科书里讲它，更多是为了把「通知机制」这条线补全。</p>
+  <p>异步 IO 长期不流行的原因也很实际：Linux 原生的 POSIX AIO 实现一直不够好（glibc 的用户态模拟有很多限制），真正好用要等到 <b>io_uring</b>（较新的内核才提供，具体版本以你环境为准）。io_uring 用一对共享内存环形队列提交和回收请求，批量提交、减少系统调用次数，这是它在高 IOPS 场景下比 epoll 更占优的原因。</p>
+  <pre><span class="c"># 判断一个服务用的是哪种模型，看它停在哪个系统调用上</span>
+strace -f -e trace=network,epoll_wait,select,poll -p 12345
+<span class="c"># 大量线程停在 read/recv  → 阻塞 IO，一连接一线程</span>
+<span class="c"># 少量线程停在 epoll_wait → 多路复用</span>
+<span class="c"># 停在 io_uring_enter     → 异步 IO</span>
+
+<span class="c"># 看进程打开的 socket 数量，判断「一连接一线程」是否成立</span>
+ls /proc/12345/fd | wc -l
+ss -tanp | grep 12345 | wc -l</pre>
+  <div class="callout ok">
+    <b>答题模板：</b>「五种模型的分界线在第二阶段。阻塞、非阻塞、多路复用、信号驱动，前四种在『把数据从内核拷到用户』这一步都是阻塞的，所以都算同步 IO；只有异步 IO 是内核拷完了再通知，调用方全程没被卡住。」
+  </div>
+  <p><b>面试落点：</b>这张表能背下来就够了，但一定要补一句「实际工程里绝大多数是 IO 多路复用 + 非阻塞 fd，纯异步 IO 在 Linux 上要等 io_uring 才真正好用」。这句话能把「背书」和「用过」区分开。</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>select / poll / epoll：差别不在名字，在数据结构</h2></div>
+  <p class="lead">「epoll 为什么比 select 快」有三个标准答案：<b>没有 fd 数量上限、不用每次把集合从用户态拷进内核、只返回就绪的 fd 而不是全部遍历</b>。这三条背后是三个不同的数据结构决策。</p>
+  <table>
+    <tr><th style="width:100px">对比项</th><th>select</th><th>poll</th><th>epoll</th></tr>
+    <tr><td>数据结构</td><td>fd_set 位图（固定长度）</td><td>pollfd 数组</td><td>内核红黑树 + 就绪链表</td></tr>
+    <tr><td>fd 上限</td><td>受 FD_SETSIZE 限制（常见默认 1024）</td><td>无硬上限，受内存和打开文件数限制</td><td>无硬上限，受内存和打开文件数限制</td></tr>
+    <tr><td>每次调用</td><td>全量拷贝 fd 集合进内核，返回后还要遍历所有 fd</td><td>全量拷贝数组，返回后遍历所有元素</td><td>注册一次（epoll_ctl），之后只取就绪链表</td></tr>
+    <tr><td>复杂度</td><td>O(n)</td><td>O(n)</td><td>注册 O(log n)，取就绪 O(k)（k 是就绪数）</td></tr>
+    <tr><td>触发模式</td><td>水平触发</td><td>水平触发</td><td>水平触发（默认）+ 边缘触发</td></tr>
+    <tr><td>跨平台</td><td>几乎所有系统</td><td>多数 Unix</td><td>Linux 专有（BSD 是 kqueue）</td></tr>
+  </table>
+  <p>select 的 1024 不是「内核不愿意支持更多」，是 <span class="k">fd_set</span> 这个结构本身用固定长度的位图表示，长度由编译期的 <span class="k">FD_SETSIZE</span> 决定。改它需要重新编译程序，而且每次调用都要把整张位图拷进内核再拷回来，fd 一多，光是拷贝就吃满 CPU。</p>
+  <h3>LT 与 ET：一个通知，两种语义</h3>
+  <p><b>水平触发（LT，默认）</b>：只要 fd 上还有数据没读完，下次 epoll_wait 还会告诉你。写错了也不容易出事，最多是重复通知。</p>
+  <p><b>边缘触发（ET）</b>：只在状态<b>变化</b>的那一刻通知一次。你没读完，它也不会再提醒。所以 ET 模式必须配两个条件：fd 设为非阻塞、每次事件都循环读到返回 EAGAIN 为止。</p>
+  <pre><span class="c"># ET 模式的正确读法（伪代码）</span>
+for (;;) {
+    n = read(fd, buf, sizeof(buf));
+    if (n &gt; 0) { append(buf, n); continue; }
+    if (n == 0) { close(fd); break; }                    <span class="c">/* 对端关闭 */</span>
+    if (errno == EAGAIN || errno == EWOULDBLOCK) break;  <span class="c">/* 读干净了，等下次通知 */</span>
+    if (errno == EINTR) continue;
+    break;
+}</pre>
+  <div class="callout danger">
+    <b>ET + 阻塞 fd = 卡死。</b>循环读到没有数据时，如果 fd 是阻塞的，最后一次 read 会永远等下去，整个事件循环挂住。这个 bug 在压测时不一定复现（数据总是很多），偏偏在低峰期偶发，非常难查。
+  </div>
+  <h3>epoll 不是「O(1) 万能药」</h3>
+  <p>这句话一定要会说，因为它能立刻把你和背博客的人区分开：</p>
+  <ul>
+    <li><b>取就绪是 O(k) 不是 O(1)。</b>一万个 fd 同时就绪，epoll_wait 还是要返回一万个事件、你还是要处理一万次，这时候它和 poll 的差距没有想象中大。</li>
+    <li><b>注册有成本。</b>每次 epoll_ctl 都要在红黑树上操作，短连接场景（连接建立就关）下这个成本占比很高。长连接才是 epoll 的主场。</li>
+    <li><b>对普通文件无效。</b>磁盘文件永远是「就绪」的，epoll 起不到等待作用，读文件该阻塞还是阻塞。所以「用 epoll 加速读本地文件」是伪命题，那要靠 page cache 和异步 IO。</li>
+    <li><b>有惊群问题。</b>多个线程等同一个 listen fd 时，新连接可能唤醒所有线程。较新的内核提供 EPOLLEXCLUSIVE 来缓解，但需要显式设置。</li>
+    <li><b>跨平台不通用。</b>BSD/macOS 用 kqueue，Windows 用 IOCP，Go/Netty 这类框架为此做了抽象层。</li>
+  </ul>
+  <p><b>面试落点：</b>「select 慢在三点：fd 上限、每次全量拷贝、返回后全量遍历。epoll 用红黑树存注册关系、用就绪链表只返回活跃的，所以 fd 多但活跃少时优势明显。但它的取事件是 O(k)，fd 全都活跃时优势就没了，而且它对普通文件无效，短连接场景注册成本也不低。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>零拷贝：省掉的是「用户态那一次搬运」</h2></div>
+  <p class="lead">「零拷贝」这个名字有误导性，它从来不是「一次拷贝都没有」，而是<b>「不让 CPU 参与那次没有必要的搬运」</b>。把这个前提说清楚，后面的数字才站得住。</p>
+  <p>先看最朴素的「读文件再发出去」：</p>
+  <pre><span class="c"># 传统 read + write 发一个文件</span>
+n = read(file_fd, buf, len);    <span class="c"># ① DMA: 磁盘 → 内核页缓存</span>
+                                <span class="c"># ② CPU: 内核页缓存 → 用户缓冲区</span>
+write(sock_fd, buf, n);         <span class="c"># ③ CPU: 用户缓冲区 → socket 缓冲区</span>
+                                <span class="c"># ④ DMA: socket 缓冲区 → 网卡</span>
+
+<span class="c"># 一共 4 次拷贝（2 次 DMA + 2 次 CPU），4 次用户态/内核态切换</span></pre>
+  <p>问题很明显：数据从磁盘到网卡，<b>压根不需要经过用户态</b>。应用只是想把文件内容转发出去，中间那次「内核 → 用户 → 内核」的往返纯属浪费——既费 CPU，又占内存带宽，还多两次上下文切换。</p>
+  <pre><span class="c"># sendfile：数据全程留在内核</span>
+sendfile(sock_fd, file_fd, NULL, len);
+<span class="c"># ① DMA: 磁盘 → 页缓存</span>
+<span class="c"># ② CPU: 页缓存 → socket 缓冲区（若网卡支持 scatter-gather，这步也可省）</span>
+<span class="c"># ③ DMA: socket 缓冲区 → 网卡</span>
+<span class="c"># 切换变成 2 次，CPU 拷贝从 2 次降到 1 次，支持 SG-DMA 时降到 0 次</span>
+
+<span class="c"># mmap + write：把页缓存映射进用户态，省掉「内核→用户」那次拷贝</span>
+p = mmap(NULL, len, PROT_READ, MAP_PRIVATE, file_fd, 0);
+write(sock_fd, p, len);   <span class="c"># 仍是 3 次拷贝，但少了一次 CPU 搬运</span></pre>
+  <table>
+    <tr><th style="width:130px">方式</th><th>拷贝次数</th><th>CPU 参与</th><th>适用</th></tr>
+    <tr><td>read + write</td><td>4</td><td>2 次</td><td>数据要在用户态处理（压缩、加密、解析）</td></tr>
+    <tr><td>mmap + write</td><td>3</td><td>1 次</td><td>需要在用户态看数据，但不想复制</td></tr>
+    <tr><td>sendfile</td><td>3（支持 SG 时 2）</td><td>1 次（或 0 次）</td><td>纯转发：静态文件、日志投递、代理</td></tr>
+    <tr><td>splice</td><td>2</td><td>0 次</td><td>通过管道在两个 fd 之间搬，内核内部完成</td></tr>
+  </table>
+  <p>工程里的对应关系：Nginx 开 <span class="k">sendfile on</span> 走的就是 sendfile；Kafka 消费端大量依赖 sendfile 把日志段直接推给客户端；Java 的 <span class="k">FileChannel.transferTo</span> 在 Linux 上会落到 sendfile。而一旦你要对数据做压缩或加密（比如 HTTPS），零拷贝就用不上了——你必须把数据搬进用户态交给 TLS 库，这时候 sendfile 的优势消失。</p>
+  <div class="callout warn">
+    <b>别在面试里说「用了 sendfile 就是零拷贝，一次拷贝都没有」。</b>准确说法是「减少了一次 CPU 拷贝和两次上下文切换；如果网卡支持 scatter-gather DMA，CPU 拷贝可以降到 0，但 DMA 拷贝始终存在——数据总要从一个地方到另一个地方。」
+  </div>
+  <p><b>面试落点：</b>「零拷贝的本质是取消用户态这趟中转。read+write 是 4 次拷贝 4 次切换，sendfile 是 3 次拷贝 2 次切换，网卡支持 SG 时 CPU 拷贝为 0。但只要你要修改数据，比如加 TLS，就还是得回到用户态，这个优化就用不上了。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>page cache 与 writeback：write 返回不等于落盘</h2></div>
+  <p class="lead">「为什么 write 成功了，机器断电数据还是丢了？」这题看着像数据库的题，其实是操作系统题。答案就一句：<b>write 只是把数据交给了 page cache。</b></p>
+  <p>Linux 的读写都过 page cache：读的时候，如果页在缓存里就直接返回（缓存命中），不在就从磁盘读进来再返回；写的时候，数据先写进缓存页并把它标记为<b>脏页（dirty）</b>，然后就返回了。真正写到磁盘，由内核的 writeback 线程在后面做。</p>
+  <pre><span class="c"># 看当前有多少脏页、多少正在回写</span>
+grep -E 'Dirty|Writeback|Cached|MemFree|MemAvailable' /proc/meminfo
+
+<span class="c"># 回写相关的内核参数（默认值各发行版不同，以 sysctl 实际输出为准）</span>
+sysctl vm.dirty_ratio vm.dirty_background_ratio
+sysctl vm.dirty_expire_centisecs vm.dirty_writeback_centisecs
+
+<span class="c"># 强制落盘：fsync 刷数据+元数据，fdatasync 只刷数据</span>
+fsync(fd);
+fdatasync(fd);
+
+<span class="c"># 直接 IO：绕过 page cache，自己管对齐（数据库常用）</span>
+open(path, O_RDWR | O_DIRECT);</pre>
+  <table>
+    <tr><th style="width:170px">触发回写的条件</th><th>含义</th></tr>
+    <tr><td>脏页超过 dirty_background_ratio</td><td>后台线程开始异步回写，不影响应用</td></tr>
+    <tr><td>脏页超过 dirty_ratio</td><td>写操作被<b>同步阻塞</b>，应用会明显卡顿</td></tr>
+    <tr><td>脏页存在超过 dirty_expire_centisecs</td><td>周期性地把「太老」的脏页刷出去</td></tr>
+    <tr><td>显式 fsync / fdatasync / sync</td><td>调用方自己要求落盘</td></tr>
+    <tr><td>内存压力</td><td>要回收内存时，脏页必须先回写才能释放</td></tr>
+  </table>
+  <p>为什么这事对运维重要？因为<b>写入量的峰值会以「延迟抖动」的形式出现在你意想不到的地方</b>。一批进程同时写文件，脏页攒到 dirty_ratio，内核开始同步回写，所有写入者一起卡住，监控上看到的是「磁盘 await 突然飙高、应用 P99 抖动」，而应用代码里根本没有慢操作。</p>
+  <p>page cache 还有一个容易误解的地方：<b>它不只是缓存文件，还承担了「合并写」的职责</b>。很多小写入在缓存里被合并成一次大的顺序写，这是 Linux 写性能看起来很好的主要原因。所以 <span class="k">O_DIRECT</span> 绕过缓存并不总是更快——它避免了缓存占用和双份内存，但也失去了合并，随机小写的场景反而更慢。数据库选它是因为要自己控制刷盘时机和缓存策略，不是因为「绕过缓存一定快」。</p>
+  <div class="callout">
+    <b>一个直接可用的判断：</b>如果应用说「我 write 成功了但数据没了」，先问它有没有 fsync。如果没有，那不是内核的 bug，是它把「写进缓存」当成了「写进磁盘」。数据库的 WAL、消息队列的持久化，都必须显式 fsync 才算数。
+  </div>
+  <p><b>面试落点：</b>「write 只写到 page cache 就返回，落盘由 writeback 异步完成。要保证持久化必须 fsync，而且要接受 fsync 的代价——它会把一次内存拷贝变成一次真实的磁盘等待。批量化、组提交、O_DIRECT 都是在跟这个代价做交易。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>内存管理：虚拟内存、页表、TLB 与 NUMA</h2></div>
+  <p class="lead">前面讲的都是「IO 怎么走」，这一节讲「内存怎么找」。因为在面试里，「为什么进程能用到比自己内存大的地址空间」「为什么两个进程访问同一块内存性能差很多」这类问题，答案都在这。</p>
+  <p>虚拟内存解决的三个问题：<b>隔离</b>（每个进程看到独立的地址空间，看不到别人的）、<b>抽象</b>（程序不用关心物理内存碎片，看到的永远是连续的）、<b>超额分配</b>（可以映射比物理内存更大的空间，用到了再从磁盘换入）。</p>
+  <table>
+    <tr><th style="width:140px">概念</th><th>是什么</th><th>在哪体现</th></tr>
+    <tr><td><b>页表</b></td><td>虚拟页号 → 物理页帧号的映射，多级结构以节省空间</td><td>每次内存访问都要查（靠 TLB 加速）</td></tr>
+    <tr><td><b>TLB</b></td><td>页表项的 CPU 缓存，命中就不用走多级页表</td><td>进程切换要换页表，TLB 可能被刷</td></tr>
+    <tr><td><b>缺页中断</b></td><td>访问的页没映射或不在内存，陷入内核处理</td><td>minor（页在内存、只缺映射）比 major（要读盘）便宜得多</td></tr>
+    <tr><td><b>VSZ / RSS</b></td><td>虚拟内存大小 / 实际驻留物理内存</td><td>ps 的 VSZ 大不代表占内存，RSS 才接近真实</td></tr>
+    <tr><td><b>NUMA</b></td><td>多路 CPU 各自挂本地内存，跨节点访问更慢</td><td>数据库、JVM 大堆场景要绑核绑内存</td></tr>
+  </table>
+  <p>TLB 为什么重要？一个 4 级页表，一次 TLB miss 要走 4 次内存访问才能拿到物理地址。程序如果有良好的局部性，TLB 命中率高，几乎无感；如果随机访问一大片内存（比如哈希表 key 分散、指针追逐），TLB 会疯狂 miss，性能可能掉一半。这也是「数组比链表快」的底层原因之一——不只是缓存预取，还有 TLB。</p>
+  <pre><span class="c"># 看缺页和换页</span>
+/usr/bin/time -v ./yourapp        <span class="c"># 输出里的 Major/Minor page faults</span>
+ps -o pid,vsz,rss,comm -p 12345
+cat /proc/12345/status | grep -E 'VmPeak|VmSize|VmRSS|VmSwap'
+
+<span class="c"># 大页：减少页表层级和 TLB 压力（默认策略各系统不同）</span>
+grep -i huge /proc/meminfo
+cat /sys/kernel/mm/transparent_hugepage/enabled
+
+<span class="c"># NUMA 视角：这个进程的内存分布在哪些节点上</span>
+numactl --hardware
+numastat -p 12345</pre>
+  <p>NUMA 值得单独提一句：双路服务器上，CPU0 访问挂在 CPU1 上的内存，延迟可能是本地的一倍多，带宽也更低。所以高性能服务会做<b>绑核 + 本地内存分配</b>。这个问题在容器里更隐蔽——你以为拿到的是 4 核，实际上可能是跨两个 NUMA 节点的 4 个超线程。</p>
+  <div class="callout warn">
+    <b>别把 VSZ 当内存占用。</b>一个 JVM 进程 VSZ 几十 G 很常见，那是虚拟地址预留（堆的保留区、mmap 的库），实际 RSS 可能只有几 G。判断内存压力看 RSS 和 available，看 VSZ 只会吓到自己。
+  </div>
+  <p><b>面试落点：</b>「虚拟内存给了隔离和超额分配，代价是每次访问要查页表，靠 TLB 缓存。TLB miss 多的时候，随机访存的程序会明显变慢。多路机器上还有 NUMA，跨节点访问内存延迟更高，所以大内存服务会考虑绑核。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>一条追问链：从「线程池开多大」问到内核</h2></div>
+  <p class="lead">这是本篇最该背下来的一段，因为它把上面所有知识串成了一条线。面试官很可能就是这么一路问下去的。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>问：线程池开多大？</b>答：CPU 密集型大致取核数 + 1（留一个补位，防止某个线程缺页时 CPU 空转）；IO 密集型按等待比例放大，经验式是 <span class="k">N × (1 + 等待时间 / 计算时间)</span>，但这个式子只是起点，必须压测。</div></div>
+    <div class="step"><div class="txt"><b>追问：为什么不能直接开 1000 个？</b>答：三类成本。栈内存（每线程 MB 级虚拟预留）、调度开销（就绪线程多，时间片变短、缓存局部性变差）、锁竞争（临界区争抢让上下文切换反而增加）。开太多吞吐不升，P99 先崩。</div></div>
+    <div class="step"><div class="txt"><b>追问：IO 密集为什么可以多开？</b>答：因为线程大部分时间在等，CPU 是空闲的。多开的意义是「让等待重叠起来」，把 CPU 的空档填满。但这是有上限的——等待本身不消耗 CPU，可线程的内存和切换要。</div></div>
+    <div class="step"><div class="txt"><b>追问：那为什么不用协程？</b>答：协程把每个并发单元的成本从 MB 降到 KB，同样内存能开更多。但它要求整条调用链都是非阻塞的，一个阻塞调用就会拖住整个线程。改造现有同步代码的成本很高。</div></div>
+    <div class="step"><div class="txt"><b>追问：协程底层靠什么等 IO？</b>答：靠 IO 多路复用。Go 的 netpoller 底层就是 epoll，协程发起网络读写时被挂起，epoll 通知就绪后再恢复。所以「协程」和「epoll」不是替代关系，是上下层。</div></div>
+    <div class="step"><div class="txt"><b>追问：epoll 是 O(1) 吗？</b>答：不是。注册是 O(log n)，取就绪是 O(k)。fd 全都活跃时它并不比 poll 快。它对普通文件也无效，因为文件永远就绪。</div></div>
+    <div class="step"><div class="txt"><b>追问：那高并发下真正的瓶颈在哪？</b>答：往往不在 IO 等待，而在下游。连接数上去了，数据库连接池、下游 QPS 配额、DNS 解析、TLS 握手 CPU，任何一环先到顶，前面的优化都白做。</div></div>
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>nproc</code><span class="desc">先确认核数，别拿 load 跟错误的基数比</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ulimit -s</code><span class="desc">单线程栈上限，直接决定「开一万个线程」在内存上是否可行</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/PID/status | grep Threads</code><span class="desc">这个进程实际开了多少线程，跟线程池配置对不对得上</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -tanp | grep -c ESTAB</code><span class="desc">机器上现在有多少条已建立的连接，判断并发量级</span><button class="copy">复制</button></div>
+    <div class="crow"><code>strace -f -e trace=network,epoll_wait -p PID</code><span class="desc">看线程停在 read 上还是 epoll_wait 上，反推 IO 模型</span><button class="copy">复制</button></div>
+  </div>
+  <pre><span class="c"># 用 Little's Law 反推需要的并发数，比拍脑袋靠谱</span>
+并发数 L = 到达率 λ × 平均停留时间 W
+<span class="c"># 例：3000 QPS，单请求平均耗时 50ms → L = 3000 × 0.05 = 150</span>
+<span class="c"># 也就是说稳态下同时「在系统里」的请求约 150 个</span>
+<span class="c"># 线程池开到 500，多出来的 350 个线程大部分时间在等队列，不是在干活</span></pre>
+  <p>这段推导在面试里非常好用，因为它把「开多大」从拍数字变成了算数字。注意 Little's Law 算的是<b>稳态平均并发</b>，不是峰值。峰值要考虑突发系数，还要留余量给慢请求——一个 5 秒的慢请求会占住一个线程 5 秒，这类长尾才是线程池被撑爆的真凶。</p>
+  <div class="callout ok">
+    <b>一句话收口：</b>「线程池大小不是配置项，是一个关于等待比例的估算，估算完必须用压测验证；验证的时候看的是 P99 和错误率，不是平均值。」
+  </div>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：说错一句就露底</h2></div>
+  <p class="lead">这些是本篇里最容易被当成「常识」说错的点。面试官听到其中任何一句，都会顺着往下挖，而下面通常没有第二层。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">「线程越多并发越高」</div><div class="pd">线程只是在等 IO 时能让出 CPU。等待不消耗 CPU，但线程本身要占栈、要被调度。到某个点之后，加线程只会让 P99 更差。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">「协程比线程快」</div><div class="pd">协程不会让计算变快，它让「挂起和恢复」变便宜。CPU 密集的任务用协程一点也不会更快，甚至因为调度器在用户态而略慢。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">「epoll 是 O(1) 的」</div><div class="pd">取就绪是 O(k)，注册是 O(log n)。fd 全部活跃时它和 poll 的差距很小。这句话说出口，基本会被追着问到底。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">ET 模式配阻塞 fd</div><div class="pd">ET 要求一次读到 EAGAIN，阻塞 fd 的最后一次 read 会永远等下去，整个事件循环卡死。这个 bug 在低峰期才复现，极难定位。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把「非阻塞」当成「异步」</div><div class="pd">非阻塞只解决第一阶段（不等数据就绪），第二阶段的数据拷贝仍然是同步的。真正异步是内核拷完再通知。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">「我们用了 epoll，所以是异步 IO」</div><div class="pd">IO 多路复用属于同步 IO 模型。它把等待集中了，但没有把拷贝交给内核。这句话是面试里最常见的概念混淆。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">「sendfile 就是零拷贝，一次拷贝都没有」</div><div class="pd">DMA 拷贝始终存在。sendfile 省掉的是「内核 → 用户」那次 CPU 拷贝，网卡支持 SG-DMA 时 CPU 拷贝才能降到 0。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">「page cache 占内存是浪费，应该清掉」</div><div class="pd">它是可回收的，而且承担了合并写的职责。清掉只会让后续读全部打回磁盘，制造一次延迟抖动。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">「write 返回成功就是写进磁盘了」</div><div class="pd">write 只写到 page cache。要持久化必须 fsync，而 fsync 的代价是一次真实的磁盘等待——所有持久化设计都在跟这个代价做交易。</div></div></div>
+  <p><b>面试落点：</b>这 9 条的共同点是「把机制记成了结论」。面试官顺着任何一条往下问一层，就到底了。所以准备的时候不要背结论，要能画出那条链路——比如从 write 到磁盘，中间有几层缓存、几次拷贝、谁在什么时候把数据刷出去。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 同一进程内的两个线程，下面哪一项是<b>各自独立</b>的？</div>
+      <button class="opt">打开的文件描述符表</button>
+      <button class="opt">堆上分配的内存</button>
+      <button class="opt">栈和寄存器上下文</button>
+      <button class="opt">当前工作目录</button>
+      <div class="ans">正确答案：<b>栈和寄存器上下文</b>。线程共享地址空间（含堆）、fd 表、工作目录和信号处理函数，但每个线程必须有独立的栈来存放自己的调用链和局部变量，切换时也要保存各自的寄存器。所以线程里的局部变量天然不共享。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 使用 epoll 的边缘触发（ET）模式，必须满足的条件是？</div>
+      <button class="opt">fd 必须设为阻塞，保证一次读完</button>
+      <button class="opt">fd 必须设为非阻塞，并且每次事件都循环读到返回 EAGAIN</button>
+      <button class="opt">必须配合 select 一起使用，否则会丢事件</button>
+      <button class="opt">必须设置 EPOLLONESHOT，否则会重复通知</button>
+      <div class="ans">正确答案：<b>非阻塞 + 读到 EAGAIN</b>。ET 只在状态变化时通知一次，没读完也不会再提醒，所以必须一次把数据读干净；而「读到没有为止」这个循环只有在非阻塞 fd 上才会返回 EAGAIN，阻塞 fd 会在最后一次 read 上永远挂住。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. select 的 1024 个 fd 上限，根本原因是？</div>
+      <button class="opt">fd_set 用固定长度的位图表示，长度由编译期的 FD_SETSIZE 决定</button>
+      <button class="opt">内核最多只支持 1024 个并发连接</button>
+      <button class="opt">每个进程最多只能打开 1024 个文件</button>
+      <button class="opt">1024 是 TCP 端口号的数量上限</button>
+      <div class="ans">正确答案：<b>fd_set 是固定长度位图</b>。这个上限来自用户态与内核态之间传递的数据结构大小，改它要重新编译程序。进程能打开多少文件由 ulimit -n 决定，和 select 的限制是两回事。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 相比 read + write，sendfile 省掉的是哪一次拷贝？</div>
+      <button class="opt">磁盘到内核页缓存的那次 DMA</button>
+      <button class="opt">socket 缓冲区到网卡的那次 DMA</button>
+      <button class="opt">页缓存到 socket 缓冲区的那次拷贝</button>
+      <button class="opt">内核页缓存到用户缓冲区的那次 CPU 拷贝</button>
+      <div class="ans">正确答案：<b>内核到用户的那次 CPU 拷贝</b>。sendfile 让数据全程留在内核态，应用不参与搬运，所以省掉了「内核 → 用户 → 内核」这个往返中的第一段。页缓存到 socket 缓冲区那次拷贝在网卡不支持 scatter-gather 时仍然存在；两次 DMA 始终存在。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 为什么说 IO 多路复用（epoll）属于同步 IO？</div>
+      <button class="opt">因为它会阻塞线程，阻塞的就一定是同步的</button>
+      <button class="opt">因为 epoll_wait 只告诉你 fd 就绪，真正的 read 仍要自己调用、自己完成数据拷贝</button>
+      <button class="opt">因为它是 Linux 专有的，其他平台没有对应的异步实现</button>
+      <button class="opt">因为它不支持边缘触发</button>
+      <div class="ans">正确答案：<b>拷贝阶段仍由应用完成</b>。同步/异步的分界线在第二阶段：数据从内核缓冲区到用户缓冲区由谁来做。epoll 解决的是「等哪个 fd 就绪」，read 那一步仍然是同步阻塞的拷贝，所以它属于同步 IO（准确说是同步非阻塞 + 多路复用）。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 一个服务 QPS 3000、单请求平均耗时 50ms、以 IO 等待为主。用 Little's Law 估算，稳态下同时「在系统里」的请求大约是？</div>
+      <button class="opt">3000 个</button>
+      <button class="opt">60 个</button>
+      <button class="opt">150 个</button>
+      <button class="opt">用这个公式算不出来，必须压测</button>
+      <div class="ans">正确答案：<b>150 个</b>。L = λ × W = 3000 × 0.05 = 150。这个数说明稳态平均只有 150 个请求同时存在，线程池开到 500 意味着大部分线程在排队而不是在干活。注意它算的是平均值，峰值和长尾请求要另外留余量。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>地址空间</b></td><td>进程看到的虚拟内存范围，进程间隔离，线程间共享</td></tr>
+    <tr><td><b>上下文切换</b></td><td>保存当前执行流的寄存器、恢复另一个执行流的过程，进程切换还要换页表</td></tr>
+    <tr><td><b>协程</b></td><td>用户态调度的执行单元，切换不陷内核，栈为 KB 级</td></tr>
+    <tr><td><b>M:N 调度</b></td><td>M 个协程映射到 N 个 OS 线程上，由运行时决定谁在哪个线程跑</td></tr>
+    <tr><td><b>阻塞 / 非阻塞</b></td><td>调用发起后，调用方线程会不会被挂起</td></tr>
+    <tr><td><b>同步 / 异步 IO</b></td><td>数据从内核到用户的拷贝由谁完成：自己做是同步，内核做完通知是异步</td></tr>
+    <tr><td><b>IO 多路复用</b></td><td>一个线程同时等待多个 fd，谁就绪处理谁，select/poll/epoll 都属于这类</td></tr>
+    <tr><td><b>LT / ET</b></td><td>水平触发（还有数据就通知）与边缘触发（只在状态变化时通知一次）</td></tr>
+    <tr><td><b>惊群</b></td><td>一个事件唤醒多个等待者，只有一个能处理，其余白醒一次</td></tr>
+    <tr><td><b>零拷贝</b></td><td>取消用户态中转，减少 CPU 拷贝和上下文切换，DMA 拷贝仍存在</td></tr>
+    <tr><td><b>page cache</b></td><td>内核用空闲内存缓存文件页，读命中直接返回，写先落缓存再异步回写</td></tr>
+    <tr><td><b>脏页 / writeback</b></td><td>已修改但未落盘的页；由内核回写线程按阈值和时间周期刷出去</td></tr>
+    <tr><td><b>TLB</b></td><td>页表项的 CPU 缓存，miss 要多走几级页表，随机访存时影响明显</td></tr>
+    <tr><td><b>NUMA</b></td><td>多路 CPU 各有本地内存，跨节点访问延迟更高，高性能场景要绑核绑内存</td></tr>
+    <tr><td><b>io_uring</b></td><td>较新内核提供的异步 IO 接口，用共享环形队列批量提交与回收请求</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个最小的 epoll 服务端（LT 和 ET 各一版），用 ab 或 wrk 压一下，故意在 ET 版里只 read 一次，观察连接卡住的现象；② 用 <span class="k">strace -f -e trace=network,epoll_wait</span> 挂一个 Nginx worker，看它平时停在哪一行，把「多路复用」从名词变成画面；③ 用 dd 写一个大文件，同时 <span class="k">grep Dirty /proc/meminfo</span>，看脏页怎么涨、什么时候触发回写。<br><br>
+    <b>之后值得单独学：</b>第 5、6 期把网络这条线接到 TCP 状态机和抓包上；第 8、10 期讲容器和 K8s 里这些机制怎么被 cgroup 与 namespace 改写；第 14、16 期讲可观测性，把「延迟抖动」拆成能定位的指标。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 4 期 · 协程不是更快，是更省；epoll 不是万能，是「fd 多而活跃少」时的正解</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

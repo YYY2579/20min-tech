@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>运维场景系统设计题：监控、日志、发布、配置中心</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 20 期</span>
+    <h1>运维场景系统设计题：监控、日志、发布、配置中心</h1>
+    <p class="sub">这类题不考你画得多漂亮，考你<b>能不能说出容量、单点和取舍</b>。画框谁都会，说出「这台机器每秒扛多少样本」的人不多。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>4</b> 道大题</span>
+      <span class="chip"><b>6</b> 步答题框架</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>4</b> 条核查命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先算一个数：10 万个活跃序列、每 15 秒抓一次，一天写进多少个样本？算不出来就先别往下看。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>白板上第一个框画在哪里，就已经分出高下了</h2></div>
+  <p class="lead">面试官说「你设计一套监控平台，能接 10 万指标每秒」。有人拿起笔就从「采集端」开始画，一路画到 Grafana，画得挺整齐。然后面试官问了一句「10 万是每秒样本数，还是每秒抓取的序列数」，笔停住了。</p>
+  <p>停住的那三秒，评分就定了。<b>不是因为他不会监控，是因为他默认了题目里的每个词都只有一个意思。</b>系统设计题的第一道坎从来不是架构，是把一句含混的需求拆成可以算的数。</p>
+  <p>这三类答法，是这类题最常见的三种挂法，挂的原因完全不同：</p>
+  <table>
+    <tr><th style="width:250px">现场</th><th style="width:190px">候选人以为自己在做</th><th>面试官记下的是</th></tr>
+    <tr><td>上来就画 Kafka、TSDB、对象存储三个框</td><td>展示知识面</td><td>没有容量概念。框谁都会画，框的大小才是设计</td></tr>
+    <tr><td>被问到「单机够不够」时回答「不够就加机器」</td><td>展示工程务实</td><td>不知道瓶颈在哪一层。分片键选错，加机器只是加更多写不进去的机器</td></tr>
+    <tr><td>架构讲得很完整，被问「哪个组件挂了整个平台就瞎了」时卡住</td><td>以为高可用是「都部署三副本」</td><td>没有故障域思维。三副本放在同一个机架，等于一副本</td></tr>
+  </table>
+  <p>所以这篇不给「标准架构图」，给的是三个能在白板上当场算、当场说、当场兜底的东西：<b>数字、单点、代价</b>。任何一道运维向的设计题，你只要在这三件事上各说清一句，就已经在中上水平。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>数字</div><div class="cd">每秒多少样本、每天多少 GB、保留多少天、几副本。四个数一乘，存储量就出来了。没有这四个数，后面所有设计都是猜。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>单点</div><div class="cd">不是「都做集群」就叫没有单点。要能指出：这个组件挂了，哪一部分能力消失、消失多久、谁来兜。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>代价</div><div class="cd">每个选择都要说出它买到了什么、付出了什么。说不取代价的设计，在面试官眼里等于没做过取舍。</div></div>
+  </div>
+  <p><b>面试落点：</b>「我先不动笔，先把题目里的量级确认清楚——是写入 10 万样本每秒，还是 10 万个序列每 15 秒抓一次，这两个差 15 倍。确认完我再算存储和分片，最后说哪几个地方是单点。」这句话说完，面试官会知道你做过容量规划。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>六步框架：把 45 分钟切成六段，每段只干一件事</h2></div>
+  <p class="lead">系统设计最怕的是「讲得很全但没重点」。面试官在 45 分钟里其实只想确认四件事：你知不知道要问什么、算不算得清、画不画得出骨架、认不认得出风险。六步框架就是把这四件事按顺序摆好，避免你在某个细节里陷进去二十分钟。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>澄清需求（约 5 分钟）</b>：给谁用、解决什么、现在怎么做、成功的标准是什么。运维向的题一定要问清「自建还是用云托管」——这一句能省掉一半设计。</div></div>
+    <div class="step"><div class="txt"><b>确认约束（约 5 分钟）</b>：量级、延迟要求、保留期、预算、团队规模、能不能停机。约束不是背景介绍，它是后面每个取舍的依据。</div></div>
+    <div class="step"><div class="txt"><b>容量估算（约 10 分钟）</b>：写入速率、存储总量、带宽、查询并发。四个数写在小角落，后面每讲一个组件都回头看它们。</div></div>
+    <div class="step"><div class="txt"><b>画骨架（约 15 分钟）</b>：数据从产生到被查询，经过哪几段，每段的职责一句话。先画主链路，再补旁路（告警、归档、权限）。</div></div>
+    <div class="step"><div class="txt"><b>讲取舍（约 5 分钟）</b>：至少主动说两个「我为什么不选另一个方案」，并给出触发条件——什么情况下我会换。</div></div>
+    <div class="step"><div class="txt"><b>失效分析（约 5 分钟）</b>：逐个组件问「它挂了会怎样」，给出降级路径。这一段是拉开档位的地方，很多人根本没走到。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:120px">步骤</th><th>面试官在这一段验证什么</th><th style="width:210px">说错的典型表现</th></tr>
+    <tr><td>澄清</td><td>你会不会先问再答</td><td>直接开始画，全程零提问</td></tr>
+    <tr><td>约束</td><td>你知不知道设计是被约束逼出来的</td><td>说「我们要高可用、高并发、可扩展」这种谁都能说的话</td></tr>
+    <tr><td>估算</td><td>你的数字感是真的还是背的</td><td>报了个存储量，但说不出怎么算的</td></tr>
+    <tr><td>骨架</td><td>你知不知道每一段为什么存在</td><td>框很多，但说不出某个框去掉会怎样</td></tr>
+    <tr><td>取舍</td><td>你是不是只会一套</td><td>被问「为什么不用 X」时答「X 不好」</td></tr>
+    <tr><td>失效</td><td>你有没有在夜里三点被叫起来过</td><td>说「都有副本，不会挂」</td></tr>
+  </table>
+  <p>框架的用法不是背顺序，是<b>卡时间</b>。很多人前两步做得很好，画骨架画到兴奋，最后十分钟面试官问「如果这个集群整个挂了怎么办」，只能临时编。你主动在还剩五分钟时说「我先说一下失效场景」，气氛立刻就变了——从被考变成了一起讨论。</p>
+  <div class="callout ok">
+    <b>可以直接说出口的开场：</b>「我先确认几个前提再动手。这套平台是给内部研发和 SRE 用的，对吧？那可用性目标大概是 99.9 还是 99.95，因为这两个数决定了我要不要做跨可用区。写入量是 10 万样本每秒这个量级，保留 15 天可查、半年归档，这个理解对吗？预算上有没有硬约束，还是说先按能跑通设计，成本后面再优化？」
+  </div>
+  <div class="callout warn">
+    <b>反面例子：</b>「我们这套用 Prometheus 采集、Kafka 缓冲、Thanos 长期存储、Grafana 展示、Alertmanager 告警。」——这是产品清单，不是设计。面试官接着问「Kafka 在这里解决什么问题，不要行不行」，答不上来就露了：你只是见过这套组合，没想过它为什么长这样。
+  </div>
+  <p><b>面试落点：</b>「我习惯先花十分钟把量和约束锁死，因为监控和日志这类系统，架构基本是被写入速率和保留期决定的。骨架画完我会主动讲两个取舍和一个失效场景，因为设计题真正区分的不是谁框画得多，是谁知道哪里会先坏。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>容量估算：一半的分数在纸上那几个乘法</h2></div>
+  <p class="lead">容量估算不需要精确，需要<b>可追溯</b>。你说「大概 300GB」，然后能当场列出 100000 除以 15 乘 86400 再乘 2 字节，这个答案就是可信的；你说「大概几百 G」，哪怕蒙对了也没用。</p>
+  <p>先把单位锁死，这是最容易出错的地方。监控系统里有两个完全不同的「每秒」：</p>
+  <table>
+    <tr><th style="width:190px">说法</th><th>含义</th><th>换算</th></tr>
+    <tr><td><b>10 万样本/秒</b></td><td>每秒写入 10 万个数据点</td><td>若抓取间隔 15 秒，对应约 150 万个活跃序列</td></tr>
+    <tr><td><b>10 万序列，15 秒一次</b></td><td>10 万个活跃序列被周期性抓取</td><td>约 6667 样本/秒，一天约 5.76 亿个样本</td></tr>
+    <tr><td><b>10 万指标/秒（含混说法）</b></td><td>必须反问</td><td>两种解释差 15 倍，存储估算直接差 15 倍</td></tr>
+  </table>
+  <p>换算只需要记住三个锚点：一天 86400 秒；抓取间隔 15 秒意味着每个序列每天 5760 个点；<b>样本数 = 序列数 × 每天点数</b>。剩下的都是乘法。</p>
+  <pre><span class="c"># 写法一：已知序列数，求日增样本与存储</span>
+活跃序列     = 1,000,000
+抓取间隔     = 15s          <span class="c"># 每序列每天 86400 / 15 = 5760 个点</span>
+日增样本     = 1,000,000 × 5760 = 5.76e9   <span class="c"># 57.6 亿</span>
+压缩后字节   = 5.76e9 × 2B  ≈ 11.5 GB/天   <span class="c"># 按 2 字节/样本估，实测随序列形态浮动</span>
+两副本       = 23 GB/天
+保留 15 天   = 345 GB      <span class="c"># 再加索引与 WAL，按 1.2 倍余量算约 410 GB</span>
+
+<span class="c"># 写法二：已知写入速率，反推需要多少序列</span>
+写入 100,000 样本/s ÷ (1/15s) = 1,500,000 个活跃序列
+<span class="c"># 这才是"分片要分几片"的输入</span>
+
+<span class="c"># 写法三：日志的带宽与容量（1TB/天）</span>
+均值带宽 = 1TB ÷ 86400s ≈ 11.6 MB/s
+峰值带宽 = 11.6 × 4     ≈ 46 MB/s     <span class="c"># 峰值系数按业务取 3~5</span>
+三副本落盘 = 3TB/天
+文本压缩比 5~10 倍 → 实际磁盘 300~600 GB/天
+</pre>
+  <div class="callout warn">
+    <b>压缩比不要拍脑袋报死。</b>「Prometheus 压缩后每样本 1~2 字节」是社区常见的经验值，实际取决于标签重复度、时间戳规律和样本波动；日志的 5~10 倍也取决于文本冗余度。正确说法是「我按 2 字节估，落地前用一周真实数据校准」——<b>承认估算有误差，比报一个精确到小数点的假数字可信得多。</b>
+  </div>
+  <p>估算完还有一步很多人跳过：<b>把数字翻译成机器数量</b>。「345GB 保留 15 天」不是结论，「单节点能存多少、要几个节点、每个节点多少 IOPS」才是。这一步的常用套路是先定单节点上限（比如单机 500 万活跃序列、2TB 本地盘），再用总量除，最后加冗余。</p>
+  <pre><span class="c"># 从总量推到节点数（示例参数，实际以你选型的压测结果为准）</span>
+单节点可承载序列   = 5,000,000
+需要的序列总数     = 1,500,000
+原始节点数         = ceil(1.5M / 5M) = 1
+<span class="c"># 但 1 个节点没有冗余，也没有滚动升级的余地</span>
+实际节点数         = 2（互备）+ 1（预留扩容）= 3
+每节点磁盘         = 345GB / 2 + 余量 ≈ 250GB
+
+<span class="c"># 别忘了查询侧：一次大范围查询可能扫过几亿个点</span>
+<span class="c"># 单查询扫描点数要设上限，否则一个手抖的查询能把整个 TSDB 拖死</span>
+</pre>
+  <p>估算不能全靠猜，落地前用现有数据反推一次最准。四条命令就能拿到真实基数与磁盘占用：</p>
+  <div class="cmds">
+    <div class="crow"><code>curl -s localhost:9090/api/v1/status/tsdb | python -m json.tool</code><span class="desc">看当前序列总数与基数最高的标签，这是估算活跃序列的起点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>promtool tsdb analyze /var/lib/prometheus</code><span class="desc">分析已落盘 block 的序列数、标签基数与样本分布，比拍脑袋准</span><button class="copy">复制</button></div>
+    <div class="crow"><code>du -sh /var/lib/prometheus</code><span class="desc">真实磁盘占用，用来校准「每样本多少字节」这个系数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>df -h /var/lib/prometheus</code><span class="desc">剩余空间，决定保留期能设多长、什么时候必须扩盘</span><button class="copy">复制</button></div>
+  </div>
+  <p>这四条命令的顺序也是排查顺序：<b>先看序列数（决定写入规模），再看压缩后的实际字节（校准系数），最后看磁盘余量（决定保留期）。</b>三个数字凑齐，容量估算就从「大概几百 G」变成了可以写在白板上、经得起追问的结论。</p>
+  <p><b>面试落点：</b>「我先统一单位：10 万如果是样本每秒，对应 150 万活跃序列；如果是 10 万序列每 15 秒抓一次，只有 6700 样本每秒，两者差 15 倍。按前者算，日增 57.6 亿样本，压缩后十几个 G，两副本保留 15 天三百多 G，三个节点就够，但这三个节点必须跨故障域。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>题一：设计一套监控平台，写入 10 万样本每秒</h2></div>
+  <p class="lead">这道题真正考的不是「你知不知道 Prometheus」，而是<b>你知不知道这条写入链路在哪一段会断</b>。10 万样本每秒对单机 TSDB 来说不算夸张，但如果标签基数失控、或者抓取目标散在几千台机器上，断的地方会完全不同。</p>
+  <p>按数据流向切成五段，每段一句话说清职责，比画十个框有用：</p>
+  <table>
+    <tr><th style="width:130px">段</th><th>职责</th><th style="width:230px">这一段会怎么坏</th></tr>
+    <tr><td><b>采集</b></td><td>从目标拉取或接收推送，做基础标签注入（集群、环境、region）</td><td>抓取超时堆积；目标数上万时单采集器成瓶颈；采集太密把被监控服务压垮</td></tr>
+    <tr><td><b>缓冲</b></td><td>削峰、解耦、允许下游短暂不可用</td><td>缓冲没有保留期上限，等于把雪崩推迟几分钟；消费跟不上时延迟持续增长</td></tr>
+    <tr><td><b>写入与分片</b></td><td>按序列哈希分片，写多副本，保证同一序列落到同一分片</td><td>分片键选错（按指标名分）导致热点；副本写入半成功造成序列缺口</td></tr>
+    <tr><td><b>存储</b></td><td>近期数据本地盘，历史数据降精度后进对象存储</td><td>本地盘写满；压缩跟不上；大量乱序样本拖慢 compaction</td></tr>
+    <tr><td><b>查询与告警</b></td><td>查询拆分成子查询并缓存；规则分片评估</td><td>单条大查询打挂整个 TSDB；告警评估器单点，挂了就没人报警</td></tr>
+  </table>
+  <pre><span class="c"># 主链路（自建版的大致形态）</span>
+目标(exporters / app) 
+  → 采集层（按集群分片，每片一组采集器，多副本，写同一份）
+  → 缓冲队列（Kafka，保留 24~72 小时，按序列哈希分区）
+  → 写入层（无状态，按序列哈希路由到对应 TSDB 分片）
+  → TSDB 分片（本地 SSD，2 小时一个 block，保留 15 天）
+  → 对象存储（历史 block + 5 分钟/1 小时下采样，保留 1 年）
+  → 查询网关（拆分 + 并发 + 结果缓存 + 扫描点数上限）
+  → 告警评估（规则按分片切，双副本选主，避免重复通知）
+  → 通知（分组、抑制、静默）
+
+<span class="c"># 三个必须写在白板上的约束</span>
+单查询最大扫描点数     <span class="c"># 防手抖查询拖死存储</span>
+单序列标签基数上限     <span class="c"># 防基数爆炸，比如别把 user_id 做标签</span>
+缓冲队列的落后告警阈值 <span class="c"># 消费延迟超过 N 分钟就报警，否则你看到的图是"假的实时"</span>
+</pre>
+  <p>分片这件事值得单独说。按<b>序列哈希</b>分片的好处是写入均匀、同一序列永远落同一片；代价是跨片聚合查询要打多个分片再合并，所以查询网关必须做拆分和部分失败容忍。按<b>指标名或业务</b>分片的好处是查询能收敛到少数分片、故障影响面清晰；代价是热门业务的片会成为热点，扩容时迁移成本高。<b>面试时把这两个说清楚，比说「我们用一致性哈希」有价值得多。</b></p>
+  <p>然后是告警评估器。它是最容易被忽略的单点：存储有三副本、采集有多副本，但告警规则通常只在一个进程里跑。这个进程挂了，指标还在写，图还能看，<b>但没有任何人会收到通知</b>——这是最坏的一种故障，因为你以为监控还在工作。所以评估器要么做双副本加选主（同一时刻只有一个在发通知），要么至少要有「评估器心跳消失」这条元告警，由外部系统盯着。</p>
+  <div class="callout danger">
+    <b>别用「监控系统自己监控自己」来兜底。</b>监控平台整体挂掉时，它自己的告警也发不出来。必须有一条完全独立的旁路：一个极简的外部探测（比如每分钟请求一次监控平台的查询接口），失败就打电话。这条旁路要简单到几乎不会坏，最好连它依赖的组件都和主平台不重合。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「写入侧我按序列哈希分片，保证同一序列落同一片、写入均匀；代价是跨片聚合要在查询网关合并，所以网关要支持子查询拆分和部分失败。存储分两层：本地盘留 15 天原始精度，超出的降采样到 5 分钟和 1 小时存对象存储。告警评估器我会做双副本选主，并且单独加一条外部心跳探测——因为评估器挂了指标还在写，图看着正常，但没人会收到告警，这是最难发现的一种故障。」
+  </div>
+  <p>追问通常会往两个方向走。一个是「指标基数怎么控」——答：在采集侧就做限制，单目标返回的序列数超阈值就丢弃并告警，绝不允许把请求 ID、用户 ID 这类高基数字段做标签；下游再做一层「每租户序列数配额」，防止一个团队把整个平台写爆。另一个是「历史数据怎么查」——答：查询网关根据时间范围决定打本地还是打对象存储，跨层查询要限制并发，宁可慢一点也不能把在线写入拖垮。</p>
+  <p><b>面试落点：</b>这道题的核心不是选型，是「我知道这条链路会在哪三个地方断：基数爆炸、大查询、告警评估器单点」，并且每个都有具体对策。</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>题二：设计日志平台，每天 1TB</h2></div>
+  <p class="lead">1TB 一天不算大，但它有两个特性让设计变难：<b>写入是持续且突发的，查询是随机且昂贵的。</b>很多人按「存下来能查」设计，最后发现磁盘够、CPU 不够，一个「搜个错误码」的查询能把整个集群拖慢。</p>
+  <p>先把数字落地：1TB 一天约等于 11.6 MB/s 均值，按峰值系数 4 算是 46 MB/s，三副本就是 3TB 一天落盘。文本日志压缩比通常 5 到 10 倍，所以实际磁盘每天 300 到 600GB。<b>这三个数决定了 Kafka 要多少分区、存储要多少节点、保留期能设多长。</b></p>
+  <table>
+    <tr><th style="width:120px">段</th><th>要做的事</th><th style="width:250px">踩过的坑</th></tr>
+    <tr><td><b>采集</b></td><td>tail 文件、合并多行堆栈、提取字段、加来源标签（集群/应用/实例）</td><td>日志轮转时按文件名跟踪会丢数据，要按 inode 跟踪；多行异常堆栈被拆成几十条</td></tr>
+    <tr><td><b>传输</b></td><td>本地磁盘缓冲 + 队列，断网时先落盘再补发</td><td>采集端内存缓冲，重启就丢；无限重试把上游打挂</td></tr>
+    <tr><td><b>处理</b></td><td>解析、脱敏（身份证/手机号/令牌）、采样、丢弃调试级别</td><td>脱敏放在查询时做，等于敏感数据已经落盘了</td></tr>
+    <tr><td><b>存储</b></td><td>热存可查 7 天，温存抽样 30 天，冷存归档 180 天以上</td><td>全量全字段建索引，索引比数据还大</td></tr>
+    <tr><td><b>查询</b></td><td>按时间 + 标签先收敛范围，再做全文检索；限制单次扫描量</td><td>不限制时间范围，默认查「最近 30 天」，一次查询扫几十 TB</td></tr>
+  </table>
+  <p>存储选型是这道题的分水岭，三条路的取舍完全不同：</p>
+  <table>
+    <tr><th style="width:110px">方案</th><th>擅长</th><th>代价</th><th style="width:150px">适合</th></tr>
+    <tr><td><b>全文索引（如 Elasticsearch 系）</b></td><td>任意关键词检索、聚合分析、生态成熟</td><td>索引膨胀、写入放大、集群运维重、内存吃紧</td><td>排障为主、查询花样多</td></tr>
+    <tr><td><b>标签索引（如 Loki 系）</b></td><td>成本低、写入轻、和指标标签天然对齐</td><td>只能靠标签收敛范围，标签选不好就查不动</td><td>已知服务、按标签定位</td></tr>
+    <tr><td><b>列式存储（如 ClickHouse 系）</b></td><td>大范围扫描快、压缩好、聚合强</td><td>需要自己设计表结构和分区，点查不如全文索引灵活</td><td>结构化日志、统计分析多</td></tr>
+  </table>
+  <p>我的判断是：<b>如果团队的主要动作是「按服务和时间找错误」，标签索引加对象存储最划算；如果主要动作是「在几亿行里搜一个订单号」，那必须上全文索引，并且要把索引字段砍到最少。</b>最贵的不是存储，是「为了让任何字段都能搜」而建的索引。</p>
+  <pre><span class="c"># 一条日志从产生到能查，中间这段可以照着说</span>
+应用 stdout
+  → 采集 agent（tail + 多行合并 + 注入 cluster/app/pod 标签）
+  → 本地磁盘队列（断网可缓冲，有上限，满了丢最旧的并计数）
+  → Kafka（按 app 分区，保留 24 小时，消费组可重放）
+  → 处理（结构化解析、字段裁剪、脱敏、按级别丢弃 debug）
+  → 热存储（7 天，可按标签 + 关键词查）
+  → 归档（压缩后进对象存储，按月分区，需要时再导入）
+
+<span class="c"># 成本四问，设计时就要能答</span>
+1. 每天落盘多少 GB（压缩后、含副本）
+2. 保留 7 天 / 30 天 / 180 天分别要多少钱
+3. 一次典型查询扫多少数据、耗时多少
+4. 如果明天量翻三倍，哪一段先撑不住
+</pre>
+  <div class="callout warn">
+    <b>「先全量存下来，以后再治理」是最贵的决定。</b>日志量涨得比业务快，因为它是「顺手多打一行」的成本最低的行为。设计时就要给出硬约束：单应用每秒日志量上限、单条日志大小上限、字段数量上限，超了就在采集侧丢弃并计数。<b>没有配额的日志平台，最后一定会被某个死循环的应用写爆。</b>
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「1TB 一天，均值 11.6MB/s，峰值我按 4 倍算是 46MB/s；三副本 3TB 落盘，压缩后 300 到 600G。这个量我倾向标签索引加热存七天：因为排障的动作是『先按服务和实例收敛，再在结果里搜关键词』，标签能承担前一半，全文索引只在少数场景需要。代价是跨服务的模糊搜索会变慢，我会用一个抽样的小索引扛这部分，而不是给所有字段建索引。」
+  </div>
+  <p><b>面试落点：</b>「日志平台的设计难点不在存，在查。写入是线性的，查询是突发的，所以我会把查询能力切成两档：常用的按标签查走便宜的通道，少见的全文检索走抽样或异步，绝不为了偶发需求把整个索引撑大。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>题三：设计发布系统，多集群、可回滚</h2></div>
+  <p class="lead">这道题的关键词是「多集群」和「可回滚」。前者考的是<b>批次与故障隔离</b>，后者考的是你有没有把发布当成一个<b>可以中止、可以从任意一步退回来的状态机</b>，而不是一串脚本。</p>
+  <p>先把模型摆正：一次发布是一个带状态的对象，不是一个脚本的执行过程。它有唯一 ID、有目标状态、有当前批次、有中止条件、有历史记录。这样设计之后，「回滚」就变成了「把目标状态指回上一个已知good 的版本」，而不是「反向执行一遍脚本」——后者在数据库变更、外部副作用面前基本不可能正确。</p>
+  <table>
+    <tr><th style="width:170px">能力</th><th>为什么必须有</th><th style="width:230px">没有会怎样</th></tr>
+    <tr><td><b>制品不可变</b></td><td>回滚要有明确的目标，必须是同一个 digest</td><td>回滚时重建了一次镜像，等于又发了个新版本</td></tr>
+    <tr><td><b>幂等执行</b></td><td>网络重试、控制面重启都会导致重复调用</td><td>同一批次被执行两次，副本数翻倍或配置被覆盖</td></tr>
+    <tr><td><b>互斥锁</b></td><td>同一服务同一环境同时只能有一个发布</td><td>两个流水线交叉执行，线上最终是什么版本没人知道</td></tr>
+    <tr><td><b>批次与暂停</b></td><td>小批量验证，指标不对立刻停</td><td>全量推完才发现问题，影响面最大化</td></tr>
+    <tr><td><b>自动判据</b></td><td>错误率/延迟超阈值自动中止，不靠人盯</td><td>人在开会，指标已经恶化十分钟</td></tr>
+    <tr><td><b>审计流水</b></td><td>谁、何时、发了什么、结果如何</td><td>事后复盘只能靠记忆和聊天记录</td></tr>
+  </table>
+  <pre><span class="c"># 一次发布的状态机（白板上可以直接画这几个节点）</span>
+created
+  → validating        <span class="c"># 制品存在？配置齐？依赖就绪？</span>
+  → deploying(batch 1..N)
+      ├─ verifying    <span class="c"># 观察窗口内看错误率/延迟/业务指标</span>
+      │    ├─ pass → 下一批
+      │    └─ fail → pausing → rolled_back
+      └─ 超时/人工 → paused
+  → succeeded
+  → rolled_back
+
+<span class="c"># 三个必须固化的规则</span>
+1. 每个批次独立可观测：批次 N 的指标只统计批次 N 的实例
+2. 中止是默认动作：判据没数据（监控缺失）也算失败，不能"看不到就当没事"
+3. 回滚 = 指向上一个 good digest，不执行任何"反向脚本"
+</pre>
+  <p>多集群的排法有两个维度要想清楚：<b>集群之间</b>先发小集群还是先发大集群，<b>集群内部</b>一次放多少。常见做法是先发流量最小的集群（或者专门的预发/灰度集群），观察窗口通过后再发生产主集群；集群内部按 1 台、10%、50%、100% 分批。<b>顺序的原则是「让最早出错的那一批，代价最小」。</b></p>
+  <p>还有一个容易被忽略的设计点：<b>发布系统和集群控制面的关系</b>。如果每个集群各自有一个控制面，发布系统就要处理「某个集群连不上」这种情况。正确做法是把「连不上」当成一种明确的批次结果（unknown），而不是失败也不是成功——因为 unknown 时你既不能继续推进，也不能直接回滚（可能已经发了一半）。这时候要人工介入，先确认集群里实际跑的是什么版本。</p>
+  <div class="callout danger">
+    <b>回滚不是发布的逆运算。</b>这一点必须说出口。镜像可以退回去，配置可以退回去，但已经执行过的数据库变更、已经发出的消息、已经被消费的数据，都退不回去。所以发布系统的正确设计前提是「每个版本都能和上一个版本共存」——数据向前兼容、接口双向兼容。做不到这一点，再完善的发布系统也只能保证「快速回到一个同样会出问题的状态」。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「我把发布建模成状态机，不是脚本。每个批次发完先进 verifying，观察窗口内如果错误率或 P99 超阈值就自动 paused，人确认后回滚。回滚是把目标 digest 指回上一个已知good 的版本，不做任何反向操作，所以前提是数据变更必须向前兼容。多集群我按故障影响从小到大排批次，某个集群失联时标记为 unknown 而不是失败——因为那时集群里可能已经发了一半，得先去确认实际状态。」
+  </div>
+  <p><b>面试落点：</b>「发布系统的核心不是能推上去，是能干净地退回来。所以三件事必须成立：制品用 digest 固定、数据变更前后兼容、每个批次可独立观测。这三件缺一件，回滚就只是心理安慰。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>题四：设计配置中心，推还是拉</h2></div>
+  <p class="lead">配置中心看起来简单：存 key-value、改了让应用知道。但它有一个别处没有的约束——<b>它挂了，全公司的应用都不能挂</b>。这一条把设计思路完全改写了：可用性优先级高于一致性，客户端必须有本地兜底。</p>
+  <p>先解决「推还是拉」这个必问题。它没有标准答案，只有取舍：</p>
+  <table>
+    <tr><th style="width:120px">维度</th><th>推（服务端主动下发）</th><th>拉（客户端轮询）</th></tr>
+    <tr><td>实时性</td><td>秒级，变更立刻到达</td><td>取决于轮询间隔，短则压力大、长则延迟高</td></tr>
+    <tr><td>服务端压力</td><td>要维护海量长连接，扩容时连接会断</td><td>请求量 = 客户端数 / 间隔，可控但持续</td></tr>
+    <tr><td>客户端复杂度</td><td>要处理连接管理、重连、乱序</td><td>简单，一次请求一次响应</td></tr>
+    <tr><td>网络与防火墙</td><td>服务端主动连客户端，跨网段常常不通</td><td>客户端出站即可，天然穿透</td></tr>
+    <tr><td>一致性</td><td>下发可能乱序，要靠版本号纠正</td><td>每次拿到的都是某个确定版本</td></tr>
+  </table>
+  <p>工业界常见的落地是<b>长轮询</b>：客户端发起请求，服务端没有变更就挂起几十秒再返回，有变更立刻返回。它兼得了「秒级生效」和「客户端出站」，代价是服务端要扛住大量挂起连接。<b>面试时说清这个折中，比站队「推好还是拉好」有说服力。</b></p>
+  <p>一致性的处理要分层看。配置的写入量很小（一天几千次顶天），读取量极大（每次启动、每次刷新），这是典型的读多写少，所以存储用带共识的组件（Raft 系的 KV，或者数据库加版本号）完全够。真正的一致性问题不在存储，在<b>客户端拿到的版本是否单调</b>：网络重试可能让客户端拿到比当前更旧的版本，所以每次下发都要带版本号，客户端只接受更大的版本。</p>
+  <pre><span class="c"># 客户端的一条配置记录，字段比内容重要</span>
+{
+  "namespace": "order",
+  "key": "timeout.ms",
+  "value": "800",
+  "version": 142,              <span class="c"># 单调递增，客户端只认更大的</span>
+  "gray": {"type": "ip", "values": ["10.0.1.11"]},
+  "updated_by": "zhang",
+  "updated_at": "2026-03-02T11:20:31Z"
+}
+
+<span class="c"># 客户端的三级兜底，缺一不可</span>
+1. 内存中的当前值（生效中）
+2. 本地磁盘快照（上次成功拉取的完整配置，带版本号）
+3. 代码里的默认值（编译期就定死，永远可用）
+
+<span class="c"># 启动顺序：先读本地快照把服务拉起来，再异步拉远端</span>
+<span class="c"># 而不是"拉不到远端就不启动"——那样配置中心一挂就是全站起不来</span>
+</pre>
+  <p>变更流程比存储更值得讲。一条配置从修改到全量生效，应该有：<b>草稿 → 审批 → 灰度（按 IP/实例/百分比）→ 全量 → 可一键回滚到上一版本</b>。每一项变更都要记录 before/after，因为「昨天有人改了个超时」这类事故，事后只能靠 diff 找回来。</p>
+  <p>还有两类配置要分开对待。<b>开关类</b>（功能灰度、降级总闸）要求秒级生效、可回滚，出问题要能立刻关；<b>启动类</b>（端口、数据库地址、线程池大小）通常只在启动时读一次，改动需要重启，把它当热更新反而危险。把这两类混在一个系统里，就会出现「改了个端口，全集群开始滚动重启」的尴尬。</p>
+  <div class="callout warn">
+    <b>反面例子：</b>把配置中心当数据库用——存业务数据、存大 JSON、存几十 MB 的规则文件，每次变更全量推送。结果是：一次推送打满带宽，客户端解析卡住，配置中心的存储成了新的单点，而且没人敢动它。<b>配置中心只该存「小、少、变更不频繁、但必须准确」的东西。</b>
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「我选长轮询：客户端出站请求，服务端挂起等变更，兼顾秒级生效和防火墙友好。存储用带共识的 KV，因为配置是读多写少，一致性靠版本号保证而不是靠强同步推送。最关键的其实是客户端兜底——本地快照加代码默认值，保证配置中心整个挂掉时应用还能启动、还能按最后一次成功的配置跑。这个优先级比『变更多快生效』高得多。」
+  </div>
+  <p><b>面试落点：</b>「配置中心的第一设计目标是『它挂了业务不能挂』，第二才是『改完多快生效』。所以推拉之争其实是次要问题，本地快照、版本号单调、灰度与回滚这三件事才是必须有的。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>高可用与故障域：三副本放在一个机架，等于一个副本</h2></div>
+  <p class="lead">被问「怎么保证高可用」时，最没用的回答是「都部署三个副本」。因为<b>副本数不等于可用性，副本的分布才等于可用性</b>。三个副本在同一台宿主机上，宿主机一挂就是零副本。</p>
+  <p>先把故障域按层级列清楚，任何一套设计都要能回答「这一层挂了会怎样」：</p>
+  <table>
+    <tr><th style="width:120px">故障域</th><th>典型事件</th><th>对策</th><th style="width:170px">代价</th></tr>
+    <tr><td><b>进程</b></td><td>崩溃、OOM、死锁</td><td>多副本 + 健康检查 + 自动重启</td><td>内存翻倍，需要无状态化</td></tr>
+    <tr><td><b>节点</b></td><td>宕机、内核 panic、磁盘坏</td><td>反亲和调度，副本不落同节点</td><td>节点数增加，调度受限</td></tr>
+    <tr><td><b>机架 / 可用区</b></td><td>交换机故障、机房断电、AZ 隔离</td><td>跨 AZ 打散；共识组件按 2+1 或 3 地部署</td><td>跨 AZ 延迟上升，写要等多数派</td></tr>
+    <tr><td><b>地域</b></td><td>区域级故障、光缆中断</td><td>异地只读副本 + 数据异步复制</td><td>RPO 不为零，切换要人工决策</td></tr>
+    <tr><td><b>依赖</b></td><td>DNS、证书、认证、镜像仓库不可用</td><td>本地缓存、降级路径、提前预热</td><td>实现复杂度上升</td></tr>
+  </table>
+  <p>共识组件的跨 AZ 部署有个具体代价要会说：三副本分布在三个 AZ，写入需要多数派确认，也就是要等一次跨 AZ 往返。同城 AZ 之间的往返通常在毫秒级，对元数据和配置这类低频写完全可接受；<b>但把它用在每秒十万次写的路径上就是灾难</b>。所以正确说法是：共识存储放元数据，热数据走无状态加最终一致。</p>
+  <p>容量这件事，高可用设计里最常被漏掉：<b>故障切换之后，剩下的容量必须能扛住峰值。</b>如果平时 6 个节点跑 60% 负载，挂掉 2 个，剩下 4 个要跑 90%，再遇到流量高峰就直接雪崩。所以容量规划要按「N+1 或 N+2 之后仍有余量」算，而不是按「当前够用」算。这一条说出来，面试官会认为你真的值过班。</p>
+  <pre><span class="c"># 检查故障域分布：副本是不是真的散开了</span>
+kubectl get pods -o wide -n monitor | awk '{print $1, $7}'   <span class="c"># 看节点分布</span>
+kubectl get pod &lt;name&gt; -n monitor -o jsonpath='{.spec.topologySpreadConstraints}' 
+
+<span class="c"># 检查容量余量：故障后是否还扛得住</span>
+<span class="c"># 用当前峰值 QPS × 故障后剩余副本数，反推单副本负载</span>
+剩余副本 = 总副本 - 单故障域副本
+单副本负载 = 峰值 QPS / 剩余副本      <span class="c"># 要低于单副本安全水位</span>
+
+<span class="c"># 检查脑裂防护：旧主是否还能写</span>
+<span class="c"># 共识系统靠 quorum，非共识的"主从"必须有 fencing 机制</span>
+</pre>
+  <p>脑裂这件事值得单独提一句。不是所有系统都有 quorum：主从架构的数据库、自己写的主备切换脚本，在网络分区时可能出现两个「主」同时写。防护手段叫 fencing——旧主发现自己失去租约就必须停止服务，或者由存储层拒绝旧主的写入（比如基于 epoch 号的乐观锁）。<b>「我们有心跳检测所以不会脑裂」是错的，心跳只能发现故障，不能阻止双写。</b></p>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「高可用我分三层说：进程级多副本、节点级反亲和、机房级跨 AZ。跨 AZ 只用在元数据和配置这类低频写上，热数据路径不跨 AZ，否则延迟扛不住。容量我会按故障后仍有余量来规划，比如 6 个节点挂 2 个还剩 4 个，这时峰值负载要低于单节点的安全水位。最后是脑裂，主从架构必须有 fencing，光有心跳不够。」
+  </div>
+  <p><b>面试落点：</b>「副本数是最表面的东西。我真正关心的是三件事：副本散不散、故障后容量够不够、双写能不能被拦住。这三件都答得出来，才叫设计过高可用。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>成本控制：保留期、采样、冷热、精度，四个旋钮</h2></div>
+  <p class="lead">设计题最后常有一问：「这套东西一年要花多少钱？」这不是财务问题，是<b>你有没有分清「必须精确」和「大概就行」</b>。监控和日志的成本，几乎全部由四个旋钮决定，而它们的调节空间比换存储引擎大得多。</p>
+  <table>
+    <tr><th style="width:110px">旋钮</th><th>怎么调</th><th>省多少（量级）</th><th style="width:190px">代价</th></tr>
+    <tr><td><b>保留期</b></td><td>热存 7~15 天，温存 30~90 天，冷存 180 天以上</td><td>保留期减半，成本约减半（线性）</td><td>老问题无法用原始精度回溯</td></tr>
+    <tr><td><b>采样</b></td><td>日志按级别丢弃 debug；链路按比例采样；指标不采样</td><td>常常能砍掉一半以上</td><td>低频问题可能刚好被采掉</td></tr>
+    <tr><td><b>冷热</b></td><td>近期放本地 SSD，历史放对象存储</td><td>单位成本差数倍</td><td>冷查询延迟高，需要异步</td></tr>
+    <tr><td><b>精度</b></td><td>原始 15 秒保留两周，之后降采样到 5 分钟 / 1 小时</td><td>降采样后数据量降到几十分之一</td><td>看不了尖刺，只能看趋势</td></tr>
+  </table>
+  <p>指标不能随便采样，这一点要能区分开：日志丢一条是丢一条，指标丢一个点会让 <span class="k">rate</span> 和分位数算错。所以指标的省钱方式是<b>降精度和缩保留期</b>，不是随机丢样本。日志的省钱方式才是采样和裁剪字段。链路追踪两者都可以用——头部采样在入口就决定采不采，尾部采样等trace 结束后按「是否有错误、是否慢」决定留不留，后者更贵但更有用。</p>
+  <pre><span class="c"># 成本估算的通用公式，四个因子乘起来</span>
+月成本 ≈ 日增量(压缩后) × 副本数 × 保留天数 × 单价
+
+<span class="c"># 举例：日志 1TB/天，压缩后按 0.15 计，三副本，热存 7 天</span>
+日落盘 = 1000GB × 0.15 × 3 = 450GB
+7 天   = 3.15TB        <span class="c"># 这是热存的部分</span>
+<span class="c"># 30 天抽样 10%：日增 45GB，30 天 1.35TB</span>
+<span class="c"># 180 天归档：日增 150GB，压缩再降一半，约 13.5TB 对象存储</span>
+
+<span class="c"># 关键不是算得准，是能说出"哪一部分钱花得不值"</span>
+</pre>
+  <p>有一个很好用的反问，可以主动用在面试里：<b>「这笔存储买到了什么决策？」</b>如果答不上来，那部分数据就是纯成本。比如「保留 180 天全量原始日志」——一年里真正回溯到 90 天以前的次数可能只有个位数，那这部分应该换成「归档 + 需要时按天导入」，成本能降一个量级，代价是查询要等几分钟。</p>
+  <div class="callout">
+    <b>一个真实的取舍模式：</b>排障需要的通常是「最近两小时的高精度 + 最近两周的中精度 + 半年的低精度」，而不是「半年全是高精度」。把保留期做成分段的，比整体缩短保留期更划算——因为你既保住了排障能力，又砍掉了最贵的那一段。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「成本我只调四个旋钮：保留期、采样、冷热、精度。指标不采样，靠降精度省；日志可以采样，但要按级别和来源分；链路用尾部采样，优先留错误和慢请求。判断标准不是『便宜』，是『这段数据有没有人真的用过』——用不上的历史数据，应该转成归档按需导入，而不是一直放在最贵的存储里。」
+  </div>
+  <p><b>面试落点：</b>「成本优化的正确顺序是先砍用不上的数据，再调精度，最后才换存储引擎。换引擎的收益通常只有几倍，而保留期和采样能带来数量级的差别。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>9 个坑：每一条都在真实面试里挂过人</h2></div>
+  <p class="lead">这些不是「不够优雅」，是<b>当场就会被追问穿的具体错误</b>。共同点是：说出来的时候听起来很专业。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">不澄清单位就开始画架构</div><div class="pd">「10 万指标每秒」有两种解释，差 15 倍。不澄清就动手，等于承认自己没有量级意识，后面所有数字都不可信。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把「加机器」当成容量方案</div><div class="pd">分片键选错、单序列热点、单查询扫全表，这些加机器都不解决。先定位瓶颈在哪一段，再谈横向扩展。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只讲写路径，不讲查询</div><div class="pd">监控和日志的线上事故，一半是大查询把存储打挂。查询网关的拆分、缓存、扫描点数上限，是设计的一部分不是优化项。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">把消息队列当万能缓冲</div><div class="pd">缓冲只能吸收短时峰值。消费能力长期低于生产速率，队列只是把雪崩推迟到保留期结束，而且延迟会一路涨到你看见的图全是旧的。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">忽略告警评估器的单点</div><div class="pd">存储三副本、采集多副本，评估器却只有一个进程。它挂了指标还在写、图还正常，但没人收到告警——这是最难发现的失效。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">故障切换后容量不够</div><div class="pd">按「平时够用」做容量，挂两个节点后剩余副本直接过载。容量要按故障后仍有安全水位来规划，这是值班过的人才会想到的一条。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">配置中心挂了应用起不来</div><div class="pd">启动时强依赖远端配置，配置中心一挂全站无法启动。必须有本地快照和代码默认值，且启动流程先读本地再异步拉远端。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把回滚设计成「反向执行脚本」</div><div class="pd">镜像能退、配置能退，数据库变更和已发出的消息退不回去。回滚应该是「指向上一个已知good 的制品」，前提是版本之间能共存。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">全程不谈钱，或者只谈「用便宜的存储」</div><div class="pd">成本是设计约束不是财务话题。说不出「保留期砍到多少、哪些数据转归档、省下多少」，说明你没真正拥有过这套系统。</div></div></div>
+  <p><b>面试落点：</b>被追问到某个坑时，别辩解，直接把它变成你的判断。比如「这里确实是个单点，我当时没做双活，因为评估器的重复通知问题更麻烦；我们是在外部加了一条独立心跳探测来兜底。如果重做，我会把评估器做成双副本选主，用租约保证同一时刻只有一个在发通知」——承认 + 原因 + 改法，比硬撑强得多。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 面试官说「这套监控要接 10 万指标每秒」，你第一步应该做什么？</div>
+      <button class="opt">直接按 10 万样本每秒估算存储</button>
+      <button class="opt">先问用自建还是云托管</button>
+      <button class="opt">先澄清「每秒 10 万」指的是样本写入速率，还是 10 万个序列按固定间隔抓取</button>
+      <button class="opt">先确认对方团队有多少人维护</button>
+      <div class="ans">正确答案：<b>先澄清单位</b>。10 万样本每秒（15 秒抓取对应约 150 万活跃序列）和 10 万序列每 15 秒抓一次（约 6700 样本每秒）差 15 倍，存储与分片规模完全不同。云托管与否确实要问，但它不影响这个必须先定的量级。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 100 万个活跃序列、抓取间隔 15 秒，每天大约写入多少个样本？</div>
+      <button class="opt">约 5760 万个</button>
+      <button class="opt">约 5.76 亿个</button>
+      <button class="opt">约 57.6 亿个</button>
+      <button class="opt">约 864 亿个</button>
+      <div class="ans">正确答案：<b>约 57.6 亿个</b>。每个序列每天 86400 ÷ 15 = 5760 个点，100 万序列乘 5760 等于 57.6 亿。按每个样本压缩后 2 字节估，约 11.5GB 一天，两副本保留 15 天约 345GB。选项里的 5.76 亿是 10 万序列的量，数量级看错了。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 日志每天 1TB，估算峰值写入带宽时，比较合理的做法是？</div>
+      <button class="opt">均值约 11.6MB/s，峰值按 3~5 倍系数估到 35~58MB/s</button>
+      <button class="opt">直接按 1TB/秒 估，留足余量</button>
+      <button class="opt">按 1TB 除以 8 小时工作时间估算</button>
+      <button class="opt">带宽不用估，存储够了就行</button>
+      <div class="ans">正确答案：<b>均值乘峰值系数</b>。1TB/86400s 约 11.6MB/s 是均值，真实流量有早晚高峰，按 3~5 倍取峰值才有工程意义。按「工作时间 8 小时」平均会低估夜间批处理任务产生的日志，按 1TB/秒 则完全脱离量级。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 配置中心整体不可用时，应用应该怎么表现？</div>
+      <button class="opt">启动失败并快速重试，避免带着错误配置运行</button>
+      <button class="opt">使用代码里的默认值运行，忽略本地快照</button>
+      <button class="opt">用本地磁盘上的最后一次成功快照启动，同时后台重试拉取</button>
+      <button class="opt">从同机房的其他实例内存里拉一份配置</button>
+      <div class="ans">正确答案：<b>本地快照兜底</b>。配置中心的第一设计目标是「它挂了业务不能挂」。客户端应该有三级兜底：内存当前值、本地快照、代码默认值；启动时先读本地快照把服务拉起来，再异步拉远端。启动强依赖远端会让配置中心成为全站可用性的天花板。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 关于发布系统的回滚，下面哪个说法是对的？</div>
+      <button class="opt">回滚就是把发布时执行的每一步反向执行一遍</button>
+      <button class="opt">回滚是把目标版本指回上一个已知good 的不可变制品，前提是数据变更向前兼容</button>
+      <button class="opt">只要镜像仓库里留着旧 tag，回滚就一定成功</button>
+      <button class="opt">回滚只需要考虑应用，数据库变更由 DBA 负责</button>
+      <div class="ans">正确答案：<b>指向旧制品 + 数据兼容</b>。反向执行脚本在数据库变更、外部副作用（已发消息、已调第三方）面前无法正确工作。回滚能力成立的前提是相邻版本能同时读写同一份数据，否则旧镜像起来了也会因为表结构不匹配而起不来。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">6. 三个副本的存储集群，被问到「节点挂两个还扛得住吗」，正确的分析角度是？</div>
+      <button class="opt">算故障后剩余副本要承担的峰值负载，确认低于单副本安全水位</button>
+      <button class="opt">三副本本身就是高可用，挂两个还剩一个，肯定没问题</button>
+      <button class="opt">只要副本跨了可用区，容量就不用考虑</button>
+      <button class="opt">挂两个节点会触发自动扩容，不需要提前规划</button>
+      <div class="ans">正确答案：<b>容量要按故障后算</b>。副本数保证的是数据不丢，不保证剩下的副本扛得住流量。如果平时 6 节点跑 60%，挂 2 个后剩 4 个要跑 90%，遇到高峰就会连锁雪崩。容量规划要按 N+1 或 N+2 之后仍有余量来定。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>样本（sample）</b></td><td>一个时间点上的一个数值，带序列标识和时间戳，是监控存储的最小单位</td></tr>
+    <tr><td><b>序列（series）</b></td><td>一组标签唯一确定的时间序列，序列数决定内存与索引规模</td></tr>
+    <tr><td><b>基数（cardinality）</b></td><td>标签取值的组合数量。把用户 ID 做标签会让基数爆炸，是监控平台最常见的自伤方式</td></tr>
+    <tr><td><b>抓取间隔</b></td><td>两次采集之间的时间，直接决定样本量：间隔减半，写入翻倍</td></tr>
+    <tr><td><b>下采样（downsampling）</b></td><td>把高精度历史数据聚合成低精度，用于长期保留，代价是看不到尖刺</td></tr>
+    <tr><td><b>冷热分层</b></td><td>近期数据放快而贵的存储，历史数据放慢而便宜的存储，查询按时间路由</td></tr>
+    <tr><td><b>分片键</b></td><td>决定数据落到哪个节点的依据。按序列哈希写入均匀，按业务分查询收敛，二者不可兼得</td></tr>
+    <tr><td><b>长轮询</b></td><td>客户端发起请求后服务端挂起，有变更立即返回，兼顾实时性与出站连接</td></tr>
+    <tr><td><b>quorum</b></td><td>共识系统要求的多数派，写要等多数确认。跨可用区部署会引入一次往返延迟</td></tr>
+    <tr><td><b>fencing</b></td><td>隔离机制，确保失去租约的旧主无法继续写，防止脑裂导致双写</td></tr>
+    <tr><td><b>故障域</b></td><td>一个故障能同时影响的范围：进程、节点、机架、可用区、地域</td></tr>
+    <tr><td><b>N+1 容量</b></td><td>按「坏掉一份之后仍能承载峰值」规划容量，而不是按当前够用规划</td></tr>
+    <tr><td><b>幂等</b></td><td>同一操作重复执行结果不变，是发布与配置下发能被安全重试的前提</td></tr>
+    <tr><td><b>背压（backpressure）</b></td><td>下游处理不过来时向上游施加压力的机制，没有背压的队列只是延迟爆炸</td></tr>
+    <tr><td><b>审计流水</b></td><td>谁在什么时候改了什么、结果如何，事后复盘的唯一可信来源</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 拿一张纸，只写数字不写架构：10 万样本每秒对应的序列数、日增样本、压缩后容量、三副本保留 15 天的磁盘量，四行算完再看答案；② 把「监控平台」这道题讲给一个不懂运维的朋友听，要求他能在三分钟内复述出数据从哪来到哪去，讲不清就是你自己没理清；③ 给一个你熟悉的系统画故障域表：进程、节点、机架、可用区各挂一次，逐个写「什么能力消失、多久恢复、谁兜底」，这张表能直接用在任何设计题里。<br><br>
+    <b>之后值得单独学：</b>第 14 期讲 Prometheus 的指标类型与基数问题，是本题监控部分的地基；第 15 期讲 SLO 与告警设计，决定你告警评估器该怎么切；第 16 期讲可观测性三支柱，日志与链路的取舍在那里更细；第 19 期讲 CI/CD 与发布策略，发布系统的状态机设计可以和它对照着看；第 21 期讲事故处理，是这套系统真正被考验的时刻。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 20 期 · 系统设计题的分数，一半在纸上那几个乘法，一半在你敢不敢主动说「这里是个单点」</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DNS 与 HTTP/HTTPS 高频问：从解析到握手</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 7 期</span>
+    <h1>DNS 与 HTTP/HTTPS 高频问：从解析到握手</h1>
+    <p class="sub"><span class="k">no-cache</span> 不是不缓存，<span class="k">301</span> 会被浏览器记很久——这些细节决定你答得像不像做过。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>20</b> 个考点</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>10</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：Cache-Control 里哪个指令是「真的不存」，哪个只是「存了但要先问」？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>一次「优化」，让老用户跳了三个月的旧域名</h2></div>
+  <p class="lead">迁移域名的时候，有人顺手把 <span class="k">302</span> 改成了 <span class="k">301</span>，理由是「301 对 SEO 更好」。上线两周后发现新域名有问题，配置回滚成 302。结果监控显示：还有三分之一的用户，访问老域名依然被跳到新域名——<b>因为浏览器已经把 301 记在自己的缓存里了，服务端改回什么都没用。</b></p>
+  <p>这是 HTTP 里最典型的「语义没吃透」事故。状态码、缓存指令、DNS 的 TTL，这些东西的共同点是：<b>它们不是配置项，是协议约定</b>。写下去的那一刻，控制权就交给了浏览器、CDN 和递归解析器。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:180px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>接口加了 no-cache，还是返回旧数据</td><td>no-cache 就是「不缓存」，肯定生效了</td><td>no-cache 的意思是「可以存，但每次用之前必须回源验证」。真正不存的是 no-store</td></tr>
+    <tr><td>域名改了解析，有的地方生效有的没生效</td><td>DNS 出问题了，或者运营商劫持</td><td>每一层缓存都按 TTL 走。旧 TTL 是 3600，就意味着一小时内一定有地方还拿着旧记录</td></tr>
+    <tr><td>App 报证书错误，浏览器打开正常</td><td>App 的 SSL 库有 bug</td><td>服务端没发中间证书。浏览器会自己去补链，Java 和很多移动端 SDK 不会</td></tr>
+  </table>
+  <p>这一篇按「一个请求从域名到响应」的顺序走：DNS 解析链路 → 记录类型与 TTL → HTTP 版本演进 → 连接复用 → 缓存 → 状态码 → 认证 → HTTPS。每一节都落一句面试话术，因为这个方向的面试题几乎全是「你知道这个字段的准确语义吗」。</p>
+  <div class="callout">
+    <b>为什么这些细节值钱：</b>「HTTP 有哪些状态码」谁都能说几个，「301 会被浏览器长期缓存、302 不会，所以域名迁移期间绝对不能用 301 做临时跳转」——这句话一说，面试官就知道你处理过真实的迁移。细节不是背出来的，是被坑出来的。
+  </div>
+  <p><b>面试落点：</b>「这套东西我记的是语义而不是配置：哪些能缓存、缓存多久、谁来验证、谁能改。因为一旦发出去，浏览器和 CDN 的行为就不受你控制了，回滚配置并不等于回滚效果。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>DNS 解析链路：谁在递归，谁在迭代</h2></div>
+  <p class="lead">「说说 DNS 解析过程。」大部分人能背出「浏览器缓存 → 系统缓存 → 本地 DNS → 根域名服务器 → 顶级域名服务器 → 权威服务器」。背得没错，但一追问「本地 DNS 和根之间是递归还是迭代」，就有一半人答反。</p>
+  <p>先把两个词分清：<b>递归</b>是「你帮我查到底，我只要最终答案」；<b>迭代</b>是「你告诉我下一步该问谁，我自己去问」。客户端（浏览器、你的程序）向递归解析器发起的查询是<b>递归</b>的，报文里那个 RD 标志位就是「Recursion Desired」。而递归解析器去问根、问 TLD、问权威，用的是<b>迭代</b>——根只会告诉你「去问这个 TLD 的服务器」，不会替你去问。</p>
+  <table>
+    <tr><th style="width:150px">环节</th><th>谁在做</th><th>缓存什么</th><th>怎么绕过它</th></tr>
+    <tr><td><b>浏览器缓存</b></td><td>浏览器自己</td><td>按域名记的解析结果，时长受浏览器自己的策略影响</td><td>换一个浏览器或无痕窗口</td></tr>
+    <tr><td><b>系统缓存</b></td><td>systemd-resolved / nscd / 系统 DNS 客户端</td><td>按 TTL 缓存，可能还有自己的上限</td><td><span class="k">resolvectl flush-caches</span>，或重启对应服务</td></tr>
+    <tr><td><b>hosts 文件</b></td><td>nsswitch 的 files 模块</td><td>不做缓存，直接命中</td><td>看 <span class="k">/etc/hosts</span> 里有没有写死</td></tr>
+    <tr><td><b>递归解析器</b></td><td>运营商 DNS、公司内网 DNS、公共 DNS</td><td>真正的解析结果缓存，按权威给的 TTL</td><td>换 <span class="k">@8.8.8.8</span> 对比，能立刻判断是不是它的问题</td></tr>
+    <tr><td><b>权威服务器</b></td><td>域名托管商</td><td>不缓存，它是数据的源头</td><td><span class="k">dig +trace</span> 一路问下去</td></tr>
+  </table>
+  <p><b>hosts 的优先级比很多人想的高</b>：nsswitch.conf 里 <span class="k">hosts: files dns</span> 这行的顺序决定了先查文件还是先查 DNS。有人为了临时测试往 hosts 里加了一行，半年后忘了，于是「只有这台机器解析到旧 IP」——这类问题查 DNS 查一天也查不出来。</p>
+  <pre><span class="c"># 完整答案：谁回的、TTL 还剩多少、走没走递归</span>
+dig example.com +noall +answer +stats
+
+<span class="c"># 只要 IP</span>
+dig +short example.com
+
+<span class="c"># 从根开始一路迭代，看每一层返回了什么（这一步最能说明「迭代」）</span>
+dig +trace example.com
+
+<span class="c"># 直接问指定的解析器，用来对比不同递归解析器的结果</span>
+dig @8.8.8.8 example.com +short
+dig @10.0.0.2 example.com +short
+
+<span class="c"># 系统层面的解析结果（会走 nsswitch，能看到 hosts 的影响）</span>
+getent hosts example.com
+resolvectl query example.com 2&gt;/dev/null</pre>
+  <p>还有一个常被问的细节：<b>一次解析要几个 RTT</b>。缓存全冷的情况下，递归解析器要依次问根、TLD、权威，至少三个往返，加上客户端到解析器这一段，冷启动可能几十到上百毫秒。这也是为什么「第一次访问慢、后面快」——不是服务器慢，是解析链路在跑。</p>
+  <p><b>面试落点：</b>「客户端到递归解析器是递归查询，解析器到根、TLD、权威是迭代查询。缓存有四层：浏览器、操作系统、递归解析器、以及权威侧的 TTL。排查解析问题时，我会先用 dig @不同服务器 对比，一步就能判断是权威配错了还是某一层缓存没到期。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>记录类型与 TTL：切换域名时最容易翻车的地方</h2></div>
+  <p class="lead">「域名换了 IP，为什么有的用户还是访问旧地址？」这个问题每年都在发生，答案永远只有一个：<b>你没有提前把 TTL 降下来</b>。</p>
+  <table>
+    <tr><th style="width:90px">类型</th><th>作用</th><th>容易踩的点</th></tr>
+    <tr><td><b>A</b></td><td>域名 → IPv4 地址</td><td>可以有多条，解析器会轮询或按策略返回</td></tr>
+    <tr><td><b>AAAA</b></td><td>域名 → IPv6 地址</td><td>客户端可能优先用 AAAA。只配了 A 但客户端强行走 IPv6，就会连不上</td></tr>
+    <tr><td><b>CNAME</b></td><td>别名，指向另一个域名</td><td><b>不能放在 zone 顶点</b>（和 SOA、NS 冲突）；链条越长解析越慢</td></tr>
+    <tr><td><b>MX</b></td><td>邮件服务器，带优先级</td><td>只能指向域名，不能直接写 IP</td></tr>
+    <tr><td><b>TXT</b></td><td>任意文本，常用于域名验证、SPF、DKIM</td><td>一条记录有长度上限，超了要拆成多段</td></tr>
+    <tr><td><b>NS</b></td><td>这个 zone 由哪些权威服务器负责</td><td>改 NS 是改「谁来回答」，和改 A 记录完全是两件事</td></tr>
+    <tr><td><b>SOA</b></td><td>zone 的元信息，含序列号和负缓存时长</td><td>它的 minimum 字段决定「查不到」这个结果能缓存多久</td></tr>
+    <tr><td><b>CAA</b></td><td>限定哪些 CA 能给这个域名签证书</td><td>配错了会导致证书续签失败，而且报错很不直观</td></tr>
+  </table>
+  <p>CNAME 那条「不能放顶点」值得展开：zone 顶点必须要有 SOA 和 NS 记录，而 CNAME 的语义是「这个名下不应该有其他任何记录」，两者冲突。所以 <span class="k">example.com</span> 本身不能是 CNAME，只能 <span class="k">www.example.com</span> 是。云厂商提供的 ALIAS / ANAME 就是绕开这个限制的方案——它在解析时把目标域名的 A 记录取回来，对外表现得像 A 记录。</p>
+  <p>TTL 的取舍是个纯工程问题：<b>TTL 长，解析快、权威压力小，但切换慢；TTL 短，切换快，但解析次数多。</b>标准做法是「切换前至少一个旧 TTL 的时间把 TTL 降下来」——比如现在是 3600，你要明天切，那就今天先把 TTL 改成 60，等一天让所有缓存都过期成 60 秒，明天切换时最多一分钟就全量生效，切完稳定了再把 TTL 升回去。</p>
+  <p>还有一个反直觉的点：<b>「查不到」也是会被缓存的。</b>如果你查询一个不存在的域名，解析器会拿到 NXDOMAIN，这个「不存在」的结论同样会缓存一段时间。缓存多久由权威返回的 SOA 记录里的 minimum 字段决定（实际取值还会和 SOA 自身的 TTL 取较小值）。所以刚配好一条记录却「有的地方还解析不到」，很可能不是没生效，而是之前的失败结果还在负缓存里。</p>
+  <pre><span class="c"># 看 TTL 还剩多少（第二列就是剩余秒数，递归解析器会递减）</span>
+dig example.com +noall +answer
+<span class="c"># example.com.  213  IN  A  93.184.216.34</span>
+
+<span class="c"># 连续查两次，TTL 应该递减；不递减说明命中了不同的解析器</span>
+dig @8.8.8.8 example.com +noall +answer
+
+<span class="c"># 查 CNAME 链，看经过了几跳</span>
+dig www.example.com CNAME +short
+
+<span class="c"># 查 SOA，看负缓存时长（最后一个数字是 minimum）</span>
+dig example.com SOA +short
+
+<span class="c"># 权威侧到底配了什么（绕过所有缓存，直接问权威）</span>
+dig @ns1.example.com example.com A +norecurse</pre>
+  <div class="callout warn">
+    <b>「TTL 设 0 就等于不缓存」是个误解。</b>TTL 0 只是告诉解析器「不要长期存」，很多解析器仍会短暂持有，浏览器也可能自己做一层缓存。真正的即时切换只能靠「提前降 TTL + 双端并存」：新旧 IP 同时提供服务一段时间，等流量自然迁移完再下线旧的。
+  </div>
+  <p><b>面试落点：</b>「切域名之前我一定会先降 TTL，至少提前一个旧 TTL 的时长，切完再升回去。因为 TTL 是权威告诉全世界『你可以记多久』，说出去就收不回来了。另外 CNAME 不能放 zone 顶点，这点经常被拿来考『你知不知道 ALIAS 是干什么的』。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>HTTP 版本演进：队头阻塞被解决了三次</h2></div>
+  <p class="lead">问「HTTP/1.1 和 HTTP/2 的区别」，答「多路复用」能过；追问「那 HTTP/2 还有没有队头阻塞」，就要看你是不是真的理解它解决的是哪一层的阻塞。</p>
+  <table>
+    <tr><th style="width:90px">版本</th><th>传输</th><th>关键变化</th><th>还剩什么问题</th></tr>
+    <tr><td><b>1.0</b></td><td>TCP，默认短连接</td><td>每个请求一个连接，用完就关</td><td>每次都要握手，慢</td></tr>
+    <tr><td><b>1.1</b></td><td>TCP，默认持久连接</td><td>连接复用、Host 头（一个 IP 多个站点）、分块传输、缓存控制增强</td><td>应用层队头阻塞：一个连接上请求必须按序返回</td></tr>
+    <tr><td><b>2</b></td><td>TCP，二进制分帧</td><td>多路复用（一个连接跑多个流）、HPACK 头压缩、流优先级</td><td><b>TCP 层队头阻塞</b>：丢一个包，这条连接上所有流都等</td></tr>
+    <tr><td><b>3</b></td><td>QUIC（基于 UDP）</td><td>0-RTT/1-RTT 建连、流级独立重传、连接迁移</td><td>UDP 可能被某些网络限制；实现和调试都更复杂</td></tr>
+  </table>
+  <p>三次「解决队头阻塞」，解决的是三个不同的东西，这是本节最值钱的一句话：</p>
+  <ul>
+    <li><b>HTTP/1.1 的管道化</b>想解决应用层的排队：一次性发多个请求，不用等前一个回来。但响应必须按请求顺序返回，前一个慢，后面全堵着，所以浏览器基本不用它，改成了「对同一个域名开 6 个左右并发连接」这种笨办法。</li>
+    <li><b>HTTP/2 的多路复用</b>真正解决了应用层：把请求拆成帧，给每个帧打上流 ID，响应可以乱序返回再由客户端按流 ID 组装。所以一个连接就够了，不用再开六个。</li>
+    <li><b>HTTP/3 的 QUIC</b>解决的是传输层：HTTP/2 再怎么多路复用，底下还是一条 TCP。TCP 保证「按序交付」，一旦中间丢了一个包，后面的数据即使到了也要在内核缓冲区等着，所有流一起卡。QUIC 把「有序」的责任上移到流一级，一个流丢包只影响这个流。</li>
+  </ul>
+  <p>还有一个常被追问的点：<b>HTTP/2 一定要 HTTPS 吗？</b>协议规范上不强制，明文版本叫 h2c。但所有主流浏览器都只在 TLS 上启用 HTTP/2，所以做 Web 站点时，事实上就是「HTTPS 才有 HTTP/2」。这也反过来推动了全站 HTTPS。</p>
+  <p>顺带说一个已经过时的最佳实践：<b>域名分片</b>。HTTP/1.1 时代为了绕过「每个域名 6 个连接」的限制，会把静态资源拆到多个域名上。到了 HTTP/2，一个连接就能跑几十个流，域名分片反而要多建连接、多一次 DNS 和 TLS，是纯粹的反优化。面试里能主动说「这个手段在 HTTP/2 下已经不该用了」，比背版本特性更有分量。</p>
+  <pre><span class="c"># 看服务端到底协商到了哪个版本</span>
+curl -sI https://example.com | head -1
+curl -s -o /dev/null -w '%{http_version}\n' https://example.com
+
+<span class="c"># 强制用某个版本对比（服务端不一定都支持）</span>
+curl --http1.1 -sI https://example.com | head -1
+curl --http2   -sI https://example.com | head -1
+
+<span class="c"># 看 ALPN 协商出了什么协议</span>
+openssl s_client -connect example.com:443 -servername example.com -alpn h2,http/1.1 &lt; /dev/null 2&gt;&amp;1 | grep ALPN</pre>
+  <p><b>面试落点：</b>「HTTP/2 解决的是应用层的队头阻塞，靠二进制分帧和流 ID 做多路复用；但底下还是 TCP，丢一个包整条连接都等，这是传输层的队头阻塞，要 HTTP/3 用 QUIC 才能解决。所以『HTTP/2 有没有队头阻塞』这个问题，答案取决于是哪一层。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>连接复用：keep-alive 的坑在「谁先关」</h2></div>
+  <p class="lead">服务端 <span class="k">keepalive_timeout</span> 是 75 秒，客户端连接池的 idle 是 60 秒，看起来很安全。但链路上还有一个负载均衡，它的空闲超时是 30 秒——于是每隔半分钟就有一批请求报 connection reset。</p>
+  <p>连接复用的收益很好算：省掉 TCP 三次握手（一个 RTT）和 TLS 握手（一到两个 RTT）。跨地域 RTT 40ms 的话，一个请求光建连就要 100ms 上下，而复用之后这部分接近 0。所以只要是高频调用，连接池几乎是必选项。</p>
+  <p>它的成本也好算：<b>连接是有状态的，而链路上每一个中间设备都有自己的状态超时。</b>NAT 网关、四层负载均衡、云防火墙，都会在空闲一段时间后悄悄删掉自己的表项，而且通常不通知两端。这时连接在两端看来还活着，实际已经断了，下一次发包才会暴露——表现为 connection reset，或者请求发出去没有任何响应直到超时。</p>
+  <table>
+    <tr><th style="width:170px">角色</th><th>典型配置</th><th>该怎么配合</th></tr>
+    <tr><td>服务端</td><td><span class="k">keepalive_timeout</span> 决定空闲多久后关连接</td><td>不要设太长，长连接会占 fd 和内存；也不要太短，否则复用率低</td></tr>
+    <tr><td>客户端连接池</td><td>idle 超时、最大连接数、最大复用次数</td><td>idle 要<b>小于</b>服务端和中间设备的超时，保证总是客户端先关</td></tr>
+    <tr><td>中间设备</td><td>NAT / LB 的空闲表项超时，常见几分钟</td><td>心跳间隔必须小于这个值，否则连接被静默删除</td></tr>
+    <tr><td>HTTP 层</td><td><span class="k">Connection: close</span> 表示这次用完就关</td><td>HTTP/1.1 默认持久，HTTP/2 里这个头没有意义</td></tr>
+  </table>
+  <p>为什么强调「客户端先关」？因为主动关闭的一方会走完整的四次挥手，双方状态都干净；如果服务端先关，客户端手里的连接成了「半关闭」的陈旧连接，下一次借出去发请求就会失败。连接池一般会有「借出前检测」，但那个检测本身也有成本，而且很多实现只是检查 socket 是否可写，检测不出对端已经发了 FIN。</p>
+  <p>HTTP/2 把这个问题放大了一点：一个连接上跑着几十个流，连接一断，所有在途请求一起失败。所以 HTTP/2 的连接池通常只保留少量连接（甚至一个），靠 GOAWAY 帧做优雅关闭——服务端要下线时先发 GOAWAY，告诉客户端「别再在这个连接上开新流了」，等在途的流跑完再关。</p>
+  <p><b>连接池该开多大</b>，是个能算的问题，不用拍脑袋。粗算用一条：需要的并发连接数约等于「每秒请求数 × 单个请求的平均耗时」。每秒 200 个请求、每个耗时 50 毫秒，那同一时刻在途的请求就是 10 个左右，池子开 20 到 30 就够，剩下的余量留给抖动。开成 500 的后果不是更快，而是对端要多维护 500 个连接、多 500 份 TLS 会话状态，自己的线程和 fd 也被占住，高峰期反而更容易排队。</p>
+  <p><b>怎么确认复用真的生效了</b>，也有可观测的量。看服务端的 accept 速率：如果 QPS 是 200，accept 也是 200，说明每个请求都在新建连接，复用完全没起作用；正常情况 accept 应该远小于请求数。另一个信号是 TIME_WAIT 的数量突然上涨——它意味着大量连接在被反复创建和关闭，而不是被复用。</p>
+  <pre><span class="c"># 看响应头里的连接语义</span>
+curl -sI https://example.com | grep -iE 'connection|keep-alive'
+
+<span class="c"># 复用同一个连接发多个请求，观察连接是否被重新建立</span>
+curl -sv https://example.com/a https://example.com/b 2&gt;&amp;1 | grep -E 'Re-using|Connected to'
+
+<span class="c"># 服务端：ESTAB 应该稳定在一个区间，而不是跟着 QPS 一起涨</span>
+ss -tan state established '( sport = :443 )' | wc -l
+
+<span class="c"># 连接反复建立/关闭的信号：TIME_WAIT 在涨</span>
+ss -tan state time-wait | wc -l</pre>
+  <div class="callout">
+    <b>一个实用的排查技巧：</b>如果「每隔 N 秒出现一批 reset」，先别怀疑代码，去量一下 N。N 约等于某个中间设备的空闲超时，那基本就是它删表了。把心跳或 idle 调到比 N 小，问题立刻消失。这种「周期性故障」的排查，量周期比看日志快得多。
+  </div>
+  <p><b>面试落点：</b>「连接复用省的是握手 RTT，代价是要处理链路上各种空闲超时。我的原则是客户端的 idle 一定小于服务端和中间设备的超时，让客户端先关；HTTP/2 还要靠 GOAWAY 做优雅下线，不然一个连接断了会带走几十个在途请求。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>缓存：no-cache 和 no-store 差的是「存不存」</h2></div>
+  <p class="lead">「加个 no-cache 让它别缓存。」这句话是缓存事故的主要来源。no-cache 的名字起得太坑，它的真实语义是<b>「可以存，但每次用之前必须回源确认」</b>，真正「别存」的是 no-store。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>强缓存</div><div class="cd">还在 max-age 内，浏览器直接用本地副本，一个请求都不发。最快，但也最不听话。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>协商缓存</div><div class="cd">有效期过了，带 ETag 或 Last-Modified 去问源站。回 304 就继续用，代价是一个 RTT。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>不该缓存</div><div class="cd">用户相关的响应、一次性令牌、实时余额。这类东西要用 no-store，而不是 no-cache。</div></div>
+  </div>
+  <p>缓存分两类，判断顺序是<b>先看强缓存，再看协商缓存</b>：</p>
+  <ul>
+    <li><b>强缓存</b>：浏览器判断还在有效期内，<b>直接用自己的副本，一个请求都不发</b>。控制字段是 <span class="k">Cache-Control: max-age=N</span>，老版本用 <span class="k">Expires</span>（绝对时间，受客户端时钟影响，现在只作为兜底）。</li>
+    <li><b>协商缓存</b>：有效期过了，浏览器带着验证字段去问源站「这个还能用吗」。源站回 304 就继续用本地副本（304 不带响应体），回 200 就传新的。控制字段是 <span class="k">ETag</span> 配 <span class="k">If-None-Match</span>，或者 <span class="k">Last-Modified</span> 配 <span class="k">If-Modified-Since</span>。</li>
+  </ul>
+  <table>
+    <tr><th style="width:200px">指令</th><th>准确语义</th><th>常见误用</th></tr>
+    <tr><td><b>no-store</b></td><td>完全不存储，连磁盘和内存都不留</td><td>用 no-cache 代替它，结果敏感响应还是被存下来了</td></tr>
+    <tr><td><b>no-cache</b></td><td>可以存，但每次使用前必须向源站验证</td><td>以为它等于「不缓存」，结果只是每次多一次 304 往返</td></tr>
+    <tr><td><b>max-age=N</b></td><td>N 秒内可以直接用，不问源站</td><td>给 HTML 设很长，发版后用户拿不到新页面</td></tr>
+    <tr><td><b>s-maxage=N</b></td><td>只对共享缓存（CDN、代理）生效，优先级高于 max-age</td><td>以为它也能控制浏览器，其实浏览器会忽略它</td></tr>
+    <tr><td><b>private</b></td><td>只允许浏览器这类私有缓存存，CDN 不能存</td><td>该加没加，导致带用户信息的响应被 CDN 缓存并广播给别人</td></tr>
+    <tr><td><b>public</b></td><td>谁都能存，包括 CDN</td><td>给带 Cookie 的响应加 public，等于把个性化内容公开</td></tr>
+    <tr><td><b>must-revalidate</b></td><td>过期后不许用旧副本，必须验证成功才能用</td><td>以为它能替代 no-cache，其实只管「过期之后」</td></tr>
+    <tr><td><b>immutable</b></td><td>在有效期内连「刷新」都不用回源</td><td>给会变的资源加，用户按刷新也拿不到新的</td></tr>
+    <tr><td><b>stale-while-revalidate</b></td><td>过期后先给旧副本，同时后台去更新</td><td>对一致性要求高的接口用，用户读到旧数据还不自知</td></tr>
+  </table>
+  <p>几个必须说清的细节：</p>
+  <ul>
+    <li><b>Cache-Control 的优先级高于 Expires。</b>两个都在时，看 Cache-Control。这条是送分题，但答错的人不少。</li>
+    <li><b>no-store 和 no-cache 同时出现时，no-store 更严格</b>，等于不存。反过来只写 no-cache，响应还是会被写进缓存。</li>
+    <li><b>ETag 比 Last-Modified 更准。</b>Last-Modified 只精确到秒，同一秒内改两次就判断不出来；ETag 是内容指纹，内容变没变一目了然。ETag 分强弱，弱的带 <span class="k">W/</span> 前缀，表示「语义上等价」而不是「字节完全相同」。</li>
+    <li><b>304 不带 body，但会带新的缓存头。</b>所以 304 也可以用来「续期」——源站可以在 304 里把 max-age 再往后推。</li>
+    <li><b>Vary 是缓存键的一部分。</b>同一个 URL，如果响应随 Accept-Encoding 或 User-Agent 变化，必须写 <span class="k">Vary</span>，否则 CDN 会把 A 版本发给 B。写 <span class="k">Vary: *</span> 等于告诉缓存「这个不能缓存」。</li>
+  </ul>
+  <pre><span class="c"># 看响应头里的缓存策略</span>
+curl -sI https://example.com/app.js | grep -iE 'cache-control|etag|expires|last-modified|vary'
+
+<span class="c"># 带 ETag 去验证，看是不是 304（-H 手动构造条件请求）</span>
+curl -sI -H 'If-None-Match: "abc123"' https://example.com/app.js | head -3
+
+<span class="c"># 看完整的一次协商过程</span>
+curl -sv -H 'If-Modified-Since: Wed, 21 Oct 2026 02:00:00 GMT' \
+  https://example.com/index.html 2&gt;&amp;1 | grep -E '^&lt; HTTP|^&lt; ETag|^&lt; Cache'</pre>
+  <p>工程上的常规做法是<b>「HTML 不缓存、静态资源长缓存 + 文件名带哈希」</b>：index.html 设 <span class="k">no-cache</span>（每次验证，保证能拿到新版本），JS/CSS 设 <span class="k">max-age</span> 一年加 <span class="k">immutable</span>，文件名里带内容哈希，内容一变文件名就变，URL 自然失效。这样既拿到了强缓存的性能，又不会出现「发版后用户还在跑旧代码」。</p>
+  <div class="callout danger">
+    <b>把用户相关的响应配成 public 是安全事故，不是性能问题。</b>一旦 CDN 缓存了带某个用户信息的页面，下一个请求同一个 URL 的人就会拿到别人的数据。带 Set-Cookie 或 Authorization 的响应，默认就该是 private，最好再加 no-store。
+  </div>
+  <p><b>面试落点：</b>「强缓存看 max-age，命中就一个请求都不发；协商缓存看 ETag 或 Last-Modified，回 304 继续用本地副本。no-cache 是『存但每次验证』，no-store 才是『完全不存』。实践里 HTML 用 no-cache、带哈希的静态资源用长 max-age 加 immutable。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>状态码：301 和 302 差的不是数字，是「谁记多久」</h2></div>
+  <p class="lead">「301 和 302 有什么区别？」「一个是永久，一个是临时。」这个答案只对了一半，缺的那一半是：<b>永久意味着可以被缓存，而且浏览器真的会缓存很久。</b></p>
+  <table>
+    <tr><th style="width:80px">状态码</th><th>语义</th><th>方法会不会变</th><th>能不能被缓存</th></tr>
+    <tr><td><b>301</b></td><td>永久重定向</td><td>历史上很多客户端会把 POST 改成 GET</td><td>可以，而且会被长期记住，直到缓存被清</td></tr>
+    <tr><td><b>302</b></td><td>临时重定向</td><td>同样有被改成 GET 的历史包袱</td><td>默认不缓存，除非显式给了缓存头</td></tr>
+    <tr><td><b>303</b></td><td>See Other，去看另一个地址</td><td><b>明确要求改成 GET</b></td><td>一般不缓存</td></tr>
+    <tr><td><b>307</b></td><td>临时重定向，保持原方法</td><td>POST 还是 POST，body 也保留</td><td>默认不缓存</td></tr>
+    <tr><td><b>308</b></td><td>永久重定向，保持原方法</td><td>POST 还是 POST</td><td>可以，和 301 一样会被记很久</td></tr>
+  </table>
+  <p>301 的缓存行为没有一个统一的「过期时间」，浏览器可能记住几天到几个月不等，具体策略各家不同、也和是否清理过缓存有关。所以工程上的结论很干脆：<b>只要这次跳转有可能要撤回，就别用 301。</b>域名永久迁移、HTTP 跳 HTTPS 这类确定不回头的场景才用它。</p>
+  <p>307 和 308 存在的意义就是补上「方法不能变」这个洞。301/302 在早期实现里被大量客户端写成「一律转成 GET」，导致一个 POST 请求重定向后 body 丢了，服务端收到一个空请求。如果你的接口需要重定向后又保持 POST，只能用 307/308。</p>
+  <table>
+    <tr><th style="width:110px">状态码</th><th>谁产生的</th><th>准确含义</th></tr>
+    <tr><td><b>304</b></td><td>源站或缓存</td><td>你手里的副本还能用，别重传了。响应不带 body</td></tr>
+    <tr><td><b>400</b></td><td>服务端</td><td>请求本身有问题：语法错、缺参数、header 不合法</td></tr>
+    <tr><td><b>401</b></td><td>服务端</td><td>没认证，或者认证失效。要带 WWW-Authenticate 说明怎么认证</td></tr>
+    <tr><td><b>403</b></td><td>服务端</td><td>认证过了，但没权限。和 401 的区别是「我知道你是谁，但你不能做这个」</td></tr>
+    <tr><td><b>404</b></td><td>服务端</td><td>资源不存在。<b>可以被缓存</b>，这一点常被忽略</td></tr>
+    <tr><td><b>429</b></td><td>服务端</td><td>限流。应该配 Retry-After 告诉客户端多久后重试</td></tr>
+    <tr><td><b>499</b></td><td>Nginx（非标准）</td><td>客户端在响应发出前断开，不是标准状态码</td></tr>
+    <tr><td><b>502 / 504</b></td><td>网关</td><td>前者是上游响应无效或连接被重置，后者是等上游超时</td></tr>
+  </table>
+  <p>401 和 403 的区分是另一个高频点。判断标准很简单：<b>换个身份能不能成？</b>能成就是 403（权限不够），怎么换都不行、必须先去认证，就是 401。把权限不足返回 401，会让客户端不停地弹登录框，是很常见的实现错误。</p>
+  <p>还有一个细节：<b>404 默认可缓存。</b>如果某个资源上线前被访问过、返回了 404 并被 CDN 缓存，上线后用户可能还在看到 404。这类「上线了但打不开」的问题，八成是 CDN 缓存了一个早先的 404，刷新一下缓存就好。</p>
+  <div class="cmds">
+    <div class="crow"><code>curl -sI https://example.com | head -1</code><span class="desc">只看状态码和 HTTP 版本，最快的一次体检</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -sIL https://example.com</code><span class="desc">跟着跳转走完，看清 301/302 链路上每一跳是谁</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' URL</code><span class="desc">状态码配跳转目标，一次输出，方便写脚本批量查</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -sv URL 2&gt;&amp;1 | grep '^&lt; '</code><span class="desc">只留响应头，看 Cache-Control、ETag、Set-Cookie 到底发了什么</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「301 是永久，意思是它可以被浏览器长期缓存，回滚配置也撤不回来，所以只在确定不回头的场景用。要保留请求方法用 307/308。401 是没认证，403 是认证了但没权限，区别是换个身份能不能成。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>认证：Cookie、Session、JWT 各自的代价</h2></div>
+  <p class="lead">「为什么不用 JWT 替代 Session？」这个问题如果答「因为 JWT 更先进」，基本就结束了。JWT 不是升级版 Session，它是用「无法主动撤销」换「服务端不用存状态」。</p>
+  <table>
+    <tr><th style="width:110px">方案</th><th>状态存在哪</th><th>优点</th><th>代价</th></tr>
+    <tr><td><b>Cookie</b></td><td>客户端，就是一个传输载体</td><td>浏览器自动携带，配合 HttpOnly 能挡住大部分 XSS 读取</td><td>自动携带带来 CSRF 风险，要配 SameSite 和 token</td></tr>
+    <tr><td><b>Session</b></td><td>服务端（内存、Redis、数据库）</td><td>可以随时让某个会话失效；不往客户端放任何敏感信息</td><td>多实例要共享存储；存储挂了全站登录态丢失</td></tr>
+    <tr><td><b>JWT</b></td><td>客户端（签名保护的自包含令牌）</td><td>服务端无状态，横向扩展方便；跨域、跨服务传递方便</td><td><b>签发后无法主动撤销</b>，只能等它过期；payload 只是编码不是加密</td></tr>
+  </table>
+  <p>Cookie 的几个属性必须能说清：<span class="k">HttpOnly</span> 让 JS 读不到（防 XSS 偷 token）；<span class="k">Secure</span> 只在 HTTPS 上发送；<span class="k">SameSite</span> 控制跨站请求要不要带这个 Cookie，Strict 最严、Lax 是常见的默认值、None 必须同时加 Secure；<span class="k">Domain</span> 和 <span class="k">Path</span> 决定作用范围，Domain 写宽了会让子域之间互相影响。</p>
+  <p>JWT 的结构是三段 base64url 用点连接：头部（算法）、载荷（声明）、签名。<b>载荷是可读的</b>——任何人拿到 token 都能解出里面的内容，所以绝不能放手机号、身份证、余额这类信息。它的安全性只来自签名，保证「没被篡改」，不保证「看不见」。</p>
+  <p>JWT 的撤销问题有几种常见解法：把有效期压到很短（几分钟）配一个长期 refresh token，refresh 存在服务端可以撤销；在服务端维护一个「已失效 jti 黑名单」，但这就又变成有状态了；或者在用户表上放一个 token 版本号，改密码或强制下线时把版本号加一，旧 token 的版本对不上就拒绝。三种都是「用一点状态换回可控性」，天下没有免费的无状态。</p>
+  <pre><span class="c"># 解出 JWT 的头部和载荷（只是 base64 解码，不需要密钥）</span>
+cut -d. -f1 token.txt | base64 -d 2&gt;/dev/null
+cut -d. -f2 token.txt | base64 -d 2&gt;/dev/null
+
+<span class="c"># 看服务端下发的 Cookie 属性</span>
+curl -sI https://example.com/login | grep -i set-cookie</pre>
+  <div class="callout warn">
+    <b>两个 JWT 的实现级坑：</b>① 一定要在服务端<b>固定</b>校验算法，别信头部里写的 alg，否则攻击者把 alg 改成 none 或换成对称算法就能伪造；② 对称密钥（HMAC）要足够长且不能泄露，非对称（RS256/ES256）要注意公钥混淆问题。这两条不是理论风险，是公开的经典漏洞模式。
+  </div>
+  <p><b>面试落点：</b>「Session 是有状态的，能随时踢人，代价是要共享存储；JWT 是无状态的，扩展方便，代价是签发后撤不回来，只能靠短过期加 refresh 或者版本号补救。选哪个取决于业务能不能接受『改密码后旧 token 还能用几分钟』。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>HTTPS：握手轮次、证书链、SNI 与 HSTS</h2></div>
+  <p class="lead">「HTTPS 握手几次？」这题的标准答案是「TLS 1.2 两次，TLS 1.3 一次」，但更值钱的是下一句：<b>加上 TCP 的三次握手，一个全新的 HTTPS 请求在发数据之前已经花掉了两到三个 RTT。</b></p>
+  <table>
+    <tr><th style="width:150px">阶段</th><th>TLS 1.2</th><th>TLS 1.3</th></tr>
+    <tr><td>完整握手</td><td>2-RTT</td><td>1-RTT</td></tr>
+    <tr><td>会话复用</td><td>1-RTT（session id 或 session ticket）</td><td>1-RTT；支持 0-RTT 恢复</td></tr>
+    <tr><td>密钥交换</td><td>可以是 RSA（无前向安全），也可以是 (EC)DHE</td><td><b>只保留 (EC)DHE</b>，默认前向安全</td></tr>
+    <tr><td>加密套件</td><td>包含非 AEAD 的老套件</td><td>只保留 AEAD 类，删掉了大量历史包袱</td></tr>
+    <tr><td>握手中的明文</td><td>证书是明文，能被中间人看到</td><td>证书也加密了，只剩 SNI 等少数字段可见</td></tr>
+  </table>
+  <p>0-RTT 值得单独提一句：它让客户端在第一个包里就带上应用数据，代价是<b>这些数据可能被重放</b>。所以只应该用于幂等请求，比如 GET 一个静态资源。用它发「下单」「支付」这种请求，是给自己埋雷。</p>
+  <p><b>证书链</b>是排查 HTTPS 问题时最高频的坑。链条是：服务器证书（叶）→ 中间 CA → 根 CA。根证书预装在操作系统和浏览器的信任库里，服务端<b>只需要发叶证书和中间证书</b>，不需要发根。少发中间证书的症状是：浏览器能打开（它会顺着证书里的 AIA 地址自己去下载），但 curl、Java、Python requests、很多移动端 SDK 会直接报「unable to get local issuer certificate」。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>数一数发了几张证书。</b>正常情况下至少两张：叶证书加中间证书。只看到一张 <span class="k">s:</span>，就是链不完整，这一条能解决掉一半的「某些客户端报错」问题。</div></div>
+    <div class="step"><div class="txt"><b>看有效期和 SAN。</b>域名匹配校验的是 SAN 扩展，不是 CN 字段。只配了 CN 没配 SAN 的老证书，在新版客户端上一样会失败。</div></div>
+    <div class="step"><div class="txt"><b>换一个严格客户端复验。</b>浏览器太宽容，会自己补链、会容忍一些不规范。用 curl 或者 openssl verify 跑一遍，能拿到更接近真实客户端的结果。</div></div>
+  </div>
+  <pre><span class="c"># 看服务端到底发了几张证书（-showcerts 会全部打印）</span>
+openssl s_client -connect example.com:443 -servername example.com -showcerts &lt; /dev/null 2&gt;&amp;1 \
+  | grep -E '^ *[0-9]+ s:|^ *i:'
+
+<span class="c"># 只看到一张 s:（叶证书）说明中间证书没配</span>
+
+<span class="c"># 看有效期和 SAN（域名写在 SAN 里，不是 CN）</span>
+openssl s_client -connect example.com:443 -servername example.com &lt; /dev/null 2&gt;&amp;1 \
+  | openssl x509 -noout -dates -ext subjectAltName
+
+<span class="c"># 验证链是否完整（这一步会模拟严格客户端）</span>
+openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt chain.pem</pre>
+  <p><b>SNI</b> 是 TLS 握手里的一个扩展，客户端在 ClientHello 里说明「我要访问哪个域名」，服务端据此选证书。没有它，一个 IP 就只能挂一张证书。SNI 在 TLS 1.3 里默认仍然是明文的（除非用 ECH），所以「SNI 泄露了你访问了哪个站点」是一个真实的隐私问题——这也是为什么有些场景会用 ECH 或者干脆每个站点独立 IP。</p>
+  <p><b>HSTS</b> 是一个响应头：<span class="k">Strict-Transport-Security: max-age=31536000; includeSubDomains</span>。浏览器收到后，在有效期内对这个域名的所有请求都强制走 HTTPS，连用户手动输入 http:// 都会被本地改写成 https。它解决的是「第一次访问可能被降级」的问题——但第一次访问本身仍然可能明文，除非域名被加进了浏览器的 preload 列表。加 preload 要谨慎：一旦进了列表，撤回要等浏览器版本更新，周期很长。</p>
+  <p>顺带说清证书类型的现状：DV（域名验证）、OV（组织验证）、EV（扩展验证）在加密强度上没有区别，区别只在审核流程和证书里包含的信息。EV 证书曾经能让浏览器地址栏显示绿色公司名，这个 UI 已经被主流浏览器移除，所以「买 EV 更安全」这个说法现在站不住。</p>
+  <p><b>面试落点：</b>「TLS 1.2 完整握手 2-RTT，1.3 是 1-RTT，还支持有重放风险的 0-RTT。证书链服务端要发叶证书和中间证书，少了中间证书浏览器能自己补、其他客户端不行。SNI 决定用哪张证书，HSTS 让浏览器以后强制走 HTTPS，但第一次访问还是可能明文。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>9 个坑：语义记错，比不会更危险</h2></div>
+  <p class="lead">这一节的坑有个共同点：<b>它们不会让系统立刻报错，而是让系统安静地做错事。</b>缓存错一天、跳转错三个月，发现的时候已经很难挽回。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 no-cache 当成「不缓存」</div><div class="pd">它表示可以存，但每次用之前必须回源验证。要真的不存，得用 no-store。用错的结果是敏感响应被写进了磁盘，或者每次请求都多一次 304 往返。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">用 301 做临时跳转</div><div class="pd">浏览器会把 301 记很久，服务端改回 302 也撤不回来。域名迁移、灰度切换这类可能回滚的场景，一律用 302 或 307。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">切域名前不降 TTL</div><div class="pd">TTL 是权威告诉全世界「你可以记多久」，说出去就收不回来。旧 TTL 是 3600，切换后就一定有一小时的混乱期。要提前一个 TTL 降下来。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">把 CNAME 放在 zone 顶点</div><div class="pd">顶点必须有 SOA 和 NS，和 CNAME「名下不能有其他记录」冲突，配了也不生效。要么用 ALIAS/ANAME，要么把顶点直接写成 A 记录。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">给 HTML 设很长的 max-age</div><div class="pd">发版后用户拿不到新页面，而且你没有任何服务端手段能让他更新——他手里的 HTML 里引用的还是旧的带哈希的资源。HTML 应该用 no-cache。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">CDN 缓存了带用户信息的响应</div><div class="pd">该加 private 没加，或者错用了 public。一旦缓存，A 用户的页面会被发给 B 用户。这是数据泄露，不是性能问题。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">以为 HTTP/2 没有队头阻塞</div><div class="pd">它只解决了应用层。底下还是 TCP，丢一个包整条连接上所有流都等。传输层的队头阻塞要 HTTP/3 才能解决。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">服务端只配了叶证书</div><div class="pd">浏览器能自己补链，所以「浏览器正常」不能作为验收标准。用 openssl s_client -showcerts 数一下发了几张证书，或者用严格客户端跑一次。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">权限不足返回 401</div><div class="pd">客户端收到 401 会以为「需要登录」，于是不停弹登录框或者反复刷新 token。没权限就是 403，语义错了会引发一连串奇怪的客户端行为。</div></div></div>
+  <p><b>面试落点：</b>这 9 条里挑一条讲，结构固定：当时的判断、造成的后果、后来改成了什么。第 2 条和第 3 条最好讲，因为它们有明确的时间线，听起来就是真事。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 响应头是 <span class="k">Cache-Control: no-cache</span>，它的准确含义是？</div>
+      <button class="opt">完全不存储这个响应，每次都必须重新下载</button>
+      <button class="opt">可以存储，并且在有效期内直接用，不用问源站</button>
+      <button class="opt">可以存储，但每次使用前都必须向源站验证是否还有效</button>
+      <button class="opt">只允许 CDN 缓存，浏览器不能缓存</button>
+      <div class="ans">正确答案：<b>存但每次验证</b>。no-cache 的名字容易误导，它禁止的是「不经验证直接使用」，不是「存储」。真正完全不存的是 no-store。实践中的表现是每次请求都会带 If-None-Match 或 If-Modified-Since，源站回 304 就继续用本地副本。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 域名迁移时把 302 改成了 301，两周后回滚成 302，但部分用户仍然被跳到新域名。原因是？</div>
+      <button class="opt">DNS 缓存还没过期</button>
+      <button class="opt">301 是永久重定向，浏览器已经把它缓存下来，服务端改配置无法影响已缓存的客户端</button>
+      <button class="opt">CDN 把所有响应都缓存了</button>
+      <button class="opt">用户的 hosts 文件被改过</button>
+      <div class="ans">正确答案：<b>301 被浏览器记住</b>。301 的语义是永久，客户端可以长期缓存这条跳转规则，具体时长由各家浏览器策略决定，可能长达数月。回滚服务端配置只影响之后的请求，已经缓存过的客户端不会重新来问。这就是「可能回滚的跳转不能用 301」的原因。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 客户端向本地递归解析器发起查询，以及递归解析器向根、TLD、权威服务器查询，分别属于？</div>
+      <button class="opt">前者是递归查询，后者是迭代查询</button>
+      <button class="opt">前者是迭代查询，后者是递归查询</button>
+      <button class="opt">两者都是递归查询</button>
+      <button class="opt">两者都是迭代查询</button>
+      <div class="ans">正确答案：<b>递归 + 迭代</b>。客户端把 RD（Recursion Desired）置位，意思是「你帮我查到底，我只要最终答案」；递归解析器去问根时用的是迭代，根只会回「去问这个 TLD 的服务器」，不会替它继续查。所以「谁在递归」这个问题的答案是：只有客户端到解析器这一段。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 一个资源命中了强缓存（max-age 还没过期），浏览器会做什么？</div>
+      <button class="opt">发一个请求，带 If-None-Match 询问源站</button>
+      <button class="opt">发一个 HEAD 请求确认资源是否存在</button>
+      <button class="opt">发一个请求，但只取响应头不取 body</button>
+      <button class="opt">一个请求都不发，直接使用本地副本</button>
+      <div class="ans">正确答案：<b>不发请求</b>。强缓存的判定完全在客户端完成：还在 max-age 内就直接用，网络面板上显示的是 from disk cache 或 from memory cache，服务端根本收不到这次请求。会发条件请求的是协商缓存，那是有效期过了之后的事。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. TLS 1.3 相比 TLS 1.2，完整握手的往返次数和密钥交换的变化是？</div>
+      <button class="opt">从 1-RTT 降到 0-RTT，仍然支持 RSA 密钥交换</button>
+      <button class="opt">从 2-RTT 降到 1-RTT，只保留 (EC)DHE 类密钥交换，默认具备前向安全</button>
+      <button class="opt">两者都是 2-RTT，只是加密套件变少了</button>
+      <button class="opt">从 3-RTT 降到 2-RTT，证书改为明文传输</button>
+      <div class="ans">正确答案：<b>2-RTT 降到 1-RTT</b>。TLS 1.3 把密钥交换收敛到 (EC)DHE，删掉了 RSA 密钥交换，所以默认就有前向安全；同时精简了套件（只留 AEAD）、加密了握手中的证书部分。0-RTT 是会话恢复时的能力，不是完整握手，而且有重放风险，只适合幂等请求。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 团队想用 JWT 完全替代 Session，最主要的障碍是？</div>
+      <button class="opt">JWT 体积太大，Cookie 存不下</button>
+      <button class="opt">JWT 不能跨域传递，只能在同域使用</button>
+      <button class="opt">JWT 签发后无法主动撤销，改密码或强制下线后旧 token 在过期前仍然有效</button>
+      <button class="opt">JWT 的载荷是加密的，服务端解析需要额外密钥</button>
+      <div class="ans">正确答案：<b>无法主动撤销</b>。JWT 是自包含的，服务端不存状态，所以没有「让某个 token 立刻失效」的原生手段。常见补救是把有效期压短配 refresh token、维护 jti 黑名单、或者在用户上加 token 版本号——但这三种都会重新引入状态。另外 JWT 的载荷只是 base64url 编码，不加密，谁都能解开看。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>递归查询</b></td><td>「你帮我查到底」。客户端到递归解析器这一段是递归，RD 标志位置位</td></tr>
+    <tr><td><b>迭代查询</b></td><td>「告诉我下一步问谁」。递归解析器对根、TLD、权威的查询是迭代</td></tr>
+    <tr><td><b>TTL</b></td><td>这条记录可以被缓存多久，由权威给出，切域名前要提前降下来</td></tr>
+    <tr><td><b>负缓存</b></td><td>「查不到」这个结论也会被缓存，时长由 SOA 的 minimum 字段决定</td></tr>
+    <tr><td><b>zone 顶点</b></td><td>域名本身（如 example.com），必须有 SOA 和 NS，所以不能配 CNAME</td></tr>
+    <tr><td><b>ALIAS / ANAME</b></td><td>云厂商提供的「顶点别名」，解析时把目标域名的 A 记录取回来，绕开 CNAME 限制</td></tr>
+    <tr><td><b>强缓存</b></td><td>max-age 内直接用本地副本，一个请求都不发</td></tr>
+    <tr><td><b>协商缓存</b></td><td>带 ETag 或 Last-Modified 去问源站，304 就继续用本地副本</td></tr>
+    <tr><td><b>no-store</b></td><td>完全不存储。和 no-cache 的区别是「存不存」，不是「验不验」</td></tr>
+    <tr><td><b>Vary</b></td><td>缓存键的补充维度。响应随请求头变化时必须声明，否则缓存会串味</td></tr>
+    <tr><td><b>301 / 308</b></td><td>永久重定向，会被客户端长期缓存；308 额外保证请求方法不变</td></tr>
+    <tr><td><b>SNI</b></td><td>TLS 握手中的服务器名称指示，一个 IP 挂多张证书靠它选</td></tr>
+    <tr><td><b>HSTS</b></td><td>让浏览器以后强制走 HTTPS 的响应头，首次访问仍可能明文</td></tr>
+    <tr><td><b>前向安全</b></td><td>长期私钥泄露后，历史流量仍无法解密。靠每次握手的临时密钥实现</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用 <span class="k">dig +trace</span> 完整跑一次解析，把根、TLD、权威三段返回的 NS 记录抄下来，理解「迭代」到底长什么样；② 给自己的测试站配一组「HTML 用 no-cache、JS 用一年 max-age + 文件名哈希」的头，然后用浏览器开发者工具看命中强缓存和协商缓存时网络面板的差别；③ 用 <span class="k">openssl s_client</span> 分别连一个配了中间证书的站点和一个没配的，数一数 <span class="k">s:</span> 出现了几次。<br><br>
+    <b>之后值得单独学：</b>第 5 期讲 TCP 状态机，这一篇里的握手轮次在那边有更底层的解释；第 6 期讲网络排障，curl 分段计时、TLS 失败、MTU 都在那边展开；第 26 期讲 Nginx 的 location 匹配和 502 家族，这一篇的状态码归属到那边会变成具体的配置项。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 7 期 · 这些字段一旦发出去就不受你控制，所以值钱的是语义，不是配置</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

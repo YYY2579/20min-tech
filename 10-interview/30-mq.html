@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>消息队列面试：Kafka 与 RabbitMQ 的必答题</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 30 期</span>
+    <h1>消息队列面试：Kafka 与 RabbitMQ 的必答题</h1>
+    <p class="sub">顺序、幂等、积压、丢失——MQ 的所有难题，本质都是<b>「你要哪一种保证，愿意付什么代价」</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>18</b> 条排查命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你说「我们保证消息不丢」的时候，指的是生产端、存储端，还是消费端？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都发生在「我们已经上了 MQ」之后</h2></div>
+  <p class="lead">「消息重复了，你先手动删一下那两条订单。」这句话在值班群里出现的频率，比任何架构图都高。它说明一件很朴素的事：<b>引入消息队列，你不是获得了一个更可靠的系统，你是把一次同步调用拆成了两个可能各自失败的动作。</b></p>
+  <p>下面三个现场，覆盖了 MQ 面试里 80% 的追问。它们都不是「组件有 bug」，而是「你对保证级别的理解比实际配置高了一档」。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>同一条订单消息被消费了两次，库存扣了两次</td><td>Kafka 重复投递了，是 bug</td><td>「至少一次」语义下重复是<b>设计内</b>的行为。消费者处理完、提交位移前进程挂了，重启后会从上次提交的位置重放。去重责任在消费端，不在 MQ</td></tr>
+    <tr><td>改了消费逻辑要重新跑，历史消息全乱了序</td><td>MQ 不保证顺序</td><td>Kafka 只保证<b>单分区内</b>有序。如果生产时没按业务 key 分区，同一个订单的两条消息可能落在两个分区，消费端并发处理自然乱序</td></tr>
+    <tr><td>大促后积压两千万条，加机器没用</td><td>消费者不够，继续加</td><td>并行度上限是分区数。消费者数超过分区数，多出来的实例分不到分区，只是白占资源。真正的解法是加分区（会破坏 key 映射）或者提升单条处理速度</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>保证级别</div><div class="cd">最多一次、至少一次、精确一次。这三个词决定了你要不要做幂等、会不会丢消息，是所有追问的根。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>并行模型</div><div class="cd">分区、消费组、rebalance。这一层决定了你的吞吐上限和顺序边界，也是「加机器没用」的原因。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>失败处理</div><div class="cd">重试、死信、积压。这一层决定了出问题时是「自动恢复」还是「人工捞数据」。</div></div>
+  </div>
+  <p>这篇的顺序：先说清为什么要用 MQ 以及它的代价（这一段决定你后面所有取舍的出发点），再拆 Kafka 的存储与副本模型，然后是顺序、幂等、丢失、积压这四个必答题，接着是消费组与 rebalance、RabbitMQ 的路由与确认，收在两边的选型对比上。每一节末尾留一句能直接说出口的话。</p>
+  <p><b>面试落点：</b>「MQ 不提供『可靠』这个属性，它提供的是若干种保证级别，每种都有代价。至少一次会重复，精确一次要么靠事务要么靠幂等，顺序只在分区内成立。所以我设计的时候先定这三件事，再谈用哪个组件。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>为什么用 MQ：三个收益和四个代价</h2></div>
+  <p class="lead">「解耦、削峰、异步」这六个字谁都会背。但面试官接着问「那你付出了什么」，能答出代价的人才算真用过。</p>
+  <p><b>解耦</b>的真实含义是：生产者不需要知道有多少消费者、它们在哪、用什么语言。它只把事件丢出去。收益是新增一个下游不用改上游代码；代价是<b>你再也无法从代码里看出「这条消息最终被谁处理了」</b>，链路的完整性从「编译期检查」变成了「文档和监控」。</p>
+  <p><b>削峰</b>的真实含义是：把瞬时的高并发写请求暂存在队列里，让下游按自己的能力匀速消费。收益是下游不用为峰值扩容；代价是<b>请求的响应时间从「确定」变成「不确定」</b>，而且积压一旦超过下游的处理速度，恢复时间会很长——积压一小时可能要好几个小时才消化完。</p>
+  <p><b>异步</b>的真实含义是：主流程只等「消息已可靠写入」，不等「业务已处理完」。收益是接口 RT 大幅下降；代价是<b>一致性从强变最终</b>，用户可能看到一个还没生效的结果，你得设计「处理中」的状态。</p>
+  <table>
+    <tr><th style="width:120px">收益</th><th>你怎么得到它</th><th>你付出了什么</th></tr>
+    <tr><td><b>解耦</b></td><td>生产者只依赖 topic/exchange，不依赖消费者</td><td>调用链不可见，问题定位要从「一个栈」变成「一条链路 + 一堆日志」</td></tr>
+    <tr><td><b>削峰</b></td><td>队列做缓冲，下游按自己节奏消费</td><td>延迟不可控，积压恢复慢，队列本身要占存储</td></tr>
+    <tr><td><b>异步</b></td><td>主流程只写消息就返回</td><td>一致性变最终，需要补偿、对账、状态机</td></tr>
+    <tr><td><b>广播</b></td><td>一份消息多个消费组各自消费</td><td>每个消费组都要自己保证幂等，重复面变大</td></tr>
+  </table>
+  <p>还有四个绕不开的系统性代价：<b>运维复杂度</b>（多一个必须高可用的中间件，它挂了业务就挂）、<b>一致性问题</b>（本地事务成功但消息没发出去，或者消息发出去了本地事务回滚）、<b>重复与乱序</b>（几乎所有 MQ 都要你自己处理）、<b>排查成本</b>（一次请求跨了三个系统，没有 traceId 就只能靠猜）。</p>
+  <div class="callout warn">
+    <b>别用 MQ 做 RPC。</b>见过最糟的设计是：生产者发一条消息，然后阻塞等消费者回一条「结果消息」。这等于把同步调用拆成两次异步投递再加一次等待，延迟更高、失败模式更多、超时更难定。<b>MQ 是为「不需要立刻知道结果」的场景设计的</b>，需要同步结果就用 HTTP/RPC，需要最终一致才用 MQ。
+  </div>
+  <p>一个判断标准值得记住：<b>如果这条消息丢了，业务能不能靠对账补回来？</b>能补，MQ 用「至少一次 + 幂等」就够了；不能补，那你要的是金融级的可靠投递，得考虑事务消息或本地消息表，而不是调几个参数。</p>
+  <p><b>面试落点：</b>「用 MQ 我用三个收益换四个代价。收益是解耦、削峰、异步；代价是链路不可见、延迟不可控、一致性变最终、多一个必须高可用的组件。所以我只在不要求同步结果的场景用它，并且默认按『至少一次 + 消费端幂等』设计，因为精确一次的成本通常不值得。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Kafka 架构：partition、replica、ISR、offset 四个词撑起全部</h2></div>
+  <p class="lead">Kafka 的面试题看起来很多，但绝大部分都能从四个词推出来：<b>分区决定并行度，副本决定可靠性，ISR 决定「什么算已提交」，offset 决定消费进度。</b></p>
+  <p>一个 topic 是逻辑概念，实际存储被切成若干 <b>partition</b>。每个 partition 是一个<b>只能追加、不可修改</b>的日志文件（分段存储），每条消息有一个单调递增的 offset。这个设计带来三个直接后果：写入永远是顺序 IO，所以吞吐高；读取可以按 offset 随机定位，所以支持「重放」；有序性只在分区内成立，所以跨分区没有全局顺序。</p>
+  <p>每个 partition 有若干个 <b>replica</b>，其中一个是 leader，其余是 follower。生产者和消费者都只跟 leader 打交道（消费者可以配置从最近的 follower 读，用于跨机房省流量），follower 的唯一工作就是不断向 leader 发 fetch 请求拉数据，保持同步。</p>
+  <p><b>ISR</b>（in-sync replicas）是「当前跟 leader 保持同步的副本集合」，<b>包含 leader 自己</b>。判断标准不是「有没有连上」，而是「有没有在限定时间内追上 leader 的最新进度」，这个时间由 <span class="k">replica.lag.time.max.ms</span> 控制（较新版本默认在 30 秒量级，具体以你集群的版本文档和实际配置为准）。落后太多就被踢出 ISR，等追上再回来。</p>
+  <p>ISR 的意义在于它定义了<b>「已提交」</b>：一条消息被 ISR 中所有副本都写进去，才算 commit。消费者能读到的上界叫 HW（high watermark），大致等于 ISR 中最小的那个进度。所以「acks=all 写入成功」的含义是「ISR 里所有人都收到了」，不是「所有副本都收到了」——如果某个副本早就掉出 ISR，它没有这条数据，也不影响写入成功。</p>
+  <table>
+    <tr><th style="width:130px">概念</th><th>是什么</th><th>它决定了什么</th></tr>
+    <tr><td><b>partition</b></td><td>有序、追加写的日志，是并行与顺序的基本单位</td><td>吞吐上限（并行度）、顺序边界</td></tr>
+    <tr><td><b>replica</b></td><td>分区的副本，一主多从</td><td>能容忍几台 broker 挂掉</td></tr>
+    <tr><td><b>ISR</b></td><td>跟得上 leader 的副本集合，含 leader</td><td>「已提交」的定义，以及 acks=all 的实际含义</td></tr>
+    <tr><td><b>HW</b></td><td>ISR 中最小的同步位点</td><td>消费者能看到哪里，也就是「不会读到将来可能被截断的数据」</td></tr>
+    <tr><td><b>offset</b></td><td>消息在分区内的序号，消费者用它记录进度</td><td>能否重放、积压怎么算</td></tr>
+  </table>
+  <p>还有一个必须提的开关：<b>unclean leader election</b>。当 leader 挂了、ISR 里又没有其他副本可当 leader 时，如果允许「从非 ISR 副本里选一个当 leader」，partition 就能恢复可用，但会<b>丢数据</b>（那个副本缺的那段永远补不回来）。所以它本质上是 C 和 A 的取舍，生产环境通常关闭，宁可这个分区暂时不可用。</p>
+  <pre><span class="c"># 看 topic 的分区、副本分布、ISR 是否齐全</span>
+kafka-topics.sh --bootstrap-server broker:9092 --describe --topic orders
+<span class="c"># 输出里 Isr 那一列如果比 Replicas 短，说明有副本掉队了</span>
+
+<span class="c"># 看下一条要写的位置、以及每个副本的进度（LEO）</span>
+kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server broker:9092 --topic orders --time -1
+
+<span class="c"># 关键配置：副本数、最小同步副本数、是否允许非 ISR 选主</span>
+kafka-configs.sh --bootstrap-server broker:9092 --entity-type topics --entity-name orders --describe
+<span class="c"># min.insync.replicas=2 / unclean.leader.election.enable=false</span></pre>
+  <div class="callout">
+    <b>一个常被忽略的容量事实：</b>分区不是越多越好。每个分区在 broker 上都对应文件句柄、页缓存和副本同步线程的资源开销，分区数暴涨会拉长 leader 选举和 controller 的故障恢复时间。所以「分区数」是一个要提前规划、事后很难改的决策——加分区会改变 key 到分区的映射，进而破坏「同一个 key 落同一个分区」这个前提。
+  </div>
+  <p><b>面试落点：</b>「Kafka 的可靠性模型是围绕 ISR 建的：分区内有序、副本提供冗余、ISR 定义什么是已提交。acks=all 的准确含义是『ISR 里所有副本都写成功』，所以它必须和 min.insync.replicas 一起配才有意义，否则 ISR 退化成只剩 leader 时，acks=all 就等于 acks=1。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>顺序性：只在分区内成立，全局有序是个陷阱</h2></div>
+  <p class="lead">「Kafka 保证消息有序吗？」标准答案是「保证单分区有序」。但真正区分水平的，是下一句：<b>那你怎么保证同一个订单的消息进同一个分区，以及为什么你不该追求全局有序。</b></p>
+  <p>先接受一个事实：Kafka 的并行单位是分区，一个分区在同一时刻只能被一个消费者线程处理。所以「全局有序」在物理上等价于「整个 topic 只有一个分区」，吞吐上限就被锁死在单分区单线程上。对于任何有量的业务，这个代价都不可接受。<b>所以正确的目标不是全局有序，是「业务上需要有序的那一组消息有序」。</b></p>
+  <p>做法是给消息指定 key（订单号、用户 ID、账户 ID），Kafka 的默认分区器会对 key 做哈希再对分区数取模，于是同一个 key 恒定落在同一个分区。同一分区内按写入顺序消费，就得到了「同一个订单的操作按顺序执行」。</p>
+  <p>但这条链上有三个地方会破坏它：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>生产端重试。</b>如果开启了重试又没有开启幂等，第一批消息失败重发时可能排到第二批后面。现代客户端开幂等（<span class="k">enable.idempotence</span>）就能解决，它同时也要求 <span class="k">max.in.flight.requests.per.connection</span> 不超过 5 且 acks=all。</div></div>
+    <div class="step"><div class="txt"><b>分区数变化。</b>key 的哈希结果对分区数取模，分区数从 6 变 8 之后，同一个 key 可能落到新分区。历史消息在旧分区、新消息在新分区，消费端看到的顺序就断了。</div></div>
+    <div class="step"><div class="txt"><b>消费端并发。</b>一个分区只能给一个消费者，但如果你在消费者内部再用线程池并发处理，顺序立刻丢失。要并发就得在应用层按 key 再分一次，保证同一个 key 落到同一个工作线程。</div></div>
+  </div>
+  <p>还有一个容易被忽略的：<b>消费失败重试也会打乱顺序</b>。第 2 条处理失败、第 3 条成功，如果第 2 条被放回重试队列稍后重试，第 3 条就已经先执行了。要严格有序，只能在同一个分区内「阻塞重试」——也就是这条不成功就不往下消费，代价是一个坏消息能卡住整个分区。所以线上常见做法是：<b>把可能失败且必须有序的操作放进同一个 key，失败就进死信队列人工处理，不阻塞后续</b>。</p>
+  <table>
+    <tr><th style="width:170px">要做到</th><th>必须满足</th><th>代价</th></tr>
+    <tr><td>单分区有序</td><td>同 key 分区 + 幂等生产者 + 消费端单线程处理该分区</td><td>该分区的吞吐上限就是单线程处理速度</td></tr>
+    <tr><td>业务分组有序</td><td>用业务主键做 key，接受不同 key 之间乱序</td><td>热点 key 会导致分区倾斜</td></tr>
+    <tr><td>全局有序</td><td>单分区</td><td>并发度 1，基本不可用于有量的业务</td></tr>
+  </table>
+  <pre><span class="c"># 生产端：指定 key，同一个订单永远去同一个分区</span>
+<span class="c"># producer.send(new ProducerRecord&lt;&gt;("orders", orderId, payload));</span>
+<span class="c"># 注意 key 必须是业务主键，不能用随机值或时间戳</span>
+
+<span class="c"># 验证同一批 key 是否落在同一分区：看每条消息的 partition 字段</span>
+kafka-console-consumer.sh --bootstrap-server broker:9092 --topic orders \
+  --property print.key=true --property print.partition=true --from-beginning | head
+
+<span class="c"># 各分区的消息量，判断有没有热点倾斜</span>
+kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server broker:9092 --topic orders</pre>
+  <div class="callout danger">
+    <b>「加分区解决积压」这个动作会破坏顺序。</b>因为 key 到分区的映射变了，同一个订单在扩容前后的消息会落在不同分区，消费端如果依赖顺序就会出错。如果业务强依赖顺序，扩容只能通过「新建 topic 双写 + 迁移」这种重手段，而且要挑在业务低峰。这一点在面试里主动说出来，比只答「加分区」高一个层次。
+  </div>
+  <p><b>面试落点：</b>「Kafka 只在分区内有序。所以我不追求全局有序，而是用业务主键做 key，让需要有序的那一组消息落到同一分区。这条链上有三个破坏点：生产端重试（用幂等生产者解决）、分区数变化（key 映射会变）、消费端内部并发（要按 key 二次分发）。真正的取舍是：越严格的有序，越接近单线程。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>重复消费：去重是消费端的责任，不是 MQ 的</h2></div>
+  <p class="lead">「消息重复了怎么办」——如果面试官问这句，他想听的不是「让 MQ 别重复」，而是<b>「你怎么让重复的消息不产生重复的效果」</b>。因为前者做不到，后者是工程常态。</p>
+  <p>先接受重复的来源。只要是「至少一次」语义，重复就有三条产生路径：生产端发送成功但没收到确认，重试了一次；broker 收到两次（少见，但幂等生产者就是为了解决这个）；消费端处理完成、提交位移之前进程挂了，重启后从旧位移重放。第三条最常见，而且和你的代码质量无关——它就是「先干活还是先记账」这个顺序问题的必然结果。</p>
+  <p>所以设计上只有两条路：<b>让处理本身幂等</b>，或者<b>用一张去重表记录「这件事做过没有」</b>。前者更优雅，后者更通用。</p>
+  <table>
+    <tr><th style="width:170px">手段</th><th>怎么用</th><th>边界</th></tr>
+    <tr><td><b>数据库唯一索引</b></td><td>把消息里的业务幂等键（订单号 + 操作类型）建成唯一键，重复插入直接冲突</td><td>只对「插入」有效；更新类要配合版本号或状态判断</td></tr>
+    <tr><td><b>去重表 / 消费记录表</b></td><td>消费前先 <span class="k">INSERT</span> 一条 (msg_id)，冲突则跳过；和业务操作放同一个本地事务</td><td>表会越来越大，要定期归档；必须和业务同库同事务，否则不成立</td></tr>
+    <tr><td><b>状态机</b></td><td>只允许「待支付 → 已支付」这种合法迁移，重复消息到达时状态已变，操作被忽略</td><td>要求业务状态清晰，且更新语句带上前置状态条件</td></tr>
+    <tr><td><b>乐观锁版本号</b></td><td><span class="k">UPDATE ... SET v = v + 1 WHERE id = ? AND v = ?</span>，影响行数为 0 就是重复</td><td>只适合「有明确当前值」的场景</td></tr>
+    <tr><td><b>Redis SETNX</b></td><td>用 msg_id 做 key，设置过期时间</td><td>不是强一致，Redis 丢数据或过期就会失效，只能当第一道闸</td></tr>
+  </table>
+  <p>一个关键细节：<b>幂等键必须是业务键，不能是消息 ID</b>。因为「同一条消息被重发」和「两笔本来就应该分开的业务」在消息 ID 上是区分不出来的——生产者重发时消息 ID 可能变了，而两笔真实的重复下单消息 ID 不同但业务上是同一件事。正确做法是用「订单号 + 操作类型」这类业务上唯一的东西。</p>
+  <p>还有一个更隐蔽的：<b>「先处理再提交位移」和「先提交位移再处理」</b>这两个顺序，决定了你得到的是「至少一次」还是「最多一次」。先处理后提交，崩溃会重放 → 至少一次，会重复；先提交后处理，崩溃会丢 → 最多一次，不能丢。要「精确一次」，只能在「处理」和「提交」之间建立原子性，比如把位移和业务数据写在同一个事务里（Kafka 事务 + 消费端把位移写进业务库，或者干脆用幂等让重复无害）。</p>
+  <pre><span class="c"># 消费端手工提交的正确姿势：处理成功后再提交，失败不提交（会重放）</span>
+<span class="c"># while (true) {</span>
+<span class="c">#   ConsumerRecords&lt;String,String&gt; records = consumer.poll(Duration.ofMillis(500));</span>
+<span class="c">#   for (ConsumerRecord&lt;String,String&gt; r : records) {</span>
+<span class="c">#     if (!dedup(r)) { biz(r); }      # 去重后再处理</span>
+<span class="c">#   }</span>
+<span class="c">#   consumer.commitSync();            # 全部处理完才提交</span>
+<span class="c"># }</span>
+
+<span class="c"># 去重表：和业务表同一个库，才能放进同一个本地事务</span>
+<span class="c">CREATE TABLE consumed_msg (
+  biz_key   VARCHAR(64) NOT NULL,
+  op_type   VARCHAR(32) NOT NULL,
+  created_at DATETIME   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (biz_key, op_type)
+) ENGINE=InnoDB;</span>
+
+<span class="c"># 当前消费组的位移，和 LEO 的差就是积压</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group order-consumer</pre>
+  <div class="callout ok">
+    <b>面试怎么答：</b>「重复是至少一次语义的必然结果，我不试图在 MQ 层消除它，而是在消费端让它无害。手段按优先级是：业务唯一索引、状态机加前置条件、去重表、最后才是 Redis 计数。幂等键用业务键而不是消息 ID，因为消息 ID 区分不了『重发』和『两笔真实业务』。」
+  </div>
+  <p><b>面试落点：</b>「我默认所有消息都可能重复，所以每个消费者都要能回答『同一条消息来两次会怎样』。这个答案最好落在数据库的唯一约束或状态机的合法迁移上，因为它有事务保护；Redis 只能当第一道闸，不能当最终保证。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>消息丢失：三个环节，三套配置，缺一个都不算不丢</h2></div>
+  <p class="lead">「我们配了 acks=all，所以不会丢消息。」这句话少了两个前提，等于没说。丢消息有三个环节，任何一个没堵住，前面堵得再好也没用。</p>
+  <p><b>环节一：生产端。</b>消息发出去，broker 没收到，或者收到了但确认丢了。配置是 <span class="k">acks</span>：0 表示发出去就不管（网络一抖就丢，性能最好，几乎没有业务场景该用）；1 表示 leader 写入就确认（leader 挂了而 follower 还没同步，这条就丢）；all（等同 -1）表示 ISR 全部写入才确认。注意 <span class="k">acks=all</span> 必须配 <span class="k">min.insync.replicas</span> 才有意义：如果 ISR 退化成只剩 leader，acks=all 就等价于 acks=1。当 ISR 数量小于 min.insync.replicas 时，broker 会拒绝写入并抛 NotEnoughReplicas 异常，这是<b>好事</b>——宁可写失败，也不要写进一个随时会丢的地方。</p>
+  <p><b>环节二：存储端。</b>消息写进 leader 的页缓存就算「写了」，落盘是异步的。如果 broker 进程崩溃但机器还在，页缓存还在，数据不丢；如果整机断电，未刷盘的部分就丢了。所以「可靠性」和「持久化刷盘策略」是两件事：靠多副本冗余（acks=all）来保证，比靠强制刷盘更划算——副本在别的机器上，那台机器断电不影响。这也是为什么 Kafka 不推荐靠 <span class="k">flush.messages</span> 这类参数来保可靠性。</p>
+  <p><b>环节三：消费端。</b>这是最容易被忽略的一段。如果开了自动提交位移（<span class="k">enable.auto.commit=true</span>），位移是定时批量提交的，可能在「你还没处理完」时就提交了；此时进程崩溃，重启后从新位移继续，中间那批消息<b>永远不会再被消费</b>。正确做法是关闭自动提交，处理成功后手工提交。</p>
+  <table>
+    <tr><th style="width:110px">环节</th><th>会怎么丢</th><th>要配什么</th></tr>
+    <tr><td><b>生产</b></td><td>没收到确认、leader 挂了未同步、重试次数用完</td><td>acks=all + retries 足够大 + 幂等生产者（防重试产生的重复）</td></tr>
+    <tr><td><b>存储</b></td><td>副本数不足、ISR 退化、非 ISR 副本被选为 leader</td><td>replication.factor 至少 3 + min.insync.replicas=2 + 关闭 unclean 选主</td></tr>
+    <tr><td><b>消费</b></td><td>先提交位移后处理、自动提交、处理异常被吞掉</td><td>关闭自动提交 + 处理成功后 commitSync + 异常不吞</td></tr>
+    <tr><td><b>Rebalance</b></td><td>再平衡时位移没提交，重新分配后从旧位置开始（重复）或提交了没处理完（丢失）</td><td>再平衡监听器里提交位移，或缩短单批处理时间</td></tr>
+  </table>
+  <p>关于<b>幂等生产者</b>，它的边界必须说准：broker 会给每个生产者分配一个 PID，生产者给每个分区维护递增的序列号，broker 记住「这个 PID 在这个分区上收到过哪些序列号」，重复的直接丢弃。所以它能解决的是「<b>生产者因为重试而重复发送</b>」，<b>不能</b>解决「消费者重复处理」，也<b>不能</b>跨生产者重启（新 PID 了）保证不重复。要跨会话、跨分区的精确一次，得用事务（<span class="k">transactional.id</span>）。较新的 Kafka（3.0 起）默认开启幂等，老集群需要显式配置，以你集群的版本文档为准。</p>
+  <pre><span class="c"># 一套「不丢」的生产端配置（顺序有讲究：幂等要求 acks=all）</span>
+<span class="c"># acks=all</span>
+<span class="c"># enable.idempotence=true</span>
+<span class="c"># retries=2147483647            # 配合 delivery.timeout.ms 控制总时长</span>
+<span class="c"># max.in.flight.requests.per.connection=5   # 幂等开启时的安全上限</span>
+
+<span class="c"># 存储端的三个数必须一起看</span>
+kafka-topics.sh --bootstrap-server broker:9092 --describe --topic orders | head -3
+<span class="c"># ReplicationFactor=3, min.insync.replicas=2, unclean.leader.election.enable=false</span>
+
+<span class="c"># 检查有没有分区长期处于 under-replicated</span>
+kafka-topics.sh --bootstrap-server broker:9092 --describe --under-replicated-partitions</pre>
+  <div class="callout warn">
+    <b>acks=all 不是「不丢」的同义词。</b>它的准确含义是「ISR 里所有副本都写入成功」。如果 min.insync.replicas 没配，ISR 退化到只剩 leader 时它仍然返回成功；如果开了 unclean 选主，挂掉的 leader 的数据可能被一个落后副本覆盖。所以「不丢」是一组配置的合力：副本数、最小同步副本数、acks、禁用非 ISR 选主、消费端手工提交。
+  </div>
+  <p><b>面试落点：</b>「丢消息分三段堵：生产端 acks=all 加幂等生产者，存储端副本数 3 加 min.insync.replicas=2 并关闭非 ISR 选主，消费端关掉自动提交、处理成功再提交位移。只答 acks=all 是不完整的，因为它依赖 ISR 的实际大小。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>积压：加消费者之前，先算一下并行度上限</h2></div>
+  <p class="lead">「积压两千万条，我加了十台消费者，一点用没有。」——因为并行度的上限是<b>分区数</b>，不是机器数。一个分区在同一时刻只能被同一个消费组里的一个消费者占用，第 11 个消费者分不到任何分区，只会空转。</p>
+  <p>先把「积压」量化。积压量 = 分区的最新位点（LEO）减去消费组已提交的位点（committed offset），Kafka 自带命令直接给这个数，单位是消息条数。但条数不等于时间，因为每条消息的处理耗时不同。要估算恢复时间，得用<b>积压条数 ÷ 每秒消费速率</b>，而每秒消费速率要在压测里量出来，不能拍脑袋。</p>
+  <p>处理积压有五个方向，代价递增：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先确认是不是消费逻辑变慢了。</b>下游数据库慢、外部接口超时、日志打得太多，都会让单条处理时间从 2ms 变成 200ms。这时候加机器只是把「慢」复制十份，还可能把下游彻底压垮。</div></div>
+    <div class="step"><div class="txt"><b>提高单条处理速度。</b>批量写库、批量调接口、去掉同步的远程调用、把非核心逻辑异步化。这是最安全也最容易被忽略的一条。</div></div>
+    <div class="step"><div class="txt"><b>在分区内并发。</b>消费线程只负责拉取，处理交给按 key 分发的工作线程池，保证同一个 key 落到同一个线程。这样既提高吞吐，又不破坏单 key 顺序。</div></div>
+    <div class="step"><div class="txt"><b>加消费者实例（不超过分区数）。</b>这一步只是把已有分区摊到更多机器上，如果分区数已经等于消费者数，再加就是白加。</div></div>
+    <div class="step"><div class="txt"><b>加分区。</b>能立刻提高上限，但会改变 key 的映射，破坏跨扩容期的顺序保证，而且需要 broker 侧做分区重分配，有流量抖动。这是最后手段。</div></div>
+  </div>
+  <p>还有一种「假积压」：<b>消费组里有一个成员卡住了，导致整个组反复 rebalance</b>。表现是 lag 一直涨、消费者日志里不停出现 rebalance、每个实例都在重复消费同一批。这时候加机器只会让 rebalance 更频繁。</p>
+  <p>如果是「消费不动了」而不是「消费得慢」，优先查三件事：消费者是不是在频繁 rebalance（看日志和组状态）、是不是有条消息一直处理失败被反复重试（会卡住整个分区）、是不是位移提交失败（权限或者 <span class="k">__consumer_offsets</span> 有问题）。</p>
+  <table>
+    <tr><th style="width:170px">手段</th><th>立刻有效吗</th><th>副作用</th></tr>
+    <tr><td>优化单条处理耗时</td><td>有效，但要改代码</td><td>无，最优先</td></tr>
+    <tr><td>分区内并发（按 key 分发）</td><td>有效</td><td>实现复杂，容易破坏顺序</td></tr>
+    <tr><td>加消费者（不超过分区数）</td><td>看情况</td><td>超过分区数纯浪费，还可能加剧 rebalance</td></tr>
+    <tr><td>加分区</td><td>有效</td><td>key 映射变化、顺序边界破坏、需要重分配</td></tr>
+    <tr><td>丢弃/跳过非关键消息</td><td>最快</td><td>数据不一致，必须业务确认</td></tr>
+  </table>
+  <pre><span class="c"># 积压总览：LAG 那一列就是积压条数</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group order-consumer
+<span class="c"># CURRENT-OFFSET / LOG-END-OFFSET / LAG 三列一起看</span>
+
+<span class="c"># 打印分区、当前位点、最新位点、积压四条，间隔采两次就能算速率</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group order-consumer | awk 'NR&gt;1{print $3, $4, $5, $6}'
+
+<span class="c"># 组里有没有成员在反复进出（rebalance 风暴的典型证据）</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group order-consumer --state</pre>
+  <div class="callout danger">
+    <b>积压的时候别急着重启消费者。</b>如果消费逻辑本身有问题（比如死循环重试某条消息），重启只是让它从头再卡一次；如果位移没提交，重启还会让积压量看起来没变。先看 lag 曲线是「平着涨」还是「阶梯式跳」，前者是消费慢，后者是 rebalance 或提交失败。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group G</code><span class="desc">看每个分区的 CURRENT-OFFSET、LOG-END-OFFSET 和 LAG，积压的起点</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kafka-topics.sh --bootstrap-server broker:9092 --describe --topic T | grep -c 'Partition:'</code><span class="desc">数一下分区数，它就是你这个消费组的并行度上限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group G --members --verbose</code><span class="desc">看每个成员分到了哪些分区，判断是不是有实例在空转</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group G --state</code><span class="desc">看组状态，频繁在 PreparingRebalance 就是风暴</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「积压我先算两个数：lag 有多少条、当前消费速率多少，得出恢复时间。然后看并行度上限等于分区数，所以超过分区数的消费者是无效的。处理顺序是：先查是不是消费变慢（下游问题），再优化单条耗时和批量，然后才是加实例，最后才考虑加分区的代价——因为加分区会破坏 key 映射和顺序。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>消费组与 rebalance：位移提交错了，前面全白搭</h2></div>
+  <p class="lead">Kafka 的消费模型有两个概念必须分清：<b>消费组</b>决定「谁消费哪些分区」，<b>位移</b>决定「从哪里开始消费」。前者变了叫 rebalance，后者错了叫重复或丢失。</p>
+  <p>一个消费组内，一个分区只会分配给一个消费者；不同消费组之间互不影响，各自维护自己的位移。所以「同一条消息被两个组各消费一次」是正常设计（广播语义），而「同一个组内两个实例消费同一条」不应该发生——除非发生了 rebalance，且旧成员还没停手。</p>
+  <p><b>Rebalance 的触发条件</b>有四个：成员加入、成员离开（含心跳超时被踢）、订阅的 topic 变化、订阅的 topic 分区数变化。它的过程是「停下所有消费 → 重新分配 → 恢复」，早期是全局停顿（eager），较新版本支持协作式（cooperative sticky），只迁移需要迁移的分区，停顿小得多。</p>
+  <p>最常见的 rebalance 风暴来自<b>处理太慢</b>：消费者在两次 poll 之间的处理时间超过了 <span class="k">max.poll.interval.ms</span>，协调者认为它死了，把它踢出组，触发 rebalance；它处理完回来发现自己被踢了，重新加入，又触发一次。表现是「lag 一直涨，日志里全是 rebalance，每个实例都在重复消费同一批」。解法是缩小 <span class="k">max.poll.records</span>（每次少拿点）、把耗时处理挪到别的线程、或者调大 <span class="k">max.poll.interval.ms</span>（但调太大会让真死掉的消费者占用分区更久）。</p>
+  <table>
+    <tr><th style="width:200px">参数</th><th>管什么</th><th>调错的后果</th></tr>
+    <tr><td><b>max.poll.records</b></td><td>一次 poll 最多返回多少条</td><td>太大 → 单批处理超时 → 被踢出组</td></tr>
+    <tr><td><b>max.poll.interval.ms</b></td><td>两次 poll 之间的最大间隔</td><td>太小 → 正常处理也被判死；太大 → 真故障时分区迟迟不释放</td></tr>
+    <tr><td><b>session.timeout.ms</b></td><td>心跳超时，多久没心跳算死</td><td>太小 → 网络抖动就 rebalance；太大 → 故障发现慢</td></tr>
+    <tr><td><b>heartbeat.interval.ms</b></td><td>心跳频率，通常是 session 的几分之一</td><td>与 session 不匹配会导致误判</td></tr>
+    <tr><td><b>enable.auto.commit</b></td><td>是否自动提交位移</td><td>true 时可能「未处理就提交」，导致丢消息</td></tr>
+  </table>
+  <p><b>位移提交</b>要与处理逻辑对齐。同步提交（commitSync）会阻塞、会重试，可靠但慢；异步提交（commitAsync）快，但失败不会自动重试，可能在 rebalance 时提交了旧位移。常见做法是「处理循环里异步提交、再平衡前同步提交一次」，并在再平衡监听器里把当前处理完的位置提交掉。</p>
+  <p>消费位点的起点由 <span class="k">auto.offset.reset</span> 决定，它只在「这个组没有已提交位移」时生效：<span class="k">earliest</span> 从头、<span class="k">latest</span> 从最新、<span class="k">none</span> 直接报错。很多人把它当成「重置位移」的开关，这是错的——已经提交过位移的组，改这个参数不会让消费位置回退。要重放，得用 <span class="k">--reset-offsets</span> 显式重置。</p>
+  <pre><span class="c"># 看组的成员、分配情况和状态（Stable / PreparingRebalance / Empty）</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --describe --group order-consumer --members --verbose
+
+<span class="c"># 重放历史消息：先把位移重置到某个时间点，注意组必须先停掉消费者</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --group order-consumer \
+  --topic orders --reset-offsets --to-datetime 2026-10-20T00:00:00.000 --execute
+
+<span class="c"># 重置到最早，用于本地复现</span>
+kafka-consumer-groups.sh --bootstrap-server broker:9092 --group order-consumer \
+  --topic orders --reset-offsets --to-earliest --execute</pre>
+  <div class="callout">
+    <b>一个实用的判断：</b>如果 lag 曲线是「平着往上涨」，那是消费速度不够；如果是「锯齿状、突然归零又突然拉高」，那是 rebalance 在反复重放。这两种现象的解法完全不同，先分清再动手。
+  </div>
+  <p><b>面试落点：</b>「rebalance 是消费组重新分配分区，触发条件是成员变动、订阅变化、分区数变化。最常见的风暴原因是单批处理时间超过 max.poll.interval.ms，被协调者判死踢出组。治理手段是减少 max.poll.records、把重活挪出 poll 线程、用协作式再平衡，并且在再平衡监听器里提交已处理的位移，避免重复消费。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>RabbitMQ：exchange 决定去哪，ack 决定算不算处理完</h2></div>
+  <p class="lead">RabbitMQ 的模型和 Kafka 完全不同：Kafka 是「日志 + 位移」，消息留在分区里等你来拉；RabbitMQ 是「交换机 + 队列」，消息被<b>推</b>给消费者，消费完就从队列里删掉。这个差别决定了两边的强项完全不同。</p>
+  <p>消息路径是：生产者 → exchange → 按 binding 规则路由 → queue → 消费者。exchange 有四种类型，考的就是这个：</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th>路由规则</th><th>典型用途</th></tr>
+    <tr><td><b>direct</b></td><td>routing key 完全相等</td><td>按类型分发，比如 order.created / order.paid</td></tr>
+    <tr><td><b>fanout</b></td><td>忽略 routing key，广播给所有绑定的队列</td><td>通知、缓存失效广播</td></tr>
+    <tr><td><b>topic</b></td><td>通配匹配，<span class="k">*</span> 匹配一个词，<span class="k">#</span> 匹配零个或多个词</td><td>按业务维度订阅，比如 <span class="k">order.*.created</span></td></tr>
+    <tr><td><b>headers</b></td><td>按消息头键值匹配，不看 routing key</td><td>多条件路由，实际用得少</td></tr>
+  </table>
+  <p><b>确认机制有三个方向</b>，这是最容易答漏的地方。生产端到 broker 有 publisher confirm（broker 收到了会回一个 confirm）；broker 内部靠队列和消息的持久化（队列 durable + 消息 delivery_mode=2）；broker 到消费端有 consumer ack（消费成功后 <span class="k">basic.ack</span>，失败可以 <span class="k">basic.nack</span> 或 <span class="k">basic.reject</span>）。<b>三段都要配，才算可靠投递</b>——只配了持久化但消费端用自动 ack，一样会丢。</p>
+  <p><span class="k">requeue</span> 是个陷阱。消费失败时把消息 nack 并 requeue=true，消息会重新入队，通常立刻又被投给同一个消费者，如果失败原因是确定性的（比如数据格式错误），就会形成无限循环，把队列堵死。正确做法是：可重试的（网络抖动、下游超时）延迟重试，不可重试的直接进死信队列。</p>
+  <p><b>prefetch</b>（basic.qos）控制「一个消费者最多同时有多少条未确认消息」。设太大，消息全堆在一个消费者手里，别的消费者闲着；设太小，吞吐上不去。这是 RabbitMQ 最重要的流控参数，很多人只知道它的名字，不知道它决定了负载能不能摊平。</p>
+  <p><b>死信队列（DLX）</b>的触发条件有三个：消息被 reject/nack 且 requeue=false、消息 TTL 过期、队列长度超限。它不只是「收垃圾的地方」，也是实现延迟队列的经典手段：消息进一个没有消费者的队列，设 TTL，到期后被转到真正的业务队列。</p>
+  <pre><span class="c"># 看队列堆积、消费者数量、未确认消息数（unacked 高说明消费端卡了或 prefetch 太大）</span>
+rabbitmqctl list_queues name messages messages_ready messages_unacknowledged consumers
+
+<span class="c"># 看连接与信道，排查「连接泄漏」</span>
+rabbitmqctl list_connections name state channels
+rabbitmqctl list_channels number consumer_count messages_unacknowledged
+
+<span class="c"># 声明一个带死信和 TTL 的队列（参数名以你使用的客户端库为准）</span>
+<span class="c"># x-dead-letter-exchange: dlx.exchange</span>
+<span class="c"># x-message-ttl: 60000</span>
+<span class="c"># x-max-length: 100000</span></pre>
+  <div class="callout warn">
+    <b>RabbitMQ 的堆积能力和 Kafka 不是一个量级。</b>消息在队列里堆着会占内存，内存到水位后会往磁盘换页（page out），此时吞吐会断崖式下降。所以「用 RabbitMQ 扛几千万条积压」是个危险的设计。反过来，Kafka 的堆积是写在磁盘日志里的顺序读，堆几亿条也只是磁盘和消费速度的问题。选型时这一条比吞吐数字更关键。
+  </div>
+  <p><b>面试落点：</b>「RabbitMQ 是推模型，路由在 exchange 做，可靠性要三段都配：publisher confirm、队列与消息持久化、消费端手工 ack。它的强项是路由灵活、单条延迟低；弱项是堆积能力差，堆到内存水位会 page out 导致吞吐骤降。所以业务消息、路由复杂的场景选它，日志和大流量管道选 Kafka。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>选型：先看堆积能力和路由需求，再看吞吐</h2></div>
+  <p class="lead">「Kafka 和 RabbitMQ 哪个好」是个没有答案的问题。有答案的是：<b>你的场景要不要回溯历史消息、要不要复杂路由、能不能接受运维成本。</b></p>
+  <p>Kafka 的本质是<b>一个分布式的、可重放的日志</b>。它的强项：吞吐高（顺序写 + 批量 + 零拷贝）、支持按位移重放、天然支持多消费组各自消费全量、生态完整（Connect、Streams、各类大数据管道）。它的弱项：路由能力弱（只有 topic 和分区，没有 exchange 那套规则）、不支持单条消息的确认与重投（只能整段位移）、分区数规划是一次性决策、运维复杂（虽然 KRaft 已经去掉了 ZooKeeper 依赖，但仍有大量参数要调）。</p>
+  <p>RabbitMQ 的本质是<b>一个传统的消息代理</b>。强项：路由灵活（四种 exchange + binding）、单条 ack 与重投、优先级队列、延迟队列、单条延迟低。弱项：堆积能力差、吞吐低于 Kafka、集群模式在消息一致性上有取舍（新版本主推基于 Raft 的 quorum queue，经典镜像模式已被弃用，具体以版本文档为准）。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>Kafka</th><th>RabbitMQ</th></tr>
+    <tr><td><b>模型</b></td><td>分区日志，拉模型，消费后消息仍在（按保留策略删除）</td><td>队列，推模型，ack 后消息删除</td></tr>
+    <tr><td><b>吞吐</b></td><td>高，顺序写加批量</td><td>中，单条确认有额外开销</td></tr>
+    <tr><td><b>路由</b></td><td>弱，只有 topic 与分区</td><td>强，四种 exchange 加 binding</td></tr>
+    <tr><td><b>回溯</b></td><td>支持，重置位移即可重放</td><td>不支持，消费完就没了</td></tr>
+    <tr><td><b>堆积</b></td><td>强，落盘顺序读</td><td>弱，内存水位后 page out，吞吐骤降</td></tr>
+    <tr><td><b>顺序</b></td><td>分区内有序</td><td>单队列单消费者有序</td></tr>
+    <tr><td><b>延迟</b></td><td>批量导致稍高，但仍在毫秒级</td><td>单条投递，通常更低更稳定</td></tr>
+    <tr><td><b>典型场景</b></td><td>日志、埋点、流处理、事件溯源、大数据管道</td><td>业务解耦、任务分发、复杂路由、RPC 式调用</td></tr>
+  </table>
+  <p>还有两个常被拿来比的：<b>RocketMQ</b> 原生支持事务消息、延迟消息、顺序消息，是国内业务消息的常见选择；<b>Redis 的 Pub/Sub</b> 不持久化，消费者离线就丢，只能做实时通知，不能做业务消息（Redis Stream 好一些，但可靠性和运维能力仍不如专业 MQ）。</p>
+  <p>选型时我自己的判断顺序是：<b>要不要重放历史</b>（要 → Kafka 系）→ <b>要不要复杂路由和单条确认</b>（要 → RabbitMQ 系）→ <b>会不会有巨量积压</b>（会 → 排除 RabbitMQ）→ <b>要不要事务消息/延迟消息</b>（要 → RocketMQ 系）→ 最后才比吞吐数字。因为吞吐不够可以加分区，堆积能力不够是架构问题。</p>
+  <div class="callout ok">
+    <b>面试怎么答：</b>「我不按吞吐选，按三个问题选：要不要回溯历史消息、要不要复杂路由、会不会有长时间积压。要回溯就 Kafka，它的位移机制天然支持重放；要复杂路由和单条确认就 RabbitMQ；会有大积压就不能选 RabbitMQ，因为它在内存水位后会 page out，吞吐崩掉。吞吐本身可以靠分区和实例解决，堆积能力不行。」
+  </div>
+  <p><b>面试落点：</b>「两个组件的本质差别是『日志』和『队列』：日志支持重放、能堆、路由弱；队列路由强、确认细、堆不动。所以日志型和流处理选 Kafka，业务解耦和任务分发选 RabbitMQ。真正的成本差别在运维和容量规划，不在压测出来的那个 QPS 数字上。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：每一句都能被追问三层</h2></div>
+  <p class="lead">下面这些的共同点是：<b>说出来很像懂，追问一句就露底</b>。它们不是知识点缺失，是「保证级别」和「实际配置」对不上。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">说 Kafka 保证消息有序</div><div class="pd">只在单分区内有序。不指定 key 时消息轮询分布到各分区，跨分区没有顺序。要顺序就得同 key 同分区，代价是这个 key 的吞吐被单线程锁死。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为配了 acks=all 就不会丢</div><div class="pd">acks=all 是「ISR 全部写入」，ISR 可能只剩 leader。必须同时配 min.insync.replicas，并关闭非 ISR 选主，否则这个配置在最需要它的时候失效。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为幂等生产者能解决业务重复</div><div class="pd">它只解决「生产者重试导致 broker 收到重复」，靠 PID 加序列号去重。消费者重复处理、生产者重启后重发、两笔真实的重复下单，它都管不了。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">开着自动提交还说自己是至少一次</div><div class="pd">自动提交是定时批量提交，可能在处理完成前就提交了位移，崩溃后那批消息直接跳过——这是「最多一次」。要至少一次必须关掉它，处理成功后手工提交。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">积压了就加消费者，加到超过分区数</div><div class="pd">一个分区只能给一个消费者，多出来的实例分不到分区，纯浪费。而且成员越多 rebalance 越频繁，情况可能更糟。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">为解积压直接加分区</div><div class="pd">key 对分区数取模，分区数一变，同一个 key 的落点就变，跨扩容期的顺序保证直接失效。有顺序要求时这是破坏性操作。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">RabbitMQ 消费失败就 nack + requeue</div><div class="pd">消息立刻重新入队，通常又回到同一个消费者，确定性失败会无限循环，把队列堵死。可重试的要延迟重试，不可重试的进死信。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用 auto-ack 图省事</div><div class="pd">消息一投出去就从队列删除，消费者进程崩溃时那批消息彻底消失。auto-ack 只适合「丢了也无所谓」的指标类消息。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 auto.offset.reset 当成位移重置开关</div><div class="pd">它只在「这个组从未提交过位移」时生效。已有位移的组改这个参数不会回退，要重放得用 --reset-offsets 显式重置，而且必须先停消费者。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用 MQ 做同步 RPC</div><div class="pd">发一条消息然后阻塞等结果消息，等于把同步调用拆成两次投递加一次等待，延迟更高、超时更难定、失败模式翻倍。需要同步结果就用 RPC。</div></div></div>
+  <p><b>面试落点：</b>被问「你踩过什么坑」，讲一个带数字和因果的。比如「大促后积压两千万条，我们第一反应是加消费者，从 8 台加到 16 台，lag 一点没降——因为分区只有 8 个。后来改成消费线程只拉取、按订单号分发到工作线程池，单实例吞吐提了三倍，两个多小时消化完」——这比背十条坑名可信，因为它包含了你当时的错误判断。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 生产端配置了 <span class="k">acks=all</span>，但 topic 是单副本且没配 <span class="k">min.insync.replicas</span>。这条链路能保证不丢消息吗？</div>
+      <button class="opt">能，acks=all 就是所有副本都确认</button>
+      <button class="opt">能，只要生产者开启重试就够了</button>
+      <button class="opt">不能。ISR 只包含 leader 时，acks=all 等价于 acks=1，leader 所在机器故障就会丢</button>
+      <button class="opt">不能，因为 acks=all 只在事务消息中生效</button>
+      <div class="ans">正确答案：<b>不能</b>。acks=all 的准确含义是「ISR 中所有副本都写入成功」，而 ISR 包含 leader 本身。单副本时 ISR 只有 leader，语义退化成 acks=1。要不丢必须副本数至少 3、min.insync.replicas 设 2、关闭非 ISR 选主，三者配合。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 要让同一个订单的所有消息严格按顺序被消费，最合理的做法是？</div>
+      <button class="opt">用订单号作为消息 key，保证落到同一分区，并在消费端保证该分区单线程处理</button>
+      <button class="opt">把 topic 的分区数设为 1，保证全局有序</button>
+      <button class="opt">在消息里加时间戳，消费端按时间戳排序后再处理</button>
+      <button class="opt">开启幂等生产者，它同时保证顺序</button>
+      <div class="ans">正确答案：<b>同 key 同分区 + 单分区单线程</b>。Kafka 只保证分区内有序，用业务主键做 key 能让同一订单恒定落在一个分区。全局单分区虽然严格有序，但并行度锁死为 1，有量的业务承受不了。时间戳排序需要缓存和等待，无法解决跨分区到达顺序问题。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 开启幂等生产者（enable.idempotence=true）后，它能防止下列哪种重复？</div>
+      <button class="opt">消费者处理完但提交位移前崩溃，重启后重复消费</button>
+      <button class="opt">业务方因为用户重复点击而发出的两条真实下单消息</button>
+      <button class="opt">生产者进程重启后重新发送的同一条业务消息</button>
+      <button class="opt">生产者因网络超时重试，导致 broker 收到同一条消息的多个副本</button>
+      <div class="ans">正确答案：<b>生产端重试造成的重复</b>。幂等生产者靠 broker 分配的 PID 和每分区的递增序列号去重，作用范围是「同一个生产者会话内的重试」。消费者重复处理、业务重复提交、生产者重启（PID 变了）都不在它的保证范围内。跨会话的精确一次需要事务。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 消费组 lag 持续上涨，消费者从 8 台加到 16 台后没有任何改善。最可能的原因是？</div>
+      <button class="opt">消费者配置的内存太小，需要扩容机器规格</button>
+      <button class="opt">topic 只有 8 个分区，一个分区只能分配给一个消费者，多出来的实例分不到分区</button>
+      <button class="opt">Kafka 的 acks 配置错了，导致写入变慢</button>
+      <button class="opt">需要重启 broker 让新消费者生效</button>
+      <div class="ans">正确答案：<b>分区数就是并行度上限</b>。同一消费组内一个分区只能被一个消费者占用，8 个分区最多支撑 8 个有效消费者，第 9 到 16 台会空转，还会因为成员变多让 rebalance 更频繁。提升吞吐要靠优化单条处理耗时、分区内按 key 并发，或者（有代价地）增加分区。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. RabbitMQ 中消费者处理消息失败，代码里 <span class="k">basic.nack</span> 并设置 <span class="k">requeue=true</span>。如果失败原因是消息格式非法，会发生什么？</div>
+      <button class="opt">消息自动进入死信队列，不影响后续消费</button>
+      <button class="opt">broker 会在一段时间后自动丢弃该消息</button>
+      <button class="opt">消息立即重新入队，通常又被投给同一个消费者，形成无限循环并堵住队列</button>
+      <button class="opt">broker 会自动降低 prefetch 直到消费成功</button>
+      <div class="ans">正确答案：<b>立即重新入队、形成循环</b>。requeue=true 会把消息放回队列头部附近，通常马上又投给同一个消费者；如果失败是确定性的（格式非法、字段缺失），就会无限重试，把这个队列的消费彻底堵死。可重试的错误应该延迟重试，不可重试的直接 nack 且 requeue=false 进死信队列。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 关于 Kafka 的 <span class="k">auto.offset.reset</span>，说法正确的是？</div>
+      <button class="opt">把它改成 earliest 就能让已有消费组重新从头消费</button>
+      <button class="opt">它只在消费组没有已提交位移时生效，重放历史要用 --reset-offsets 显式重置</button>
+      <button class="opt">它控制的是消息在 broker 上的保留时间</button>
+      <button class="opt">它只对开启了自动提交的消费者有效</button>
+      <div class="ans">正确答案：<b>只在无位移时生效</b>。auto.offset.reset 决定「找不到已提交位移时从哪开始」，取值 earliest / latest / none。已经提交过位移的组改它不会回退位置，要重放必须用 kafka-consumer-groups.sh 的 --reset-offsets 显式重置，并且先停掉消费者，否则重置会被覆盖。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>partition</b></td><td>topic 的物理分片，是有序、追加写、可重放的日志，也是并行度的基本单位</td></tr>
+    <tr><td><b>offset</b></td><td>消息在分区内的序号，生产端写、消费端记，是「重放」能力的来源</td></tr>
+    <tr><td><b>replica / leader</b></td><td>分区的副本，一主多从，读写走 leader，follower 持续拉取同步</td></tr>
+    <tr><td><b>ISR</b></td><td>与 leader 保持同步的副本集合，包含 leader，由落后的时间阈值界定</td></tr>
+    <tr><td><b>HW</b></td><td>high watermark，ISR 中最小的同步位点，消费者可见的上界</td></tr>
+    <tr><td><b>acks</b></td><td>生产端确认级别，0 不等、1 等 leader、all 等整个 ISR</td></tr>
+    <tr><td><b>min.insync.replicas</b></td><td>允许写入的最小 ISR 大小，小于它则拒绝写入，是 acks=all 生效的前提</td></tr>
+    <tr><td><b>unclean leader election</b></td><td>允许从非 ISR 副本中选 leader，换来可用性但会丢数据</td></tr>
+    <tr><td><b>幂等生产者</b></td><td>靠 PID 加分区序列号在 broker 侧去重，只覆盖单会话内的生产重试</td></tr>
+    <tr><td><b>消费组</b></td><td>一组共同消费一个 topic 的消费者，组内一个分区只给一个成员</td></tr>
+    <tr><td><b>rebalance</b></td><td>消费组重新分配分区的过程，触发于成员或订阅变化，会造成停顿与重复消费</td></tr>
+    <tr><td><b>LAG</b></td><td>分区最新位点减去消费组已提交位点，即积压条数</td></tr>
+    <tr><td><b>exchange</b></td><td>RabbitMQ 的路由组件，类型有 direct / fanout / topic / headers</td></tr>
+    <tr><td><b>prefetch</b></td><td>RabbitMQ 中单个消费者允许的未确认消息上限，是核心流控参数</td></tr>
+    <tr><td><b>DLX</b></td><td>死信交换机，接收被拒绝、过期或超长的消息，也常用于实现延迟队列</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 本地起一个单节点 Kafka，建一个 1 分区的 topic，用两个消费者实例加入同一个组，观察第二个实例分不到分区（<span class="k">--describe --members</span> 能看到分配结果）；② 写一个消费者，在处理逻辑里 <span class="k">Thread.sleep</span> 超过 <span class="k">max.poll.interval.ms</span>，然后看日志里 rebalance 是怎么被触发的，把参数和现象对上；③ 把生产端从 <span class="k">acks=1</span> 改成 <span class="k">all</span>，同时把 <span class="k">min.insync.replicas</span> 设成 2、故意停掉一个 broker，观察生产者是收到成功还是 NotEnoughReplicas 异常。<br><br>
+    <b>之后值得单独学：</b>第 31 期讲分布式事务，本地消息表和事务消息是这一篇的直接延续；第 18 期 Redis 的缓存一致性，和「消息丢失后怎么对账」是同一类问题；第 20 期系统设计里的日志平台，本质就是这一篇的 Kafka 加上容量规划。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 30 期 · 消息队列不提供「可靠」，它提供几种保证级别，每种都有账单</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

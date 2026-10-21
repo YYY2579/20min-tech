@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kubernetes 核心八股：对象、控制循环与声明式</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 10 期</span>
+    <h1>Kubernetes 核心八股：对象、控制循环与声明式</h1>
+    <p class="sub">你永远不「启动容器」，你只<b>声明想要的状态</b>，剩下的交给控制循环。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个核心对象</span>
+      <span class="chip"><b>9</b> 个组件</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你把一个 Pod 删了，它为什么又回来了？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都像 bug，其实都是设计</h2></div>
+  <p class="lead">刚接触 Kubernetes 的人，前两周一定会遇到下面这三件事，并且都会在心里骂一句「这东西怎么这么怪」。等你想明白它们为什么这样，Kubernetes 的核心就通了：<b>它不是一台替你执行命令的机器，是一个不断把现实拉向期望的循环。</b></p>
+  <table>
+    <tr><th style="width:210px">现场</th><th style="width:170px">直觉判断</th><th>真实原因</th></tr>
+    <tr><td>同一个 YAML <span class="k">kubectl apply</span> 两次，第二次输出 unchanged，Pod 也没重启</td><td>命令没生效，是不是要加 force</td><td>声明式接口本来就是幂等的：期望状态没变，就没有任何需要调和的动作。这是特性，不是失灵</td></tr>
+    <tr><td>删掉一个 Pod，几秒后同名的新 Pod 又出现了（名字多了一段随机串）</td><td>删除权限不够，或者有东西在跟我作对</td><td>ReplicaSet 控制器发现实际副本数少于期望值，立刻补一个。你删的是 Pod，副本数的期望没变</td></tr>
+    <tr><td>Service 有 ClusterIP，Pod 也是 Running，从别的 Pod curl 过去超时</td><td>网络插件坏了，或者 kube-proxy 挂了</td><td>Service 的 selector 没匹配上任何 Ready 的 Pod，Endpoints 是空的，规则里没有后端，包被丢掉</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>对象是「意图」</div><div class="cd">YAML 描述的是你想要什么，不是你执行了什么。系统负责把现实搬到你写的那一页上。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>控制器是「循环」</div><div class="cd">每个控制器盯一类对象，比较期望与实际，然后做差量。它不关心事件从哪来，只关心现在差多少。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>apiserver 是「唯一入口」</div><div class="cd">所有组件都只跟它说话，它是唯一能读写 etcd 的角色。这条约束决定了整个系统的形态。</div></div>
+  </div>
+  <p>这一篇按「它解决什么问题 → 谁在干活 → 怎么表达意图 → 具体对象 → 边界与坑」的顺序走。<b>不要把它当成对象清单背</b>，每个对象存在的理由，都是某一个具体的运维问题。想不起理由的时候，回到「如果只有 Docker 会怎样」这个假设上，答案通常就出来了。</p>
+  <div class="callout">
+    <b>一个能贯穿全文的类比：</b>你给管家写了一张便条「冰箱里常备两瓶牛奶」。管家每隔一会儿去看一眼，少了他就去买，多了他就拿走。你不需要每次都说「去买牛奶」——你只需要维护那张便条。便条是对象，管家是控制器，看一眼再动手是 reconcile。
+  </div>
+  <p><b>面试落点：</b>「Kubernetes 的核心是声明式 API 加控制循环。我写的是期望状态，控制器不断比较实际状态并做差量，所以我删掉 Pod 它会补回来，我重复 apply 也不会产生副作用。所有的排障，本质是看期望和实际在哪一层对不上。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>它解决的问题：Docker 答不上的五个问题</h2></div>
+  <p class="lead">「有 Docker 了，为什么还要 Kubernetes？」这题答「为了集群管理」太笼统。真正的答案是五个具体问题，每一个都能让只靠 Docker 的方案在上生产时卡住。</p>
+  <table>
+    <tr><th style="width:150px">问题</th><th>只有 Docker 时</th><th>Kubernetes 的答案</th></tr>
+    <tr><td><b>调度</b></td><td>你得自己决定这台机器还剩多少 CPU、该放到哪台</td><td>scheduler 按 requests、亲和性、污点做筛选和打分，自动选节点</td></tr>
+    <tr><td><b>自愈</b></td><td>容器挂了要有人或脚本去拉，机器挂了要人工迁移</td><td>控制器维持副本数，节点失联后 Pod 会被重新调度</td></tr>
+    <tr><td><b>服务发现</b></td><td>容器 IP 会变，你得自己维护一份地址表</td><td>Service 给一组 Pod 一个稳定虚拟 IP，CoreDNS 提供名字</td></tr>
+    <tr><td><b>发布与回滚</b></td><td>自己写脚本摘流量、起新容器、观察、回退</td><td>Deployment 的滚动更新和 revision 回滚是内置能力</td></tr>
+    <tr><td><b>期望状态</b></td><td>命令式：执行了什么就是什么，失败就是失败</td><td>声明式：写下目标，系统持续收敛，中间失败了会重试</td></tr>
+  </table>
+  <p>这五条里，最容易被低估的是第五条。前四条都能用脚本堆出来，第五条改变的是<b>运维的心智模型</b>：你不再关心「这一步有没有成功」，只关心「现在离目标还差多少」。这个转变带来的直接好处是，任何一次误操作都可以通过重新 apply 修正，而不需要知道系统当前处于哪个中间态。</p>
+  <p>代价也要说清楚，否则答案会显得只会夸：<b>声明式系统更难调试</b>。命令式脚本失败时，你看的是那一行命令的返回；声明式系统失败时，你要判断是哪个控制器没动作、为什么没动作、它看到的世界和你看到的是不是同一个。这就是为什么 <span class="k">kubectl describe</span> 和 Events 在 K8s 排障里占那么大比重——它们是控制器「看到的现实」的出口。</p>
+  <div class="callout warn">
+    <b>Kubernetes 不是「更好的 Docker」。</b>它不管镜像怎么构建，也不管单机上的容器怎么跑。它管的是「一群机器上，一组进程应该长什么样」。把这两个层次混在一起答，后面问「Pod 和容器什么关系」就一定答不清。
+  </div>
+  <p><b>面试落点：</b>「K8s 解决的是调度、自愈、服务发现、发布回滚和期望状态这五件事。前四件是用脚本也能勉强做的，第五件是范式变化：从『执行步骤』变成『维护目标』。代价是排障变复杂，因为你得判断是哪个控制器没把现实拉过去。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>组件职责：谁跟 etcd 说话，谁跟容器说话</h2></div>
+  <p class="lead">「K8s 有哪些组件」是送分题，但紧接着的「apiserver 挂了会怎样」「kubelet 挂了会怎样」是分水岭。答得出来，说明你理解的是数据流，不是名单。</p>
+  <table>
+    <tr><th style="width:170px">组件</th><th style="width:90px">位置</th><th>职责</th><th>挂了会怎样</th></tr>
+    <tr><td><b>kube-apiserver</b></td><td>控制面</td><td>唯一的 API 入口，做认证、鉴权、准入控制、校验，然后读写 etcd</td><td>控制面瘫痪：不能查、不能改，但已运行的 Pod 继续跑</td></tr>
+    <tr><td><b>etcd</b></td><td>控制面</td><td>唯一的事实存储，强一致 KV，保存全部对象</td><td>等同于失忆，apiserver 无法工作</td></tr>
+    <tr><td><b>kube-scheduler</b></td><td>控制面</td><td>给未绑定的 Pod 选节点：先过滤（资源、亲和、污点），再打分</td><td>新 Pod 一直 Pending，已有 Pod 不受影响</td></tr>
+    <tr><td><b>kube-controller-manager</b></td><td>控制面</td><td>跑一堆控制器：Deployment、ReplicaSet、Node、Endpoints、Job、ServiceAccount…</td><td>副本不再补齐，滚动更新停住，Endpoints 不更新</td></tr>
+    <tr><td><b>cloud-controller-manager</b></td><td>控制面</td><td>对接云厂商：负载均衡器、节点生命周期、路由</td><td>LoadBalancer 类型的 Service 拿不到外部 IP</td></tr>
+    <tr><td><b>kubelet</b></td><td>节点</td><td>节点代理，watch 分给自己的 Pod，通过 CRI 调运行时，报状态、跑探针</td><td>该节点上的 Pod 状态不再更新，最终被判失联并迁移</td></tr>
+    <tr><td><b>kube-proxy</b></td><td>节点</td><td>把 Service 的规则变成 iptables/IPVS 规则，做转发</td><td>本节点的 Service 访问异常，ClusterIP 不通</td></tr>
+    <tr><td><b>容器运行时</b></td><td>节点</td><td>containerd / CRI-O，真正创建和运行容器（通过 CRI 接口）</td><td>Pod 起不来，kubelet 报 runtime 相关错误</td></tr>
+    <tr><td><b>CoreDNS</b></td><td>集群插件</td><td>集群内 DNS，把 Service 名解析成 ClusterIP</td><td>服务名解析失败，但用 IP 仍然通</td></tr>
+  </table>
+  <p>有一条架构约束值得单独记：<b>只有 apiserver 读写 etcd</b>。scheduler、controller-manager、kubelet 全部通过 apiserver 的 watch 接口感知变化，谁都不直连 etcd。这条约束让 etcd 的访问可以被统一鉴权和审计，也让整个系统的耦合点只有一个。</p>
+  <p>另一点常被忽略：<b>kubelet 不是「被 apiserver 指挥」的</b>。它是主动 watch「绑定到本节点的 Pod」，然后自己决定怎么实现。apiserver 不发起连接，是 kubelet 连出去。所以 apiserver 短暂不可用时，已经调度好的 Pod 照常运行，kubelet 只是没法上报状态。</p>
+  <pre><span class="c"># 控制面组件在 kube-system 里（kubeadm 部署的形态）</span>
+kubectl -n kube-system get pod -o wide
+kubectl -n kube-system get pod -l component=kube-apiserver
+
+<span class="c"># 看某个对象被哪些控制器动过（ownerReferences 是链）</span>
+kubectl get pod web-6d4b9c7f5-x2k9p -o jsonpath='{.metadata.ownerReferences}'
+
+<span class="c"># 节点的实际状态与容量，来自 kubelet 上报</span>
+kubectl describe node node-1 | sed -n '/Capacity/,/Events/p'
+
+<span class="c"># apiserver 的健康探针（三个端点含义不同）</span>
+kubectl get --raw='/healthz?verbose' | head</pre>
+  <p>排障时这个表非常实用：现象是「新 Pod 一直 Pending」→ 看 scheduler；「副本数不齐、Deployment 不动」→ 看 controller-manager；「Pod 起来但状态一直 ContainerCreating」→ 看 kubelet 和运行时；「服务名解析不了、IP 能通」→ 看 CoreDNS；「Service 完全不通」→ 看 kube-proxy 和 Endpoints。每一条都指向一个具体组件，而不是「集群坏了」。</p>
+  <div class="callout ok">
+    <b>一个常被追问的细节：</b>kube-proxy 不是负载均衡器，也不转发流量。它只在节点上<b>写规则</b>，真正转发的是内核的 netfilter/IPVS。所以「kube-proxy 压力大」通常不是因为它处理了多少请求，而是规则数量太多导致同步慢。这个区别在面试里说出来，会显得你不是只背了组件名。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>kubectl -n kube-system get pod -o wide</code><span class="desc">一眼看到控制面与插件跑在哪，先确认它们都是 Running</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pod NAME -o jsonpath='{.metadata.ownerReferences}'</code><span class="desc">这个 Pod 属于谁，顺着 owner 链能追到 Deployment</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl describe node NODE</code><span class="desc">容量、已分配 requests、污点与 Conditions，调度问题从这里看</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get events --sort-by=.lastTimestamp</code><span class="desc">按时间排序的事件流，控制器「说了什么」都在这里</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get --raw='/healthz?verbose'</code><span class="desc">apiserver 各依赖的健康状态，判断控制面是否整体可用</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「apiserver 是唯一入口，也是唯一读写 etcd 的组件；scheduler 只管选节点；controller-manager 跑各种控制器做调和；kubelet 在节点上 watch 分给自己的 Pod，通过 CRI 调运行时；kube-proxy 只写转发规则，不转发流量。apiserver 挂了已运行的 Pod 不受影响，但控制面不能变更。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>声明式与 reconcile：为什么 apply 是幂等的</h2></div>
+  <p class="lead">「kubectl create 和 kubectl apply 有什么区别」这题，答「apply 能重复执行」只对了一半。真正的问题是：<b>它凭什么能重复执行？</b></p>
+  <p>先把两个词分开。<b>命令式</b>是「做这件事」：创建、删除、扩容。它关心动作，重复执行会报错或者产生副作用。<b>声明式</b>是「要这个状态」：期望三个副本、镜像版本是 v2、端口是 8080。它关心结果，重复执行只要状态没变就是空操作。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>kubectl create</th><th>kubectl apply</th></tr>
+    <tr><td><b>语义</b></td><td>创建对象，对象已存在就报 AlreadyExists</td><td>把对象调到 YAML 描述的状态，不存在则创建</td></tr>
+    <tr><td><b>重复执行</b></td><td>失败</td><td>第二次返回 unchanged，不产生任何变更</td></tr>
+    <tr><td><b>怎么算差量</b></td><td>不算，只提交</td><td>客户端用 last-applied 注解做三方合并；服务端用 managedFields</td></tr>
+    <tr><td><b>会不会重启 Pod</b></td><td>不会（它只创建对象）</td><td>只有 Pod 模板真的变了才触发滚动更新</td></tr>
+    <tr><td><b>适合</b></td><td>一次性对象、脚本里明确知道不存在</td><td>日常管理、GitOps、CI 反复部署</td></tr>
+  </table>
+  <p>幂等的来源是「比较而不是执行」。apiserver 收到 apply 后，把提交的内容和现有对象合并，如果合并结果和现有对象一致，就什么都不写，返回 unchanged。所以「apply 两次」不会产生两个 Deployment，也不会多出一个 ReplicaSet——因为期望状态没有变化。</p>
+  <p>这也解释了一个高频误解：<b>apply 不会重启 Pod</b>。很多人改完 YAML 发现 Pod 没重启，以为 apply 没生效。实际上只有 <span class="k">spec.template</span> 变化才会生成新的 ReplicaSet 并滚动替换；改个 label、改个 annotation、加个无关字段，都不会动 Pod。要强制重启，得改模板里的某个字段（常见做法是加一个时间戳注解），而不是指望 apply 有「重跑」的意思。</p>
+  <pre><span class="c"># 看服务端记录的字段管理者（server-side apply 的痕迹）</span>
+kubectl get deploy web -o yaml | sed -n '/managedFields/,/^status/p' | head -30
+
+<span class="c"># 看客户端 apply 留下的 last-applied 注解</span>
+kubectl get deploy web -o jsonpath='{.metadata.annotations.kubectl\.kubernetes\.io/last-applied-configuration}' | head -c 400
+
+<span class="c"># 只看会改什么，不真改（排障时非常有用）</span>
+kubectl diff -f deploy.yaml
+
+<span class="c"># 服务端 apply（字段所有权更清晰，冲突会明确报错）</span>
+kubectl apply --server-side -f deploy.yaml</pre>
+  <p>再说 reconcile 的工作方式。控制器是<b>电平触发（level-triggered）</b>的，不是边沿触发：它不关心「刚才发生了一个删除事件」，而是每隔一段时间（以及每次被事件唤醒时）重新读一遍实际状态，和期望比一次。这个设计的好处是<b>丢事件不会丢状态</b>——即使中间漏了几个事件，下一轮比较照样能发现差异。代价是有一堆无意义的空转，所以控制器会用 informer 缓存和 workqueue 去重来省资源。</p>
+  <p>并发控制靠 <span class="k">resourceVersion</span>：每次写入都会递增，更新时带上旧值，如果不匹配就报 conflict，让你重新读一遍再改。这是乐观锁，不阻塞读，冲突时重试。理解这一点，才能解释「为什么两个控制器同时改一个对象不会互相覆盖成脏数据」。</p>
+  <div class="callout">
+    <b>「期望状态」和「实际状态」要分清。</b>YAML 里的 <span class="k">spec</span> 是你写的期望；<span class="k">status</span> 是控制器写回的现实。排障时看 <span class="k">status</span> 里的 conditions，往往比看 Events 更直接——因为 conditions 是控制器明确表达的判断，比如 Available、Progressing、Ready。
+  </div>
+  <p><b>面试落点：</b>「create 是命令式，对象存在就报错；apply 是声明式，它把提交的内容和现有对象合并，一致就不写，所以幂等。它的幂等来自『比较』而不是『执行』。apply 不会重启 Pod，只有 Pod 模板变了才滚动。控制器是电平触发的，每轮重新比较期望和实际，所以丢事件不会导致状态漂移。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Pod：为什么里面要先跑一个「什么都不干」的容器</h2></div>
+  <p class="lead">进到一个 Pod 的节点上看进程，会发现每个 Pod 都有一个 <span class="k">pause</span> 容器，镜像很小，进程就干一件事：<span class="k">pause()</span> 睡着。它不处理请求、不写日志，但没有它整个 Pod 就不成立。</p>
+  <p>原因在 namespace 的生命周期上。<b>网络 namespace 需要一个「持有者」</b>：如果 Pod 里第一个容器创建了 netns，它退出时 netns 就会消失，后面的容器就没了网络。所以先起一个永远不退出的 pause 容器，由它创建并持有 netns，其他容器通过 <span class="k">--net=container:pause</span> 加进来。这个 pause 容器也叫 sandbox 容器。</p>
+  <p>于是 Pod 内的容器共享这些：</p>
+  <ul>
+    <li><b>网络 namespace</b>：同一个 IP、同一个端口空间，互相可以用 <span class="k">localhost</span> 访问。这是 sidecar 模式的基础。</li>
+    <li><b>IPC namespace</b>：可以用 System V IPC 和 POSIX 共享内存通信。</li>
+    <li><b>UTS namespace</b>：共享主机名，Pod 里的 hostname 就是 Pod 名。</li>
+    <li><b>卷</b>：同一个 Pod 里声明的 volume 可以挂到多个容器，用来交换文件。</li>
+  </ul>
+  <p>不共享的是 PID namespace（默认各自独立，除非显式开启 <span class="k">shareProcessNamespace</span>）和 mount namespace（各自有自己的根文件系统）。这个细节常被问：「同一个 Pod 里两个容器能看到对方的进程吗？」默认不能。</p>
+  <table>
+    <tr><th style="width:170px">问题</th><th>答案</th></tr>
+    <tr><td>Pod 是最小<b>调度</b>单位还是最小<b>部署</b>单位？</td><td>都是。scheduler 以 Pod 为单位选节点，一个 Pod 里的容器一定在同一台机器上</td></tr>
+    <tr><td>一个 Pod 里能不能放两个业务容器？</td><td>能，但它们会被绑在一起：同生共死、抢同一份资源、共享 IP。不适合放两个独立业务</td></tr>
+    <tr><td>「一个容器一个 Pod」对吗？</td><td>作为默认实践是对的。Pod 的意义在于「必须共享网络和卷的进程组」，没有这层需求就别塞一起</td></tr>
+    <tr><td>Pod 能重启吗？</td><td>不能。Pod 是重建的（新 UID、新 IP）。容器可以按 restartPolicy 重启，Pod 本身不会</td></tr>
+    <tr><td>Pod 的 IP 会变吗？</td><td>会。重建、重新调度都会换 IP，所以不能拿 Pod IP 当稳定地址，要用 Service</td></tr>
+  </table>
+  <pre><span class="c"># 看 Pod 里到底有几个容器（含 pause，需要看运行时层）</span>
+kubectl get pod web-0 -o jsonpath='{.spec.containers[*].name}'
+kubectl get pod web-0 -o jsonpath='{.status.podIP} {.status.hostIP}'
+
+<span class="c"># 在节点上能看到 sandbox 容器</span>
+crictl pods
+crictl ps -p &lt;sandbox-id&gt;
+
+<span class="c"># 进 Pod 的网络命名空间（排查网络时比 exec 更底层）</span>
+crictl inspectp &lt;sandbox-id&gt; | grep -i pid
+nsenter -t &lt;pid&gt; -n ss -lntp</pre>
+  <p>为什么「不该一个 Pod 塞多个业务容器」？因为它们共享命运和资源：一个 OOM，整个 Pod 可能被驱逐；一个把 CPU 吃满，另一个跟着被限流；滚动更新时一起重建，没法独立发布。sidecar 之所以合理，是因为它<b>服务于主容器</b>（日志采集、代理、证书轮转），生命周期本来就该一致。</p>
+  <div class="callout warn">
+    <b>不要把 Pod 当成「小虚拟机」来用。</b>有人把应用、数据库、定时任务塞进一个 Pod，图省事。结果扩缩容时三个一起扩，数据库主从乱了；滚动更新时数据库跟着重启；资源限制也没法分别设。Pod 的边界应该是「这些进程必须在一起」，不是「这些进程属于同一个项目」。
+  </div>
+  <p><b>面试落点：</b>「Pod 是最小调度单位，里面的容器共享网络、IPC、UTS 和卷，所以能用 localhost 互访。pause 容器的作用是持有网络 namespace，不然第一个容器退出后网络就没了。默认 PID namespace 不共享。一个容器一个 Pod 是常态，多容器只用于必须共享网络和卷的 sidecar 场景。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>工作负载对象：六个对象，一条 ownerReference 链</h2></div>
+  <p class="lead">「Deployment 和 StatefulSet 有什么区别」几乎必问。标准答案是「有无状态、有无稳定网络标识」，但更本质的差别是：<b>它们对「一个 Pod 是谁」这件事的定义不同。</b></p>
+  <table>
+    <tr><th style="width:130px">对象</th><th>管什么</th><th>关键特性</th><th>什么时候用</th></tr>
+    <tr><td><b>Pod</b></td><td>一个或一组共享网络/卷的容器</td><td>最小调度单位，不自我修复</td><td>几乎不直接创建，除非调试或静态 Pod</td></tr>
+    <tr><td><b>ReplicaSet</b></td><td>维持 N 个相同的 Pod</td><td>按 selector 认领 Pod，多退少补</td><td>几乎不直接用，由 Deployment 管理</td></tr>
+    <tr><td><b>Deployment</b></td><td>无状态应用的副本与发布</td><td>滚动更新、revision 回滚、Pod 可互换</td><td>Web 服务、API 网关、无状态 worker</td></tr>
+    <tr><td><b>StatefulSet</b></td><td>有状态应用</td><td>固定序号名、稳定网络标识、每副本独立 PVC、有序启停</td><td>数据库、消息队列、需要固定身份的集群成员</td></tr>
+    <tr><td><b>DaemonSet</b></td><td>每个节点一个 Pod</td><td>节点加入就自动部署，节点移除就回收</td><td>日志采集、监控 agent、CNI、kube-proxy</td></tr>
+    <tr><td><b>Job</b></td><td>跑完就结束的任务</td><td>completions、parallelism、backoffLimit</td><td>数据迁移、批处理、一次性脚本</td></tr>
+    <tr><td><b>CronJob</b></td><td>按 cron 表达式跑 Job</td><td>concurrencyPolicy、startingDeadlineSeconds、历史保留数</td><td>定时备份、报表、清理任务</td></tr>
+  </table>
+  <p>先看这条链：<span class="k">Deployment → ReplicaSet → Pod</span>。Deployment 不直接管 Pod，它管 ReplicaSet；每次 Pod 模板变化，它就创建一个新的 ReplicaSet，然后逐步把副本从旧的挪到新的，这就是滚动更新。旧 ReplicaSet 保留着（副本数归零），所以回滚只是把副本数挪回去，不需要重新构建。<span class="k">revisionHistoryLimit</span> 控制保留多少个旧版本，默认值以你环境的版本为准。</p>
+  <p>StatefulSet 的差别在于「身份」。它的 Pod 名字是 <span class="k">web-0</span>、<span class="k">web-1</span>，不是随机串；每个 Pod 通过 headless Service（<span class="k">clusterIP: None</span>）拿到一个稳定的 DNS 名，形如 <span class="k">web-0.web.default.svc.cluster.local</span>；每个 Pod 用自己的 PVC（来自 <span class="k">volumeClaimTemplates</span>），重建后还能挂回原来那块盘。默认的 <span class="k">podManagementPolicy</span> 是 OrderedReady，也就是 0 号 Ready 之后才起 1 号，删除时倒序。<b>这就是它能跑有状态集群的原因：成员有名字、有固定地址、有固定存储。</b></p>
+  <pre><span class="c"># 看 Deployment 下面的 ReplicaSet 与 Pod 的归属</span>
+kubectl get deploy,rs,pod -l app=web
+kubectl get rs -o wide
+
+<span class="c"># 回滚到上一个版本（不需要重新构建镜像）</span>
+kubectl rollout history deploy/web
+kubectl rollout undo deploy/web
+kubectl rollout status deploy/web --timeout=120s
+
+<span class="c"># StatefulSet 的稳定 DNS 要配 headless Service</span>
+kubectl get svc web-headless -o jsonpath='{.spec.clusterIP}'
+kubectl exec web-1 -- nslookup web-0.web-headless.default.svc.cluster.local
+
+<span class="c"># Job 的完成情况与失败重试上限</span>
+kubectl get job migrate -o jsonpath='{.spec.backoffLimit} {.status.succeeded}/{.spec.completions}'</pre>
+  <p>DaemonSet 值得单独提一句：它<b>会绕过部分调度限制</b>，因为它的语义是「每个（符合条件的）节点都要有一个」。节点打上污点后，普通 Pod 会被赶走，DaemonSet 的 Pod 往往因为内置的 tolerations 还留着。这也解释了为什么节点 NotReady 时，你还能看到 CNI 和日志 agent 的 Pod 挂在那里。</p>
+  <div class="callout ok">
+    <b>选型的一句话版本：</b>「Pod 之间可互换、需要滚动发布 → Deployment；Pod 有身份、有独立存储、要按顺序启停 → StatefulSet；每个节点都要一份 → DaemonSet；跑完就结束 → Job；按时间跑 → CronJob。」把这句背熟，选型题就不会错。
+  </div>
+  <p><b>面试落点：</b>「Deployment 管无状态副本，通过 ReplicaSet 做版本管理，Pod 可互换；StatefulSet 给每个 Pod 固定序号、稳定 DNS 和独立 PVC，适合有状态集群；DaemonSet 保证每节点一个；Job 和 CronJob 管一次性与定时任务。它们都通过 ownerReference 形成层级，删上层会级联删下层。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Service：ClusterIP 不是一个进程</h2></div>
+  <p class="lead">「ClusterIP 是怎么实现的？」很多人答「kube-proxy 监听了这个 IP」。这是错的。没有任何进程监听 ClusterIP，它是一串<b>内核转发规则</b>，包到了节点就被改写目的地址，直接送到某个 Pod。</p>
+  <p>Service 的本质是「一组 Pod 的稳定访问入口」。Pod IP 会变，Service 的 ClusterIP 在它生命周期内不变。这个虚拟 IP 不在任何网卡上，ping 它通常不通（因为它只处理特定协议的规则），但 TCP 连接会被 DNAT 到某个后端 Pod。</p>
+  <table>
+    <tr><th style="width:130px">类型</th><th>暴露范围</th><th>实现</th><th>典型场景</th></tr>
+    <tr><td><b>ClusterIP</b></td><td>集群内</td><td>分配一个虚拟 IP，kube-proxy 写 DNAT 规则</td><td>内部服务互调，默认类型</td></tr>
+    <tr><td><b>NodePort</b></td><td>集群外，通过任意节点的 IP + 端口</td><td>在 ClusterIP 基础上，每个节点监听一个高端口并转发</td><td>测试环境、没有 LB 的自建集群</td></tr>
+    <tr><td><b>LoadBalancer</b></td><td>集群外，通过云负载均衡</td><td>云控制器创建 LB，把流量导到 NodePort 或 Pod</td><td>生产对外服务，需要固定公网入口</td></tr>
+    <tr><td><b>ExternalName</b></td><td>集群内，解析到外部域名</td><td>返回一条 CNAME，没有 ClusterIP，也没有后端</td><td>把外部依赖（如托管数据库）包成集群内名字</td></tr>
+  </table>
+  <p>NodePort 的端口不是随便填的。默认范围是 <span class="k">30000-32767</span>，由 apiserver 的 <span class="k">--service-node-port-range</span> 决定（以你环境为准）。写一个 8080 上去会被拒，报「provided port is not in the valid range」。这个限制经常让刚从 Docker 转过来的人困惑，因为 Docker 的 <span class="k">-p 8080:80</span> 是想写多少写多少。</p>
+  <pre><span class="c"># 四种类型的字段差异，一眼能看出来</span>
+kubectl get svc web -o jsonpath='{.spec.type} {.spec.clusterIP} {.spec.ports[*].nodePort}'
+
+<span class="c"># 关键：Endpoints 有没有后端。空的就说明 selector 没匹配上</span>
+kubectl get endpoints web
+kubectl get endpointslice -l kubernetes.io/service-name=web
+
+<span class="c"># 对比 Service 的 selector 和 Pod 的 label</span>
+kubectl get svc web -o jsonpath='{.spec.selector}'
+kubectl get pod --show-labels
+
+<span class="c"># 从集群内验证：先用名字，再用 ClusterIP，最后直接打 Pod IP</span>
+kubectl run tmp --rm -it --image=busybox:1.36 --restart=Never -- sh
+<span class="c"># 进去后：nslookup web / wget -qO- web:8080 / wget -qO- &lt;pod-ip&gt;:8080</span></pre>
+  <p>「Service 访问不通」这个现象，正确的排查顺序是<b>从 Endpoints 往前推</b>，而不是从网络往后查：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>看 Endpoints 是否为空。</b>空的话，问题在 selector 或 Pod 的 Ready 状态，跟网络一点关系都没有。这一步能解决大半问题。</div></div>
+    <div class="step"><div class="txt"><b>看 targetPort 和容器实际监听端口是否一致。</b>Service 的 port 是访问入口，targetPort 才是容器端口，两个都写 8080 但应用监听 8000，就会连不上。</div></div>
+    <div class="step"><div class="txt"><b>看 Pod 是否 Ready。</b>没 Ready 的 Pod 不会被放进 Endpoints（除非 <span class="k">publishNotReadyAddresses</span>）。所以 readiness 探针配错，表现就是「Pod 明明在跑，Service 就是没后端」。</div></div>
+    <div class="step"><div class="txt"><b>再看 kube-proxy 和规则。</b>节点上 <span class="k">iptables -t nat -L KUBE-SERVICES -n</span> 或 <span class="k">ipvsadm -Ln</span>，确认规则存在。</div></div>
+    <div class="step"><div class="txt"><b>最后才查 CNI 和 NetworkPolicy。</b>前面都对还通不了，才怀疑网络插件或策略拦截。</div></div>
+  </div>
+  <div class="callout danger">
+    <b>headless Service（clusterIP: None）没有虚拟 IP，DNS 直接返回 Pod IP 列表。</b>它常和 StatefulSet 搭配，给每个 Pod 一个稳定名字。但也意味着客户端要自己做负载均衡和重试——DNS 返回的第一个地址挂了，你得自己换下一个。别把它当成「省了一个 ClusterIP」的优化。
+  </div>
+  <p><b>面试落点：</b>「ClusterIP 不是进程，是 kube-proxy 写的内核 DNAT 规则，包到节点就被改写到某个 Pod。四种类型是 ClusterIP、NodePort、LoadBalancer、ExternalName；NodePort 默认 30000-32767。Service 不通先看 Endpoints，空的话是 selector 或 readiness 的问题，不是网络问题。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>三种探针：liveness 只该查自己</h2></div>
+  <p class="lead">「liveness 探针检查数据库连接，数据库抖了一下，整个服务被重启了三轮。」这是探针设计里最典型的事故，也是面试里最能体现判断力的一道题。</p>
+  <table>
+    <tr><th style="width:120px">探针</th><th>失败后发生什么</th><th>该查什么</th><th>不该查什么</th></tr>
+    <tr><td><b>liveness</b></td><td><b>重启容器</b></td><td>进程自己是否还活着、有没有死锁、事件循环有没有卡住</td><td>下游依赖、数据库、缓存。这些挂了应该摘流量，不是重启自己</td></tr>
+    <tr><td><b>readiness</b></td><td><b>从 Endpoints 摘除</b>，不重启</td><td>能否处理请求：依赖是否可用、预热是否完成、限流是否处于拒绝态</td><td>无关的次要功能。它频繁翻转会造成流量抖动</td></tr>
+    <tr><td><b>startup</b></td><td>成功前禁用另外两个探针；失败则重启</td><td>慢启动应用（加载大模型、重建索引、JVM 预热）</td><td>已经很快启动的服务，加了只是多一层配置</td></tr>
+  </table>
+  <p>为什么 liveness 不能查下游？因为故障会<b>横向放大</b>。数据库慢了 → 所有 Pod 的 liveness 失败 → 全部重启 → 重启中的 Pod 更处理不了请求 → 数据库压力看似下降但请求全失败 → 恢复后又要同时冷启动。一个下游抖动被放大成一次全站故障，这就是「级联重启」。</p>
+  <p>正确的分工是：<b>liveness 只回答「我这个进程还值得救吗」，readiness 回答「我现在能不能接流量」。</b>数据库不可用时，readiness 失败、流量摘走，等数据库恢复再自动加回来，全程不重启，恢复是秒级的。</p>
+  <pre><span class="c"># liveness：只查自己，给足容忍次数</span>
+livenessProbe:
+  httpGet: { path: /healthz, port: 8080 }
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+<span class="c"># readiness：可以查依赖，但要能快速恢复</span>
+readinessProbe:
+  httpGet: { path: /ready, port: 8080 }
+  periodSeconds: 5
+  failureThreshold: 2
+
+<span class="c"># startup：给慢启动留预算，成功后自动让位</span>
+startupProbe:
+  httpGet: { path: /healthz, port: 8080 }
+  periodSeconds: 10
+  failureThreshold: 30        <span class="c"># 最多等 300 秒</span></pre>
+  <p>参数语义要说准：<span class="k">periodSeconds</span> 默认 10 秒，<span class="k">timeoutSeconds</span> 默认 1 秒，<span class="k">failureThreshold</span> 默认 3，<span class="k">successThreshold</span> 默认 1（liveness 和 startup 只能是 1）。所以默认配置下，一个 liveness 失败要连续 3 次、大约 30 秒才触发重启。很多人以为「探针失败就立刻重启」，于是把参数调得很激进，反而制造了误杀。</p>
+  <p>startup 探针的预算算法要会：<b>最大等待时间约等于 failureThreshold 乘 periodSeconds</b>。上面的例子是 30 乘 10，等于 300 秒。如果应用最慢要 5 分钟才能起来，这个预算必须大于它，否则会在启动完成前被杀，进入「启动 → 被杀 → 再启动」的死循环，看起来像 CrashLoopBackOff，其实是预算不够。</p>
+  <div class="callout warn">
+    <b>readiness 探针不要太敏感。</b>它每失败一次就摘一次流量，恢复后又加回来。如果它查的是「数据库连接池是否有空闲连接」这种瞬时指标，就会导致 Pod 在 Endpoints 里反复进出，客户端看到的是间歇性 502。readiness 应该表达「持续不可用」，不是「此刻有点忙」。
+  </div>
+  <p><b>面试落点：</b>「liveness 失败重启容器，只能查自己，查下游会导致级联重启；readiness 失败摘流量不重启，可以查依赖；startup 用于慢启动，成功前屏蔽另外两个，预算约等于 failureThreshold 乘 periodSeconds。默认 period 10 秒、failureThreshold 3，所以不是一失败就重启。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>requests / limits 与 QoS：调度看 requests，运行看 limits</h2></div>
+  <p class="lead">「requests 和 limits 有什么区别？」这题的关键不是定义，而是<b>它们作用在不同的阶段</b>：requests 影响调度（能不能放到这台机器），limits 影响运行（跑起来最多能用多少）。</p>
+  <table>
+    <tr><th style="width:110px">字段</th><th>作用阶段</th><th>超了会怎样</th><th>CPU 与内存的差别</th></tr>
+    <tr><td><b>requests</b></td><td>调度</td><td>不会被「超」，它是节点分配的依据</td><td>CPU 是时间片，内存是预留；两者都参与节点可用量计算</td></tr>
+    <tr><td><b>limits</b></td><td>运行</td><td>CPU 被 throttle（变慢），内存被 OOMKill（被杀）</td><td><b>CPU 可压缩，内存不可压缩</b>，这是最重要的一句话</td></tr>
+  </table>
+  <p>为什么 CPU 超了只是变慢、内存超了就被杀？因为 CPU 是「按时间分配」的资源，超了就让你的进程少跑几个时间片，请求排队；内存是「按空间占用」的资源，超了没有地方放，只能杀掉一个进程腾地方。理解这一点，就能解释「为什么我的服务 CPU 打满只是变慢，内存涨一点就直接重启」。</p>
+  <p>QoS 是这三者的组合结果，一共三级：</p>
+  <table>
+    <tr><th style="width:140px">QoS</th><th>条件</th><th>驱逐顺序</th><th>典型写法</th></tr>
+    <tr><td><b>Guaranteed</b></td><td>每个容器都设了 CPU 和内存，且 requests 等于 limits</td><td>最后被驱逐</td><td>核心服务，资源确定</td></tr>
+    <tr><td><b>Burstable</b></td><td>设了 requests 或 limits，但不满足 Guaranteed</td><td>中间，按超出 requests 的程度排序</td><td>大多数业务服务</td></tr>
+    <tr><td><b>BestEffort</b></td><td>所有容器都没设 requests 和 limits</td><td>最先被驱逐</td><td>临时任务、可中断的批处理</td></tr>
+  </table>
+  <p>这里有个很容易答错的细节：<b>如果只写 limits 不写 requests，Kubernetes 会把 limits 的值复制给 requests</b>（在没有 LimitRange 兜底的情况下）。所以「只设 limits」看起来是「不占资源、用多少算多少」，实际是「按上限预留」，调度器会认为这个 Pod 要占满那么多，节点很快就放不下了。这个行为经常造成「节点明明很空，Pod 却 Pending」。</p>
+  <pre><span class="c"># 看 Pod 实际生效的 requests/limits 和 QoS 等级</span>
+kubectl get pod web-0 -o jsonpath='{.status.qosClass}{"\n"}'
+kubectl get pod web-0 -o jsonpath='{range .spec.containers[*]}{.name}{" req="}{.resources.requests}{" lim="}{.resources.limits}{"\n"}{end}'
+
+<span class="c"># 节点上被 requests 占掉多少（调度依据）</span>
+kubectl describe node node-1 | sed -n '/Allocated resources/,/Events/p'
+
+<span class="c"># 看有没有被 CPU 限流（需要指标，容器层面也能看）</span>
+kubectl top pod web-0
+kubectl exec web-0 -- cat /sys/fs/cgroup/cpu.stat | grep throttled</pre>
+  <p>实际配置的经验值是：<b>requests 按稳态用量给，limits 按峰值给，内存的 limits 不要压得太紧</b>。因为内存不可压缩，limits 给得太小，一次流量尖峰或者一个大查询就 OOMKill，而重启后的冷启动会让下一次尖峰更容易触发，形成循环。CPU 的 limits 可以紧一些，代价只是变慢，不会死。</p>
+  <div class="callout">
+    <b>还有一个常被忽略的：<span class="k">LimitRange</span> 会给没写 resources 的容器塞默认值。</b>所以「我明明没设 requests，为什么 Pod 显示有 100m」——去 <span class="k">kubectl describe limitrange -n &lt;ns&gt;</span> 看。这也解释了为什么两个集群里同样的 YAML，QoS 等级不一样。
+  </div>
+  <p><b>面试落点：</b>「requests 决定调度，limits 决定运行时上限。CPU 超限只是被 throttle，内存超限会 OOMKill，因为 CPU 可压缩、内存不可压缩。QoS 分 Guaranteed、Burstable、BestEffort，按这个顺序被驱逐。只设 limits 不设 requests 时，requests 会默认等于 limits，所以调度上等于按上限占资源。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>Namespace 与 RBAC：它不是网络隔离</h2></div>
+  <p class="lead">「两个 Namespace 里的 Pod 能互通吗？」能，默认就能，而且不需要任何配置。这是 Namespace 最常被误解的一点：<b>它隔离的是名字和权限，不是网络。</b></p>
+  <p>Namespace 干三件事：给对象名加作用域（两个 ns 里可以各有一个叫 web 的 Deployment）、给 RBAC 划边界（这个用户只能改 dev 里的东西）、给配额划边界（ResourceQuota 按 ns 限制总量）。它<b>不</b>干的事：网络隔离（要靠 NetworkPolicy）、节点隔离（要靠亲和性和污点）、运行时隔离（同一个 ns 的 Pod 可能跑在不同节点上）。</p>
+  <pre><span class="c"># 配额与默认值：这两个对象经常成对出现</span>
+kubectl get resourcequota -n dev
+kubectl describe resourcequota -n dev
+kubectl get limitrange -n dev -o yaml | sed -n '/default/,/type/p'
+
+<span class="c"># RBAC 四要素：谁能（subject）对什么（resource）做什么（verb）</span>
+kubectl get role,rolebinding -n dev
+kubectl describe rolebinding dev-reader -n dev
+
+<span class="c"># 最实用的鉴权命令：以某个 ServiceAccount 的身份试一下</span>
+kubectl auth can-i list pods -n dev --as=system:serviceaccount:dev:app
+kubectl auth can-i delete nodes --as=system:serviceaccount:dev:app</pre>
+  <p>RBAC 的结构其实只有四个词：<b>Subject</b>（User / Group / ServiceAccount）、<b>Verb</b>（get、list、watch、create、update、patch、delete）、<b>Resource</b>（pods、deployments…）、<b>Scope</b>（Role 在命名空间内，ClusterRole 是集群级）。绑定关系是 RoleBinding 把 Role 授给 Subject；RoleBinding 也可以引用 ClusterRole，但权限仍然只在该命名空间内生效。这个「ClusterRole + RoleBinding = 命名空间内的集群角色权限」是常考细节。</p>
+  <p>ServiceAccount 是给 Pod 用的身份。默认情况下，Pod 会自动挂载一个 token，应用可以用它访问 apiserver。这带来两个实践建议：<b>不需要访问 apiserver 的 Pod，把 <span class="k">automountServiceAccountToken</span> 设为 false</b>；每个应用用自己的 SA，不要共用 default，更不要给它 cluster-admin。较新版本的 token 是投射卷、有有效期、绑定 audience 的，不再是永久有效的静态 secret——这一点如果还按老版本答，会显得知识没更新。</p>
+  <div class="callout danger">
+    <b>NetworkPolicy 只有在 CNI 支持时才生效。</b>你把 YAML 写上去了，<span class="k">kubectl apply</span> 也成功了，但如果网络插件不实现它，就是一张废纸——没有任何报错。判断方法：看 CNI 文档，或者起两个 Pod 实测一次「本该被拒绝」的流量是不是真的被拒。这类「配置成功但没生效」的问题，比配置失败更难发现。
+  </div>
+  <p><b>面试落点：</b>「Namespace 隔离名字、RBAC 和配额，不隔离网络，跨 ns 的 Pod 默认可通，要隔离得上 NetworkPolicy，而且得 CNI 支持。RBAC 是 subject、verb、resource 加作用域四要素，RoleBinding 引用 ClusterRole 时权限仍限于该命名空间。Pod 用 ServiceAccount 拿身份，不需要访问 apiserver 就该关掉 token 自动挂载。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：面试里最容易被追到哑口的地方</h2></div>
+  <p class="lead">这些不是「不知道」，是「知道一半」。Kubernetes 的追问特别喜欢停在边界上：你说得出概念，他就问「那这种情况下会怎样」。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">说 Pod 会被「重启」</div><div class="pd">Pod 不会重启，只会被重建：新 UID、新 IP、新容器。容器可以按 restartPolicy 重启，Pod 这一层没有重启的概念。这个区别决定了「重启后 IP 变了」这类现象能不能解释。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为 ClusterIP 上有进程在监听</div><div class="pd">它是 kube-proxy 写进内核的 DNAT 规则，不是 socket。所以 ping 不通是正常的，ss 也看不到监听。真正转发的是 netfilter/IPVS。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">Service 不通先去查网络插件</div><div class="pd">先看 Endpoints 是不是空的。selector 写错、Pod 没 Ready、targetPort 不匹配，都会让 Endpoints 为空，这时候网络再正常也没用。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">liveness 探针里查数据库</div><div class="pd">数据库抖动会让所有副本同时重启，把一次下游故障放大成全站故障。liveness 只查自己，依赖状态交给 readiness。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">只写 limits 不写 requests</div><div class="pd">K8s 会把 limits 复制成 requests，调度器按上限预留。结果节点看着很空，Pod 却一直 Pending。requests 要按稳态给，limits 按峰值给。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把 Namespace 当网络隔离</div><div class="pd">跨 Namespace 的 Pod 默认可通。要隔离必须用 NetworkPolicy，而且依赖 CNI 实现，不支持的插件会静默忽略。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">以为 apply 会重启 Pod</div><div class="pd">只有 spec.template 变了才滚动更新。改 label、改注解、改无关字段都不会动 Pod。要强制重启得改模板内容。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">NodePort 随便写端口</div><div class="pd">默认只能用 30000-32767，范围由 apiserver 的 --service-node-port-range 决定。写 8080 会直接被拒，这不是权限问题，是范围问题。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 limits 当成「保证」</div><div class="pd">limits 是上限，不是保证。节点资源紧张时，Burstable 和 BestEffort 会被驱逐，Guaranteed 只是最后被驱逐，也不是绝对不被驱逐。要稳定就多留余量、做好 PDB。</div></div></div>
+  <p><b>面试落点：</b>这九条里，选一条你能讲出场景的。比如「我们一开始把数据库连接检查写进 liveness，结果 MySQL 主从切换时整个服务被重启了两轮，后来改成 readiness 查依赖、liveness 只查本地健康，切换时只是短暂摘流量」——有因果、有动作、有结果，比背九条坑有用。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 用 <span class="k">kubectl delete pod</span> 删掉一个由 Deployment 管理的 Pod，几秒后出现了一个新 Pod。原因是？</div>
+      <button class="opt">kubelet 发现容器不见了，自动重建了同一个 Pod</button>
+      <button class="opt">ReplicaSet 控制器发现实际副本数少于期望值，按 reconcile 补了一个新 Pod</button>
+      <button class="opt">scheduler 周期性重新调度所有 Pod</button>
+      <button class="opt">apiserver 会拒绝删除 Pod，你看到的其实是删除失败</button>
+      <div class="ans">正确答案：<b>ReplicaSet 补副本</b>。Deployment 管 ReplicaSet，ReplicaSet 的期望副本数是 3 就维持 3 个。你删掉一个，实际变 2，控制器下一轮比较就创建一个新的。新 Pod 是新对象（新 UID、新 IP），不是「原来那个重启」。要真的减少副本，得改 replicas 或删上层对象。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">2. Service 有 ClusterIP，后端 Pod 是 Running，但从其他 Pod 访问持续超时。<span class="k">kubectl get endpoints web</span> 显示 <span class="k">&lt;none&gt;</span>。最可能的原因是？</div>
+      <button class="opt">kube-proxy 没有运行，规则没下发</button>
+      <button class="opt">CNI 插件异常，Pod 网络不通</button>
+      <button class="opt">CoreDNS 解析失败，名字找不到</button>
+      <button class="opt">Service 的 selector 与 Pod 的 label 不匹配，或 Pod 未 Ready，导致没有后端地址</button>
+      <div class="ans">正确答案：<b>selector 或 Ready 状态</b>。Endpoints 为空说明 Endpoints 控制器没有找到符合条件的 Pod，常见原因是 selector 写错、Pod 的 label 不符，或者 Pod 存在但没有通过 readiness 探针（未 Ready 的 Pod 不会进 Endpoints）。这一步和网络无关，先修 selector 或探针。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 某服务的 liveness 探针里检查了数据库连接。数据库主从切换期间连接全部失败，最可能发生什么？</div>
+      <button class="opt">所有副本的 liveness 连续失败，容器被逐个重启，故障从「数据库短暂不可用」放大成「服务整体重启」</button>
+      <button class="opt">Pod 会被摘出 Endpoints，但不会重启，等数据库恢复自动加回</button>
+      <button class="opt">liveness 失败只会记录事件，不会产生任何动作</button>
+      <button class="opt">Kubernetes 会自动延长探针超时时间，等数据库恢复</button>
+      <div class="ans">正确答案：<b>级联重启</b>。liveness 失败的动作就是重启容器，而它不区分「我自己坏了」还是「下游坏了」。所有副本同时因为同一个下游失败而重启，就是级联故障。正确做法是 liveness 只查进程自身，依赖状态放到 readiness，失败时只摘流量。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 一个 Pod 要被判定为 Guaranteed QoS，需要满足什么条件？</div>
+      <button class="opt">只要设置了 limits，就是 Guaranteed</button>
+      <button class="opt">所有容器的 requests 都大于 0 即可，不要求和 limits 相等</button>
+      <button class="opt">每个容器都设置了 CPU 和内存的 requests 与 limits，且两者相等</button>
+      <button class="opt">Pod 必须显式标注 qosClass: Guaranteed</button>
+      <div class="ans">正确答案：<b>requests 等于 limits</b>。Guaranteed 要求 Pod 里每个容器都同时设置 CPU 和内存的 requests 与 limits，并且数值完全相等。少一个容器、少一种资源、或者数值不等，都会落到 Burstable。qosClass 是系统计算后写入 status 的，不能手动指定。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 一个应用启动需要 4 分钟，配置了 startupProbe，periodSeconds 10、failureThreshold 3。会发生什么？</div>
+      <button class="opt">startup 成功前 liveness 生效，所以 30 秒后就会被重启</button>
+      <button class="opt">启动预算只有约 30 秒，应用还没起来就被判定失败并重启，形成循环</button>
+      <button class="opt">startupProbe 会自动延长预算，直到应用启动完成</button>
+      <button class="opt">startupProbe 失败只会告警，不会重启容器</button>
+      <div class="ans">正确答案：<b>预算不足</b>。startupProbe 的最大等待时间约等于 failureThreshold 乘 periodSeconds，这里是 3 乘 10 等于 30 秒。应用要 4 分钟才起来，会在第 30 秒被判失败并重启，看起来像 CrashLoopBackOff，实际是预算配小了。应该把 failureThreshold 提到 30 左右，留足 300 秒。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">6. 关于控制面组件，下面哪个说法是正确的？</div>
+      <button class="opt">kube-scheduler 负责创建容器，kubelet 只负责上报状态</button>
+      <button class="opt">kube-proxy 监听 ClusterIP 并把请求转发给后端 Pod</button>
+      <button class="opt">kube-controller-manager 直接读写 etcd 来同步副本数</button>
+      <button class="opt">kube-apiserver 是唯一读写 etcd 的组件，其他组件都通过它 watch 和提交变更</button>
+      <div class="ans">正确答案：<b>apiserver 是唯一入口</b>。etcd 只由 apiserver 访问，scheduler、controller-manager、kubelet 都通过 apiserver 的 API 和 watch 工作。scheduler 只负责选节点（bind），创建容器的是 kubelet 通过 CRI 调运行时；kube-proxy 只写 iptables/IPVS 规则，不转发流量。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>声明式 API</b></td><td>提交期望状态而不是动作，系统负责收敛，重复提交是幂等的</td></tr>
+    <tr><td><b>reconcile</b></td><td>控制器比较期望与实际并做差量的循环，电平触发，丢事件不会丢状态</td></tr>
+    <tr><td><b>ownerReference</b></td><td>对象之间的从属关系，Deployment → ReplicaSet → Pod 靠它形成级联</td></tr>
+    <tr><td><b>Pod</b></td><td>最小调度单位，容器共享网络、IPC、UTS 和卷；不会重启，只会重建</td></tr>
+    <tr><td><b>pause 容器</b></td><td>sandbox 容器，持有 Pod 的网络 namespace，让其他容器能加入</td></tr>
+    <tr><td><b>ReplicaSet</b></td><td>维持指定数量 Pod 的控制器，是 Deployment 版本管理的载体</td></tr>
+    <tr><td><b>StatefulSet</b></td><td>给 Pod 固定序号、稳定 DNS 和独立 PVC 的工作负载，适合有状态集群</td></tr>
+    <tr><td><b>DaemonSet</b></td><td>保证每个（符合条件的）节点上有一个 Pod，常用于 agent 类组件</td></tr>
+    <tr><td><b>Endpoints / EndpointSlice</b></td><td>Service 的后端地址列表，由控制器根据 selector 和 Ready 状态维护</td></tr>
+    <tr><td><b>headless Service</b></td><td>clusterIP 为 None 的 Service，DNS 直接返回 Pod IP，没有虚拟 IP</td></tr>
+    <tr><td><b>NodePort</b></td><td>在每个节点上开一个高端口转发到 Service，默认范围 30000-32767</td></tr>
+    <tr><td><b>liveness / readiness / startup</b></td><td>分别对应重启容器、摘流量、慢启动保护三种动作，边界不能混</td></tr>
+    <tr><td><b>QoS</b></td><td>Guaranteed / Burstable / BestEffort，由 requests 与 limits 的关系决定，影响驱逐顺序</td></tr>
+    <tr><td><b>ResourceQuota / LimitRange</b></td><td>命名空间级的总量限制与单容器默认值，后者会悄悄改你的 QoS</td></tr>
+    <tr><td><b>RBAC</b></td><td>subject、verb、resource 加作用域组成的授权模型，Role 与 ClusterRole 作用范围不同</td></tr>
+    <tr><td><b>NetworkPolicy</b></td><td>Pod 级网络策略，需要 CNI 支持才生效，不支持时会被静默忽略</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 建一个 Deployment，把副本删掉一个，用 <span class="k">kubectl get rs,pod -w</span> 看着它被补回来，再用 <span class="k">kubectl get pod -o jsonpath='{.metadata.ownerReferences}'</span> 把这条链找出来；② 故意把 Service 的 selector 改错一个字符，观察 Endpoints 变成 <span class="k">&lt;none&gt;</span>、访问超时，再改回来，记住这个顺序；③ 给一个慢启动应用只配 liveness 不配 startupProbe，把 failureThreshold 调小，看它进入重启循环，然后加上 startupProbe 对比前后行为。<br><br>
+    <b>之后值得单独学：</b>第 11 期是这篇的排障版——Pending、CrashLoopBackOff、OOMKilled、Evicted 各自怎么定位；第 12 期讲网络全链路，从 Pod 到 Service 到 Ingress，把这次的 Endpoints 和 kube-proxy 展开；第 13 期讲调度、QoS 与优雅发布，把这篇文章里的 requests 和探针用到滚动更新上。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 10 期 · 面试问 K8s，考的不是你认识几个对象，是你能不能说出「谁在把现实拉向期望」</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

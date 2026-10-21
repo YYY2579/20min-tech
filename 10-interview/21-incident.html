@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>线上事故：前 5 分钟做什么，事后怎么讲</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 21 期</span>
+    <h1>线上事故：前 5 分钟做什么，事后怎么讲</h1>
+    <p class="sub">面试官问「讲一次你处理的事故」，想听的不是英雄主义，是<b>你有没有流程</b>。有流程的人讲时间轴，没流程的人讲心情。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>9</b> 大模块</span>
+      <span class="chip"><b>1</b> 套复盘模板</span>
+      <span class="chip"><b>6</b> 个必填字段</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：告警响了，你的第一个动作是打开日志，还是打开变更记录？答案决定你在第几层。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>「我重启了一下就好了」——这句话一出口，面试就结束了</h2></div>
+  <p class="lead">面试官问「讲一次你处理的事故」。有人讲了八分钟：日志里报什么错、他查了哪些配置、最后怎么发现的。技术细节很足，但面试官从头到尾没听到三件事：<b>你怎么知道这事有多严重、谁在决定回滚、你怎么防止它再来一次。</b></p>
+  <p>这三件事，才是事故题真正在考的东西。因为事故现场最稀缺的不是技术能力，是<b>在信息不全、有人催、领导在群里问的情况下，还能按顺序做决定的能力</b>。这个能力有明确的结构，也有明确的评分点，不是玄学。</p>
+  <p>先看三种最典型的答法，以及它们各自暴露了什么：</p>
+  <table>
+    <tr><th style="width:280px">候选人说的话</th><th style="width:170px">他以为在证明</th><th>面试官听到的</th></tr>
+    <tr><td>「我重启了一下，服务就恢复了」</td><td>我能解决问题</td><td>没有根因，下次还会炸；而且重启往往让现场消失</td></tr>
+    <tr><td>「我一路查到是缓存雪崩，改了 TTL 就好了」</td><td>我技术很深</td><td>没有影响面、没有时间线，不知道你在团队里是什么角色</td></tr>
+    <tr><td>「那次是 DBA 改错了配置」</td><td>我很清楚责任在哪</td><td>在甩锅。面试官会想：你以后也会这么说我们</td></tr>
+  </table>
+  <p>反过来，一个能拿高分的回答长这样：先说清楚「多久、影响了多少人、损失是什么」，再说「我在第几分钟做了什么判断、依据是什么」，然后说「我们改了哪三件事，其中哪一件是可以验证的」，最后说「如果重来，我会在哪一步提前十分钟」。<b>全程没有一个形容词，全是时间点和动作。</b></p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>止血</div><div class="cd">先让用户不再受影响。这一步和「找原因」是两条线，可以并行，但优先级更高。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>同步</div><div class="cd">让所有相关的人在同一份事实上做决定。信息不同步的团队，会同时做三个互相冲突的动作。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>复盘</div><div class="cd">把「这次运气好」变成「下次有防线」。复盘的产出不是文档，是带 owner 和日期的改动。</div></div>
+  </div>
+  <div class="callout warn">
+    <b>反面例子：</b>「当时比较紧急，我先重启了服务，然后慢慢查日志，最后发现是内存泄漏，加了个定时重启的任务。」——三个问题：重启掩盖了现场；「慢慢查」说明没有时间压力下的排序；「定时重启」是把故障变成常态，等于承认不打算修根因。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的开场：</b>「我讲一次我自己值班时处理的。先说结论：一次配置变更导致读请求打到数据库，影响 18 分钟，约 3% 的用户下单失败，没有资损。我按时间讲：第 0 分钟收到告警，第 2 分钟定级并拉群，第 7 分钟决定回滚，第 18 分钟恢复，第 40 分钟出初版复盘。」
+  </div>
+  <p><b>面试落点：</b>事故题的正确开场是「结论 + 量级 + 时间轴」，不是「那天晚上我在加班」。前者证明你有结构，后者只证明你辛苦。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>定级与角色：先决定这事有多大，再决定谁上</h2></div>
+  <p class="lead">事故处理里最贵的错误不是技术选错，是<b>定级错了</b>。把一个 P1 当 P3 处理，二十分钟后才叫人，用户已经跑了一半；把一个 P3 当 P1 处理，全公司半夜被叫起来，三个月后没人再信告警。</p>
+  <p>定级不能靠感觉，要有可以当场对照的判据。下面这套口径是我用的，各公司不同，但结构值得抄——<b>关键是判据必须写死，不能出现「感觉挺严重的」</b>：</p>
+  <table>
+    <tr><th style="width:70px">级别</th><th>判据（满足任一）</th><th style="width:130px">响应要求</th><th style="width:150px">同步频率</th></tr>
+    <tr><td><b>P1</b></td><td>核心链路不可用；影响超过 30% 用户；有资损或数据错误；合规风险</td><td>立即全员响应，负责人到场，决策人唯一</td><td>每 15 分钟一次</td></tr>
+    <tr><td><b>P2</b></td><td>核心功能降级但可用；影响 5%~30% 用户；错误率明显高于 SLO 允许值</td><td>值班 + 相关模块负责人，30 分钟内到场</td><td>每 30 分钟一次</td></tr>
+    <tr><td><b>P3</b></td><td>非核心功能异常；少量用户受影响；有可用的绕行方案</td><td>值班处理，工作时间内跟进</td><td>有进展时同步</td></tr>
+    <tr><td><b>P4</b></td><td>体验问题、单点报错、监控缺失但业务无感</td><td>进待办，按周处理</td><td>不需要即时同步</td></tr>
+  </table>
+  <p>定级之后是角色。很多团队出事时「大家一起上」，看起来很团结，实际上是最低效的形态：三个人同时改配置，两个人同时在群里问「好了吗」，没人记录，最后连什么时候恢复的都说不清。<b>事故现场至少要有四个角色，哪怕一个人兼几个，也要明确说出来：</b></p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>IC（事故指挥）</b>：只做三件事——定级、分配、决定何时止损。不亲手排查。他的核心价值是「在信息不全时拍板」，而不是「技术最强」。</div></div>
+    <div class="step"><div class="txt"><b>执行</b>：真正动手的人。可以有多人，但每个动作要先报给 IC，避免两个人同时改同一个东西。</div></div>
+    <div class="step"><div class="txt"><b>沟通</b>：对内同步（事故群）、对外同步（客服/客户/状态页）。要求是「只说已验证的事实」，不猜根因。</div></div>
+    <div class="step"><div class="txt"><b>记录</b>：按时间戳记下每个动作和判断，包括「谁在几点决定回滚」。这份记录是复盘唯一的原始材料，事后靠回忆一定会失真。</div></div>
+  </div>
+  <p>小团队里 IC 和记录常常是同一个人，这是可以接受的；不可接受的是<b>没有 IC</b>。没有 IC 的时候，事故的走向由「谁嗓门大」决定，而嗓门大的人往往不在最了解系统的那一批里。</p>
+  <div class="callout warn">
+    <b>反面例子：</b>「我们团队比较扁平，出事就大家一起看，谁有想法谁上。」——在面试里这句话会被理解成「你们没有流程」。改成：「小团队里我通常兼 IC 和记录，但我一定会先明确一句『现在由我指挥，改配置前先在群里报一声』，否则四五个人同时动手，故障会变成两个。」
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「我的判断是先定级再动人。判据写死在 runbook 里：核心链路不可用或有资损就是 P1，直接拉全员；核心降级是 P2，值班加模块负责人。定完级我第一句话是『现在我是 IC，动手前在群里报一声，我统一决策』。我不亲手查，因为我一旦钻进日志，就没人管整体节奏了。」
+  </div>
+  <p><b>面试落点：</b>「事故里最贵的错误是定级错，不是技术选错。定级靠判据不靠感觉，定完级要明确 IC，因为多人同时动手会把一次故障变成两次。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>前 5 分钟：止损优先，但不是无脑止损</h2></div>
+  <p class="lead">「先止损还是先查根因」这个问题，标准答案是「先止损」，但如果只答这一句，会被追问到答不出来。因为真实场景里，<b>止损动作本身可能比故障更危险</b>——比如回滚会丢数据、切主会丢写入、扩容会把有问题的版本铺得更广。</p>
+  <p>所以正确的顺序不是「止损优先」，而是<b>「先确认信号可信，再判断止损动作的风险，然后立刻止损」</b>。前五分钟按这个顺序走：</p>
+  <table>
+    <tr><th style="width:80px">时间</th><th>动作</th><th style="width:230px">判断依据</th></tr>
+    <tr><td><b>0~1 分</b></td><td>确认告警是真的，不是监控抖动</td><td>看两个独立信号：入口错误率和业务指标（下单量、支付量）。只有一个异常时先怀疑监控</td></tr>
+    <tr><td><b>1~2 分</b></td><td>定级、拉群、指定 IC</td><td>用判据表，不用感觉。宁可先定高一级，五分钟内可以降级</td></tr>
+    <tr><td><b>2~3 分</b></td><td>看最近变更</td><td>发布时间、配置变更、扩缩容、依赖方变更、证书到期。多数线上故障和变更相关，先排除它成本最低</td></tr>
+    <tr><td><b>3~4 分</b></td><td>判断止损动作的风险</td><td>回滚是否兼容数据？切流是否会让新版本承担全部流量？限流会不会误伤正常用户？</td></tr>
+    <tr><td><b>4~5 分</b></td><td>执行止损，同时开始记录</td><td>优先选「可逆、影响面小、生效快」的动作。执行前在群里报一句</td></tr>
+  </table>
+  <p>为什么把「看最近变更」放在这么前面？因为它同时满足三个条件：<b>成本极低（看一眼发布记录）、命中率高（多数故障与变更相关）、止损路径明确（回滚）</b>。而「查日志找报错」虽然也很重要，但它往往要花十几分钟才能定位到一个具体代码行，这十几分钟里用户还在受影响。</p>
+  <p>另一个必须说清的概念是<b>止损和根因是两条并行线</b>，不是串行。IC 负责止损，另一个人可以同时在查根因。如果只有一个人，那顺序就是先止血、再查因——因为「查到原因但用户还在受影响」是更糟的结果。</p>
+  <div class="callout danger">
+    <b>重启是最快也最危险的止血手段。</b>它快，因为它不要求你理解问题；它危险，因为：一，现场没了，事后只能猜；二，如果是有状态服务，重启可能触发全量重建，把一次局部故障放大成全局故障；三，它会给你「已经修好了」的错觉，而根因还在，几小时后原样复发。<b>重启可以作为争取时间的临时手段，但必须同时保留现场：先摘一个实例下来留证据，再重启其余的。</b>
+  </div>
+  <div class="callout warn">
+    <b>反面例子：</b>「我第一反应是先看日志，把错误堆栈找出来，确认是哪一行代码的问题，然后再决定怎么处理。」——这句话在面试里等于说「我让用户多等了二十分钟」。正确说法是：「我先看变更记录，同时让人拉日志，两条线并行；变更里有一个十分钟前的配置发布，我先回滚它，因为回滚是可逆的，成本最低。」
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「前五分钟我只做四件事：确认信号是真的、定级拉人、看最近有没有变更、判断止损动作本身的风险。止损和查根因是两条线，但止损优先级更高，因为用户还在受影响。唯一会让我先查再止的情况，是止损动作不可逆——比如回滚会丢数据、切主会丢写入，那时候我会先花两分钟确认代价，再决定。」
+  </div>
+  <p><b>面试落点：</b>「先止损是原则，但止损不是无脑动作。我会先花三十秒判断这个动作可不可逆、会不会扩大影响，再执行。这三十秒不是犹豫，是避免把一次故障变成两次。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>信息同步：说事实、说节奏、不说猜测</h2></div>
+  <p class="lead">事故里最消耗信任的不是故障本身，是<b>反复改口</b>。「五分钟就好」说了三次，第三次之后，业务方开始自己想办法绕开你。同步的价值不是安抚，是让所有人基于同一份事实做决定。</p>
+  <p>同步要有固定结构，因为紧张的时候人会忘了该说什么。下面这五行，每次同步照着填，一分钟内能发出去：</p>
+  <pre><span class="c"># 事故同步模板（每次同步都发这一份，不要自由发挥）</span>
+【级别】P1 / P2            <span class="c"># 级别变化要单独说一句</span>
+【现状】进行中 / 已止损 / 已恢复
+【影响】哪些功能、多少用户、从几点开始（用数字，不用"部分用户"）
+【已做】回滚了 X 版本、摘掉了 A 机房流量（只写已执行完的）
+【下一步】谁在做什么、下一次同步是几点
+【需要】需要谁支持（DBA / 网络 / 业务方决策）
+</pre>
+  <p>几个具体的纪律：</p>
+  <table>
+    <tr><th style="width:170px">该做</th><th>为什么</th><th style="width:230px">不该做</th></tr>
+    <tr><td>给时间点，不给时长</td><td>「下次同步 21:40」是可兑现的；「马上好」不可兑现</td><td>「预计五分钟恢复」</td></tr>
+    <tr><td>区分「已验证」和「怀疑」</td><td>猜测一旦被当成结论传播，后面要花更多时间纠正</td><td>「应该是数据库的问题」</td></tr>
+    <tr><td>影响面用数字</td><td>数字让业务方能决定要不要发公告、要不要人工兜底</td><td>「部分用户受影响」</td></tr>
+    <tr><td>坏消息第一时间说</td><td>坏消息延迟一分钟，信任成本翻倍</td><td>等恢复了再说「其实中间差点全挂」</td></tr>
+    <tr><td>指定一个出口</td><td>一个声音，避免三条互相矛盾的信息同时在外面流传</td><td>所有人在群里各自回复业务方</td></tr>
+  </table>
+  <p>对外同步（客服、客户、状态页）和对内同步要分开写。对内可以写「怀疑是连接池耗尽，正在验证」；对外只能写「部分用户下单失败，我们正在处理」。<b>把内部推测直接转发给客户，是事故里最常见的二次伤害。</b></p>
+  <div class="callout warn">
+    <b>反面例子：</b>群里连着刷：「在看了」「快好了」「应该马上」「再等等」「好像恢复了」。——五条消息，零信息量。业务方无法判断要不要发公告，客服无法回答用户，而 IC 还得花时间回复「到底怎么样了」。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「我每 15 分钟发一次同步，格式固定：级别、现状、影响面、已执行的动作、下一步和下一次同步时间。我只写已经验证的事实，怀疑的部分会明确标『怀疑，未验证』。这样业务方能自己判断要不要发公告，客服也有一份可以直接用的话。」
+  </div>
+  <p><b>面试落点：</b>「同步的作用不是安抚，是让业务方能在信息和你一样的时候做决定。所以我给时间点不给时长，给数字不给『部分用户』，猜测和事实分开写。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>止损手段：六种动作，各自的生效时间和代价</h2></div>
+  <p class="lead">「你会怎么止损」如果只答「回滚」，说明你只处理过一种事故。真实的止损手段至少有六种，选哪一种取决于<b>故障类型</b>和<b>你能承受的代价</b>。选错的典型后果是：明明是容量问题却去回滚，回滚完照样挂。</p>
+  <table>
+    <tr><th style="width:110px">手段</th><th style="width:110px">生效时间</th><th>适用</th><th style="width:230px">代价与风险</th></tr>
+    <tr><td><b>回滚</b></td><td>分钟级</td><td>故障与最近发布强相关</td><td>回滚会丢掉新功能；数据变更不兼容时回滚本身会失败</td></tr>
+    <tr><td><b>摘流量 / 切流</b></td><td>秒~分钟</td><td>单机房、单可用区、单实例异常</td><td>剩余容量要能扛住；会话和有状态服务要能迁移</td></tr>
+    <tr><td><b>限流</b></td><td>秒级</td><td>下游被打爆，需要保住核心请求</td><td>会误伤正常用户；阈值设错会把小故障变成大故障</td></tr>
+    <tr><td><b>降级 / 关开关</b></td><td>秒级</td><td>非核心功能拖垮核心链路</td><td>要求提前埋好开关并演练过；临时加开关来不及</td></tr>
+    <tr><td><b>扩容</b></td><td>分钟级</td><td>容量不足、排队变长</td><td>只对容量型有效；对慢查询、锁竞争、连接泄漏无效</td></tr>
+    <tr><td><b>切主 / 切机房</b></td><td>分钟级</td><td>主库或主集群不可用</td><td>可能丢未同步的写入；切换后容量和延迟都会变差</td></tr>
+  </table>
+  <p>选择逻辑可以压成三句话：<b>变更引起的，先回滚；单点/单机房引起的，先摘流量；下游被打爆的，先限流或降级。</b>扩容放在最后，因为它生效慢，而且经常不解决问题——如果瓶颈是数据库的一条慢查询，加应用实例只会让数据库更难受。</p>
+  <p>还有一个反直觉的点：<b>止损动作要有「停止条件」</b>。限流设了 30% 之后，什么时候恢复？降级开关打开之后，谁来关？很多事故的二次伤害来自「临时措施忘了撤」，比如事故结束三天后才发现某个降级开关还开着，功能少了一半没人报障。</p>
+  <pre><span class="c"># 每个止损动作执行时，同时记三件事（写进事故群，别只放在脑子里）</span>
+动作：回滚 shop-api 到 1.8.2
+时间：21:34
+执行人：我
+预期效果：5 分钟内错误率回落到 1% 以下
+撤销条件：错误率连续 10 分钟低于 0.5% 后，再观察 10 分钟不动
+
+<span class="c"># 临时措施必须挂一个"到期提醒"，否则它会变成永久配置</span>
+<span class="c"># 降级开关、限流阈值、临时白名单，都属于这一类</span>
+</pre>
+  <div class="callout warn">
+    <b>反面例子：</b>「当时流量太大，我先把副本数从 6 扩到 20，问题就缓解了。」——如果故障是慢查询导致的连接堆积，扩到 20 个副本会让数据库连接数翻三倍，几十分钟后炸得更狠。而且「缓解」不等于「解决」，扩容掩盖了根因，下次流量峰值会原样重演。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「止损手段我按故障类型选：变更引起的先回滚，机房或单点问题先摘流量，下游被打爆先限流或降级，扩容放最后——因为它生效慢，而且对慢查询、锁竞争这类问题无效，甚至会加重下游压力。每个动作我都会写明预期效果和撤销条件，因为临时措施忘了撤，是二次事故的常见来源。」
+  </div>
+  <p><b>面试落点：</b>「止损不是只有一个回滚。判断标准是故障类型：变更、单点、容量、下游过载，对应四种完全不同的动作。选错的代价比不做更大。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>根因分析：追到「人不小心」，等于没追</h2></div>
+  <p class="lead">「5 Whys」这个方法被用坏的方式只有一种：<b>追到某个人犯了个错就停</b>。为什么配置写错了？因为手滑。为什么手滑？因为人都会手滑。到这里，结论就变成了「下次注意」，而这句结论不具备任何执行力。</p>
+  <p>正确的追法不是往「谁」上追，而是往「<b>为什么这个错误能造成这么大影响</b>」上追。同一个手滑，在有两道防线的系统里只值一次告警，在没有防线的系统里值一次 P1。<b>根因分析的产出应该是「防线为什么没拦住」，而不是「谁按错了」。</b></p>
+  <table>
+    <tr><th style="width:130px">层次</th><th>问法</th><th>典型答案</th><th style="width:180px">能落成的改进</th></tr>
+    <tr><td><b>触发点</b></td><td>什么动作直接引发了故障</td><td>一次配置发布把超时从 800ms 改成了 80ms</td><td>这类答案只能解释「什么时候开始」，不能解释「为什么这么严重」</td></tr>
+    <tr><td><b>直接原因</b></td><td>这个动作为什么会导致故障</td><td>超时过短导致请求大量重试，重试放大了下游压力</td><td>修单个参数，治标</td></tr>
+    <tr><td><b>系统性原因</b></td><td>为什么这个改动能直接生效、为什么没有拦住</td><td>配置没有校验、没有灰度、没有变更评审；重试没有退避和预算</td><td>加校验、加灰度、加重试预算——这三条才是复盘产出</td></tr>
+  </table>
+  <p>所以「5 Whys」的正确用法是<b>每一层都问「为什么防线没拦住」</b>，而不是「为什么人会犯错」。举个对照：</p>
+  <pre><span class="c"># 错误的追法（追到人就停）</span>
+为什么故障？→ 配置改错了
+为什么改错？→ 手滑
+为什么手滑？→ 人不小心
+结论：加强培训、提高责任心   <span class="c"># 这条结论无法验收，也无法阻止下次</span>
+
+<span class="c"># 正确的追法（追到防线）</span>
+为什么故障？→ 超时被改成 80ms，重试风暴打挂下游
+为什么一个配置能直接打到全量？→ 配置发布没有灰度，改完即全量
+为什么没有灰度？→ 配置中心支持按 IP 灰度，但没人用过，也没写进流程
+为什么没有校验？→ 超时字段没有范围校验，80ms 被当成合法值
+为什么重试会放大？→ 客户端重试没有退避、没有全局重试预算
+结论：三条可验收的改进（灰度流程 + 参数范围校验 + 重试预算）
+</pre>
+  <p>这里有个容易被面试官欣赏的细节：<b>区分「直接原因」和「系统性原因」，是为了让改进项落在你能控制的地方。</b>直接原因常常是「某个人做了某件事」，你控制不了人;系统性原因是「流程、默认值、防线、可观测性」，这些是能改的。</p>
+  <div class="callout danger">
+    <b>「无责复盘」不等于「不追事实」。</b>无责的意思是「不惩罚如实陈述的人」，不是「不记录谁做了什么」。时间线里必须写清每个动作的执行人，否则没法还原因果；但结论段落里不能出现「某某责任心不强」这种判断。<b>前者是事实，后者是评价，混在一起，下次就没人敢说实话了。</b>
+  </div>
+  <div class="callout warn">
+    <b>反面例子：</b>「根因是运维同学误操作，已经批评教育，后续加强规范学习。」——这句话在复盘会上说出来，会议室会安静三秒，然后所有人开始学会「下次别说实话」。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「我复盘时追两层：直接原因是超时被改成了 80ms，但这不是根因。根因是三个防线同时缺失——配置发布没有灰度、参数没有范围校验、客户端重试没有退避。所以改进项不是『小心一点』，是三条能验收的改动：灰度必须走、超时字段加范围校验、重试加预算和退避。」
+  </div>
+  <p><b>面试落点：</b>「追到人就停的复盘没有价值，因为人一定会犯错。我要追的是『为什么这个错误能造成这么大影响』，答案通常在防线缺失上，而防线是可以补的。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>复盘模板：六个必填字段，和一张能打分的表</h2></div>
+  <p class="lead">复盘文档最常见的失败是「写得很长，但没有一句能执行」。判断一份复盘合不合格，不需要读完，只看六个字段：<b>少一个就是不合格，写「无」也算不合格</b>。这六条可以直接当检查清单用。</p>
+  <table>
+    <tr><th style="width:60px">#</th><th style="width:150px">字段</th><th>合格标准（可验收）</th><th style="width:200px">常见的不合格写法</th></tr>
+    <tr><td>1</td><td><b>影响面</b></td><td>谁受影响、多少比例、持续多久、有无资损或数据错误，四个都要有数字</td><td>「部分用户受到影响」</td></tr>
+    <tr><td>2</td><td><b>时间线</b></td><td>发现、定级、止损、恢复四个节点精确到分钟，每个节点写下判断依据</td><td>「晚上九点左右出现异常」</td></tr>
+    <tr><td>3</td><td><b>直接原因</b></td><td>触发动作 + 导致故障的机制，能复现</td><td>「系统不稳定」</td></tr>
+    <tr><td>4</td><td><b>系统性原因</b></td><td>至少一条防线缺失（流程 / 校验 / 灰度 / 观测 / 容量），且说明为什么之前没发现</td><td>「同事误操作」</td></tr>
+    <tr><td>5</td><td><b>改进项</b></td><td>每条有 owner、截止日期、验收标准；至少一条是「防止同类问题」而不是「修这一次」</td><td>「加强监控」「提高警惕」</td></tr>
+    <tr><td>6</td><td><b>验证方式</b></td><td>怎么证明改进有效：什么时间、用什么方法、达到什么结果算通过</td><td>改进项写完就没有下文</td></tr>
+  </table>
+  <p>有了字段，还要有评分，否则「合格」仍然很主观。下面这张表每项 0 到 2 分，满分 12 分，可以自己给自己的复盘打分，也可以用来判断团队的水平：</p>
+  <table>
+    <tr><th style="width:130px">评分项</th><th>0 分</th><th>1 分</th><th>2 分</th></tr>
+    <tr><td><b>影响面</b></td><td>没有数字</td><td>有用户比例但无时长</td><td>比例、时长、资损三者齐全</td></tr>
+    <tr><td><b>时间线</b></td><td>只有「大概晚上」</td><td>有节点但缺判断依据</td><td>四节点精确到分钟，含「为什么这时决定止损」</td></tr>
+    <tr><td><b>直接原因</b></td><td>写「异常」「不稳定」</td><td>有机制但无法复现</td><td>能说清触发条件，别人照做能复现</td></tr>
+    <tr><td><b>系统性原因</b></td><td>归因到人</td><td>指出一个防线缺失</td><td>指出多个防线同时失效，并解释为什么之前没暴露</td></tr>
+    <tr><td><b>改进项</b></td><td>「加强 XX」</td><td>有动作但无 owner 或日期</td><td>每条有 owner、日期、验收标准，且有一条是防同类</td></tr>
+    <tr><td><b>验证方式</b></td><td>没有</td><td>写了「后续观察」</td><td>写明何时、用什么方法、达到什么指标算通过</td></tr>
+  </table>
+  <p>判定口径：<b>10 分以上是能拿去复用的复盘；7 到 9 分是记录了事实但推不动改进；7 分以下基本是情绪会纪要。</b>这套分数最有用的时候不是评价别人，是写完自己的复盘对着打一遍——你会发现「改进项」那一栏几乎永远拿不到 2 分，因为大多数改进项没有验收标准。</p>
+  <pre><span class="c"># 一份能直接抄的复盘骨架（字段名可以换，这六块不能少）</span>
+## 1. 影响面
+   影响功能：下单接口
+   影响范围：18 分钟，约 3% 的请求失败（约 4200 单）
+   资损：无（失败请求用户可重试，未产生错单）
+
+## 2. 时间线（精确到分钟，含判断依据）
+   21:12 告警：下单错误率 12%（阈值 2%）—— 同时看到支付量下降，确认非监控误报
+   21:14 定级 P1，拉群，我任 IC
+   21:16 查变更：21:05 有一次配置发布，超时 800ms 改成 80ms
+   21:19 决定回滚（可逆、影响面小于继续观察）
+   21:22 回滚完成，错误率降至 4%
+   21:30 错误率降至 0.3%，确认恢复
+   21:52 初版复盘，次日评审
+
+## 3. 直接原因
+   超时 80ms 导致 90% 请求超时，客户端无退避重试，重试把 QPS 放大到 3 倍
+
+## 4. 系统性原因
+   配置发布无灰度（平台支持，流程未要求）
+   超时字段无范围校验
+   客户端重试无退避、无全局重试预算
+
+## 5. 改进项（owner + 日期 + 验收标准）
+   配置发布强制灰度 5% 观察 10 分钟 | 张三 | 04-10 | 平台拦截未灰度发布
+   超时字段加范围校验（100~30000ms）| 李四 | 04-05 | 提交 80ms 被拒绝
+   客户端重试加指数退避 + 预算 | 王五 | 04-20 | 压测下重试放大量不超过 1.3 倍
+
+## 6. 验证方式
+   04-25 做一次"故意发错配置"演练，确认被拦截；
+   05-10 回看一个月内是否还有无灰度发布（应为 0）
+</pre>
+  <div class="callout warn">
+    <b>反面例子：</b>改进项写「加强监控，增加告警」「优化流程，提高规范意识」「后续持续跟进」。这三句的共同点是：<b>没有 owner、没有日期、没有验收标准，所以永远不会被完成，也永远不会被发现没完成。</b>
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「我们复盘有六个必填字段：影响面、时间线、直接原因、系统性原因、改进项、验证方式，少一个就打回。改进项必须带 owner 和日期，还要写清怎么验证——比如『配置发布强制灰度』这一条，验收标准是『平台能拦住未灰度的发布』，而不是『已通知大家注意』。我给自己打分的口径是每项 0 到 2 分，10 分以上才算能复用的复盘。」
+  </div>
+  <p><b>面试落点：</b>「我判断复盘质量只看一件事：改进项能不能验收。写『加强监控』的复盘等于没写，因为没人知道什么时候算做完。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>面试里怎么讲：五段式，控制在三分钟</h2></div>
+  <p class="lead">STAR 在事故题里不够用，因为事故的核心不是「任务-行动」，是<b>「在信息不全时你怎么排序」</b>。我建议用五段：背景、判断、动作、结果、反思。前四段各四十秒，反思留一分钟——因为反思才是区分「做过」和「想过」的地方。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>背景（30 秒）</b>：系统规模 + 你的角色 + 故障的一句话定义。不要铺垫「那天晚上我正在吃饭」。</div></div>
+    <div class="step"><div class="txt"><b>判断（40 秒）</b>：你看到的第一个信号是什么、怎么确认它不是误报、怎么定级、为什么选这个止损动作。这一段是含金量最高的。</div></div>
+    <div class="step"><div class="txt"><b>动作（40 秒）</b>：按时间点讲，包含「谁在什么时候做了什么」。要有一个「我决定不做什么」的例子。</div></div>
+    <div class="step"><div class="txt"><b>结果（30 秒）</b>：恢复时间、影响面、有没有资损。用数字，不用「很快恢复」。</div></div>
+    <div class="step"><div class="txt"><b>反思（60 秒）</b>：系统性原因 + 三条改进 + 其中哪条已经落地并验证过。最后加一句「如果重来我会怎么不同」。</div></div>
+  </div>
+  <p>下面这段可以直接背，把里面的系统名和数字换成你自己的：</p>
+  <pre><span class="c"># 一段完整的三分钟回答（口述版，不要念，理解结构后自己说）</span>
+
+背景：我负责的是一个订单服务，6 个副本、峰值 1200 QPS，
+      那天我值班，是唯一的 on-call。
+
+判断：21:12 收到错误率告警，12%，阈值是 2%。我先看了支付量，
+      同时在跌，所以确认不是监控误报。按判据这是核心链路不可用，
+      直接定 P1，拉群，我说我任 IC。
+      然后我第一件事不是看日志，是看变更记录——21:05 有一个配置发布，
+      把下游超时从 800ms 改成了 80ms。
+
+动作：我判断回滚是可逆的、影响面小于继续观察，21:19 决定回滚，
+      21:22 完成。同时让另一个人拉日志确认机制，结果和我的判断一致：
+      超时太短导致 90% 请求超时，客户端又没退避，重试把 QPS 放大了三倍。
+      我刻意没做的一件事是扩容——因为瓶颈不在应用，扩容只会让下游更难受。
+
+结果：18 分钟，约 3% 请求失败、4200 单，没有资损，用户重试可成功。
+
+反思：直接原因是配置改错，但根因是三个防线同时缺失：配置发布没有灰度、
+      超时字段没有范围校验、客户端重试没有退避和预算。
+      我们落了三件事：发布强制灰度 5% 观察 10 分钟（平台层面拦截）、
+      超时字段加 100 到 30000ms 的范围校验、重试加指数退避和全局预算。
+      灰度那条已经用"故意发错配置"演练验证过，能拦住。
+      如果重来，我会在告警响之前就发现——因为那次发布没有灰度，
+      这本身就该在发布环节被拦住，而不是等到用户受影响。
+</pre>
+  <p>这段回答里有几个刻意的设计，值得单独指出来：<b>「我刻意没做的一件事」</b>证明你有取舍；<b>「确认不是监控误报」</b>证明你知道告警也会骗人；<b>「已经用演练验证过」</b>证明改进不是纸面的；<b>「如果重来」</b>证明你事后还在想。这四句话，比任何技术细节都更能拉开档位。</p>
+  <div class="callout warn">
+    <b>反面例子：</b>「那次事故我从头跟到尾，连续工作了 36 小时，最后终于定位到是一个内存泄漏，改了代码就好了。领导也表扬了我们团队。」——全程在讲辛苦和表扬，没有一句影响面、判断依据、改进验证。面试官无法判断你的能力，只能判断你能熬夜。
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术（当被追问「你具体做了什么」时）：</b>「我是 IC，不亲手改配置。我做的是三件事：定级、决定止损动作、控制节奏。具体动作是执行的同学做的，我在群里报每一次决策和依据。这个分工让我们在 18 分钟内恢复，而不是四五个人同时改配置把故障扩大。」
+  </div>
+  <p><b>面试落点：</b>「讲事故我按背景、判断、动作、结果、反思五段，重点在判断和反思。判断证明我会排序，反思证明我不会让同一件事再发生。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>不该说的话：五句一出口就掉档</h2></div>
+  <p class="lead">事故题有个特点：<b>说错一句，前面讲得再好都会被覆盖</b>。因为面试官在这道题上主要判断的是「这个人能不能在压力下合作」，而某些句子会直接触发否定判断。</p>
+  <table>
+    <tr><th style="width:250px">不该说</th><th>为什么致命</th><th>换成什么</th></tr>
+    <tr><td>「这是 DBA / 开发 / 网络的问题」</td><td>甩锅。面试官会假设你入职后也这样评价他们</td><td>「触发点是 DBA 的一次变更，但我们缺少变更前的容量确认，这一层是我们该补的」</td></tr>
+    <tr><td>「重启就好了」</td><td>没有根因，等于告诉对方你只会一招</td><td>「先重启争取时间，同时摘了一个实例保留现场，事后定位到是连接泄漏」</td></tr>
+    <tr><td>「影响不大，就几个用户」</td><td>无量化，且在淡化问题</td><td>「影响 18 分钟、约 4200 单、3% 的请求失败，没有资损」</td></tr>
+    <tr><td>「当时太乱了，记不清」</td><td>说明没有记录机制，也没复盘</td><td>「时间线是复盘时按群记录和告警时间还原的，四个节点都能对上」</td></tr>
+    <tr><td>「我们从来没有出过事故」</td><td>要么在说谎，要么系统小到不值得问</td><td>「我主导过的最大一次是 P2；P1 我参与过两次，角色是执行」</td></tr>
+  </table>
+  <p>还有一类话不致命但很掉分：<b>过度使用「我们」.</b>「我们定级、我们回滚、我们复盘」——面试官分不清哪部分是你做的。正确用法是「我做决策，执行是另一位同学」，把边界说清楚。这不是抢功，是让对方能评估你的真实位置。</p>
+  <p>最后一个高频陷阱：<b>被问「如果当时是你，你会怎么做得更好」时，不要否定当时的自己。</b>说「我应该早点回滚」不算反思，因为没有任何信息增量。有信息增量的说法是：「按现在的流程，我会在第 3 分钟就回滚，因为当时我花了 3 分钟确认机制，而那个确认对止损决策其实不必要——错误率已经在涨，回滚是可逆的，先做再说。」</p>
+  <div class="callout warn">
+    <b>反面例子：</b>「那次事故主要是 DBA 那边改了个参数，跟我们应用没关系，后来他们自己修好了。」——一句话踩了两个雷：甩锅，且没有量化。更好的说法是：「触发点是 DBA 的一次参数变更，但我们这边没有变更前的容量确认和熔断，这一层是我们该补的，后来加了下游超时和连接池上限。」
+  </div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术（被问「你有没有责任」时）：</b>「有。我是当天的 IC，定级和止损节奏是我的责任。事后看，我在确认机制上多花了三分钟，这三分钟对止损没有帮助，因为回滚是可逆的。流程上我们也没有强制灰度，这一条我认，也已经落成了平台拦截。」
+  </div>
+  <p><b>面试落点：</b>「事故题最忌讳两件事：甩锅和模糊。责任该认的认，数字该给的给，角色该分的分。这三件事做到，哪怕事故本身不大，也能证明你可靠。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>9 个坑：每一条都能让一次事故变成两次</h2></div>
+  <p class="lead">这些坑的共同点是：<b>当时看起来都在「积极处理」</b>。积极不等于正确，尤其在事故现场。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">不看变更记录就开始查日志</div><div class="pd">多数故障与变更相关，而看变更只要十秒、回滚只要几分钟。先查日志，等于把最便宜的路径放到最后。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把重启当成解决方案</div><div class="pd">重启会毁掉现场，还可能触发全量重建把局部故障放大成全局故障。它可以争取时间，但必须同时保留一个实例做证据。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">四五个人同时动手</div><div class="pd">一个人改配置、一个人回滚、一个人扩容，三个动作互相干扰，最后没人知道是哪个生效了。必须有 IC，动手前报备。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">同步时说「马上好」</div><div class="pd">不可兑现的承诺比不承诺更伤信任。给时间点：「下次同步 21:40」，做不到就再同步一次，说明为什么。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把猜测当结论往外发</div><div class="pd">「应该是数据库问题」传到业务方就变成「数据库挂了」，然后你要花半小时纠正。事实和怀疑必须分开标注。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">扩容解决一切</div><div class="pd">慢查询、锁竞争、连接泄漏、线程池打满，扩容都不解决，还可能加重下游压力。先定位瓶颈在哪一层。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">复盘追到「某人不小心」</div><div class="pd">人一定会犯错，所以这个结论没有改进空间。要追的是「为什么这个错误能造成这么大影响」，答案在防线。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">改进项没有 owner 和日期</div><div class="pd">「加强监控」这类改进项永远不会被完成，也永远不会被发现没完成。每条必须有责任人、截止日、验收标准。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">临时措施忘了撤</div><div class="pd">限流阈值、降级开关、临时白名单，事故结束后没人管，三个月后功能少一半没人报障。每个临时动作都要挂到期提醒。</div></div></div>
+  <div class="callout ok">
+    <b>可以直接说出口的话术：</b>「这些坑我们踩过两条：一是四五个人同时动手，二是临时限流忘了撤。第一条我们改成强制指定 IC，动手前在群里报一句，故障处理时间反而短了；第二条我们给每个临时措施挂了到期提醒，事故关闭时必须逐条确认撤销。这两条都不难，难的是在紧张的时候还愿意按流程走。」
+  </div>
+  <p><b>面试落点：</b>被问到这些坑时，最好的回答方式是「我们踩过，后来改成了什么」。比如「我们早期确实是四五个人一起上，后来强制指定 IC，动手前在群里报一句，故障处理时间反而短了——因为不再互相覆盖」。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 收到「下单错误率 12%」的告警，第一步最合理的动作是？</div>
+      <button class="opt">立刻重启所有应用实例，先恢复再说</button>
+      <button class="opt">打开日志平台，搜索最近的错误堆栈</button>
+      <button class="opt">用第二个独立信号（如支付量）确认不是监控误报，然后定级拉人</button>
+      <button class="opt">先在群里问一句「大家有没有感觉慢」</button>
+      <div class="ans">正确答案：<b>先确认信号可信，再定级</b>。单一指标异常可能是采集问题或阈值问题，交叉验证成本只要几十秒。确认之后立刻按判据定级、指定 IC，而不是先钻进日志——日志可以并行查，但不能占用止损的决策时间。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 「止损优先于根因」这个原则，在什么情况下需要先确认代价再动手？</div>
+      <button class="opt">任何情况下都不需要，止损永远第一</button>
+      <button class="opt">止损动作不可逆或可能扩大影响时，例如回滚会丢数据、切主会丢未同步写入</button>
+      <button class="opt">只有当领导批准之后</button>
+      <button class="opt">只有当故障持续超过 30 分钟时</button>
+      <div class="ans">正确答案：<b>动作不可逆时要先确认代价</b>。止损的目的是减少用户损失，如果一个动作本身会造成数据丢失或把故障扩散到更大范围，那它就不是止损。花三十秒判断可逆性，是避免把一次故障变成两次。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 复盘里写「根因是运维同学误操作，已批评教育」，问题出在哪？</div>
+      <button class="opt">追到了人，没有追到防线，结论无法验收也无法防止复发</button>
+      <button class="opt">没有问题，事实就是误操作</button>
+      <button class="opt">问题在于不该记录执行人</button>
+      <button class="opt">问题在于没有处罚到位</button>
+      <div class="ans">正确答案：<b>归因到人，改进不可执行</b>。「不小心」这个结论对应的改进只能是「注意一点」，无法验收。正确做法是继续问「为什么这个错误能直接生效、为什么没有拦住」，产出灰度、校验、重试预算这类可以验证的改动。记录执行人是必要的，它和时间线一起用于还原因果。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">4. 下面哪个改进项是合格的？</div>
+      <button class="opt">加强监控，增加关键指标告警</button>
+      <button class="opt">提高团队规范意识，避免类似问题</button>
+      <button class="opt">配置发布强制灰度 5% 观察 10 分钟，张三负责，04-10 前完成，验收标准是平台能拦截未灰度发布</button>
+      <button class="opt">后续持续跟进该问题，必要时再做优化</button>
+      <div class="ans">正确答案：<b>有 owner、日期、验收标准的那条</b>。前三条都没有可验收的完成条件，所以永远不会被判定为「已完成」或「未完成」，最终不了了之。合格的改进项要能被别人检查：谁说、什么时候、做到什么程度算完成。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 事故同步时，下面哪种说法最合适？</div>
+      <button class="opt">「应该是数据库的问题，我们正在处理，马上就好」</button>
+      <button class="opt">「P1，影响下单，约 3% 请求失败；已回滚 21:05 的配置发布；下次同步 21:40；需要 DBA 确认连接数」</button>
+      <button class="opt">「部分用户受到影响，技术团队正在紧急排查中」</button>
+      <button class="opt">「大家不要慌，问题不大，我们搞定了会说」</button>
+      <div class="ans">正确答案：<b>级别 + 数字 + 已做 + 下次时间 + 需要谁</b>。同步的价值是让别人能基于同一份事实做决定：业务方判断要不要发公告，客服判断怎么回答用户。猜测当结论、模糊的「部分用户」、不可兑现的「马上好」，都会制造二次混乱。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 面试讲事故时，说到「我刻意没有做扩容」，这句话的作用是？</div>
+      <button class="opt">说明当时资源不够，条件受限</button>
+      <button class="opt">说明你不敢做决策</button>
+      <button class="opt">说明你判断过瓶颈不在应用层，扩容会加重下游压力，体现了取舍</button>
+      <button class="opt">说明扩容这件事不重要</button>
+      <div class="ans">正确答案：<b>体现取舍</b>。事故题里「我做了什么」只能证明执行力，「我决定不做什么、为什么」才能证明判断力。扩容对慢查询、锁竞争、连接泄漏无效，还可能让下游更难受——能说清这一点，说明真的定位过瓶颈。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>IC（事故指挥）</b></td><td>事故现场唯一决策人，负责定级、分配和止损节奏，通常不亲手排查</td></tr>
+    <tr><td><b>止损</b></td><td>让用户不再受影响的动作，和找根因是两条并行的线</td></tr>
+    <tr><td><b>MTTD</b></td><td>平均发现时间，靠监控覆盖与告警质量决定</td></tr>
+    <tr><td><b>MTTR</b></td><td>平均恢复时间，衡量止血速度，不等于根因解决</td></tr>
+    <tr><td><b>Runbook</b></td><td>针对某类告警的处置手册，让值班的人不必现场推理</td></tr>
+    <tr><td><b>变更关联</b></td><td>故障发生后先核对最近的发布、配置、扩缩容，是成本最低的定位起点</td></tr>
+    <tr><td><b>直接原因</b></td><td>触发故障的具体动作与机制，能复现</td></tr>
+    <tr><td><b>系统性原因</b></td><td>为什么这个触发能造成这么大影响，通常指向防线缺失</td></tr>
+    <tr><td><b>无责复盘</b></td><td>不惩罚如实陈述的人，但仍然完整记录事实与执行人</td></tr>
+    <tr><td><b>改进项</b></td><td>带 owner、日期、验收标准的改动，没有这三样就不算改进项</td></tr>
+    <tr><td><b>二次事故</b></td><td>由处置动作本身引发的新故障，例如扩容压垮下游、临时措施忘了撤</td></tr>
+    <tr><td><b>状态页</b></td><td>对外同步故障状态的固定入口，内容只写已验证事实</td></tr>
+    <tr><td><b>演练</b></td><td>在受控条件下故意触发故障，用来验证止损路径和回滚能力</td></tr>
+    <tr><td><b>事后回看</b></td><td>改进项到期后回看是否真的生效，是复盘闭环的最后一步</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 挑一次你参与过的真实故障，用六个必填字段写一份复盘，然后按 0/1/2 打分，重点看「改进项」和「验证方式」两栏能不能拿到 2 分；② 用手机录一段三分钟的五段式讲述，回听时数一数出现了几次「大概」「应该」「好像」，超过两次就重录；③ 找一台测试机，故意做三件事——把超时改成 1ms、把副本数设成 0、把配置中心停掉，然后掐表记录你从「发现」到「止损」用了几分钟，这个时间就是你面试时能说出口的数字。<br><br>
+    <b>之后值得单独学：</b>第 15 期讲 SLO 与告警，事故的「发现」这一段完全由它决定；第 16 期讲可观测性，三条支柱怎么配合定位，是第 5 分钟之后的事；第 19 期讲发布与回滚，止损手段里最常用的那一种在那里展开；第 20 期把发布与监控当成系统设计题，能看到这些能力背后的架构；第 22 期讲行为面，事故故事怎么讲得更短、更有判断，是另一套训练。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 21 期 · 事故题的分水岭不在你修得多快，在你说不说得清「第几分钟做了什么判断」</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

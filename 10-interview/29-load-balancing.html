@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>负载均衡：LVS、Nginx、HAProxy 怎么选</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 29 期</span>
+    <h1>负载均衡：LVS、Nginx、HAProxy 怎么选</h1>
+    <p class="sub">四层和七层不是「谁更高级」，是<b>你能拿到什么信息、愿意付多少性能代价</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>6</b> 类调度算法</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>20</b> 条验证命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你的 LB 到后端用的是短连接还是长连接？答案决定了你会不会遇到那种「偶发 502」。</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都发生在「加了负载均衡之后」</h2></div>
+  <p class="lead">「后端 Nginx 的访问日志里，client 地址全是同一个 10.0.0.5。」这句话说出来，会议室里通常没人接得上——因为大家默认负载均衡是个「透明」的东西，加上去就该什么都不变。真实情况是：<b>它在网络路径上插了一层，这一层会改变源 IP、改变连接生命周期、改变故障的表现形式。</b></p>
+  <p>下面三个现场几乎覆盖了负载均衡面试里所有「你是不是真配过」的追问。它们的共同点是：单独看每一个组件都正常，拼在一起才出问题。</p>
+  <table>
+    <tr><th style="width:210px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>后端日志里 client IP 全是 LB 的地址</td><td>Nginx 的 log_format 配错了</td><td>四层转发在 IP 层改写或封装，后端看到的对端就是 LB。要么改七层用 X-Forwarded-For，要么在四层开透明转发 / Proxy Protocol，后端得配合解析</td></tr>
+    <tr><td>每天几十个 502，重试就好，后端日志一条都没有</td><td>后端偶发崩溃，或者机器不稳</td><td>LB 和后端都维持空闲连接池，后端 keepalive 到期先发 FIN，LB 恰好在这一刻从池里取了这条已关闭的连接发请求，收到 RST。请求根本没进后端业务逻辑，所以后端没有日志</td></tr>
+    <tr><td>LVS DR 配完，VIP 能 ping 通，访问超时</td><td>防火墙挡了，或者后端没起服务</td><td>回程不通：RS 上没在 lo 配 VIP、ARP 没抑制导致地址冲突、或者 RS 的默认网关没配好。DR 只改 MAC，回程完全不经过 director</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>路径</div><div class="cd">请求从哪进、响应从哪出、中间谁改了什么字段。三种 LVS 模式的全部差别就在这三个问题上。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>会话</div><div class="cd">同一用户的连续请求怎么落到同一台后端。四层只能靠源 IP，七层能靠 Cookie，但都不是免费的。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>可观测</div><div class="cd">出问题时你在哪一层能看到证据。看不到的那一层，就是你的排查边界。</div></div>
+  </div>
+  <p>这篇的走法：先把四层和七层的分界线划清，再拆 LVS 的三种模式（这是最容易答错的地方），然后是调度算法与会话保持、keepalived 与脑裂、健康检查、连接与超时、云上 SLB 的黑盒边界、可用区与兜底拓扑，收在「你怎么证明这套东西可靠」这句最容易被追问的话术上。</p>
+  <p><b>面试落点：</b>「负载均衡不是透明设备。它改的是网络路径，所以源 IP、连接复用、故障形态都会跟着变。排查时我先确认请求有没有真的到后端，再判断是转发层还是应用层的问题。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>四层与七层：真正的分界线是「你按什么信息做决策」</h2></div>
+  <p class="lead">「四层快还是七层快」这个问题问错了方向。正确的问法是：<b>你要根据什么信息决定把请求发给谁？</b>只看 IP 和端口，四层就够；要看域名、路径、Header、Cookie，你只能上七层。</p>
+  <p>四层转发不解析应用层协议。它拿到一个 TCP 连接（或者一个 UDP 包），按五元组里的目的地址和端口选一台后端，然后把字节搬过去。也正因为不解析，它对协议完全中立：HTTP、MySQL、Redis、自研的二进制私有协议，在它眼里都是字节流。转发可以在内核里完成（IPVS），也可以在用户态做（HAProxy 的 tcp 模式），但都不需要理解 payload。</p>
+  <p>七层必须先<b>把字节流还原成请求</b>。这意味着它要理解协议语法、维护连接状态、处理慢客户端（一个只发一半请求头就不动的客户端会占住连接和工作内存），也意味着它天然能读懂 Host、Path、Header、Cookie、状态码。能读懂，才谈得上按这些字段路由、改写、缓存、限流。</p>
+  <p>所以「四层是低配版七层」是错的。它们解决的是两类问题：四层解决「流量怎么分发到一组等价的后端」，七层解决「这批流量分别该去哪、该长什么样」。云上常见的组合是四层 SLB 顶在最前面，后面挂一组七层 Nginx——四层负责扛连接数和做跨可用区容灾，七层负责路由和 TLS 卸载。</p>
+  <table>
+    <tr><th style="width:120px">维度</th><th>四层</th><th>七层</th></tr>
+    <tr><td><b>能看到什么</b></td><td>源/目的 IP、端口、TCP 状态、字节数</td><td>以上全部，加上方法、URL、Host、Header、Cookie、状态码、响应时间</td></tr>
+    <tr><td><b>决策依据</b></td><td>地址与端口，或连接数/权重</td><td>任意 HTTP 字段，可组合规则</td></tr>
+    <tr><td><b>转发开销</b></td><td>低，路径短，可做到接近线速</td><td>高一些，要解析、要缓冲、要管理两段连接</td></tr>
+    <tr><td><b>协议中立</b></td><td>是，换成任何 TCP 协议都能转</td><td>否，只懂它实现的协议</td></tr>
+    <tr><td><b>会话保持</b></td><td>只能源 IP 哈希</td><td>Cookie 注入、URL 哈希、Header 哈希</td></tr>
+    <tr><td><b>TLS</b></td><td>透传（看不到内容），或按 SNI 分流</td><td>可终止，能看到明文请求，再决定怎么转</td></tr>
+    <tr><td><b>典型故障</b></td><td>回程不通、源 IP 丢失、后端全摘</td><td>502/504、慢客户端拖垮 worker、buffer 配置错</td></tr>
+  </table>
+  <div class="callout">
+    <b>一个容易答错的点：</b>「四层做 TLS 卸载之后是不是就变七层了？」不是。<b>卸载</b>只是把加解密这一步挪到了 LB 上，只要你不解析 HTTP、不按 URL 路由，它仍然是四层转发。反过来，按 SNI（TLS 握手里的服务器名）分流也不需要解密内容，属于四层能力。真正让它变成七层的，是「读懂 HTTP 请求并据此做决策」。
+  </div>
+  <p>HAProxy 常被问「它到底是几层」。答案是：<b>看你怎么配</b>。<span class="k">mode tcp</span> 就是四层，<span class="k">mode http</span> 就是七层，同一个进程两种模式可以并存，不同 frontend 各配各的。Nginx 的 stream 模块同理。所以别把产品名当层级，把配置当层级。</p>
+  <p><b>面试落点：</b>「四层和七层的分界不是性能，是可见信息。四层只看得到 IP 和端口，所以它只能做等价后端之间的分发，协议无关、开销低；七层要解析请求，才能按 URL、Header、Cookie 路由，代价是要管理连接状态和处理慢客户端。我们线上是四层顶在前面扛连接、七层在后面做路由，两层各解决一半问题。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>LVS 三种模式：差别只有一个问题——响应从哪条路回去</h2></div>
+  <p class="lead">LVS 的标准实现只有三种转发模式：<b>NAT、DR、TUN</b>。它们的分歧点不是算法，不是性能参数，而是<b>响应包走不走 director</b>。把这一句想通，三种模式的所有差异都能自己推出来。</p>
+  <p>共同的部分先说清：IPVS 是内核里的一个模块，规则由 <span class="k">ipvsadm</span> 下发（也可以用 keepalived 生成）。它挂在 netfilter 的钩子上，包进来之后按「虚拟地址:端口」匹配到某个虚拟服务，再按调度算法选一台真实服务器，然后改写包头。三种模式的差别，全在「改写哪些字段」和「回程怎么走」。</p>
+  <h3>NAT：改目的地址，双向都过 director</h3>
+  <p>NAT 模式把目的 IP 改成 RS 的 IP（需要时连端口一起改），RS 处理完把响应发回给 director，director 再把源地址改回 VIP 送给客户端。所以<b>请求和响应都要经过 director</b>，RS 的默认网关必须指向 director，否则响应会从自己的网关出去，客户端收到一个源地址不对的包，连接直接建不起来。</p>
+  <p>它的优势是<b>支持端口映射</b>（VIP:80 转到 RS:8080），RS 可以是任意系统、不需要特殊配置，甚至可以在不同网段。劣势也很直接：director 要处理双向流量，是明确的瓶颈；连接表跟着翻倍。</p>
+  <h3>DR：只改 MAC，响应直接回客户端</h3>
+  <p>DR 模式只改写以太网帧的目的 MAC，IP 头一个字节都不动。RS 收到的帧目的 IP 还是 VIP，所以<b>RS 必须把这个 VIP 配在自己身上</b>——通常配在 loopback 上，这样它才会认为这个包是发给自己的。处理完，RS 直接把响应发给客户端，源 IP 仍然是 VIP，客户端看不出差别。</p>
+  <p>代价是三个硬约束：<b>第一</b>，director 和 RS 必须在同一个二层广播域，因为改的是 MAC；<b>第二</b>，RS 必须抑制 ARP，否则它会对外宣称「VIP 在我这里」，把网关和客户端的 ARP 表搅乱，表现为「时通时不通」；<b>第三</b>，不支持端口映射，VIP 的端口和后端端口必须一致。反过来说，DR 的收益很大：director 只承担入向流量，出向完全不经过它，同样一台机器能扛的连接数比其他模式高得多。</p>
+  <h3>TUN：套一层 IP 隧道，能跨网段</h3>
+  <p>TUN 模式在原始 IP 包外面再封一层 IP 头（IPIP 隧道），发到 RS，RS 拆掉外层头，看到里面的目的地址是 VIP，处理完同样直接把响应发给客户端。它能跨三层网段，适合 director 和 RS 不在同一机房的场景。代价是多一次封装解封装的开销、RS 要支持并启用隧道设备（<span class="k">tunl0</span>）、MTU 要相应留出余量。</p>
+  <table>
+    <tr><th style="width:110px">模式</th><th>改什么</th><th>响应路径</th><th>跨网段</th><th>端口映射</th><th>RS 额外要求</th></tr>
+    <tr><td><b>NAT</b></td><td>目的 IP（+端口）</td><td>经过 director</td><td>可以</td><td>支持</td><td>网关指向 director</td></tr>
+    <tr><td><b>DR</b></td><td>目的 MAC</td><td>直接回客户端</td><td>不行，需二层可达</td><td>不支持</td><td>lo 上配 VIP + 抑制 ARP</td></tr>
+    <tr><td><b>TUN</b></td><td>外包一层 IP 头</td><td>直接回客户端</td><td>可以</td><td>不支持</td><td>启用 tunl0 + 处理 MTU</td></tr>
+  </table>
+  <pre><span class="c"># 看当前规则：-L 列服务，-n 数字，-c 看连接表</span>
+ipvsadm -Ln
+ipvsadm -Lnc | head
+<span class="c"># 输出里 SYN_RECV 长期不变成 ESTABLISHED，基本就是回程不通</span>
+
+<span class="c"># DR 模式在 RS 上必须做的两件事：VIP 配到 lo、抑制 ARP</span>
+ip addr add 192.0.2.100/32 dev lo
+sysctl -w net.ipv4.conf.all.arp_ignore=1
+sysctl -w net.ipv4.conf.all.arp_announce=2
+sysctl -w net.ipv4.conf.lo.arp_ignore=1
+sysctl -w net.ipv4.conf.lo.arp_announce=2
+
+<span class="c"># 确认 VIP 在哪台机器上应答 ARP，冲突时这里会看到异常</span>
+ip -4 addr show
+arping -I eth0 192.0.2.100
+
+<span class="c"># 手工加一条规则，验证思路用（生产交给 keepalived 生成）</span>
+ipvsadm -A -t 192.0.2.100:80 -s wrr
+ipvsadm -a -t 192.0.2.100:80 -r 10.0.0.11:80 -g -w 3
+<span class="c"># -g 是 DR，-m 是 NAT，-i 是 TUN</span></pre>
+  <div class="callout warn">
+    <b>DR 模式最常见的三个坑，按出现频率排：</b>① RS 上没配 VIP，包到了直接被内核丢掉（因为目的地址不是本机）；② ARP 没抑制，VIP 被多台机器同时应答，流量随机跑偏；③ RS 的 <span class="k">rp_filter</span> 严格模式把「源 IP 是客户端、却从 eth0 进来」的回程包当成伪造包丢掉。这三个现象都长得像「网络不通」，但改的地方完全不同。
+  </div>
+  <p><b>面试落点：</b>「LVS 三种模式的区别就是响应走不走 director。NAT 双向都过 director，支持端口映射但 director 是瓶颈；DR 只改 MAC，RS 在 lo 上配 VIP 并抑制 ARP，响应直接回客户端，所以吞吐最好，但要求二层可达；TUN 用 IP 隧道解决跨网段，开销比 DR 大。生产上绝大多数场景用 DR。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>调度算法与会话保持：源 IP 哈希是最省事也最容易翻车的一种</h2></div>
+  <p class="lead">「我们做了会话保持，所以不需要共享 session。」这句话在扩容那天会变成故障：新加的机器分不到任何流量，老机器上的人一多就抖，而你不敢重启任何一台——因为重启意味着那台机器上的会话全部丢失。</p>
+  <p>先把算法分两类。<b>静态</b>的不看后端状态：<span class="k">rr</span> 轮询、<span class="k">wrr</span> 加权轮询、<span class="k">dh</span> 目的地址哈希、<span class="k">sh</span> 源地址哈希。<b>动态</b>的会参考当前连接数：<span class="k">lc</span> 最少连接、<span class="k">wlc</span> 加权最少连接、<span class="k">sed</span> 最短期望延迟、<span class="k">nq</span> 永不排队、<span class="k">lblc</span> 基于局部性的最少连接、<span class="k">lblcr</span> 带复制的版本。</p>
+  <p><span class="k">wlc</span> 是 LVS 里最常用的动态算法，它的「连接数」不是原始值，而是按权重折算过的——大意是「活跃连接数 × 256 + 非活跃连接数」再除以权重，取结果最小的那台。这个折算假设「权重高的机器处理能力强，所以同样的连接数对它更轻松」。理解这一点，你就知道为什么权重配错会让某台机器被打爆：权重是<b>你声明</b>的能力比例，不是它真实的能力。</p>
+  <table>
+    <tr><th style="width:110px">算法</th><th>适合什么</th><th>什么时候会翻车</th></tr>
+    <tr><td><b>rr / wrr</b></td><td>后端同质、请求耗时接近</td><td>请求耗时差异大时，慢请求会堆在某几台上</td></tr>
+    <tr><td><b>lc / wlc</b></td><td>请求耗时差异大、长连接多</td><td>权重与真实能力不符，或连接数与负载不成正比（比如长连接但很闲）</td></tr>
+    <tr><td><b>sh</b></td><td>需要按客户端粘性，且客户端 IP 分散</td><td>客户端集中在少数出口 IP（NAT、公司网关、运营商代理）时严重倾斜</td></tr>
+    <tr><td><b>一致性哈希</b></td><td>需要把同一个 key 稳定映射到同一台</td><td>热点 key、节点故障导致的流量转移、扩缩容时的部分漂移</td></tr>
+  </table>
+  <p>会话保持有四条路，代价依次递减：<b>源 IP 哈希</b>（四层唯一选择，粒度粗，NAT 后失效）、<b>Cookie 注入</b>（七层，能精确到浏览器，但首次请求没有 Cookie，且需要解析 HTTP）、<b>URL/Header 哈希</b>（适合同一类请求打到同一台做本地缓存）、<b>把会话从进程里拿出去</b>（Redis / 数据库 / 签名 Cookie）。前三条是「让请求回到同一台」，最后一条是「让请求不需要回到同一台」——只有最后一条真正解决了扩容问题。</p>
+  <p>一致性哈希值得单独说，因为它是高频追问。取模分片（<span class="k">hash(key) % N</span>）在 N 从 4 变 5 时，几乎<b>所有</b> key 的落点都会变；一致性哈希把节点和 key 都映射到一个环上，key 顺时针找第一个节点，增加一个节点只影响环上相邻的一段，平均约 1/N 的 key 需要迁移。虚拟节点（每个物理节点在环上出现几十上百次）是为了解决「节点少时环划分不均」的问题。</p>
+  <p>但一致性哈希不是免费的：节点故障时，它负责的那一段会<b>整段压给顺时针的下一台</b>，如果那段本来就热，下一台会被打穿；扩容时仍有部分 key 漂移，如果漂的是缓存 key，就会有一波集中回源。所以它降低的是「迁移量」，不是「迁移的存在」。</p>
+  <pre><span class="c"># LVS 侧：换调度算法、调权重，都是改已有规则</span>
+ipvsadm -E -t 192.0.2.100:80 -s wlc
+ipvsadm -e -t 192.0.2.100:80 -r 10.0.0.11:80 -g -w 5
+
+<span class="c"># 看每台当前扛了多少连接，判断倾斜（最后一列是后端地址）</span>
+ipvsadm -Lnc | awk 'NR&gt;3{print $NF}' | sort | uniq -c
+
+<span class="c"># Nginx 七层：ip_hash 是源 IP，hash ... consistent 是一致性哈希</span>
+<span class="c"># upstream app { ip_hash; server 10.0.0.11:8080; }</span>
+<span class="c"># upstream app { hash $request_uri consistent; server 10.0.0.11:8080; }</span>
+
+<span class="c"># HAProxy：balance 后面跟算法名，hash-type 决定是否用一致性哈希</span>
+<span class="c"># balance roundrobin | leastconn | source | uri</span>
+<span class="c"># hash-type consistent</span></pre>
+  <div class="callout danger">
+    <b>别把源 IP 哈希当成会话保持的通用解。</b>办公网、4G 基站、运营商 NAT 后面可能有成千上万个用户共享同一个出口 IP，哈希的结果是全压在一台上。更糟的是移动网络切换基站会换 IP，用户下一秒就被打到另一台，购物车直接清空。如果你的业务真的依赖会话，正确方向是共享存储或者签名 Cookie，而不是让 LB 记住他。
+  </div>
+  <p><b>面试落点：</b>「会话保持我分两种思路：让请求回到同一台，或者让请求不需要回到同一台。四层只能用源 IP 哈希，粒度粗且怕 NAT；七层可以用 Cookie，但首次请求仍然要选一台。真正 scalable 的做法是把会话外置。扩容时如果用取模分片，几乎全量重映射，所以缓存类场景我会用一致性哈希加虚拟节点。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>keepalived 与 VIP 漂移：漂过去的是 IP，不是连接</h2></div>
+  <p class="lead">「VIP 已经漂到备机了，为什么业务还是不通？」因为漂移只搬了一个 IP 地址。<b>TCP 连接、内核里的连接跟踪表、应用层的会话，一样都没搬。</b>所有在切换瞬间还活着的长连接，全部作废。</p>
+  <p>keepalived 的核心是 VRRP：一组机器共享一个虚拟 IP，通过周期性的通告报文互相竞争，优先级最高的成为 MASTER 并持有 VIP，其余的做 BACKUP 等着。MASTER 定时发通告（VRRP 使用组播，目的地址是 224.0.0.18，IP 协议号 112），BACKUP 在若干个通告周期内收不到，就认为对方挂了，接管 VIP 并免费 ARP 通知全网「这个 IP 现在在我这里」。</p>
+  <p>配置上有四个字段必须两端一致，否则根本跑不起来：<span class="k">virtual_router_id</span>（同一个 VRID 才属于同一组）、<span class="k">priority</span>（决定谁主）、认证信息、以及绑定的网卡。还有一个行为开关 <span class="k">preempt</span>：开启时高优先级节点恢复后会抢回 VIP，关闭则一直让位。抢回意味着又一次切换，所以很多团队会关掉它，宁可手动切回。</p>
+  <p>云上最常见的「本地能漂、云上不漂」，原因是<b>云网络通常不放行组播</b>。解决办法是改成单播：配置 <span class="k">unicast_peer</span> 直接指定对端 IP，让通告以单播形式发出去。这一点如果不主动说，面试官会认为你只在虚拟机里试过。</p>
+  <h3>脑裂：两台都觉得自己是主</h3>
+  <p>脑裂的触发条件很朴素：<b>心跳链路断了，但两台机器都还活着</b>。此时 BACKUP 收不到通告，接管 VIP；MASTER 那边网络也断了，它并不知道自己被孤立，仍然认为自己是主。于是同一个 VIP 同时出现在两台机器上。</p>
+  <p>后果比「VIP 消失」更隐蔽：如果两台都能被客户端访问到（比如心跳走的是专线，业务走的是普通网络，只有专线断），ARP 层面会出现两个 MAC 应答同一个 IP，客户端和网关的 ARP 缓存各记各的，流量随机分裂到两台。这两台的连接表、限流计数、本地缓存全都不一致，表现为「一部分用户登录态丢失、一部分请求被限流」。如果只有一台能被访问到，反而只是「切换了一下」。</p>
+  <table>
+    <tr><th style="width:180px">防护手段</th><th>解决什么</th><th>代价</th></tr>
+    <tr><td>心跳走独立链路，最好两条</td><td>降低心跳本身故障的概率</td><td>多一张网卡、多一条专线</td></tr>
+    <tr><td>BACKUP 上检测「我还能到对端吗」</td><td>能到说明是自己这边的通告发不出去，主动降优先级进 FAULT</td><td>脚本本身的判断逻辑要写对，误判会导致该接管时不接管</td></tr>
+    <tr><td>对「同一 VIP 出现在两台」告警</td><td>事后第一时间发现，不用等业务报障</td><td>需要额外的探测点</td></tr>
+    <tr><td>fencing（STONITH，直接断电/隔离）</td><td>物理上保证只有一个主</td><td>重，一般只在强一致场景用</td></tr>
+  </table>
+  <pre><span class="c"># VIP 现在在哪台、绑在哪个网卡</span>
+ip -4 addr show | grep -B2 192.0.2.100
+
+<span class="c"># keepalived 的状态迁移都写在日志里：Entering MASTER / BACKUP / FAULT</span>
+journalctl -u keepalived --since "-1h" | grep -E 'MASTER|BACKUP|FAULT|VRRP'
+
+<span class="c"># 抓 VRRP 通告，看对端到底有没有在发（协议号 112）</span>
+tcpdump -i eth0 -nn proto 112 -c 10
+
+<span class="c"># 关键字：同一个 VRID 出现两个不同源 IP，就是双主</span></pre>
+  <div class="callout warn">
+    <b>keepalived 不检查后端健康。</b>它只关心「对端还活着吗」，不关心「我这台机器上的 Nginx 还能不能干活」。如果只配了 VRRP，一台机器上的服务挂了而 keepalived 还在，VIP 不会漂，流量继续打到一台死掉的后端上。要做到「服务挂了也漂」，得加 <span class="k">vrrp_script</span> 探测本地服务，失败时把状态置为 FAULT 并降低优先级。
+  </div>
+  <p><b>面试落点：</b>「VIP 漂移只保证入口地址还在，不保证已有连接。切换瞬间所有长连接都会断，所以业务要么能重连，要么就得在客户端做重试。脑裂的根因是心跳断而两台都活着，防护靠独立心跳链路、对端可达性检测和双主告警；云上还要注意组播被禁，得改单播。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>健康检查：全站 502 往往是因为探针检查了下游</h2></div>
+  <p class="lead">「数据库抖了 30 秒，结果整个站点 502 了 30 秒。」这个因果链听起来荒谬，但它的实现非常自然：健康检查接口里写了一句 <span class="k">SELECT 1</span>。数据库一慢，所有后端的探针同时超时，LB 把所有后端同时摘掉，于是入口直接没有可用后端。</p>
+  <p>健康检查分两种。<b>被动检查</b>靠真实请求的失败计数，Nginx 的 <span class="k">max_fails</span> 与 <span class="k">fail_timeout</span> 就是这套：在 fail_timeout 窗口内失败达到 max_fails 次，就把这台摘掉，并在接下来的一段时间内不再发请求给它。它的优点是零额外流量，缺点是<b>发现即已经伤到用户</b>——你得先失败几次，才能知道它坏了。</p>
+  <p><b>主动检查</b>是定时发探测请求，keepalived 的 <span class="k">TCP_CHECK</span> / <span class="k">HTTP_GET</span> / <span class="k">SSL_GET</span> / <span class="k">MISC_CHECK</span>，HAProxy 的 <span class="k">check inter ... rise ... fall ...</span>。它能提前发现，代价是探测流量，以及一个绕不开的取舍：<b>探测间隔 × 连续失败次数 = 最坏发现延迟</b>。间隔 2 秒、连续失败 3 次，最坏就是 6 秒；这 6 秒里错误还在发生。把间隔调到 1 秒能缩短延迟，但探测流量翻倍，而且更容易因为瞬时抖动误判。</p>
+  <table>
+    <tr><th style="width:150px">方式</th><th>发现延迟</th><th>误判风险</th><th>适合</th></tr>
+    <tr><td><b>被动（失败计数）</b></td><td>要等真实请求失败若干次</td><td>低（失败是真实发生的）</td><td>所有场景的基础，必配</td></tr>
+    <tr><td><b>主动 TCP 探测</b></td><td>间隔 × fall</td><td>低，但只能证明端口能连</td><td>非 HTTP 协议、或七层探针成本太高时</td></tr>
+    <tr><td><b>主动 HTTP 探测</b></td><td>间隔 × fall</td><td>中，探针内容写错就会误判</td><td>HTTP 服务，能验证「真的能处理请求」</td></tr>
+    <tr><td><b>MISC / 脚本探测</b></td><td>取决于脚本</td><td>高，脚本逻辑就是你的判断</td><td>需要检查本地资源、队列积压等自定义条件</td></tr>
+  </table>
+  <p>探针内容有三条原则，值得背下来：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>只检查自己能控制的东西。</b>进程活着、端口能连、本地依赖（比如本地缓存目录可写）正常。这些坏了，换一台确实更好。</div></div>
+    <div class="step"><div class="txt"><b>不要检查下游。</b>数据库、Redis、第三方接口慢，是所有后端同时慢，摘掉任何一台都不会变好，只会把「慢」升级成「全挂」。</div></div>
+    <div class="step"><div class="txt"><b>用专门的轻量接口。</b>别拿首页当探针，首页可能有缓存、有重查询、有鉴权跳转，探针会把它们全触发一遍，还会污染监控数据。</div></div>
+  </div>
+  <p>还有两个工程细节。<b>抖动</b>（flapping）：一台时好时坏的后端会反复进出，每次进出都扰动流量分布。对策是让 <span class="k">rise</span> 大于 <span class="k">fall</span>（恢复要更谨慎），或者先降权再摘除。<b>慢启动</b>：一个刚恢复的节点如果立刻接全量流量，很可能因为缓存冷、连接池空而再次被打挂，形成循环。HAProxy 的 <span class="k">slowstart</span> 就是干这个的，Nginx 开源版没有等价能力，得靠权重手工渐增。</p>
+  <pre><span class="c"># Nginx 被动检查：fail_timeout 窗口内失败 max_fails 次就摘，摘 fail_timeout 秒</span>
+<span class="c"># upstream app {</span>
+<span class="c">#   server 10.0.0.11:8080 max_fails=3 fail_timeout=10s;</span>
+<span class="c">#   server 10.0.0.12:8080 max_fails=3 fail_timeout=10s;</span>
+<span class="c"># }</span>
+
+<span class="c"># 手工验证探针接口：确认它不依赖下游，且响应够快</span>
+curl -s -o /dev/null -w 'code=%{http_code} time=%{time_total}\n' http://10.0.0.11:8080/healthz
+
+<span class="c"># 后端视角：LB 的探测请求长什么样、多久一次（看 access log 里的 UA 和频率）</span>
+tail -f /var/log/nginx/access.log | grep healthz
+
+<span class="c"># HAProxy 运行时可动态改权重、临时下线一台，验证摘除行为</span>
+<span class="c"># echo "set server be_app/srv1 state maint" | socat stdio /var/run/haproxy.sock</span>
+<span class="c"># echo "set server be_app/srv1 weight 0"      | socat stdio /var/run/haproxy.sock</span></pre>
+  <div class="callout danger">
+    <b>「所有后端同时被摘」几乎总是配置问题，不是后端问题。</b>判断方法很简单：看被摘的时间点是否完全一致。真故障是陆续挂的，配置问题是一起挂的。如果探针里含下游调用、或者探针超时设得比下游的超时还短，就会出现这种「整齐划一」的摘除。
+  </div>
+  <p><b>面试落点：</b>「健康检查我会配两层：被动失败计数保底，主动探测提前发现。探针只检查自己能控制的东西，绝不检查数据库这类共享依赖，否则下游一抖就是全站摘除。参数上的取舍是探测间隔乘连续失败次数就是最坏发现延迟，我用 rise 大于 fall 来抑制抖动，恢复时用慢启动避免二次打挂。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>连接与超时：偶发 502 的经典成因是「两边都想关连接」</h2></div>
+  <p class="lead">「每天几十个 502，重试一下就好了，后端日志里一条都没有。」这是负载均衡最经典的悬案。它不随机、不集中、不随流量增长，只在某些时刻出现——因为它是<b>一个时间窗口的竞态</b>，不是一次故障。</p>
+  <p>机制是这样的：为了性能，LB 到后端通常用长连接（连接池）。池子里的连接空闲一段时间后，两边都可能主动关闭。后端先关，会发 FIN；LB 收到 FIN 后这条连接就不可用了，正常应该从池里移除。但如果 LB 恰好在 FIN 到达之前的一瞬间，从池里取出这条连接、把请求写进去，内核会回一个 RST，LB 拿到的是「连接被重置」，于是给客户端返 502。</p>
+  <p>Nginx 的 error log 里，这个现象的标准长相是 <b>upstream prematurely closed connection while reading response header from upstream</b>。请求根本没进后端业务代码，所以后端业务日志干干净净——这正是「后端说不是我」的原因，两边都没说谎。</p>
+  <p>解法只有一个方向：<b>让一端明确地先关</b>。通常让 LB 的空闲超时短于后端的 keepalive 超时，由 LB 主动回收，同时后端把 keepalive 设得更长，避免它先发 FIN。另一个方向是让 LB 感知连接可用性（发请求前先探活），或者对幂等请求开启重试（<span class="k">proxy_next_upstream</span>），但后者对非幂等请求有风险，等于可能重复下单。</p>
+  <table>
+    <tr><th style="width:190px">超时</th><th>在哪一侧</th><th>管什么</th></tr>
+    <tr><td><b>keepalive_timeout</b></td><td>Nginx（作为服务端和作为客户端含义不同）</td><td>空闲连接保留多久。作为上游客户端时，它决定连接池里的连接什么时候被关掉</td></tr>
+    <tr><td><b>proxy_connect_timeout</b></td><td>LB</td><td>和后端建立 TCP 连接要多久。超了就是 502，因为连接都没建立</td></tr>
+    <tr><td><b>proxy_read_timeout</b></td><td>LB</td><td>等后端响应的最长时间。超了是 504</td></tr>
+    <tr><td><b>proxy_send_timeout</b></td><td>LB</td><td>向后端写请求的超时，大 body 上传时才会碰到</td></tr>
+    <tr><td><b>client_*_timeout</b></td><td>LB</td><td>面向客户端的一侧，慢客户端会占住连接</td></tr>
+  </table>
+  <p>502 和 504 的归属要分清，因为排查方向完全不同。<b>502</b> 是「我拿到的是无效响应」——连接被拒、被重置、响应头解析失败、后端提前关闭。它说明<b>后端在，但对话失败</b>。<b>504</b> 是「我等超时了」——后端可能还在算，只是慢。它说明<b>后端在算，但太慢</b>。<b>499</b> 是 Nginx 自己的状态码，表示客户端在服务端响应之前就断开了，通常是客户端超时设得比服务端短。</p>
+  <p>超时值怎么定？不要抄网上的数字。原则有两条：<b>由外向内递减</b>，客户端超时 &gt; LB 超时 &gt; 后端内部超时，这样外层不会先放弃而内层还在空转；<b>按业务分位定</b>，读接口的 P99 是多少，超时设成它的若干倍，而不是全站一个值。一个下单接口和一个报表导出接口用同一个读超时，必然有一边是错的。</p>
+  <pre><span class="c"># 看当前生效的全部超时配置（-T 会展开 include）</span>
+nginx -T 2&gt;/dev/null | grep -E 'keepalive|_timeout|proxy_http_version|Connection'
+
+<span class="c"># 上游连接池的标准写法：三个都要有，缺一个连接就不会复用</span>
+<span class="c"># upstream app {</span>
+<span class="c">#   server 10.0.0.11:8080;</span>
+<span class="c">#   keepalive 64;                    # 每个 worker 保留的空闲连接数</span>
+<span class="c"># }</span>
+<span class="c"># location / {</span>
+<span class="c">#   proxy_http_version 1.1;          # 1.0 默认不带 keepalive</span>
+<span class="c">#   proxy_set_header Connection "";  # 清掉 close，否则每请求新建连接</span>
+<span class="c">#   proxy_pass http://app;</span>
+<span class="c"># }</span>
+
+<span class="c"># 定位一次 502 是不是连接复用导致的：看 error log 的具体措辞</span>
+grep -E 'prematurely closed|Connection reset|no live upstreams' /var/log/nginx/error.log | tail
+
+<span class="c"># 分段计时，先分清慢在解析、连接、还是首字节</span>
+curl -o /dev/null -s -w 'dns=%{time_namelookup} conn=%{time_connect} tls=%{time_appconnect} ttfb=%{time_starttransfer} total=%{time_total}\n' https://example.com/</pre>
+  <div class="callout">
+    <b>一个反直觉的结论：</b>把后端 keepalive 调得很短，看起来「更干净」，实际上是在制造 502。因为后端越频繁地主动关连接，LB 池里就越容易出现「刚关还没被发现」的连接。正确做法是让后端 keepalive 长于 LB 的空闲超时，让 LB 成为主动关闭方，它的连接池状态才是自己可控的。
+  </div>
+  <p><b>面试落点：</b>「偶发 502 且后端无日志，我第一个怀疑连接复用竞态：后端 keepalive 比 LB 空闲超时短，后端先发 FIN，LB 从池里取了这条已关的连接。解法是让 LB 先关，后端 keepalive 设长。502 是对话失败，504 是等超时，499 是客户端先走，这三个数在 LB 和后端两侧的口径要对齐，否则会互相甩锅。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>云 SLB 的黑盒：你至少要能证明「请求到没到后端」</h2></div>
+  <p class="lead">云上的负载均衡是个黑盒。你看不到 ipvsadm 规则，进不去它所在的机器，也不知道它背后是一台还是十台。这时候「是不是 SLB 的问题」这个判断，只能靠<b>对照实验</b>，不能靠感觉。</p>
+  <p>先说你能看到什么：监听配置（协议、端口、证书）、后端组和权重、健康检查参数、会话保持开关、访问日志（如果开了）、以及监控指标（活跃连接数、新建连接数、入/出带宽、4xx/5xx 比例、后端响应时间）。这些足够你完成大部分判断。</p>
+  <p>再说你看不到什么：转发实现、连接表容量、单机还是集群、具体的超时实现细节。所以排查要按「能不能绕开它」来设计：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先证明请求到了后端。</b>在后端抓包（<span class="k">tcpdump -i any port 8080</span>）或看访问日志。没有记录，问题在 SLB 到后端这一段——健康检查、安全组、后端端口、权重为 0，都有可能。</div></div>
+    <div class="step"><div class="txt"><b>再证明后端回得对。</b>从后端机器上直接 <span class="k">curl -H 'Host: 你的域名' http://127.0.0.1:8080/path</span>，绕开 SLB。返回正常，说明应用没问题，差异在转发层。</div></div>
+    <div class="step"><div class="txt"><b>然后对比两侧的口径。</b>SLB 的 5xx 和后端的 5xx 数量对不对得上？对不上，说明有一部分请求压根没到后端，或者是 SLB 自己产生的错误。</div></div>
+    <div class="step"><div class="txt"><b>动手改一个变量。</b>临时把一台后端摘掉、把权重改成 0、把健康检查换成 TCP。改完观察指标是否跟着变，没变说明你的假设错了。</div></div>
+  </div>
+  <p><b>真实客户端 IP</b> 是云上最高频的追问。七层监听一般会在 <span class="k">X-Forwarded-For</span> 里追加客户端地址，格式是逗号分隔的一串；取哪一段取决于你信任几层代理——直接取第一个会被客户端伪造（他可以在请求里自己带一个 XFF），安全做法是从右往左数，跳过你信任的代理层数。<b>四层监听</b>没有 HTTP 头可加，要么用透明转发（后端看到的源 IP 就是客户端，但要求回程也经过 SLB），要么用 Proxy Protocol（在后端连接的最前面插一行文本，后端必须显式支持解析，Nginx 要开 <span class="k">proxy_protocol</span>，否则整个请求会被当成畸形数据）。</p>
+  <p><b>健康检查的源地址</b>必须放行。云厂商的健康检查通常来自一个固定的地址段，如果你在后端安全组里只放了 SLB 的业务地址，探针会被拒，结果是「后端明明是好的，SLB 显示全部不健康，客户端直接 5xx，而后端日志里什么都没有」。这个现象和上一节的「全站摘除」长得一样，但原因完全不同。</p>
+  <p>还有一个容量视角：云 SLB 通常有<b>三个独立的上限</b>——并发连接数、新建连接速率（每秒能建多少新连接）、带宽。任何一个打满，表现都是超时或丢包，但要看不同的指标。具体数值以你购买的规格文档为准，不要凭印象说数字。短连接多的业务最先撞的是新建连接速率，长连接多的业务最先撞的是并发连接数。</p>
+  <pre><span class="c"># 后端抓包：确认请求到底有没有进来（先看有没有 SYN，再看有没有数据）</span>
+tcpdump -i any -nn 'tcp port 8080' -c 20
+
+<span class="c"># 带 Host 头直连后端，绕开 SLB 做对照</span>
+curl -sv -H 'Host: www.example.com' http://10.0.0.11:8080/healthz
+
+<span class="c"># 后端拿不到真实 IP 时，先确认请求头里到底带了什么</span>
+<span class="c"># Nginx: log_format 里加 $http_x_forwarded_for $proxy_protocol_addr</span>
+
+<span class="c"># 开 Proxy Protocol 的话，listen 必须显式声明，否则解析失败</span>
+<span class="c"># listen 8080 proxy_protocol;</span></pre>
+  <div class="callout warn">
+    <b>别把 SLB 当透明的。</b>它是一台（或一组）你不知道配置的代理。凡是代理会做的事——改源地址、改 Host、加头、超时、限速、健康检查——它都可能做，而且默认行为和你本地测的不同。上线前的验证清单里应该有这一条：从真实客户端走一遍完整链路，把后端收到的请求头打印出来看一眼。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>tcpdump -i any -nn 'tcp port 8080' -c 20</code><span class="desc">在后端抓包，先回答「请求到底有没有进来」这个问题</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -sv -H 'Host: www.example.com' http://10.0.0.11:8080/healthz</code><span class="desc">带 Host 直连后端，绕开 SLB，证明应用本身是好的</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -o /dev/null -s -w '%{http_code} %{time_total}\n' http://后端/路径</code><span class="desc">对比经 SLB 与不经 SLB 的耗时，差异大就说明问题在转发层</span><button class="copy">复制</button></div>
+    <div class="crow"><code>dig +noall +answer www.example.com</code><span class="desc">切换前先看解析结果与 TTL，评估 DNS 兜底实际要多久生效</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「云 SLB 是黑盒，所以我的判断方法是做对照：后端抓包证明请求到没到，带 Host 直连后端证明应用对不对，再对比两侧的 5xx 数量看有没有请求被 SLB 自己吞掉。真实 IP 在七层看 XFF 但从右往左取，四层只能靠透明转发或 Proxy Protocol。健康检查源地址必须放行，这是最常见的『后端全不健康』原因。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>高可用拓扑：做完双机之后，还剩三个单点</h2></div>
+  <p class="lead">「我们做了 LB 双机，所以入口是高可用的。」这句话通常只对了一半。双机解决了「一台机器坏」，但没解决「两台在同一个机架」「两台在同一个可用区」「DNS 挂了怎么办」。</p>
+  <p>入口冗余有三档。<b>主备</b>（keepalived + VIP 漂移）最常用，切换要几秒，切换瞬间长连接全断。<b>双活</b>（ECMP 或动态路由，两台同时转发）没有切换动作，一台挂了路由收敛，连接会断但那台机器上的流量会被重新分配；实现上依赖网络设备支持等价多路径。<b>DNS 轮询</b>最弱，它把选择权交给了客户端和本地 DNS，而客户端不遵守 TTL、缓存不刷新是常态。</p>
+  <p>第二层单点是<b>物理位置</b>。两台 director 放在同一个机柜、同一个交换机下，等于没做冗余——那台交换机的故障会同时带走两台。要跨机架、跨可用区，并且后端也要跨，否则 LB 活着而后端全在一个可用区，照样全站挂。</p>
+  <p>第三层是<b>DNS 兜底</b>。当整个机房不可用时，唯一能做的就是改 DNS。要接受两个现实：一是 TTL 只能建议，不能强制，很多递归 DNS 和客户端会缓存远超 TTL 的时间，实际生效可能是分钟级；二是切换后还有一段「部分用户仍然打到老地址」的尾巴。所以 DNS 适合做「机房级」兜底，不适合做秒级切换。</p>
+  <table>
+    <tr><th style="width:130px">层级</th><th>单点是什么</th><th>兜底手段</th><th>切换量级</th></tr>
+    <tr><td><b>地址</b></td><td>VIP 所在的机器</td><td>keepalived 主备 / ECMP 双活</td><td>秒级</td></tr>
+    <tr><td><b>位置</b></td><td>机架、交换机、可用区</td><td>跨机架部署 + 多可用区后端</td><td>无切换动作，靠冗余</td></tr>
+    <tr><td><b>入口</b></td><td>域名解析结果</td><td>多 A 记录 / 智能 DNS / 全局流量管理</td><td>分钟级，受客户端缓存影响</td></tr>
+    <tr><td><b>数据</b></td><td>主库、共享存储</td><td>主从 + 切换，或双写</td><td>视方案而定，通常最慢</td></tr>
+  </table>
+  <p><b>同城双活真正的难点不在 LB。</b>让两个机房都能接流量，入口层很容易——两套 LB、DNS 分流或者专线打通。难的是数据层：两边都写会冲突，一边写一边同步会有延迟，切过去之后老机房的数据怎么处理。面试里如果只讲「我们做了双活，用 DNS 分流」，多半会被追问「那数据库怎么双活」，答不上来就说明你只做过入口。</p>
+  <p><b>容量</b>要单独说，因为 LB 的瓶颈和大家想的不一样。它通常不是 CPU 先打满，而是<b>并发连接数</b>（连接表大小）、<b>新建连接速率</b>（每秒能处理多少握手）、<b>带宽</b>（出向通常更容易先满）三者之一先到顶。所以压测要分三个维度分别压，只看 QPS 会漏掉长连接场景的瓶颈——一万 QPS 的短连接和一万个挂着不动的长连接，对 LB 的压力完全不同。</p>
+  <pre><span class="c"># 看入口层的连接水位与新建速率（在 LB 机器上）</span>
+ss -s
+cat /proc/net/sockstat
+<span class="c"># 输出里 TCP: inuse / orphan / tw 三个数，tw 暴涨说明短连接太多</span>
+
+<span class="c"># conntrack 用量，做 NAT 时这是硬上限</span>
+cat /proc/sys/net/netfilter/nf_conntrack_count
+cat /proc/sys/net/netfilter/nf_conntrack_max
+
+<span class="c"># DNS 切换前先看当前解析结果和 TTL，评估生效时间</span>
+dig +noall +answer www.example.com</pre>
+  <div class="callout ok">
+    <b>判断一套入口是否真的高可用，问四个问题：</b>两台 LB 在同一个机架吗？后端跨可用区了吗？切换需要多久、切换时已有连接怎么办？上次真实演练是什么时候？四个都答得出来，才算做过；只答得出第一个，那是装过。
+  </div>
+  <p><b>面试落点：</b>「入口冗余我分三层看：地址层用 keepalived 或 ECMP，位置层要跨机架跨可用区，域名层用 DNS 做机房级兜底。DNS 切换受客户端缓存影响，实际是分钟级，不能指望它做秒级切换。容量上 LB 的瓶颈通常是并发连接数、新建连接速率和带宽，所以压测要分维度，不能只看 QPS。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：怎么证明这套 LB 是可靠的</h2></div>
+  <p class="lead">「你们负载均衡怎么保证高可用？」——回答「用了 keepalived」只说明你装过，不说明它可靠。<b>可靠性是能证明的，证明方式是演练记录加观测数据</b>，不是组件清单。</p>
+  <p>一个能扛住追问的回答有四段：<b>入口怎么冗余</b>（谁在前面、几台、怎么切、切换耗时多少）、<b>怎么发现故障</b>（主动还是被动、探测间隔、最坏摘除延迟）、<b>容量有多少余量</b>（峰值水位、按什么维度算）、<b>验证过没有</b>（演练做了什么、业务有没有感）。前两段是设计，后两段是证据，缺了后两段就是纸上方案。</p>
+  <p>指标要能报出来，而且要是你系统里真实存在的：入口的 5xx 比例、上游响应时间的分位值、被摘除的后端数量、VIP 漂移次数与耗时、活跃连接数与新建连接速率的水位。这些指标的价值在于<b>它们能证伪</b>——比如「5xx 里有多少是 LB 自己产生的、多少是后端返回的」，这个拆分能直接定位责任方。</p>
+  <p>演练怎么设计，是可以直接说的一段：摘掉一台后端，观察流量是否在预期时间内转移、客户端有没有报错；kill 掉主 director，测 VIP 漂移耗时和长连接断开情况；断开心跳链路，验证会不会脑裂、告警会不会响；把某台权重调 0，验证优雅下线。每次演练记录三个数：<b>发现耗时、切换耗时、受影响的请求数</b>。有这三个数，"高可用"才是一个可比较的结论。</p>
+  <table>
+    <tr><th style="width:170px">被追问</th><th>别这么答</th><th>这么答</th></tr>
+    <tr><td>「切换要多久」</td><td>很快，秒级</td><td>取决于 VRRP 通告间隔和检测次数，实测值来自演练记录；长连接会断，靠客户端重连</td></tr>
+    <tr><td>「后端挂了怎么发现」</td><td>有心跳</td><td>被动失败计数 + 主动 HTTP 探测，最坏发现延迟是间隔乘 fall，探针不查下游</td></tr>
+    <tr><td>「怎么防脑裂」</td><td>keepalived 自己会处理</td><td>独立心跳链路 + 对端可达性检测 + 双主告警，必要时 fencing</td></tr>
+    <tr><td>「容量够吗」</td><td>够，还能撑一倍</td><td>按并发连接、新建速率、带宽三个维度看水位，最紧的是哪一个，余量多少</td></tr>
+  </table>
+  <p>还有一个加分点：<b>主动说出这套方案的代价</b>。主备切换有几秒中断、四层看不到 URL 所以要再挂一层七层、源 IP 哈希在 NAT 环境下会倾斜、跨可用区部署会增加一点延迟。能说清代价的人，通常是真的做过取舍，而不是照着架构图讲。</p>
+  <div class="callout ok">
+    <b>一段可以直接说出口的话：</b>「入口是四层双活，两台 director 跨机架，用动态路由做等价多路径，所以没有主备切换那几秒；后面挂一组七层 Nginx 做路由和 TLS 卸载。故障发现靠被动失败计数加主动探测，探针只查自身，最坏摘除延迟在秒级。每季度做一次摘除和漂移演练，记录发现耗时、切换耗时和受影响请求数。代价是四层看不到 URL，所以路由规则都在七层那一层维护。」
+  </div>
+  <p><b>面试落点：</b>「我不会说『用了 keepalived 所以高可用』。我会说清楚四件事：入口怎么冗余、故障怎么发现、容量余量多少、演练验证过什么。因为可靠性不是组件属性，是你在故障发生时还能不能把流量送到健康后端的能力，这个只能靠演练数据证明。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：一听就知道有没有真配过</h2></div>
+  <p class="lead">下面这些不是概念错误，是<b>把「配通了」当成「配对了」</b>。它们在测试环境跑得好好的，上线后按天出问题。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">说 LVS 能按 URL 转发</div><div class="pd">LVS 工作在网络层，看不到 HTTP 内容，只能按 IP、端口、连接数分发。要按 URL 路由必须上七层。这一句说错，后面全崩。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为 LVS 自带健康检查</div><div class="pd">IPVS 只管转发，不知道后端死活。健康检查是 keepalived、ldirectord 这类上层工具做的。答「LVS 会自动摘除故障节点」等于说你没配过。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">DR 模式只在 director 上配了 VIP</div><div class="pd">RS 上不把 VIP 配到 lo，包到了会被内核直接丢弃（目的地址不是本机）。还要抑制 ARP，否则 VIP 冲突，表现为时通时不通。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用源 IP 哈希做会话保持，还觉得挺稳</div><div class="pd">办公网和运营商 NAT 后面成千上万人共享出口 IP，哈希结果全压一台；移动网络换基站就换 IP，会话直接丢。粒度不够就是不够。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">健康检查接口里查数据库</div><div class="pd">共享依赖一抖，所有后端同时被判死，入口直接 5xx。这不是高可用，是把下游的抖动放大成全站故障。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">后端 keepalive 比 LB 空闲超时还短</div><div class="pd">后端先发 FIN，LB 从池里取了这条已关闭的连接，得到 RST，返 502，后端业务日志干净。调反方向才对：让 LB 先关。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">四层 LB 上抓不到 HTTP 日志，就说请求没到</div><div class="pd">四层看不到 HTTP，它连路径都不知道。要判断请求到没到，得在后端抓包或看后端日志，不是在前端找访问记录。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">只做 LB 双机，没管心跳链路</div><div class="pd">心跳断了但两台都活着，就是双主。同一 VIP 两个 MAC 应答，流量分裂，会话和限流计数全不一致，比干脆挂掉更难查。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把一致性哈希当成「扩容无损」</div><div class="pd">它只是把迁移量从「几乎全部」降到「一小部分」。节点故障时那一段流量会整段压给下一台，扩容时仍有 key 漂移，缓存场景会有一波集中回源。</div></div></div>
+  <p><b>面试落点：</b>被问「你踩过什么坑」，讲一个带前后因果的。比如「我们有段时间每天几十个 502，后端日志一条没有，查了三天才想明白是后端 keepalive 比 SLB 空闲超时短，SLB 复用到一条刚被后端关掉的连接。后来把后端 keepalive 调到比 SLB 长，问题就消失了」——这比背九个坑名有说服力得多。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. LVS 的 DR 模式下，真实服务器处理完请求后，响应包走哪条路？</div>
+      <button class="opt">回给 director，由 director 改写源地址后再发给客户端</button>
+      <button class="opt">直接从真实服务器发往客户端，源 IP 仍是 VIP，不经过 director</button>
+      <button class="opt">必须经过 IP 隧道回到 director，否则源地址不合法</button>
+      <button class="opt">由 director 重建一条连接转发给客户端</button>
+      <div class="ans">正确答案：<b>直接回客户端</b>。DR 只改写以太网帧的目的 MAC，IP 头保持不变，真实服务器在 lo 上持有 VIP，所以它认为请求就是发给自己的，处理完直接把响应发给客户端，源 IP 是 VIP。这正是 DR 吞吐高的原因——director 只承担入向流量。NAT 模式才是双向都经过 director。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 需要把 VIP 的 80 端口转发到后端的 8080 端口，三种 LVS 模式里哪种支持？</div>
+      <button class="opt">DR，因为它只改 MAC，最灵活</button>
+      <button class="opt">TUN，因为隧道里可以带端口信息</button>
+      <button class="opt">NAT，因为它本来就改写目的 IP 和端口</button>
+      <button class="opt">三种都支持，端口映射是 IPVS 的通用能力</button>
+      <div class="ans">正确答案：<b>NAT</b>。NAT 模式本来就修改目的地址，顺手改端口是同一个动作，所以支持端口映射。DR 只改 MAC、TUN 只加一层 IP 头，IP 头和端口都不动，因此要求 VIP 端口与后端端口一致。这是选型时很容易被忽略的一条硬约束。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 后端 Nginx 的 keepalive_timeout 设得比负载均衡的空闲超时更短，最可能出现什么现象？</div>
+      <button class="opt">偶发 502，后端 error log 里没有业务异常，LB 日志提示上游提前关闭连接</button>
+      <button class="opt">大量 499，客户端主动断开</button>
+      <button class="opt">后端 CPU 使用率显著升高</button>
+      <button class="opt">连接完全无法建立，全部请求超时</button>
+      <div class="ans">正确答案：<b>偶发 502</b>。后端先发 FIN 关闭空闲连接，LB 恰好在 FIN 处理完之前从池里取出这条连接发请求，收到 RST，于是返回 502。请求没进业务逻辑，后端自然没有业务日志。解法是让 LB 的空闲超时短于后端 keepalive，由 LB 主动回收连接。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 七层健康检查接口里执行了一次数据库查询。数据库抖动 30 秒，会发生什么？</div>
+      <button class="opt">只会摘除一台后端，流量自动转移，用户无感</button>
+      <button class="opt">健康检查会自动降级为 TCP 探测，不影响结果</button>
+      <button class="opt">只影响监控数据，不影响转发决策</button>
+      <button class="opt">所有后端同时被判为不健康，入口直接返回 5xx，比数据库抖动本身更严重</button>
+      <div class="ans">正确答案：<b>全站摘除</b>。数据库是共享依赖，它慢的时候所有后端的探针会同时超时，LB 判定全部不健康，于是没有可用后端。健康检查必须只检查自己能控制的东西，检查下游等于把下游的局部抖动放大成全站故障。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 相对「取模分片」，一致性哈希的主要好处是？</div>
+      <button class="opt">彻底消除热点，任何情况下负载都均匀</button>
+      <button class="opt">节点增减时只有环上相邻一部分 key 需要重新映射，迁移量大幅下降</button>
+      <button class="opt">不再需要虚拟节点，实现更简单</button>
+      <button class="opt">可以保证多个副本之间的强一致</button>
+      <div class="ans">正确答案：<b>迁移量下降</b>。取模在 N 变化时几乎全部 key 落点都会变；一致性哈希只影响环上相邻的一段，平均约 1/N。但它不消除热点（需要虚拟节点缓解倾斜），也不保证强一致——节点故障时那一段流量会整段转移给下一台。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. keepalived 发生脑裂（两台都认为自己是 MASTER）时，最直接的后果是？</div>
+      <button class="opt">VIP 从网络上消失，全站立刻不可达</button>
+      <button class="opt">后端节点会被全部摘除，返回 503</button>
+      <button class="opt">同一 VIP 被两台机器同时持有并应答，流量分裂，连接与会话状态不一致</button>
+      <button class="opt">VRRP 协议版本自动降级，通告停止</button>
+      <div class="ans">正确答案：<b>双主、流量分裂</b>。两台都持有 VIP 并响应 ARP，客户端和网关的 ARP 缓存各记各的，流量随机落到两台。这两台的连接表、限流计数、本地会话都不一致，表现为部分用户登录态丢失、部分请求被错误限流，比单纯挂掉更难定位。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>四层 / 七层</b></td><td>按能否解析应用层协议划分。四层只看 IP 和端口，七层能读懂请求内容并据此决策</td></tr>
+    <tr><td><b>IPVS</b></td><td>Linux 内核里的四层转发模块，LVS 的实际实现，规则由 ipvsadm 或 keepalived 下发</td></tr>
+    <tr><td><b>DR</b></td><td>直接路由模式，只改目的 MAC，真实服务器持有 VIP 并直接回包，要求二层可达且抑制 ARP</td></tr>
+    <tr><td><b>NAT 模式</b></td><td>改写目的地址与端口，请求响应都经过 director，支持端口映射但 director 是瓶颈</td></tr>
+    <tr><td><b>TUN</b></td><td>IP 隧道模式，在原始包外再封一层 IP，可跨网段，真实服务器直接回包</td></tr>
+    <tr><td><b>VIP</b></td><td>虚拟 IP，对外提供服务的地址，可在多台机器间漂移</td></tr>
+    <tr><td><b>VRRP</b></td><td>虚拟路由冗余协议，用组播通告竞争主备，协议号 112，组播地址 224.0.0.18</td></tr>
+    <tr><td><b>脑裂</b></td><td>心跳中断但两台都存活，导致同时持有 VIP，流量分裂</td></tr>
+    <tr><td><b>wlc</b></td><td>加权最少连接，按「活跃数乘 256 加非活跃数」除以权重取最小，权重是你声明的能力比例</td></tr>
+    <tr><td><b>一致性哈希</b></td><td>节点与 key 映射到同一个环，key 顺时针找节点，增减节点只影响相邻区间</td></tr>
+    <tr><td><b>虚拟节点</b></td><td>一个物理节点在哈希环上占多个位置，用来缓解节点少时的负载倾斜</td></tr>
+    <tr><td><b>健康检查</b></td><td>被动靠真实请求失败计数，主动靠定时探测，最坏发现延迟约等于间隔乘连续失败次数</td></tr>
+    <tr><td><b>flapping</b></td><td>后端反复在健康与不健康之间跳，造成流量分布抖动</td></tr>
+    <tr><td><b>Proxy Protocol</b></td><td>在连接最前面插入一行文本传递真实源地址，后端必须显式开启解析</td></tr>
+    <tr><td><b>ECMP</b></td><td>等价多路径，多台设备同时转发同一目标，用于入口双活，无需主备切换</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用两台虚机加 keepalived 配一组 VIP，然后故意 <span class="k">iptables -A INPUT -p vrrp -j DROP</span> 模拟心跳中断，看两台是不是都变成 MASTER，亲手制造一次脑裂；② 在 Nginx 上配一个 upstream，把其中一台停掉，观察 <span class="k">max_fails</span> 生效的时机和恢复时机，记录「发现延迟」这个数；③ 用 <span class="k">tcpdump</span> 在 DR 模式的 RS 上抓包，确认进来的包目的 MAC 是 RS 的、目的 IP 是 VIP，回程包的源 IP 也是 VIP，把「只改 MAC」这件事看一遍。<br><br>
+    <b>之后值得单独学：</b>第 26 期讲 Nginx 的 location 与 proxy_pass，是七层这一侧的细节；第 12 期讲 K8s 的 Service 与 Ingress，本质上是把这一篇的 LB 概念做成了声明式对象（ClusterIP 是 iptables/ipvs 规则，不是进程）；第 32 期限流熔断，讲的正是「入口扛不住时该怎么办」。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 29 期 · 负载均衡的分界线不在性能，在你需要看到哪一层的字段才能做决策</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

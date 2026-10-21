@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prometheus 八股：指标类型、PromQL 与基数爆炸</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 14 期</span>
+    <h1>Prometheus 八股：指标类型、PromQL 与基数爆炸</h1>
+    <p class="sub"><span class="k">histogram_quantile</span> 算错、<span class="k">rate</span> 窗口乱设、标签基数爆炸——面试和线上同时考这三样。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>9</b> 大模块</span>
+      <span class="chip"><b>15</b> 条 PromQL</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先想一秒：为什么 <span class="k">increase()</span> 会返回 3.7 这种小数？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场，三种「看起来对」的错</h2></div>
+  <p class="lead">面试官在白板上写下一行 <span class="k">avg(rate(http_request_duration_seconds_sum[5m])) / avg(rate(http_request_duration_seconds_count[5m]))</span>，问你「这是 P99 吗」。你说不是，他接着问「那你写一个」。这一问能筛掉七成人。</p>
+  <p>Prometheus 的题有个特点：语法谁都能背，但<b>语义错一错就是量级错</b>。面板上的数字看着很正常，结论却是反的。下面三个现场，都是「代码没报错、图也画出来了、结论是错的」。</p>
+  <table>
+    <tr><th style="width:170px">现场</th><th style="width:180px">常见写法</th><th>错在哪</th></tr>
+    <tr><td>P99 面板显示 180ms，用户投诉 3 秒</td><td>对分位数再取 avg</td><td>分位数不是可加量。十个实例的 P99 求平均，既不等于全局 P99，也不代表任何一台</td></tr>
+    <tr><td>QPS 曲线全是尖刺和断点</td><td><span class="k">rate(x[1m])</span>，抓取间隔也是 1m</td><td>窗口里常常只有一两个样本，边界一对不齐就外推失败，返回空值</td></tr>
+    <tr><td>一次发版后 Prometheus 内存翻五倍</td><td>URL 直接做了标签</td><td>路径里带订单号，每个请求都是新 series。不是「监控变多了」，是基数被打爆了</td></tr>
+  </table>
+  <div class="callout">
+    <b>为什么先摆这三个：</b>它们分别对应「聚合语义」「时间窗口」「标签设计」三类错误，也是面试追问的三条主线。你把这三条讲清楚，比背二十个函数有用得多——因为函数可以查文档，语义错了查不出来。
+  </div>
+  <p>这一篇按「数据怎么进来 → 怎么存 → 怎么算 → 怎么告 → 怎么长期留」走一遍，每一节都落一句能直接说出口的话。凡是我给具体默认值的地方，都以你环境的 <span class="k">--help</span> 和官方文档为准，版本之间会变。</p>
+  <p><b>面试落点：</b>「Prometheus 的坑大多不在语法，在语义。比如分位数不能跨实例平均，rate 的窗口必须覆盖足够多的抓取点，标签值一旦无限增长就会把 TSDB 打爆。这三件事我在线上都踩过。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Pull 模型与 TSDB：为什么是拉，以及拉不到时发生了什么</h2></div>
+  <p class="lead">「为什么 Prometheus 用拉不用推？」标准答案是「拉更简单、好调试」。这个答案没错，但它答的是现象，不是设计取舍。追问一句「那五分钟就跑完的批处理任务怎么监控」，很多人就卡住了。</p>
+  <p>拉的本质是<b>把「谁是被监控对象」这个知识放在服务端</b>。目标列表来自服务发现（Kubernetes、Consul、文件、DNS），Prometheus 自己决定去谁那里、多久去一次、超时多久。这带来四个直接好处：服务端天然知道目标活着没有（<span class="k">up</span> 这个指标就是抓取行为本身的副产品）；采集节奏由监控系统控制，不会被业务突发打崩；调试时 <span class="k">curl</span> 一下目标的 <span class="k">/metrics</span> 就能看到原始数据；目标下线后 series 自动进入 stale，不需要谁去通知谁。</p>
+  <p>代价也要说清楚：网络方向必须是「Prometheus 能连到目标」，跨网段、跨云、边缘节点经常不满足；短生命周期任务（CronJob、批处理）根本等不到你来拉，只能推。这就是 Pushgateway 存在的原因，也是它最容易出事的地方。</p>
+  <div class="callout warn">
+    <b>Pushgateway 不会自动清理。</b>它是个「指标暂存柜」，推上去的 series 会一直留在那里，直到你删或者重启（是否持久化看启动参数）。一个跑完就退出的任务，如果每次都推同一个 job，那个值会永远停在最后一次，<span class="k">up</span> 还是 1，看起来一切正常。正确做法是业务侧推一个时间戳指标，或者用带实例维度的 job 名并配 TTL 清理，告警里加 <span class="k">time() - push_time_seconds &gt; 3600</span> 这类判断。
+  </div>
+  <p>存这一侧，先建立一个模型：<b>一条 series 由指标名加一组标签唯一确定</b>，一个样本是（时间戳, 浮点值）。Prometheus 把样本按时间切成块写盘，默认两小时一个 block，后台再把小 block 合并成大 block；新写入先进 WAL 再落盘，所以进程崩溃丢的是最后一段，不是全部。查询靠的是「按标签找 series」的倒排索引，加上按时间顺序扫样本。</p>
+  <table>
+    <tr><th style="width:150px">你敲的命令</th><th>它在回答什么</th></tr>
+    <tr><td><span class="k">up</span></td><td>上一次抓取成没成功。它为 0 时，其它指标全是旧值或不存在</td></tr>
+    <tr><td><span class="k">scrape_duration_seconds</span></td><td>抓一次花了多久。接近 timeout 说明目标本身慢或者指标太多</td></tr>
+    <tr><td><span class="k">scrape_samples_scraped</span></td><td>这次抓回多少条样本。它突然涨，就是基数出问题的第一信号</td></tr>
+    <tr><td><span class="k">prometheus_tsdb_head_series</span></td><td>当前活跃 series 数。这是容量规划最该盯的数</td></tr>
+    <tr><td><span class="k">/api/v1/status/tsdb</span></td><td>按指标名、标签名统计 series 数量，找基数元凶的第一站</td></tr>
+  </table>
+  <pre><span class="c"># 配置写完先校验，别等 reload 才发现语法错</span>
+promtool check config /etc/prometheus/prometheus.yml
+
+<span class="c"># 热加载（启动时加了 --web.enable-lifecycle 才有）</span>
+curl -X POST http://localhost:9090/-/reload
+
+<span class="c"># 看目标自己吐出来的原始指标，排查「为什么这条 series 长这样」</span>
+curl -s http://10.0.0.12:9100/metrics | grep -E '^node_load|^node_memory'
+
+<span class="c"># 线上最该常看的两个数</span>
+prometheus_tsdb_head_series
+scrape_samples_scraped</pre>
+  <div class="cmds">
+    <div class="crow"><code>curl -s localhost:9090/metrics | grep tsdb_head_series</code><span class="desc">当前活跃 series 数，容量规划的第一指标</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -s localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job:.labels.job, health}'</code><span class="desc">所有抓取目标的健康状态，比看图快</span><button class="copy">复制</button></div>
+    <div class="crow"><code>promtool check rules /etc/prometheus/rules/*.yml</code><span class="desc">规则文件语法校验，改完先跑这个再 reload</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试怎么答：</b>「Pull 的核心好处是目标清单和采集节奏都由服务端掌握，抓取失败本身就是一个信号；代价是网络方向受限、短任务覆盖不了，所以要用 Pushgateway，而 Pushgateway 的老化必须自己管，否则会留下一堆永远不更新的假数据。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>四种指标类型：选错的代价在三个月后显现</h2></div>
+  <p class="lead">「Counter 和 Gauge 有什么区别」太浅，真正的分水岭是 Histogram 和 Summary。这两者选错，当下看不出来，等到你要做跨实例分位数、要做容量规划的时候，数据已经没法补了。</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th>语义</th><th>客户端产生什么</th><th>适合</th><th>不能做什么</th></tr>
+    <tr><td><b>Counter</b></td><td>只增不减的累计值，进程重启归零</td><td>一个值</td><td>请求数、错误数、字节数</td><td>直接看绝对值没意义，必须 rate/increase</td></tr>
+    <tr><td><b>Gauge</b></td><td>可增可减的瞬时值</td><td>一个值</td><td>温度、队列长度、内存占用、并发数</td><td>不能对它做 rate（会得到无意义的变化率）</td></tr>
+    <tr><td><b>Histogram</b></td><td>按固定边界分桶累计</td><td><span class="k">_bucket{le}</span>、<span class="k">_sum</span>、<span class="k">_count</span></td><td>延迟、大小分布，需要跨实例聚合分位数</td><td>桶是预先定死的，事后改桶等于历史数据失真</td></tr>
+    <tr><td><b>Summary</b></td><td>客户端自己算分位数</td><td><span class="k">{quantile="0.99"}</span>、<span class="k">_sum</span>、<span class="k">_count</span></td><td>单实例精度要求高、不需要聚合</td><td>分位数不能跨实例相加或平均，改了目标数就废</td></tr>
+  </table>
+  <p>为什么 Summary 不能聚合？因为 P99 不是「第 99 个百分位的那个值」这么一个可加的东西。两台机器各 100 个请求，A 的 P99 是 10ms、B 的 P99 是 5s，合起来的 P99 可能是 5s，也可能不是——取决于那 198 个请求怎么分布。<b>分位数丢掉了分布形状，只剩一个点，而聚合需要形状。</b>Histogram 保留的是「每个桶里有多少个」，形状还在，所以能先加再算。</p>
+  <p>Counter 的重启归零值得单独说。Prometheus 的 <span class="k">rate()</span> 会自动处理这种「掉到 0 再涨回来」的 reset：它把下降当成计数器重置，从零重新累加。所以你在代码里<b>不要自己做归零保护</b>，也不要手动写「如果当前值小于上次就置零」的逻辑，那会让 rate 算出负数或者巨大值。</p>
+  <pre><span class="c"># 一个 Histogram 在 exposition 格式里长这样（节选）</span>
+http_request_duration_seconds_bucket{le="0.1"} 24054
+http_request_duration_seconds_bucket{le="0.5"} 133988
+http_request_duration_seconds_bucket{le="1"} 144320
+http_request_duration_seconds_bucket{le="+Inf"} 144320
+http_request_duration_seconds_sum 53423.0
+http_request_duration_seconds_count 144320
+
+<span class="c"># 注意 le 是「小于等于」，桶是累计的，所以后面的数一定不小于前面的</span>
+<span class="c"># 平均延迟可以直接用 sum/count 算：</span>
+rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])</pre>
+  <div class="callout ok">
+    <b>一句话选型：</b>需要跨实例、需要和 SLO 对齐、需要事后换算法——用 Histogram；只有单实例、只关心本机分位数、且明确不聚合——才考虑 Summary。默认选 Histogram，因为改主意的成本低得多。
+  </div>
+  <p><b>面试怎么答：</b>「Counter 是累计量，重启归零由 rate 自动处理；Gauge 是瞬时值；Histogram 在客户端分桶、服务端能聚合出分位数，代价是桶要提前定；Summary 在客户端算分位数，精度高但不可聚合，多实例场景基本不能用。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>PromQL 核心：rate 的窗口、外推，以及 by 与 without 的分工</h2></div>
+  <p class="lead">PromQL 的语法十分钟能学会，语义要花很久。面试官问「rate 和 irate 什么区别」，答「一个平均一个瞬时」只能算及格；能接着说「所以 irate 不能用来做告警」才算过关。</p>
+  <p><span class="k">rate(v[d])</span> 做的事是：取窗口内的样本，处理 counter reset，算出每秒平均增长，<b>再把结果外推到窗口两端</b>。外推是为了让相邻窗口的计算结果连续，但副作用是 <span class="k">increase()</span> 会返回小数——比如 5 分钟里实际涨了 3 次，它可能给你 3.7。这不是 bug，是估算。知道这一点，你就不会在「请求数必须是整数」上纠结，也不会拿 increase 的结果直接对账。</p>
+  <p>窗口该开多大？一个经验规则是<b>至少是抓取间隔的四倍</b>。抓取间隔 15 秒，窗口就别低于 1 分钟；抓取间隔 1 分钟，窗口至少 4 分钟。窗口太小时，边界上常常只有一两个样本，甚至一个都没有——这时候 rate 直接返回空，图上是断点，告警里是「无数据」。这类问题在面板上表现为「偶尔掉一下」，很容易被当成采集抖动。</p>
+  <table>
+    <tr><th style="width:130px">函数</th><th>用几个样本</th><th>特点</th><th>什么时候用</th></tr>
+    <tr><td><span class="k">rate</span></td><td>窗口内全部（至少 2 个）</td><td>平滑，有外推，慢变化也能看出来</td><td>面板、告警、容量趋势，默认选它</td></tr>
+    <tr><td><span class="k">irate</span></td><td>最后 2 个</td><td>灵敏，对单点抖动极其敏感</td><td>看瞬时毛刺、调试；<b>不要用于告警</b></td></tr>
+    <tr><td><span class="k">increase</span></td><td>同 rate</td><td>等价于 rate 乘窗口秒数，可能带小数</td><td>「这个窗口涨了多少」，适合报表</td></tr>
+    <tr><td><span class="k">delta</span></td><td>窗口内全部</td><td>给 Gauge 用，不做 reset 处理</td><td>温度、内存这类可增可减的值</td></tr>
+    <tr><td><span class="k">deriv</span></td><td>窗口内全部</td><td>线性回归斜率，单位是每秒</td><td>预测「多久写满」这类问题</td></tr>
+  </table>
+  <p>聚合顺序是个高频送命题。<span class="k">sum(rate(http_requests_total[5m]))</span> 是对的：先把每条 series 变成速率，再加起来。<span class="k">rate(sum(http_requests_total)[5m:1m])</span> 也能跑，但语义完全不同——它先把所有实例加成一个总数，再对这个总数求速率。后者在实例重启时会出问题：一台机器归零，总数掉一截，rate 把它当成一次 reset，结果偏低。所以<b>能先 rate 就先 rate</b>。</p>
+  <p><span class="k">by</span> 和 <span class="k">without</span> 的区别只有一个：<span class="k">by</span> 是白名单，只保留列出的标签；<span class="k">without</span> 是黑名单，去掉列出的标签、保留其余。写告警时我倾向 <span class="k">by</span>，因为新增标签不会意外把一条告警拆成十条。<span class="k">without(instance)</span> 看着方便，但哪天有人加了个 <span class="k">pod</span> 标签，告警数量立刻翻倍。</p>
+  <pre><span class="c"># 全局 QPS（先 rate 再 sum）</span>
+sum(rate(http_requests_total[5m]))
+
+<span class="c"># 按接口分组的 5xx 比例，注意分母要加 0 保护，否则除零得到 NaN</span>
+sum by (path) (rate(http_requests_total{status=~"5.."}[5m]))
+  /
+sum by (path) (rate(http_requests_total[5m]))
+
+<span class="c"># 与一小时前对比（offset 只改变取值时间，不改变求值时刻）</span>
+sum(rate(http_requests_total[5m])) - sum(rate(http_requests_total[5m] offset 1h))
+
+<span class="c"># 子查询：对「已经聚合过的结果」再套一层时间函数</span>
+max_over_time( sum(rate(http_requests_total[1m]))[30m:1m] )
+
+<span class="c"># 标签匹配：把两个指标的 instance 对齐，只保留左边</span>
+  rate(node_cpu_seconds_total{mode="idle"}[5m])
+* on(instance) group_left(nodename) node_uname_info</pre>
+  <div class="callout">
+    <b>查不到数据时先分三种情况：</b>一是 series 根本不存在（标签写错、目标没被抓）；二是 series 存在但窗口里样本不够（窗口太小或抓取间隔变了）；三是结果为 NaN（除零、对负数开方）。<span class="k">count(metric)</span> 能一秒区分前两种，比盯着空图猜快得多。
+  </div>
+  <p><b>面试怎么答：</b>「rate 是窗口内的平均速率并对两端外推，所以 increase 会有小数；irate 只看最后两个点，灵敏但抖动大，不适合告警。窗口我一般开到抓取间隔的四倍以上，太短会因为没有样本而断图。聚合顺序是先 rate 再 sum，反过来会在实例重启时算出偏低的值。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>分位数：为什么必须用 Histogram，以及算错的两个动作</h2></div>
+  <p class="lead">「P99 怎么算」这题的正确写法只有一种结构，但错误写法有十几种，而且都能跑出数来。面试时写出正确的那一行，再补一句「它是桶内线性插值，所以是近似值」，基本就稳了。</p>
+  <p>先记住正确写法：<b>先对桶求速率、按 <span class="k">le</span> 聚合、再喂给 <span class="k">histogram_quantile</span></b>。三个动作的顺序不能换，<span class="k">le</span> 不能丢。</p>
+  <pre><span class="c"># 正确：保留 le，先 rate 再 sum by (le)</span>
+histogram_quantile(0.99,
+  sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
+)
+
+<span class="c"># 错误 1：把 le 聚合掉了——函数拿不到桶边界，直接返回 NaN 或错值</span>
+histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])))
+
+<span class="c"># 错误 2：对已经算出来的分位数再聚合——数学上不成立</span>
+avg(histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m]))))
+
+<span class="c"># 想要「每个接口各自的 P99」，就按接口分组，le 必须留在分组里</span>
+histogram_quantile(0.99,
+  sum by (path, le) (rate(http_request_duration_seconds_bucket[5m]))
+)</pre>
+  <p>为什么是「近似」？因为原始数据已经变成桶了，桶里具体怎么分布没人知道。<span class="k">histogram_quantile</span> 的做法是找到 P99 落在哪个桶，然后在这个桶的上下界之间做线性插值。<b>如果 P99 落在最后一个有限桶和 <span class="k">+Inf</span> 之间，它只能假设分布均匀，误差可能非常大</b>——一个 10 秒的慢请求和一个 60 秒的超时，在 <span class="k">+Inf</span> 桶里是没有区别的。</p>
+  <p>所以桶的设计不是随便填的。合理的做法是：<b>在 SLO 边界附近加密</b>。你的 SLO 是「95% 的请求在 300ms 内完成」，那 200ms、250ms、300ms、400ms 这几个桶必须有，否则你连「有没有达标」都测不准。桶的总数控制在十几个以内，桶越多，series 越多，成本按桶数线性上涨。</p>
+  <table>
+    <tr><th style="width:190px">常见错误写法</th><th>结果</th><th>正确做法</th></tr>
+    <tr><td>对分位数求 avg / sum</td><td>数字看着合理，结论完全错</td><td>先聚合桶，再算分位数</td></tr>
+    <tr><td>聚合时丢掉 <span class="k">le</span></td><td>返回 NaN 或毫无意义的常数</td><td><span class="k">sum by (le)</span></td></tr>
+    <tr><td>用 <span class="k">_sum / _count</span> 当 P99</td><td>那算的是平均延迟，会把长尾抹平</td><td>分位数要用 <span class="k">_bucket</span></td></tr>
+    <tr><td>拿 Summary 的 quantile 跨实例相加</td><td>结果无意义</td><td>改用 Histogram，或改成「超过阈值的比例」</td></tr>
+    <tr><td>桶只设到 1s，业务有 5s 慢请求</td><td>P99 全挤在 <span class="k">+Inf</span> 里，永远算不准</td><td>桶上界覆盖到超时时间</td></tr>
+  </table>
+  <div class="callout ok">
+    <b>一个比 P99 更好用的写法：</b>把「分位数」换成「超过阈值的请求占比」，它可以直接聚合、可以直接和 SLO 对比，也不受桶插值误差影响。<br>
+    <span class="k">sum(rate(http_request_duration_seconds_bucket{le="0.3"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))</span><br>
+    得到的是「300ms 内完成的比例」，SLO 要 99%，就看这个值有没有低于 0.99。面试里主动给出这个替代方案，是很明显的加分项。
+  </div>
+  <p><b>面试怎么答：</b>「分位数用 histogram_quantile，前提是先 rate、再 sum by (le)，le 一定不能丢。它是在桶内做线性插值，所以是近似值，桶的边界要卡在 SLO 附近。分位数本身不可聚合，所以不能对多个实例的 P99 求平均——要做全局视角，只能聚合桶，或者干脆监控『超过阈值的比例』。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>基数爆炸：谁在偷偷制造 series</h2></div>
+  <p class="lead">Prometheus 挂掉的原因里，最常见的一个不是查询写错，是<b>标签值无限增长</b>。它的表现很有欺骗性：采集正常、查询正常、磁盘慢慢涨，直到某天内存打满、写入变慢、查询超时，你才发现 series 从八十万变成了四百万。</p>
+  <p>先把账算清楚：一条 series 的数量 ≈ 指标名数量 × 各标签取值数量的组合。一个指标加一个 <span class="k">user_id</span> 标签，有一百万用户，那就是一百万条 series。<b>标签的每一个不同取值，都是一条新的时间线</b>，不是一列数据。</p>
+  <table>
+    <tr><th style="width:190px">制造者</th><th>为什么致命</th><th>怎么改</th></tr>
+    <tr><td>URL 路径直接做标签</td><td><span class="k">/order/20261021001</span> 每个订单一条</td><td>改成路由模板 <span class="k">/order/:id</span>，或用 relabel 正则裁掉</td></tr>
+    <tr><td>user_id / order_id / session_id</td><td>基数等于业务实体数量</td><td>移到日志或 trace，指标里只留聚合维度</td></tr>
+    <tr><td>trace_id / request_id</td><td>每个请求一条，最纯粹的灾难</td><td>绝对不要出现在指标标签里</td></tr>
+    <tr><td>error message 原文</td><td>同一类错误写法不同就是新值</td><td>归一化成 <span class="k">error_type</span>，比如 timeout / refused / 5xx</td></tr>
+    <tr><td>pod 名、容器 ID</td><td>每次发布都产生新值，旧 series 还留着</td><td>用 Deployment 级标签，或用 recording rule 提前降维</td></tr>
+    <tr><td>把状态码细到几十种</td><td>再乘上 path、method，组合数爆炸</td><td>指标里只留 2xx/3xx/4xx/5xx，细节留给日志</td></tr>
+  </table>
+  <p>怎么找凶手？先看总量，再按指标名排序，最后看是哪个标签的取值最多。Prometheus 自带两个入口：HTTP API 的 <span class="k">/api/v1/status/tsdb</span>，以及 <span class="k">promtool tsdb analyze</span>。查询侧可以用 <span class="k">count by (__name__)</span> 粗略排序——但这个查询本身很贵，生产上要慎用，最好在低峰期跑。</p>
+  <pre><span class="c"># 哪个指标名下的 series 最多（注意：这个查询本身开销很大）</span>
+topk(20, count by (__name__) ({__name__=~".+"}))
+
+<span class="c"># 某个指标的标签取值有多少种——定位到具体标签</span>
+count(count by (path) (http_requests_total))
+
+<span class="c"># 官方给的诊断入口，比手写查询轻</span>
+curl -s http://localhost:9090/api/v1/status/tsdb | jq '.data.seriesCountByMetricName[:10]'
+curl -s http://localhost:9090/api/v1/status/tsdb | jq '.data.labelValueCountByLabelName[:10]'
+
+<span class="c"># 离线分析 block，能看到标签对基数的贡献</span>
+promtool tsdb analyze /var/lib/prometheus/data</pre>
+  <p>控制手段分三层。<b>采集层</b>用 <span class="k">metric_relabel_configs</span> 直接丢掉不该存在的标签，或者用 <span class="k">sample_limit</span> 让超限的目标直接抓取失败（宁可丢这个目标，也别拖垮整个实例）。<b>存储层</b>用 recording rule 把高基数维度提前聚合掉，面板只查规则产出的低基数指标。<b>设计层</b>是根本：指标只回答「多少、多快、多错」，具体是谁、哪一个，交给日志和链路。</p>
+  <pre><span class="c"># 采集时裁掉高基数标签：把 path 里的 ID 段替换掉</span>
+scrape_configs:
+  - job_name: api
+    metric_relabel_configs:
+      - source_labels: [path]
+        regex: '/order/[0-9]+'
+        target_label: path
+        replacement: '/order/:id'
+      - regex: 'trace_id|request_id|user_id'
+        action: labeldrop
+    sample_limit: 50000      <span class="c"># 超过就整次抓取失败并置 up=0，属于兜底手段</span></pre>
+  <div class="callout danger">
+    <b>别用 <span class="k">honor_labels: true</span> 解决冲突。</b>它的意思是「目标自己带的标签优先，冲突时给服务端标签加 <span class="k">exported_</span> 前缀」。听起来很客气，实际后果是目标可以随便往你的 TSDB 里塞标签——包括那个每请求都变的 ID。默认的 <span class="k">false</span> 是更安全的选择。
+  </div>
+  <p><b>面试怎么答：</b>「基数是标签取值的组合数，一个 user_id 标签就能把 series 放大到用户量级。我排查会先看 head_series 和 tsdb 的统计接口，找到是哪个指标、哪个标签贡献最多，然后在采集层 relabel 掉，或者用 recording rule 降维。根治的办法是让指标只留可聚合的维度，把身份信息放到日志和 trace 里。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>Recording rules：预计算能救面板，也能埋雷</h2></div>
+  <p class="lead">面板打开要八秒，超时。有人提议「加机器」，有人提议「上 Thanos」。多数时候真正的解法是三条 recording rule——把重查询变成一条已经算好的 series。</p>
+  <p>recording rule 的机制很简单：按 <span class="k">interval</span> 周期性地把一条表达式的结果写成新指标。它的收益来自两处：一是把「扫描大量原始样本」变成「读一条已经聚合的 series」；二是<b>降维</b>——把 <span class="k">path</span>、<span class="k">instance</span> 这些高基数标签在写入时就聚合掉，面板只面对几十条 series。</p>
+  <p>但它不是免费的。规则结果本身也要存，也要占 series；如果规则里保留了全部标签，你只是把「查询慢」换成了「存储涨」。更麻烦的是依赖关系：同一组内的规则按顺序执行，跨组按各自的 interval 执行，如果 A 组依赖 B 组的产出，就要保证 B 先算完，否则 A 会读到上一轮的值甚至空值。</p>
+  <pre>groups:
+  - name: api.rules
+    interval: 30s
+    rules:
+      <span class="c"># 命名习惯：level:metric:operation，方便一眼看出粒度</span>
+      - record: api:http_requests:rate5m
+        expr: sum by (path, status) (rate(http_requests_total[5m]))
+
+      <span class="c"># 把 5xx 比例预先算好，面板和告警共用，避免两处逻辑漂移</span>
+      - record: api:http_error_ratio:rate5m
+        expr: |
+          sum by (path) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by (path) (rate(http_requests_total[5m]))</pre>
+  <p>命名不是洁癖，是检索能力。推荐 <span class="k">level:metric:operations</span> 这套：<span class="k">level</span> 是聚合粒度（<span class="k">instance</span>、<span class="k">api</span>、<span class="k">cluster</span>），<span class="k">metric</span> 是原始指标名，<span class="k">operations</span> 是做过什么（<span class="k">rate5m</span>、<span class="k">sum</span>）。看到名字就知道能不能直接用于告警，不用去翻规则文件。</p>
+  <table>
+    <tr><th style="width:190px">症状</th><th>可能的原因</th><th>怎么办</th></tr>
+    <tr><td>面板慢，但规则指标很快</td><td>规则覆盖不到这个查询</td><td>补一条规则，或把面板改成查规则产出</td></tr>
+    <tr><td>规则执行时间越来越长</td><td>规则里扫了全量标签，或者窗口太大</td><td>缩短窗口、提前降维、拆分规则组</td></tr>
+    <tr><td>某个规则指标出现空洞</td><td>上一轮还没算完，下一轮已经开始</td><td>调大 interval、减少单组规则数、检查是否 OOM</td></tr>
+    <tr><td>存储涨得比预期快</td><td>规则保留了全部原始标签</td><td>在 <span class="k">by</span> 里只留真正要用的维度</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>不要在 recording rule 里做 <span class="k">topk</span>。</b>topk 的结果依赖「当下谁排前面」，每轮算出来的标签集合都可能不同，最终你会得到一堆时有时无、互相覆盖的 series。要排名就在查询时算，要长期观察就固定一份白名单。
+  </div>
+  <p>规则也要测试。<span class="k">promtool test rules</span> 可以喂一组人工构造的输入序列，断言某个时刻的输出值——这样改规则时不用等到线上才发现算错。这条在面试里提一句，可信度会明显不一样，因为大多数人只知道写 YAML。</p>
+  <p><b>面试怎么答：</b>「recording rule 解决两类问题：重查询的预计算，和高基数维度的提前聚合。写的时候要注意命名规范、组内依赖顺序、以及别把原始标签全带进来，否则只是把查询压力换成了存储压力。规则本身我会用 promtool test rules 做单元测试。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>告警规则：for 管抖动，absent 管消失</h2></div>
+  <p class="lead">「for 是干什么的」谁都会答「持续时间」。追问「那指标直接没了怎么办」——很多人会说「那就不会告警了」，然后意识到问题的严重性：<b>最严重的故障，往往表现为指标消失。</b></p>
+  <p><span class="k">for</span> 的作用是把状态从 pending 推到 firing：表达式为真的持续时间超过 <span class="k">for</span>，才真正发出去。它过滤的是抖动，不是过滤故障。设成 <span class="k">0s</span> 意味着任何一次瞬时越界都会发，在业务有周期性尖刺时就是灾难。</p>
+  <p>但 for 有个副作用：故障恢复了、表达式变假，告警立刻停止。如果服务在阈值附近来回跳，你会收到「 firing → resolved → firing」的循环。<b><span class="k">keep_firing_for</span></b> 就是为这个场景加的：表达式恢复后，仍然保持 firing 一段时间，避免闪断刷屏。较新版本的 Prometheus 支持这个字段，用之前确认你的版本。</p>
+  <p>指标消失的问题要用 <span class="k">absent</span> 系列解决。<span class="k">absent(m)</span> 在「一条 series 都没有」时返回 1；<span class="k">absent_over_time(m[5m])</span> 在「整个窗口内都没有」时返回 1。两者都不能写成 <span class="k">m == 0</span>——后者在 series 不存在时同样不返回任何东西，你以为在监控「值为零」，实际上什么都没监控。</p>
+  <pre>groups:
+  - name: api.alerts
+    rules:
+      - alert: ApiHighErrorRate
+        expr: |
+          sum by (path) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by (path) (rate(http_requests_total[5m])) &gt; 0.05
+        for: 10m
+        keep_firing_for: 5m
+        labels:
+          severity: critical
+          team: api
+        annotations:
+          summary: "{{ $labels.path }} 5xx 比例 {{ $value | humanizePercentage }}"
+          runbook: "https://wiki.example.com/runbook/api-5xx"
+
+      <span class="c"># 抓取本身失败：up 是 Prometheus 自己产生的，最可靠</span>
+      - alert: TargetDown
+        expr: up == 0
+        for: 3m
+        labels: {severity: critical}
+
+      <span class="c"># 指标整体消失：不能用 == 0，必须用 absent</span>
+      - alert: MetricsMissing
+        expr: absent(up{job="api"})
+        for: 5m
+        labels: {severity: warning}</pre>
+  <table>
+    <tr><th style="width:200px">写法</th><th>语义</th><th>适用</th></tr>
+    <tr><td><span class="k">up == 0</span></td><td>抓取失败，但目标还在目标列表里</td><td>目标宕机、端口不通</td></tr>
+    <tr><td><span class="k">absent(m)</span></td><td>当前一条 series 都没有</td><td>整个 job 被删、配置漏了</td></tr>
+    <tr><td><span class="k">absent_over_time(m[10m])</span></td><td>十分钟内一次都没出现过</td><td>间歇性断采、指标改名后的静默失效</td></tr>
+    <tr><td><span class="k">m == 0</span></td><td>series 存在且值为 0</td><td>只适合「确定永远存在」的指标</td></tr>
+    <tr><td><span class="k">unless</span></td><td>左集合里排除右集合</td><td>「没有对应实例的孤儿指标」这类集合差</td></tr>
+  </table>
+  <div class="callout">
+    <b>注释里的模板别放会变的东西。</b><span class="k">{{ $labels.instance }}</span> 是稳定的，<span class="k">{{ $value }}</span> 每次评估都变。如果把 $value 拼进 <span class="k">labels</span>（不是 annotations），同一个告警会因为数值不同被当成不同告警，分组、抑制、静默全部失效。
+  </div>
+  <p><b>面试怎么答：</b>「for 用来压抖动，只有持续满足条件才发；keep_firing_for 解决恢复瞬间的反复横跳。指标消失是最危险的情况，必须用 absent 或 absent_over_time 单独覆盖，不能指望 == 0，因为 series 不存在时它什么也不返回。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>Alertmanager：分组、抑制、静默，三件套各管一件事</h2></div>
+  <p class="lead">Prometheus 只负责「算出来该不该告警」，Alertmanager 负责「这条告警该不该现在、发给谁、发几次」。两者的边界答不清，说明你只配过 receiver。</p>
+  <p>一条告警从 Prometheus 发到 Alertmanager 之后，要过四道工序：<b>路由</b>决定去哪个 receiver；<b>分组</b>把同一批告警合成一条通知；<b>抑制</b>让高级别告警压住低级别；<b>静默</b>按条件临时闭麦。分组靠 <span class="k">group_by</span>，抑制靠 <span class="k">inhibit_rules</span>，静默靠 UI 或 API 创建，三者不能互相替代。</p>
+  <p><span class="k">group_by</span> 写在 route 上，常见写法是按 <span class="k">alertname</span> 和 <span class="k">cluster</span> 分组。分组太细（比如把 instance 加进去）等于没分，一条告警一条消息；分组太粗（只按 cluster）会把完全不相关的问题塞进一条通知，值班的人要在里面找重点。</p>
+  <p>三个时间参数要分清：<span class="k">group_wait</span> 是新组第一次发通知前等多久（攒一攒一起发）；<span class="k">group_interval</span> 是同一组有变化时，两次通知之间的最小间隔；<span class="k">repeat_interval</span> 是没变化时多久重发一次提醒。默认值以官方文档和你环境的配置为准，但语义是固定的：前两个控制「快」，最后一个控制「别忘」。</p>
+  <pre>route:
+  receiver: default
+  group_by: [alertname, cluster]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: pager
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true          <span class="c"># 继续往下匹配，让 critical 也进工单系统</span>
+    - matchers: [severity="warning"]
+      receiver: im
+
+inhibit_rules:
+  <span class="c"># 同一个实例上，宕机告警压住所有其它告警——避免一条根因刷出三十条</span>
+  - source_matchers: [alertname="TargetDown"]
+    target_matchers: [severity=~"warning|critical"]
+    equal: [instance]</pre>
+  <div class="callout warn">
+    <b>抑制最常见的错是少写 <span class="k">equal</span>。</b>不写 equal 就意味着「全局生效」：A 机房的一台机器宕机，会把 B 机房所有同 severity 的告警一起压掉。必须写清楚「在哪几个标签相同的情况下才抑制」，通常至少要包含 <span class="k">instance</span> 或 <span class="k">cluster</span>。
+  </div>
+  <p>静默和抑制的区别，用一个问题就能说清：<b>抑制是「因为有别的事发生，所以这条不重要」；静默是「我知道，别吵」</b>。静默必须带过期时间，而且要有人负责到期后的状态——我见过太多「上线前静默两小时，三个月后还静着」的案例，那段时间里真出事是没人知道的。规范做法是静默必须有工单号，到期自动失效，值班交接时检查当前生效的静默列表。</p>
+  <p>最后一句关于高可用：Alertmanager 集群靠 gossip 同步静默和通知记录，去重靠 notification log，所以集群节点之间必须能互相通信。<b>不要只配 Prometheus 双写、不给 Alertmanager 组集群</b>——那样每条告警会发两遍。</p>
+  <p><b>面试怎么答：</b>「Prometheus 判断要不要告，Alertmanager 决定发给谁、发几次、和谁合并。分组解决『一次故障刷一百条』，抑制解决『根因告警该压住衍生告警』，静默是人工的临时闭麦、必须带过期时间。抑制规则里最容易出错的是 equal 没写全，会把不相干的范围一起压掉。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>高可用与长期存储：双写、去重、降采样</h2></div>
+  <p class="lead">「Prometheus 怎么做到高可用」——标准答案是「两台一起抓，双写」。接着追问「那查询和告警不会重复吗」，能答上来的不到一半。</p>
+  <p>先明确一件事：<b>Prometheus 本身不是分布式系统</b>。两个实例各自抓同样的目标、各自存一份数据，彼此不通信、不复制。这带来两个直接后果：查询要自己去重，告警要避免两边都发。</p>
+  <p>去重的办法是给两台实例打上同一个 <span class="k">replica</span> 标签（不同值），查询时用 <span class="k">--query.replica-label</span> 告诉 Prometheus 按这个标签去重。告警则相反：<b>只让一台实例评估规则</b>，或者让两台都算但 Alertmanager 侧靠 fingerprint 去重——前者更干净，后者更简单，取决于你的容忍度。</p>
+  <table>
+    <tr><th style="width:150px">方案</th><th>解决什么</th><th>代价</th></tr>
+    <tr><td>本地 TSDB</td><td>单机、短期（默认保留期以启动参数为准，常见是 15 天）</td><td>不能水平扩展，实例挂了历史就断</td></tr>
+    <tr><td>remote_write</td><td>把数据实时推给远端（Mimir、VictoriaMetrics、Thanos Receive 等）</td><td>网络和队列成为新瓶颈，远端故障会积压 WAL</td></tr>
+    <tr><td>Thanos Sidecar</td><td>把 block 上传对象存储，长期保留 + 全局查询</td><td>查询有延迟（要等 block 上传），架构组件多</td></tr>
+    <tr><td>联邦</td><td>从下级 Prometheus 拉取聚合后的少量指标</td><td>只适合汇总，别指望它做全量长期存储</td></tr>
+  </table>
+  <pre>remote_write:
+  - url: http://mimir:9009/api/v1/push
+    queue_config:
+      max_samples_per_send: 5000
+      capacity: 10000
+    write_relabel_configs:
+      <span class="c"># 推到远端前先丢掉不需要长期保留的高基数指标</span>
+      - source_labels: [__name__]
+        regex: 'go_.*|process_.*'
+        action: drop
+
+<span class="c"># 查询去重：告诉 Prometheus 哪个标签代表副本</span>
+--query.replica-label=replica</pre>
+  <p>长期存储真正的难点不是「存下来」，是「查得动」。原始精度数据放一年，一次跨月的 range 查询会扫掉几十亿个样本。<b>降采样</b>就是为此存在的：把老数据按 5 分钟、1 小时聚合成更低精度。要注意降采样后的数据只能用来画趋势，不能再算精确的 rate 和分位数——那些桶已经被合并了，语义已经变了。</p>
+  <p>还有一笔账要算：series 数 × 采样点 = 存储量。抓取间隔从 15 秒改成 30 秒，存储直接减半，代价是分辨率变粗、短时尖刺可能看不到。这个取舍在面试里主动说出来，比背「Thanos 有五个组件」有价值。</p>
+  <p><b>面试怎么答：</b>「Prometheus 的高可用是双实例各自抓取，不是复制，所以查询侧要按 replica 标签去重，告警侧要么只让一台评估，要么靠 Alertmanager 去重。长期存储一般走 remote_write 或 Thanos，用对象存储加降采样控制成本，但降采样后的数据不能再算精确分位数。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">坑</span><h2>10 个坑：每一个都能让面板骗你三个月</h2></div>
+  <p class="lead">下面这些不是语法错误，是<b>语义错误</b>。它们的共同点是：查询能跑、图能画、没人报警，直到某天你拿这个数做了决策。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">rate 的窗口等于抓取间隔</div><div class="pd">窗口里经常只有一两个样本，边界一对不齐就返回空。窗口至少开到抓取间隔的四倍，否则你会看到一片断点和尖刺，还以为是采集不稳定。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">先 sum 再 rate</div><div class="pd">rate(sum(...)) 把所有实例加成一个总数再求速率，某台机器重启归零时总数会掉一截，被当成 reset 处理，结果偏低。正确顺序是先 rate 再 sum。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">对分位数求平均</div><div class="pd">avg(P99) 既不等于全局 P99，也不代表任何一台实例。分位数丢掉了分布形状，只有 Histogram 的桶能保留形状。要全局视角就聚合桶，或者改看「超过阈值的比例」。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">histogram_quantile 时把 le 聚合掉</div><div class="pd">le 是桶边界，丢了它函数就没有坐标，返回 NaN 或一个常数。记住写 sum by (le)，要分组就写 sum by (path, le)。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把 request_id / trace_id 做成标签</div><div class="pd">这是最纯粹的基数灾难：每个请求一条 series。指标只该回答「多少、多快、多错」，具体是哪一个请求，去日志和链路里找。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">告警的 for 设成 0s</div><div class="pd">任何一次瞬时越界都会发。业务有周期性尖刺时，你会被自己的告警淹没，然后开始忽略所有告警——这比不告警更危险。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">用 m == 0 监控「指标消失」</div><div class="pd">series 不存在时这个表达式不返回任何东西，等于什么都没监控。要覆盖「消失」必须用 absent 或 absent_over_time。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">抑制规则不写 equal</div><div class="pd">不写就是全局生效，一个机房的根因告警会把其它机房的告警一起压掉。equal 至少要有 instance 或 cluster。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">双写却不配 replica 标签</div><div class="pd">两台 Prometheus 各存一份、各自评估规则，Alertmanager 收到两份 fingerprint 不同的告警，同一条故障发两遍。查询也会出现两条曲线互相盖住。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">recording rule 保留全部原始标签</div><div class="pd">那不是预计算，是把「查询慢」换成了「存储涨」。规则的 by 子句只该留真正要用的维度，否则 series 数量和原始指标一样多。</div></div></div>
+  <p><b>面试落点：</b>被问「你踩过什么坑」，挑第 3 个或第 5 个讲，讲清楚当时的错误判断和后来的修正。比如「我们曾经用 avg 把各实例的 P99 汇总，面板一直显示两百毫秒，用户投诉三秒，最后才发现聚合方式从根上就是错的」——这种细节比列十个坑名有说服力。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 抓取间隔是 1 分钟，有人写了 <span class="k">rate(http_requests_total[1m])</span>，面板上时不时出现断点。最可能的原因？</div>
+      <button class="opt">Counter 类型不支持 rate，应该换成 Gauge</button>
+      <button class="opt">Prometheus 的 rate 最多只支持 30 秒窗口</button>
+      <button class="opt">窗口内样本数经常不足两个，rate 在样本不够时返回空值</button>
+      <button class="opt">缺少 offset，导致时间对齐失败</button>
+      <div class="ans">正确答案：<b>样本数不足</b>。rate 需要窗口内至少两个样本才能算斜率，窗口等于抓取间隔时，边界稍有错位就只剩一个甚至零个样本，结果直接为空。经验做法是窗口不小于抓取间隔的四倍。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. <span class="k">increase(http_requests_total[5m])</span> 返回 3.7，而请求数不可能是小数。怎么解释？</div>
+      <button class="opt">这是浮点误差，加个 round() 就准确了</button>
+      <button class="opt">increase 会把窗口两端外推，本质是估算而非精确计数</button>
+      <button class="opt">说明计数器发生了 reset，数据已损坏</button>
+      <button class="opt">说明抓取间隔大于 5 分钟，样本被压缩了</button>
+      <div class="ans">正确答案：<b>外推导致的估算</b>。rate 会按窗口内样本的斜率向窗口边界外推，increase 等于 rate 乘窗口秒数，因此会得到小数。需要精确计数时应该用后端日志或离线数据对账，而不是指望 increase。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 下面哪个写法能正确算出所有实例合计的 P99 延迟？</div>
+      <button class="opt">avg(histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])))</button>
+      <button class="opt">histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])))</button>
+      <button class="opt">histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_sum[5m])))</button>
+      <button class="opt">histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))</button>
+      <div class="ans">正确答案：<b>最后一项</b>。必须先对 <span class="k">_bucket</span> 求 rate，再按 <span class="k">le</span> 聚合，最后喂给 histogram_quantile。少了 le 就没有桶边界；用 _sum 算的是平均值不是分位数；对分位数再取 avg 在数学上不成立。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于 Summary 和 Histogram，哪个说法正确？</div>
+      <button class="opt">Summary 的分位数在客户端计算，无法跨实例聚合；Histogram 保留分桶计数，可以聚合后再算分位数</button>
+      <button class="opt">Summary 比 Histogram 更省 series，所以多实例场景应该优先用 Summary</button>
+      <button class="opt">Histogram 的分位数是精确值，Summary 是近似值</button>
+      <button class="opt">两者可以互相替代，只是 API 名字不同</button>
+      <div class="ans">正确答案：<b>第一项</b>。Summary 在客户端用滑动窗口算分位数，输出的只是一个点，丢掉分布形状后无法合并；Histogram 输出的是累计桶计数，形状还在，所以能先聚合再计算。另外 Histogram 的桶数是固定的，series 成本通常反而更高。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. Prometheus 内存突然翻倍，怀疑基数爆炸。第一步最该做什么？</div>
+      <button class="opt">立刻调大内存限制，先扛过去</button>
+      <button class="opt">重启 Prometheus 清空 head，观察是否恢复</button>
+      <button class="opt">查 <span class="k">/api/v1/status/tsdb</span> 或 <span class="k">promtool tsdb analyze</span>，定位是哪个指标、哪个标签贡献了最多 series</button>
+      <button class="opt">把所有指标的采集间隔改成 5 分钟</button>
+      <div class="ans">正确答案：<b>查 tsdb 统计</b>。基数问题的根因一定落在「某个标签的取值数量」上，官方诊断接口能直接给出按指标名和标签名的 series 排序，比手写 count by 查询更轻、更准。重启只会清掉 head，重新采集后照样涨回来。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 业务指标因为采集配置被误删而彻底消失，但服务确实挂了。下面哪种写法能覆盖「指标消失」这种情况？</div>
+      <button class="opt">expr: http_requests_total == 0，值为零就告警</button>
+      <button class="opt">expr: absent(up{job="api"})，没有任何 series 时返回 1</button>
+      <button class="opt">expr: rate(http_requests_total[5m]) &lt; 0，速率变负就告警</button>
+      <button class="opt">expr: up == 1，抓取成功就代表服务健康</button>
+      <div class="ans">正确答案：<b>absent</b>。<span class="k">m == 0</span> 只在 series 存在且值为 0 时有输出，series 不存在时什么也不返回，等于没监控；<span class="k">rate</span> 在无样本时同样是空；<span class="k">up == 1</span> 只说明抓取成功，指标被删掉时它依然是 1。要覆盖「消失」必须用 absent 或 absent_over_time。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>series</b></td><td>指标名加一组标签唯一确定的时间线，基数的基本单位</td></tr>
+    <tr><td><b>sample</b></td><td>一个（时间戳, 数值）对</td></tr>
+    <tr><td><b>scrape</b></td><td>Prometheus 主动向目标拉取一次指标的动作</td></tr>
+    <tr><td><b>exposition format</b></td><td>目标暴露指标的文本格式，<span class="k">/metrics</span> 返回的就是它</td></tr>
+    <tr><td><b>block</b></td><td>TSDB 的落盘单位，按时间切块，后台会合并成更大的块</td></tr>
+    <tr><td><b>WAL</b></td><td>预写日志，进程崩溃时用它恢复最近未落盘的样本</td></tr>
+    <tr><td><b>staleness</b></td><td>目标消失后 series 被标记为 stale，不再参与计算</td></tr>
+    <tr><td><b>recording rule</b></td><td>周期性把表达式结果写成新指标的规则，用于预计算和降维</td></tr>
+    <tr><td><b>absent</b></td><td>「一条 series 都没有」时返回 1，用于监控指标消失</td></tr>
+    <tr><td><b>keep_firing_for</b></td><td>表达式恢复后仍保持 firing 一段时间，抑制来回抖动</td></tr>
+    <tr><td><b>inhibit</b></td><td>满足条件时压住另一批告警，通常用根因压衍生</td></tr>
+    <tr><td><b>group_wait</b></td><td>新告警组第一次发通知前的等待时间，用来攒批</td></tr>
+    <tr><td><b>remote_write</b></td><td>把样本实时推给远端存储的协议</td></tr>
+    <tr><td><b>downsampling</b></td><td>把老数据聚合成更低精度，用于长期存储，代价是失去细节</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 本地起一个 Prometheus 加 node_exporter，故意写 <span class="k">rate(x[1m])</span> 和 <span class="k">rate(x[5m])</span> 对比曲线，亲眼看断点；② 用 <span class="k">promtool</span> 造一个 Histogram，分别算 P50/P90/P99，再把桶改粗，看误差怎么变大；③ 给一个测试服务加一个 <span class="k">request_id</span> 标签，观察 <span class="k">prometheus_tsdb_head_series</span> 十分钟内怎么涨，然后删掉它，体会「加标签一时爽」。<br><br>
+    <b>之后值得单独学：</b>第 15 期讲 SLO 与告警设计——本篇讲的是「怎么把数算对」，那一篇讲「算对了之后该对什么数告警」；第 16 期把指标、日志、链路串起来，回答「Prometheus 说有事，然后呢」。如果目标是 SRE 岗，第 21 期的事故处理和复盘模板建议一起看，面试里经常连着问。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 14 期 · 监控的难点不在把图画出，在于你敢不敢用这个数做决定</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

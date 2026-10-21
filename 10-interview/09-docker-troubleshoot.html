@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker 排障手册：容器起不来、磁盘爆了、网络不通</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 9 期</span>
+    <h1>Docker 排障手册：容器起不来、磁盘爆了、网络不通</h1>
+    <p class="sub">先看退出码，再看日志，最后才怀疑镜像——顺序错了就是白折腾。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>10</b> 类故障</span>
+      <span class="chip"><b>25</b> 条命令</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>5</b> 个退出码</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：容器状态是 Exited (0)，这算成功还是失败？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都是从「重启一下」开始的</h2></div>
+  <p class="lead">容器排障最容易犯的错，不是不会看日志，是<b>顺序错了</b>：先猜镜像有问题，于是重新 <span class="k">docker build</span>；猜网络有问题，于是 <span class="k">docker network prune</span>；猜资源不够，于是加内存。半小时过去，现象还在，现场已经被自己破坏完了。</p>
+  <p>正确的顺序只有三步，而且每一步都比上一步贵：<b>退出码 → 日志 → 进容器</b>。退出码几乎零成本，却直接告诉你「是谁杀的、为什么退的」；日志告诉你「应用自己认为发生了什么」；进容器是最后一步，因为它会改变现场。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉动作</th><th>真实原因</th></tr>
+    <tr><td>容器起来 2 秒就 Exited (0)，日志一片空白</td><td>镜像坏了，重新构建一次</td><td>主进程把自己放到后台了。容器的生命周期等于 PID 1，PID 1 一退容器就结束，跟镜像没关系</td></tr>
+    <tr><td>磁盘 100%，但 <span class="k">du -sh /var/lib/docker</span> 加起来对不上</td><td>有隐藏文件，或者统计有延迟</td><td>容器的 json-file 日志默认<b>不轮转</b>，一个容器写几十 G 很常见；另外镜像层里被删掉的文件也算在磁盘上</td></tr>
+    <tr><td>宿主机 <span class="k">curl 127.0.0.1:8080</span> 通，外面访问不通</td><td>端口映射写错了</td><td>映射规则在，但 firewalld/ufw 把 <span class="k">FORWARD</span> 链默认策略设成了 DROP，转发的包被丢在外面</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>退出码先看</div><div class="cd">137、139、127、126 各对应一类原因。它不解释细节，但能一刀切开「被杀」「崩了」「找不到命令」。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>日志看两头</div><div class="cd">开头看启动参数和配置加载，结尾看最后一句。中间那几千行重复的通常没信息量。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>inspect 看事实</div><div class="cd">退出码、是否 OOM、重启次数、实际生效的 Cmd/Entrypoint、挂载和端口，全在这里，不靠记忆。</div></div>
+  </div>
+  <div class="callout">
+    <b>为什么要强调顺序：</b>退出码是内核/运行时给出的客观事实，日志是应用的主观陈述，进容器是你的推测。先信事实，再听陈述，最后才验证推测。反过来的习惯一旦养成，就会变成「每次出事都重建镜像」，看起来在处理，其实在赌。
+  </div>
+  <p><b>面试落点：</b>「容器起不来我按三步走：先 <span class="k">docker ps -a</span> 看状态和退出码，再 <span class="k">docker inspect</span> 看 ExitCode、OOMKilled 和实际生效的启动命令，然后看 logs。这三步能覆盖大部分情况，进容器是最后一步，因为会改现场。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>三步定位法：ps -a、inspect、logs 各回答什么</h2></div>
+  <p class="lead">这三条命令人人都会敲，但大部分人只用了它们十分之一的信息量。真正的差别在于：<b>你知道每一列、每个字段在回答哪个问题</b>。</p>
+  <p>第一步 <span class="k">docker ps -a</span>，看三样：STATUS 里的 <span class="k">Exited (N)</span>、<span class="k">Restarting</span> 的循环、以及 <span class="k">Up 3 seconds</span> 这种「刚起来又要挂」的时间。 <span class="k">Restarting (1) 5 seconds ago</span> 说明重启策略在生效，但应用一直在挂，这时候不要等它「自己好」。</p>
+  <p>第二步 <span class="k">docker inspect</span>，这是信息最全的一步。至少要看五个字段：</p>
+  <table>
+    <tr><th style="width:250px">字段</th><th>回答什么</th></tr>
+    <tr><td><span class="k">.State.ExitCode</span></td><td>退出码。和 ps 里的一致，但方便脚本取值</td></tr>
+    <tr><td><span class="k">.State.OOMKilled</span></td><td>是不是被 cgroup 的内存限制杀掉的。137 的真假靠它区分</td></tr>
+    <tr><td><span class="k">.State.Error</span></td><td>运行时层面的错误，比如「OCI runtime create failed」</td></tr>
+    <tr><td><span class="k">.Config.Entrypoint / .Cmd</span></td><td>实际生效的启动命令。很多人以为写的是 A，实际被执行的是 B</td></tr>
+    <tr><td><span class="k">.RestartCount</span></td><td>重启了多少次。数字大说明在循环，不用等下次</td></tr>
+  </table>
+  <p>第三步 <span class="k">docker logs</span>。注意两个细节：一是它<b>对已退出的容器同样有效</b>（日志在 json-file 里），所以容器挂了也能看到最后的输出；二是它依赖日志驱动，如果 daemon 配的是 syslog、fluentd 这类不支持读取的驱动，<span class="k">docker logs</span> 会直接报「configured logging driver does not support reading」，这时候要去日志系统里查。</p>
+  <pre><span class="c"># 1. 状态与退出码：-a 才能看到已退出的</span>
+docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+docker ps -a --filter 'status=exited'
+
+<span class="c"># 2. 一次性把关键字段取出来</span>
+docker inspect -f 'exit={{.State.ExitCode}} oom={{.State.OOMKilled}} restarts={{.RestartCount}} err={{.State.Error}}' web
+docker inspect -f 'entrypoint={{json .Config.Entrypoint}} cmd={{json .Config.Cmd}}' web
+
+<span class="c"># 看完整的状态时间线，判断是启动失败还是跑了一阵才挂</span>
+docker inspect -f '{{.State.StartedAt}} -&gt; {{.State.FinishedAt}}' web
+
+<span class="c"># 3. 日志：开头、结尾、带时间戳</span>
+docker logs --tail 50 web
+docker logs --since 10m -t web 2&gt;&amp;1 | head -40
+docker logs web 2&gt;&amp;1 | tail -100</pre>
+  <p>这三步之后，如果还没结论，第四条命令是 <span class="k">docker events</span>。它能给出「什么时候创建、什么时候 start、什么时候 die、什么时候被 kill」的时间线，特别适合判断「是容器自己退的，还是被谁停的」。在有多人操作、或者有自动伸缩脚本的环境里，这条时间线经常直接指出元凶。</p>
+  <pre><span class="c"># 实时事件流，只过滤某个容器（另开一个窗口观察）</span>
+docker events --filter container=web --format '{{.Time}} {{.Action}} {{.Actor.ID}}'
+
+<span class="c"># 过去的 30 分钟（需要 daemon 保存了事件，默认会保留一段时间）</span>
+docker events --since 30m --until 0s --filter type=container</pre>
+  <div class="callout ok">
+    <b>一个能省十分钟的习惯：</b>把 <span class="k">docker inspect -f</span> 的常用字段写成一段别名或小脚本，比如 <span class="k">dstat NAME</span> 一次输出退出码、OOM、重启次数、启动命令、挂载。出事的时候脑子是空的，靠肌肉记忆比靠临场拼字符串可靠。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>docker ps -a --format 'table {{.Names}}\t{{.Status}}'</code><span class="desc">先看 STATUS，Exited (N) 里的 N 就是第一手证据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker inspect -f '{{.State.ExitCode}} {{.State.OOMKilled}}' NAME</code><span class="desc">退出码与是否被 OOM 杀掉，两个字段定性 90% 的启动失败</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker logs --tail 50 --since 10m -t NAME</code><span class="desc">带时间戳看最后 50 行，已退出的容器同样能读</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker events --filter container=NAME</code><span class="desc">谁在什么时候 start / die / kill，判断是自杀还是被杀</span><button class="copy">复制</button></div>
+    <div class="crow"><code>docker system df -v</code><span class="desc">镜像、容器、卷、构建缓存各占多少，找磁盘先看这张表</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「ps -a 看状态和退出码，inspect 看 ExitCode、OOMKilled、RestartCount 和实际生效的 Entrypoint/Cmd，logs 看应用输出。这三步的信息量依次递增，成本也依次递增。如果还判断不了，用 docker events 看是谁在什么时候把它停掉的。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>退出码：128+N 是最容易被忽略的一条规则</h2></div>
+  <p class="lead">「137 是什么？」大部分人答「内存溢出」。这个答案只对了一部分——137 只说明进程收到了 SIGKILL，而 SIGKILL 可能来自 OOM killer，也可能来自 <span class="k">docker stop</span> 等满 10 秒后的强杀，还可能来自你自己敲的 <span class="k">kill -9</span>。</p>
+  <p>先把规则说清：<b>应用正常退出时，退出码就是应用自己返回的值（0~255）；被信号杀死时，退出码是 128 加信号编号。</b>所以 137 = 128 + 9（SIGKILL），143 = 128 + 15（SIGTERM），139 = 128 + 11（SIGSEGV），130 = 128 + 2（SIGINT）。</p>
+  <table>
+    <tr><th style="width:90px">退出码</th><th style="width:190px">含义</th><th>典型成因</th></tr>
+    <tr><td><b>0</b></td><td>主进程正常退出</td><td>进程干完活自己退了（一次性任务正常）；或者它把自己 daemon 化了，PID 1 直接结束</td></tr>
+    <tr><td><b>1</b></td><td>应用自己返回的错误</td><td>配置解析失败、端口被占、连不上数据库、启动脚本里 <span class="k">set -e</span> 中断</td></tr>
+    <tr><td><b>125</b></td><td>Docker 自身出错，容器没跑起来</td><td>参数非法、端口已被占用、挂载路径不存在、daemon 连不上</td></tr>
+    <tr><td><b>126</b></td><td>命令存在但无法执行</td><td>脚本没有执行权限、挂载带了 <span class="k">noexec</span>、二进制架构不匹配</td></tr>
+    <tr><td><b>127</b></td><td>找不到要执行的命令</td><td>ENTRYPOINT 拼错、基础镜像里没这个 shell、PATH 不对</td></tr>
+    <tr><td><b>137</b></td><td>被 SIGKILL 杀死</td><td>OOM killer、<span class="k">docker stop</span> 超时后强杀、人工 kill -9</td></tr>
+    <tr><td><b>139</b></td><td>被 SIGSEGV 杀死（段错误）</td><td>原生库崩溃、JVM 崩溃（配合 hs_err_pid 日志）、架构不匹配的二进制</td></tr>
+    <tr><td><b>143</b></td><td>被 SIGTERM 杀死</td><td>正常 <span class="k">docker stop</span> 的默认信号；应用没处理就直接退了</td></tr>
+  </table>
+  <p>125、126、127 这三个是 Docker 自己的约定，很多人不知道，所以看到 127 会去翻应用日志，翻了半天发现日志里啥也没有——因为命令根本没执行起来，应用连一行输出都没产生。<b>127 的第一反应应该是「镜像里的可执行文件路径对不对」，而不是「代码有 bug」。</b></p>
+  <pre><span class="c"># 137 到底是不是 OOM：看这一个字段就够了</span>
+docker inspect -f '{{.State.OOMKilled}}' web
+<span class="c"># true 才是被 cgroup 内存限制杀的；false 就要查是谁发的 SIGKILL</span>
+
+<span class="c"># 确认容器的 StopSignal 和超时时间（默认 SIGTERM，10 秒）</span>
+docker inspect -f 'stop={{.Config.StopSignal}} timeout={{.Config.StopTimeout}}' web
+
+<span class="c"># 127 排查：进不去容器就用 --entrypoint 覆盖成 shell</span>
+docker run --rm --entrypoint sh myapp:1.0 -c 'ls -l /usr/local/bin; echo $PATH'
+
+<span class="c"># 126 排查：看二进制架构和权限</span>
+docker run --rm --entrypoint sh myapp:1.0 -c 'file /app/server; ls -l /app/server'</pre>
+  <div class="callout warn">
+    <b>不要用 137 直接下「内存不够」的结论。</b>Kubernetes 里 <span class="k">kubectl delete pod</span> 等满 grace period 之后也是 SIGKILL；CI 里 runner 被回收、宿主机重启、<span class="k">docker kill</span>，全都是 137。要区分只能看 <span class="k">OOMKilled</span> 字段和内核日志（<span class="k">dmesg</span> 里的 oom-kill 记录）。
+  </div>
+  <p>还有一个反直觉的点：<b>退出码 0 不代表服务正常</b>。在容器的语义里，0 只意味着「PID 1 正常结束了」。一个 nginx 容器如果启动脚本把 nginx 放到后台、脚本自己退出，容器立刻 Exited (0)，编排系统看到的是「成功」，重启策略 <span class="k">on-failure</span> 甚至不会拉起它。这类问题排查起来最费劲，因为所有指标都显示「一切正常」。</p>
+  <p><b>面试落点：</b>「退出码规则是正常退出用应用自己的返回值，被信号杀就是 128 加信号号。137 是 SIGKILL，可能是 OOM 也可能是 stop 超时或人工 kill，要看 inspect 的 OOMKilled。125/126/127 是 Docker 层面的错：参数错、没权限、找不到命令。0 只说明主进程正常退出，不代表服务可用。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>启动就退出：多半是「前台进程」这四个字</h2></div>
+  <p class="lead">「我的容器明明启动成功了，一秒钟就 Exited (0)。」这是新手最常见的一句话，也是面试里很好用的素材。原因通常只有三类：<b>进程后台化了、启动命令被覆盖了、依赖没就绪</b>。</p>
+  <p>第一类最典型。nginx 默认以 daemon 方式运行：主进程 fork 出 worker，自己退出。在物理机上这是好事，在容器里就是灾难——PID 1 退出，容器结束。<b>容器的存活条件不是「里面有进程在跑」，而是「PID 1 还在」。</b>所以官方镜像的启动命令都加了前台参数，比如 <span class="k">nginx -g 'daemon off;'</span>；httpd 是 <span class="k">-DFOREGROUND</span>；很多 Java 启动脚本里的 <span class="k">nohup ... &amp;</span> 也是同一个坑。</p>
+  <pre><span class="c"># 典型错误：脚本把服务放后台，然后自己退出</span>
+<span class="c"># start.sh</span>
+<span class="c"># nohup java -jar app.jar &gt; /var/log/app.log 2&gt;&amp;1 &amp;</span>
+<span class="c"># 容器立刻 Exited (0)，日志还是空的，因为输出重定向到文件了</span>
+
+<span class="c"># 正确写法：exec 让 PID 1 就是应用本身，信号才能打到它</span>
+<span class="c"># exec java -jar app.jar</span>
+
+<span class="c"># 排查时临时覆盖启动命令，进容器看现场（不要用于生产）</span>
+docker run --rm -it --entrypoint sh myapp:1.0
+docker run -d --name keep --entrypoint sleep myapp:1.0 infinity</pre>
+  <p>第二类是启动命令被覆盖。Dockerfile 里 <span class="k">ENTRYPOINT</span> 和 <span class="k">CMD</span> 的组合规则值得记准：<b>ENTRYPOINT 是「可执行文件」，CMD 是「默认参数」</b>；如果在 <span class="k">docker run</span> 后面跟了命令，它会整体替换 CMD，而不是追加。所以一个写着 <span class="k">ENTRYPOINT ["/app/server"]</span> 加 <span class="k">CMD ["--port","8080"]</span> 的镜像，你 <span class="k">docker run image --help</span> 得到的是 <span class="k">/app/server --help</span>，不是 shell。很多人在这里绕很久，其实 <span class="k">docker inspect</span> 一看 <span class="k">.Config.Cmd</span> 就明白了。</p>
+  <p>第三类是依赖没就绪。应用启动时连不上数据库，直接 <span class="k">System.exit(1)</span>，容器退出。这时候日志里通常有一行 <b>Connection refused</b>，而数据库容器可能只是还在初始化。解决办法不是「加 sleep 30」，而是让启动逻辑能重试，或者用编排层的健康检查来控制启动顺序（Compose 的 <span class="k">depends_on: condition: service_healthy</span>，K8s 的 initContainer 或探针）。</p>
+  <table>
+    <tr><th style="width:200px">现象</th><th>判断</th><th>处置</th></tr>
+    <tr><td>Exited (0)，日志空</td><td>主进程后台化，或输出被重定向到文件</td><td>改成前台运行 + <span class="k">exec</span>，日志写 stdout</td></tr>
+    <tr><td>Exited (1)，日志有 Connection refused</td><td>依赖未就绪，或地址写成了 localhost</td><td>加重试、改配置、用服务名而不是 127.0.0.1</td></tr>
+    <tr><td>Exited (127)</td><td>命令不存在</td><td>看 ENTRYPOINT 路径、基础镜像里有没有这个 shell</td></tr>
+    <tr><td>Exited (126)</td><td>没有执行权限，或架构不匹配</td><td><span class="k">chmod +x</span>、检查 <span class="k">--platform</span></td></tr>
+    <tr><td>报 <b>no such file or directory</b>，但文件明明在</td><td>脚本是 CRLF 换行，shebang 变成了 <span class="k">#!/bin/sh\r</span></td><td>转成 LF，或在 Dockerfile 里 <span class="k">sed -i 's/\r$//'</span></td></tr>
+    <tr><td>Restarting (1) 循环</td><td>重启策略在生效，但每次启动都失败</td><td>先 <span class="k">docker update --restart=no</span> 停掉循环，保留现场再查</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>别用 <span class="k">tail -f /dev/null</span> 或 <span class="k">sleep infinity</span> 当「修好了」。</b>它只是让容器保持运行，应用根本没起来。真正要的是「进程在前台、日志到 stdout、信号能收到」。临时调试可以用，进了生产就是给自己埋雷。
+  </div>
+  <p><b>面试落点：</b>「容器 Exited (0) 而日志为空，我第一反应是主进程后台化了。容器的生命周期等于 PID 1，nginx 这种默认 daemon 的必须加 daemon off。第二种是 CMD 被 run 后面的参数整体替换了。第三种是依赖没起，日志里会有 Connection refused，该做重试而不是 sleep。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>磁盘被写满：一半是日志，一半是镜像层</h2></div>
+  <p class="lead">「磁盘 100% 了，删了几个镜像还是 100%。」这类工单的答案通常不在镜像上，而在 <span class="k">/var/lib/docker/containers</span> 里那些没人看的 <span class="k">-json.log</span>。</p>
+  <p>先把 Docker 占的空间拆成四块，这是回答「磁盘去哪了」的框架：</p>
+  <table>
+    <tr><th style="width:130px">类别</th><th>位置</th><th>增长原因</th></tr>
+    <tr><td><b>镜像</b></td><td><span class="k">/var/lib/docker/overlay2</span>（只读层）</td><td>每次构建都留一份，tag 覆盖后旧镜像变成 dangling，没人清</td></tr>
+    <tr><td><b>容器可写层</b></td><td><span class="k">overlay2/&lt;id&gt;/diff</span></td><td>应用往容器里写文件、日志没走 stdout、临时文件不清理</td></tr>
+    <tr><td><b>容器日志</b></td><td><span class="k">containers/&lt;id&gt;/&lt;id&gt;-json.log</span></td><td>json-file 驱动默认<b>不限制大小、不轮转</b>，一个容器写几十 G 很常见</td></tr>
+    <tr><td><b>卷</b></td><td><span class="k">/var/lib/docker/volumes</span></td><td>匿名卷不随容器删除而清理，CI 环境里能攒出几十 G</td></tr>
+  </table>
+  <pre><span class="c"># 先看总量分布：四类的占比一目了然</span>
+docker system df
+docker system df -v          <span class="c"># 细到每个镜像、容器、卷</span>
+
+<span class="c"># 找最大的容器日志（这一步经常直接抓到元凶）</span>
+du -sh /var/lib/docker/containers/*/*-json.log | sort -h | tail -5
+
+<span class="c"># 确认日志驱动和是否有大小限制</span>
+docker info --format '{{.LoggingDriver}}'
+docker inspect -f '{{json .HostConfig.LogConfig}}' web
+
+<span class="c"># 截断一个正在写的日志（比 rm 安全，句柄还在但空间立即释放）</span>
+: &gt; /var/lib/docker/containers/&lt;id&gt;/&lt;id&gt;-json.log</pre>
+  <p>日志不轮转是一个设计选择，不是 bug：Docker 默认把容器 stdout/stderr 落到 json-file，方便 <span class="k">docker logs</span> 读，但它<b>不会自动限制大小</b>。要限制必须在 daemon 层或容器层显式配。注意 daemon 级的 <span class="k">log-opts</span> 只对<b>新建</b>的容器生效，已经跑着的容器要重建才会应用。</p>
+  <pre><span class="c"># /etc/docker/daemon.json：全局限制，改完要重启 docker</span>
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "50m", "max-file": "3" }
+}
+
+<span class="c"># 单个容器启动时指定（优先级更高）</span>
+docker run -d --log-opt max-size=50m --log-opt max-file=3 --name web nginx
+
+<span class="c"># 也可以用 local 驱动，默认就带轮转，压缩率更好</span>
+<span class="c"># "log-driver": "local", "log-opts": {"max-size": "50m"}</span></pre>
+  <p>清理要分清三个命令的破坏力，这是面试里很容易被追问的点：<span class="k">docker system prune</span> 删停止的容器、未使用的网络、dangling 镜像和构建缓存；加 <span class="k">-a</span> 会把<b>所有没有被容器使用的镜像</b>都删掉，包括你准备回滚用的那个 tag；加 <span class="k">--volumes</span> 会删匿名卷，数据库数据可能一起没。这三者的区别必须能一句话说清，因为生产上敲错一个字母就是事故。</p>
+  <div class="callout danger">
+    <b>不要用 <span class="k">rm -rf /var/lib/docker/*</span> 来救磁盘。</b>它会把镜像、容器、卷、网络配置全部抹掉，Docker 重启后会以为自己是个新装的机器。而且如果有容器正在运行，删掉运行中的层目录会直接让进程读到 I/O 错误。要先停 Docker 服务，再决定删哪一块。
+  </div>
+  <p>磁盘长期不够的根治办法是迁 <span class="k">data-root</span>：把 <span class="k">/var/lib/docker</span> 挪到更大的数据盘。步骤是停服务、用 <span class="k">rsync -aP</span> 保留权限和硬链接地复制、改 <span class="k">/etc/docker/daemon.json</span> 里的 <span class="k">data-root</span>、启动、用 <span class="k">docker info</span> 确认 <span class="k">Docker Root Dir</span> 已经变了、最后再删旧目录。<b>顺序不能反</b>，先删再改等于自杀。</p>
+  <pre><span class="c"># 迁移 data-root 的完整步骤</span>
+systemctl stop docker
+rsync -aP /var/lib/docker/ /data/docker/
+
+<span class="c"># /etc/docker/daemon.json</span>
+<span class="c"># { "data-root": "/data/docker" }</span>
+
+systemctl start docker
+docker info | grep -i 'root dir'
+docker images | head            <span class="c"># 确认镜像还在</span>
+<span class="c"># 验证无误后再删旧目录</span></pre>
+  <p><b>面试落点：</b>「Docker 占空间分四块：镜像层、容器可写层、容器日志、卷。最常见的是 json-file 日志没限制，一个容器能写几十 G，用 du 找 *-json.log 最快。清理要区分 prune 和 prune -a，后者会删掉回滚用的镜像。根治是配 max-size 和迁 data-root。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>端口与网络：映射成功不等于外部能访问</h2></div>
+  <p class="lead">「-p 8080:80 明明写了，<span class="k">docker ps</span> 也显示 <span class="k">0.0.0.0:8080-&gt;80/tcp</span>，但外部就是打不开。」这个现场有五个常见分岔，得按顺序排除。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先确认监听地址。</b>容器里如果应用只绑 <span class="k">127.0.0.1:80</span>，宿主机 DNAT 过来的包进不去。容器里 <span class="k">ss -lntp</span> 看到的是 <span class="k">127.0.0.1:80</span> 就中招了，应用要绑 <span class="k">0.0.0.0</span>。</div></div>
+    <div class="step"><div class="txt"><b>再看宿主机端口有没有被占。</b><span class="k">bind: address already in use</span> 时 Docker 返回 125，容器根本没创建。用 <span class="k">ss -lntp | grep 8080</span> 找占用者，常见是上一个没退干净的容器或者宿主机的服务。</div></div>
+    <div class="step"><div class="txt"><b>确认 DNAT 规则存在。</b><span class="k">iptables -t nat -S DOCKER</span> 里应该有到容器 IP 的 DNAT。没有规则说明端口没发布成功，或者 iptables 被别的工具刷过。</div></div>
+    <div class="step"><div class="txt"><b>查 FORWARD 链。</b>这是最隐蔽的一层：firewalld 或 ufw 把 <span class="k">FORWARD</span> 默认策略设成 DROP，宿主机本机访问没问题（走 INPUT），转发给容器的包全被丢。看 <span class="k">iptables -S FORWARD</span> 和 <span class="k">firewall-cmd --state</span>。</div></div>
+    <div class="step"><div class="txt"><b>最后看云上的安全组。</b>宿主机上 curl 通、同网段另一台机器不通，通常是安全组或网络 ACL 没放行，和 Docker 无关。</div></div>
+  </div>
+  <pre><span class="c"># 容器里到底监听的哪个地址（关键是 0.0.0.0 还是 127.0.0.1）</span>
+docker exec web ss -lntp
+<span class="c"># 进不去容器就用 nsenter，效果一样还不受镜像里有没有 ss 的限制</span>
+nsenter -t $(docker inspect -f '{{.State.Pid}}' web) -n ss -lntp
+
+<span class="c"># 宿主机侧的规则与转发策略</span>
+iptables -t nat -S DOCKER
+iptables -S FORWARD
+sysctl net.ipv4.ip_forward
+firewall-cmd --state 2&gt;/dev/null; ufw status 2&gt;/dev/null
+
+<span class="c"># 容器到容器的连通性，以及 DNS 解析</span>
+docker exec web getent hosts db
+docker exec web cat /etc/resolv.conf</pre>
+  <p>容器间通信失败，先分清两种情况：<b>是解析不了名字，还是连不上 IP</b>。解析不了，多半是用了默认 bridge——它不带内嵌 DNS，只有自定义网络才有 <span class="k">127.0.0.11</span> 那个解析器。连不上 IP，则要查是不是在同一个网络里（<span class="k">docker network inspect</span> 看 Containers 列表），以及目标端口有没有监听。</p>
+  <p>还有一个宿主 <span class="k">resolv.conf</span> 的经典坑：在开了 systemd-resolved 的机器上，<span class="k">/etc/resolv.conf</span> 里的 nameserver 是 <span class="k">127.0.0.53</span>。Docker 会把它过滤掉（因为容器里的 127.0.0.1 是容器自己），如果过滤完一个都不剩，就退回公共 DNS，结果内网域名在容器里解析不了。<b>现象是「宿主机能 ping 通内网域名，容器里不行」</b>，解法是给 daemon 配 <span class="k">dns</span> 项，或者用自定义网络。</p>
+  <div class="callout warn">
+    <b>容器访问宿主机服务，不要写 <span class="k">localhost</span>。</b>那指向容器自己。bridge 模式下用网关地址（<span class="k">docker network inspect bridge</span> 的 Gateway，通常是 172.17.0.1），或者用 <span class="k">--add-host=host.docker.internal:host-gateway</span>。硬编码 IP 的问题换台机器就暴露。
+  </div>
+  <p><b>面试落点：</b>「映射了但外部不通，我按五层查：容器里监听地址是不是 0.0.0.0、宿主机端口是否被占、DNAT 规则在不在、FORWARD 链有没有被防火墙 DROP、云安全组。宿主机本机通而外部不通，最可能是 FORWARD 或安全组。容器之间不通，先分清是 DNS 还是 IP 层。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>时间差 8 小时：容器里默认是 UTC</h2></div>
+  <p class="lead">「日志时间比实际早八小时」「定时任务在凌晨跑」，这两个现象的根因是同一个：大部分基础镜像里没有时区数据，容器默认走 UTC。</p>
+  <p>时区在 Linux 上是两样东西：<b>/etc/localtime</b> 这个文件（指向 tzdata 里的某个区域文件），以及 <span class="k">TZ</span> 这个环境变量。glibc 的程序两者都认；但 Alpine 用的 musl 更依赖 <span class="k">TZ</span>，而且 Alpine 默认不装 tzdata，你设了 <span class="k">TZ=Asia/Shanghai</span> 它也不认识，最后还是 UTC。</p>
+  <table>
+    <tr><th style="width:230px">做法</th><th>适用</th><th>注意</th></tr>
+    <tr><td><span class="k">-e TZ=Asia/Shanghai</span></td><td>Debian/Ubuntu 系基础镜像，glibc 会读</td><td>镜像里必须有 tzdata，否则变量无效</td></tr>
+    <tr><td>挂载 <span class="k">/etc/localtime:/etc/localtime:ro</span></td><td>任何镜像，最直接</td><td>依赖宿主机时区；跨机器部署时行为可能不一致</td></tr>
+    <tr><td>Dockerfile 里装 tzdata 并设置</td><td>需要可移植的镜像</td><td>Alpine 要 <span class="k">apk add --no-cache tzdata</span>，会多几兆</td></tr>
+    <tr><td>JVM 参数 <span class="k">-Duser.timezone=Asia/Shanghai</span></td><td>Java 应用</td><td>优先级高于系统时区，最稳；但日志框架自己也可能有配置</td></tr>
+    <tr><td>应用层统一用 UTC 存、展示时转换</td><td>分布式系统的最佳实践</td><td>需要前后端约定，改造成本高但最不容易出错</td></tr>
+  </table>
+  <pre><span class="c"># 对比一下就知道差在哪</span>
+date
+docker exec web date
+docker exec web cat /etc/timezone 2&gt;/dev/null
+docker exec web ls -l /etc/localtime
+
+<span class="c"># 临时验证：加上 TZ 再跑一次</span>
+docker run --rm -e TZ=Asia/Shanghai alpine date
+<span class="c"># Alpine 没装 tzdata 时上面这条仍可能是 UTC</span>
+docker run --rm -e TZ=Asia/Shanghai alpine sh -c 'apk add -q tzdata &amp;&amp; date'
+
+<span class="c"># JVM 里确认实际生效的时区</span>
+docker exec app java -XshowSettings:properties -version 2&gt;&amp;1 | grep -i timezone</pre>
+  <p>为什么这件事在排障里重要？因为<b>它会污染所有基于时间的判断</b>。日志时间和监控时间对不上，你会把「事故发生在 10:00」看成 02:00，去翻错误的监控窗口；定时任务按容器时间跑，备份在业务高峰执行；证书校验、token 过期、TOTP 验证码，全都可能因为时区错而失败。这类问题的特征是「逻辑都对，就是结果不对」，很难往时区上想。</p>
+  <div class="callout">
+    <b>一个判断技巧：</b>如果偏差正好是整数小时（8 小时、5 小时半），先怀疑时区；如果是几秒到几分钟的漂移，那是 NTP 或时钟同步问题；如果是负的、而且忽大忽小，可能是日志采集链路的时间戳覆盖。三种原因的排查方向完全不同。
+  </div>
+  <p><b>面试落点：</b>「容器默认 UTC，因为基础镜像通常不带 tzdata。/etc/localtime 和 TZ 是两套机制，glibc 都认，Alpine 的 musl 更依赖 TZ 而且要先装 tzdata。Java 用 -Duser.timezone 最稳。工程上更好的做法是存储统一 UTC，展示层再转。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>资源限制与 OOM：JVM 堆不是全部</h2></div>
+  <p class="lead">「容器 limit 2G，JVM 堆设了 1.8G，还是被 OOMKilled，堆 dump 一看才用了 1.2G。」这不是玄学，是<b>堆只是进程内存的一部分</b>。</p>
+  <p>一个 Java 进程在容器里的内存占用，大致是这些加起来：堆（Xmx 上限）、元空间（Metaspace）、线程栈（每个线程约 1M 虚拟内存，实际占用少一些但会计入）、直接内存（NIO 的 DirectByteBuffer）、JIT 生成的代码缓存、GC 自身的结构、以及 glibc 的 malloc arena（多线程下容易碎片化膨胀）。所以 <b>Xmx 设成 limit 的 90% 几乎必然出事</b>，行业里常见的经验值是 70%~75%。</p>
+  <table>
+    <tr><th style="width:200px">现象</th><th>判断</th><th>处置</th></tr>
+    <tr><td>ExitCode 137 + OOMKilled=true</td><td>cgroup 内存到顶，内核杀的</td><td>降 Xmx、查泄漏、确认 limit 是否合理</td></tr>
+    <tr><td>137 但 OOMKilled=false</td><td>不是内存问题，是有人发了 SIGKILL</td><td>查 docker stop、编排层驱逐、人工操作</td></tr>
+    <tr><td>容器内 <span class="k">free</span> 显示宿主机内存</td><td>/proc/meminfo 未隔离，误判</td><td>看 cgroup 的 memory.current / memory.max</td></tr>
+    <tr><td>Java 8 老版本不认 cgroup 限制</td><td>堆按宿主机内存算，一下就被杀</td><td>升 JDK，或显式设 Xmx，或用 MaxRAMPercentage</td></tr>
+    <tr><td>刚启动就 OOM，堆还没热</td><td>元空间 + 线程栈 + 直接内存超了</td><td>给非堆留足空间，别把 Xmx 顶到 limit</td></tr>
+  </table>
+  <pre><span class="c"># 是不是 OOM，一条命令定论</span>
+docker inspect -f 'oom={{.State.OOMKilled}} exit={{.State.ExitCode}}' app
+
+<span class="c"># cgroup 侧的客观数据</span>
+CG=/sys/fs/cgroup/system.slice/docker-$(docker inspect -f '{{.Id}}' app).scope
+cat $CG/memory.max $CG/memory.current
+cat $CG/memory.events          <span class="c"># oom / oom_kill 的累计次数</span>
+
+<span class="c"># 容器的实时资源曲线</span>
+docker stats --no-stream app
+
+<span class="c"># 让 JVM 自己按容器 limit 算堆（JDK 10+ 默认支持容器感知）</span>
+<span class="c"># -XX:MaxRAMPercentage=70 -XX:InitialRAMPercentage=40</span></pre>
+  <p>还要说清 <span class="k">--memory-swap</span> 的语义，因为它的默认值很容易被误解：它是「内存 + swap 的总量」，不是「swap 单独的量」。不设置时，如果设了 <span class="k">--memory</span>，默认总量是它的两倍（以你环境为准）；设成和 <span class="k">--memory</span> 相等表示禁用 swap；设成 <span class="k">-1</span> 表示不限制。这意味着<b>你以为没开 swap，其实可能开了</b>，而 swap 一开，内存压力下的表现会从「干脆被 OOM」变成「慢慢被拖死」，更难排查。</p>
+  <div class="callout danger">
+    <b>OOMKilled 的容器，日志往往停在半句话上。</b>因为它没有机会 flush。这时候不要指望应用日志给出原因，要看的是「死前内存曲线长什么样」——是缓慢爬升（泄漏）、还是瞬间尖峰（一次大查询、大文件、批量任务）。这两种的修法完全不同：前者要抓 dump，后者要限流或分批。
+  </div>
+  <p><b>面试落点：</b>「137 先看 OOMKilled。是 OOM 的话，Java 的堆只是进程内存的一部分，还有元空间、线程栈、直接内存和 malloc arena，所以 Xmx 一般设到 limit 的 70% 左右。老版本 JDK 8 不感知 cgroup，会按宿主机内存算堆，这是经典事故。另外 --memory-swap 是内存加 swap 的总量，不是 swap 的量。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>构建失败：网络、缓存、多阶段，三类原因</h2></div>
+  <p class="lead">「昨天还能构建，今天报错。」构建失败的原因比运行失败更集中，基本就是三类：<b>拉不到东西、缓存给了旧结果、路径在多阶段之间对不上</b>。</p>
+  <p>第一类最常见：<span class="k">RUN apt-get update</span> 卡住或 404、<span class="k">pip install</span> 超时、<span class="k">go mod download</span> 连不上 proxy。原因可能是构建容器没有走代理、内网源配错、或者 DNS 在构建环境里不可用。要区分「网络不通」和「源上没有这个包」：前者是超时/连接拒绝，后者是 404/找不到版本。</p>
+  <pre><span class="c"># 构建时传代理（只在构建期生效，不会留在镜像里）</span>
+docker build --build-arg HTTP_PROXY=http://proxy:8080 \
+             --build-arg HTTPS_PROXY=http://proxy:8080 -t myapp .
+
+<span class="c"># 怀疑是构建网络问题，临时用宿主机网络验证</span>
+docker build --network=host -t myapp .
+
+<span class="c"># 关掉缓存，确认是不是缓存导致用了旧的包索引</span>
+docker build --no-cache --progress=plain -t myapp . 2&gt;&amp;1 | tail -40</pre>
+  <p>第二类是缓存。典型症状是「明明改了 Dockerfile 里的 apt 源，构建还用旧的」——因为 <span class="k">RUN apt-get update</span> 那一层命中了缓存。<b>update 和 install 必须写在同一条 RUN 里</b>，这样缓存要么整体命中（索引和包是配套的），要么整体失效。分成两条写，就会出现「索引是三个月前的、包已经更新了」的 404。</p>
+  <p>第三类是多阶段。常见错误是 <span class="k">COPY --from=builder /app/bin/app /usr/local/bin/</span>，但 builder 阶段实际产物在 <span class="k">/out/app</span>。报错是 <span class="k">COPY failed: stat ...: file does not exist</span>，看起来像权限问题，其实是路径错。另一个隐蔽的情况是 <b>静态链接 vs 动态链接</b>：builder 里编译出的二进制依赖 glibc，最终镜像用 alpine（musl），一跑就报 <span class="k">no such file or directory</span>——不是文件不在，是解释器找不到。解法是静态编译（Go 的 <span class="k">CGO_ENABLED=0</span>）或者最终镜像用同系的基础镜像。</p>
+  <table>
+    <tr><th style="width:210px">报错关键词</th><th>大概率原因</th><th>验证方式</th></tr>
+    <tr><td>Could not resolve / connection timed out</td><td>构建环境 DNS 或代理不通</td><td><span class="k">--network=host</span> 重试一次</td></tr>
+    <tr><td>404 Not Found（apt/pip/npm）</td><td>包索引过期或源地址错</td><td><span class="k">--no-cache</span> 重建</td></tr>
+    <tr><td>no space left on device</td><td>构建缓存 + 镜像把磁盘写满</td><td><span class="k">docker system df</span>、<span class="k">docker builder prune</span></td></tr>
+    <tr><td>COPY failed: file does not exist</td><td>多阶段路径错，或被 .dockerignore 排除</td><td>在 builder 阶段 <span class="k">ls</span> 一下产物路径</td></tr>
+    <tr><td>exec format error</td><td>架构不匹配（arm 机器构建 amd64 镜像等）</td><td><span class="k">--platform linux/amd64</span>，或检查基础镜像架构</td></tr>
+    <tr><td>permission denied（构建期）</td><td>USER 切换后没权限写目录</td><td>调换 USER 与 chown 的顺序</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>构建缓存在 CI 上比在本机更容易骗人。</b>很多 CI 会把缓存目录挂来挂去，跨分支、跨提交复用。如果出现「本地能构建、CI 不能」，第一件事是 <span class="k">--no-cache</span> 重跑一次；如果这样就过了，问题一定在缓存键上，而不是代码。
+  </div>
+  <p><b>面试落点：</b>「构建失败我分三类：网络（拉不到包）、缓存（用了旧索引）、多阶段（路径或架构不对）。apt 的 update 和 install 要同层，否则会出现索引和包不匹配的 404。多阶段最常见的坑是产物路径写错，以及用 alpine 跑 glibc 编译的二进制，报 no such file or directory 其实是解释器找不到。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>Compose：depends_on 只保证顺序，不保证就绪</h2></div>
+  <p class="lead">「我写了 <span class="k">depends_on: [db]</span>，为什么应用还是连不上数据库？」因为短语法的 depends_on 只做一件事：<b>先启动 db 容器，再启动 app 容器</b>。它不等 db 里的进程真的能接受连接。</p>
+  <p>这个区别在数据库上特别致命：MySQL 容器 start 之后，要初始化数据目录、跑 init 脚本，可能几十秒才能接受连接。这段时间里 app 已经起来了，连不上就退出，然后重启策略再拉一次，循环几次才成功。你看到的是「偶尔能起来」，于是误以为是随机问题。</p>
+  <table>
+    <tr><th style="width:230px">写法</th><th>语义</th><th>是否等就绪</th></tr>
+    <tr><td><span class="k">depends_on: [db]</span></td><td>只保证启动顺序</td><td>否</td></tr>
+    <tr><td><span class="k">depends_on: db: condition: service_started</span></td><td>同上，显式写法</td><td>否</td></tr>
+    <tr><td><span class="k">condition: service_healthy</span></td><td>等 healthcheck 变成 healthy</td><td>是，但目标必须定义 healthcheck</td></tr>
+    <tr><td><span class="k">condition: service_completed_successfully</span></td><td>等一次性任务正常结束</td><td>是，适合迁移、初始化任务</td></tr>
+  </table>
+  <pre><span class="c"># 关键是给依赖方定义 healthcheck，否则 service_healthy 无意义</span>
+services:
+  db:
+    image: postgres:16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped</pre>
+  <p><span class="k">start_period</span> 这个参数值得单独说：它表示「这段时间内的失败不计入 retries」。慢启动的应用如果没设它，前几次探测失败就把容器标成 unhealthy 了，而它其实只是还没起来。这跟 K8s 的 startupProbe 是同一个思路。</p>
+  <pre><span class="c"># 看健康状态和最后一次探测的输出</span>
+docker ps --format 'table {{.Names}}\t{{.Status}}'
+docker inspect -f '{{json .State.Health}}' app | head -c 600
+
+<span class="c"># 等所有服务 healthy 再返回（CI 里很好用）</span>
+docker compose up -d --wait
+
+<span class="c"># 只看某个服务的日志，带时间戳</span>
+docker compose logs -f --tail 50 app</pre>
+  <p>还有一个与重启相关的语义要分清：<span class="k">restart: unless-stopped</span> 会在容器退出时拉起，<b>包括正常退出（exit 0）</b>；<span class="k">on-failure</span> 只在非 0 退出时拉起；<span class="k">always</span> 连 Docker 重启后也会拉起。<b>而 unhealthy 不会触发重启</b>——Docker 的健康检查只改状态，不动容器（Swarm 模式才会重建）。很多人以为「配了 healthcheck 就会自动重启不健康的容器」，这是错的。</p>
+  <div class="callout ok">
+    <b>一个务实的原则：</b>能在应用里做重试，就不要靠启动顺序。重试是运行时的能力，编排层只能控制启动时刻，两者不在一个层次上。把「等数据库」写进启动脚本，看起来简单，实际把故障从「启动失败」变成了「启动很慢但不知道在等谁」。
+  </div>
+  <p><b>面试落点：</b>「compose 的 depends_on 短语法只保证启动顺序，不等就绪；要等就绪得配 healthcheck 加 condition: service_healthy，还要给慢启动的服务设 start_period。另外 unhealthy 不会触发自动重启，那只是状态，不是重启策略。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：排障时最容易做错的十件事</h2></div>
+  <p class="lead">这些坑的共同点是：<b>动作本身没错，时机错了</b>。它们不会让问题变得更难，只会让现场消失，让你第二次遇到时还是不会。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看日志不看退出码</div><div class="pd">127 和 126 的情况，应用连一行日志都没产生，日志里当然是空的。先看退出码能省掉一大圈。反过来，OOMKilled 的容器日志常常停在半句，也不能作为唯一依据。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">看到 137 就说内存不够</div><div class="pd">137 只表示收到 SIGKILL。docker stop 等满超时、编排层驱逐、人工 kill -9 都是 137。要看 inspect 的 OOMKilled 字段才能定性。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">一上来就 docker system prune -a</div><div class="pd">它删掉所有未被使用的镜像，包括你回滚要用的那个 tag。磁盘是腾出来了，下次回滚得重新拉，网络不好的时候就是二次事故。先 docker system df -v 看清楚再决定。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">日志不配 max-size</div><div class="pd">json-file 默认不轮转，一个死循环打日志的容器能在一晚上写满磁盘，然后拖垮整台机器上的所有容器。这个配置要在 daemon 层全局设，别指望每个 compose 文件都记得写。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">容器起不来就加 -it 或 restart</div><div class="pd">-it 会改变启动行为（有 TTY 和没有 TTY，很多程序的输出和缓冲策略都不一样），restart 会让失败循环反复覆盖日志。要保留现场，用 --entrypoint sh 单独起一个调试容器，别动原来那个。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">端口冲突去改 Docker 配置</div><div class="pd">bind: address already in use 是宿主机上已经有进程占了这个端口，跟 Docker 的配置无关。ss -lntp 找出来，要么停掉它，要么换映射端口。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">以为 -p 了就对外可用</div><div class="pd">firewalld/ufw 把 FORWARD 默认策略设为 DROP 时，宿主本机访问正常、外部全不通。这个现象特别有欺骗性，因为你在服务器上 curl 一百次都是通的。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">容器里用 localhost 访问宿主机</div><div class="pd">localhost 在容器里指容器自己。要用网关地址或者 host.docker.internal。这个错误在把应用从物理机迁到容器时几乎必然发生一次。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">JVM 堆按宿主机内存设</div><div class="pd">容器 limit 2G、Xmx 设 4G，结果容器被 OOMKilled，堆 dump 里却看不出问题，因为死的时候堆还没涨到 4G。堆要按 limit 算，还要给非堆留 25% 以上。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把 depends_on 当成「依赖已就绪」</div><div class="pd">它只保证启动顺序。数据库还在初始化时应用已经起来了，连不上就退出，重启几次碰巧成功——于是你以为问题解决了，直到下一次发布。</div></div></div>
+  <p><b>面试落点：</b>这十条里最值得讲的是第 2 条和第 3 条，因为它们都涉及「动作很快、后果很重」。讲的时候给出具体数字：「一次 prune -a 删掉了 40 多个镜像，回滚时拉了二十分钟」——比说「要注意」有说服力得多。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 容器启动后立刻变成 <b>Exited (0)</b>，日志里没有任何输出。最可能的原因是？</div>
+      <button class="opt">镜像构建失败，缺少入口文件</button>
+      <button class="opt">容器内存不足，被内核杀掉了</button>
+      <button class="opt">启动脚本把服务放到后台后自己退出，PID 1 结束导致容器结束</button>
+      <button class="opt">端口没有映射，容器无法完成初始化</button>
+      <div class="ans">正确答案：<b>主进程后台化</b>。容器的生命周期绑定 PID 1，脚本用 <span class="k">nohup ... &amp;</span> 或服务自身 daemon 化后，PID 1 退出，容器立即结束并返回 0。日志为空通常是因为输出被重定向到文件了。修法是前台运行并用 <span class="k">exec</span> 让应用成为 PID 1。内存不足会是 137，端口未映射不会导致退出。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">2. 容器退出码 127，应该优先怀疑什么？</div>
+      <button class="opt">应用内部抛了未捕获异常</button>
+      <button class="opt">容器被 OOM killer 杀掉</button>
+      <button class="opt">二进制架构与宿主机不匹配</button>
+      <button class="opt">要执行的命令在镜像里不存在，或 ENTRYPOINT 路径写错</button>
+      <div class="ans">正确答案：<b>命令不存在</b>。127 是 shell/Docker 约定的「command not found」，容器里根本没有产生应用日志。架构不匹配通常报 exec format error 并返回 126 一类的错误；OOM 是 137；未捕获异常一般是 1。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. 容器退出码 137，怎么判断是不是被内存限制杀的？</div>
+      <button class="opt">看应用日志里有没有 OutOfMemoryError</button>
+      <button class="opt">看 <span class="k">docker inspect</span> 的 <span class="k">.State.OOMKilled</span> 字段，或 cgroup 的 memory.events</button>
+      <button class="opt">看 <span class="k">docker stats</span> 的当前内存用量</button>
+      <button class="opt">137 一定是 OOM，不需要再判断</button>
+      <div class="ans">正确答案：<b>看 OOMKilled</b>。137 = 128 + 9，只说明进程收到 SIGKILL。OOM killer、docker stop 超时后的强杀、人工 kill -9 都会产生 137。OOMKilled 为 true，或者 cgroup 的 memory.events 里 oom_kill 计数增长，才是内存原因。Java 的 OutOfMemoryError 是堆内申请失败，被 cgroup 杀时往往没有这条日志。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 宿主机磁盘满了，<span class="k">du -sh /var/lib/docker</span> 显示的空间远小于磁盘总量。最该先查什么？</div>
+      <button class="opt">容器的 json-file 日志大小，以及已删除但仍被进程持有的文件</button>
+      <button class="opt">镜像层数是不是超过了 128 层</button>
+      <button class="opt">Docker 的版本是不是太旧</button>
+      <button class="opt">宿主机的文件系统是不是 ext4</button>
+      <div class="ans">正确答案：<b>容器日志与已删除未释放的文件</b>。json-file 默认不限制大小、不轮转，<span class="k">du -sh /var/lib/docker/containers/*/*-json.log</span> 经常能直接抓到几十 G 的单个文件；另一种是文件被删但句柄未释放，df 满而 du 看不到。层数、版本、文件系统类型都不会造成这种差异。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">5. <span class="k">-p 8080:80</span> 已配置，<span class="k">docker ps</span> 显示映射正常，在宿主机上 <span class="k">curl 127.0.0.1:8080</span> 通，但从另一台机器访问超时。最可能的原因？</div>
+      <button class="opt">容器里的应用崩了，端口没有监听</button>
+      <button class="opt">端口映射写反了，应该是 -p 80:8080</button>
+      <button class="opt">容器没有连接到自定义网络</button>
+      <button class="opt">防火墙把 FORWARD 链的默认策略设成了 DROP，或者云安全组没放行</button>
+      <div class="ans">正确答案：<b>FORWARD / 安全组</b>。宿主机本机访问走 INPUT 链，转发到容器走 FORWARD 链。firewalld、ufw 或某些加固脚本把 FORWARD 默认策略设为 DROP 后，表现为「本机通、外部不通」。端口写反的话本机也不会通；容器崩了本机同样不通；网络类型不影响端口发布。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 容器 <span class="k">--memory=2g</span>，JVM 设了 <span class="k">-Xmx1800m</span>，运行一段时间后被 OOMKilled，但堆 dump 显示只用了 1.2G。最合理的解释是？</div>
+      <button class="opt">docker inspect 的 OOMKilled 字段不可靠，实际是别的原因</button>
+      <button class="opt">JVM 的堆上限设置没有生效，实际用了 2G 以上</button>
+      <button class="opt">堆之外还有元空间、线程栈、直接内存、代码缓存和 malloc arena，加起来超过了 2G 的 limit</button>
+      <button class="opt">容器内存限制应该设为堆的两倍，这是硬性要求</button>
+      <div class="ans">正确答案：<b>堆外内存</b>。Xmx 只限制堆，进程总内存还包括 Metaspace、每个线程的栈、NIO 直接内存、JIT 代码缓存、GC 结构和 glibc 的分配器开销。所以 Xmx 一般只给到 limit 的 70%~75%，或者用 MaxRAMPercentage 让 JVM 按 cgroup limit 自行计算。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>ExitCode</b></td><td>容器主进程的退出码。0~255 是应用返回值，128+N 表示被信号 N 杀死</td></tr>
+    <tr><td><b>OOMKilled</b></td><td>inspect 里的布尔字段，表示容器是否因 cgroup 内存到顶被杀</td></tr>
+    <tr><td><b>SIGTERM / SIGKILL</b></td><td>docker stop 先发 TERM，等超时（默认 10 秒）再发 KILL；KILL 不可捕获</td></tr>
+    <tr><td><b>125 / 126 / 127</b></td><td>Docker 层面的三种失败：自身出错、命令不可执行、命令不存在</td></tr>
+    <tr><td><b>json-file</b></td><td>默认日志驱动，把 stdout/stderr 落成本地文件，默认不轮转</td></tr>
+    <tr><td><b>log-opts</b></td><td>日志驱动参数，max-size 和 max-file 是控制磁盘的关键两项</td></tr>
+    <tr><td><b>data-root</b></td><td>Docker 的数据目录，默认 /var/lib/docker，可在 daemon.json 里迁移</td></tr>
+    <tr><td><b>dangling image</b></td><td>没有 tag 引用的镜像层，构建后残留，用 docker image prune 清理</td></tr>
+    <tr><td><b>DNAT</b></td><td>端口映射的实现，改写目的地址；对应的出方向是 SNAT/MASQUERADE</td></tr>
+    <tr><td><b>FORWARD 链</b></td><td>iptables 的转发链，容器对外服务的包要经过它，常被防火墙策略误伤</td></tr>
+    <tr><td><b>start_period</b></td><td>healthcheck 的启动宽限期，期间的失败不计入 retries，给慢启动应用用</td></tr>
+    <tr><td><b>service_healthy</b></td><td>Compose 的依赖条件，等目标容器健康后才启动当前服务</td></tr>
+    <tr><td><b>MaxRAMPercentage</b></td><td>JVM 参数，按容器内存上限的百分比设置堆，替代写死的 Xmx</td></tr>
+    <tr><td><b>exec format error</b></td><td>二进制架构不匹配，常见于在 arm 机器上运行 amd64 镜像</td></tr>
+    <tr><td><b>nsenter</b></td><td>进入指定进程的 namespace，容器里没有工具时用它看网络和挂载</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 故意写一个 <span class="k">nohup ... &amp;</span> 的启动脚本，观察容器 Exited (0) 与空日志，再改成 <span class="k">exec</span> 前台运行对比；② 起一个死循环打日志的容器，不配 max-size，用 <span class="k">du</span> 看着 <span class="k">-json.log</span> 涨到几百兆，然后截断、加限制、重建；③ 用一个 2G limit 的容器跑一段吃内存的代码，把 <span class="k">OOMKilled</span>、<span class="k">memory.events</span>、退出码 137 三个证据凑齐一次，以后就不会再把 137 当成唯一结论。<br><br>
+    <b>之后值得单独学：</b>第 8 期讲这些现象的底层原理——namespace、cgroup、overlay2 到底怎么工作；第 11 期把这套排障搬到 Kubernetes，Pod 的 CrashLoopBackOff、OOMKilled、Evicted 各有各的判断顺序；第 16 期讲可观测性，容器日志怎么采集、怎么在不看机器的情况下定位问题。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 9 期 · 排障的功夫不在命令多，在于你先信退出码，再信日志，最后才信自己的猜测</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

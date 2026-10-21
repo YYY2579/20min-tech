@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>存储与文件系统面试：ext4、XFS、NFS 与对象存储</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 33 期</span>
+    <h1>存储与文件系统面试：ext4、XFS、NFS 与对象存储</h1>
+    <p class="sub">面试问「磁盘满了但 <span class="k">du</span> 看不到」，答案是<b>inode、被删未释放、还是挂载点被覆盖</b>——三种都常见。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个考点</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>4</b> 种存储接口</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：df 说 100%，du 加起来只有 40%，差的 60% 去哪了？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都叫「磁盘满」，修法完全不同</h2></div>
+  <p class="lead">凌晨的告警写着「磁盘使用率 100%」。你登上机器敲 <span class="k">df -h</span>，确实是 100%；再敲 <span class="k">du -sh /*</span>，加起来只有 40%。这 60% 的差额，是这一篇最值钱的部分——因为它有四种完全不同的成因，改错方向会浪费一整晚。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>df 显示 100%，du 加起来远小于它</td><td>有隐藏目录，或者 du 算错了</td><td>可能是文件被删但进程还握着句柄（空间不释放），也可能是 du 统计时跨了挂载点，把别的盘算进来了，导致数字反而不可比</td></tr>
+    <tr><td>df -h 还有 20% 空间，写入报 No space left on device</td><td>df 坏了，或者磁盘有硬件问题</td><td>inode 用完了。df -h 看的是块，df -i 看的是 inode 数量，小文件多的时候后者先耗尽</td></tr>
+    <tr><td>往 /data 写了 200G 日志，重启后不见了，根分区反而满了</td><td>数据被误删了</td><td>挂载点在写入之后才挂上去，原来的数据被「盖住」了——没删，只是被遮住，而写入落到了根分区的同名目录里</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>df 和 du 口径不同</div><div class="cd">df 问的是文件系统（超级块）还剩多少块，du 数的是目录树里文件占多少块。两者天然有差，但差到 60% 就是故障信号。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>空间和 inode 是两笔账</div><div class="cd">块用完了报 No space，inode 用完了也报 No space，同一句话两个原因。所以永远先跑 df -h 和 df -i 两条。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>挂载是「遮盖」不是「合并」</div><div class="cd">往一个已有内容的目录上挂文件系统，原内容不会消失也不会合并，只是从路径上看不见了。umount 之后它又回来了。</div></div>
+  </div>
+  <p>这一篇按「先分清三种存储接口 → 再拆文件系统内部的账（inode、块、挂载）→ 然后比较 ext4 和 XFS → 再往外扩展到 NFS、RAID、SSD、对象存储」的顺序走。中间会贯穿一条主线：<b>每一种存储都有自己的语义边界，绝大多数故障是「用了它的接口，但没接受它的语义」</b>。</p>
+  <div class="callout">
+    <b>一句话记住这四种差的来源：</b>inode 满（df -i）、被删未释放（lsof +L1）、挂载点覆盖（du -x 对比）、ext4 的 5% 预留块（tune2fs -l）。这四个查完还对不上，再怀疑文件系统损坏。
+  </div>
+  <p><b>面试怎么答：</b>「df 和 du 对不上，我按四步查：先 df -i 看是不是 inode 满了，再 lsof +L1 看有没有被删但还打开的文件，然后用 du -x 只统计当前文件系统、排除跨挂载点的干扰，最后看 ext4 的保留块比例。这四种覆盖了绝大多数情况，剩下的才考虑文件系统损坏或者硬件问题。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>块、文件、对象：三种接口，三套语义</h2></div>
+  <p class="lead">面试里问「对象存储和文件存储有什么区别」，很多人答「一个是云的一个是本地的」。这个答案说明他没用过。真正的区别在<b>接口</b>：你能对它做什么操作，决定了它能承载什么业务。</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th>你拿到的是什么</th><th>访问方式</th><th>典型产品</th><th>适合</th></tr>
+    <tr><td><b>块存储</b></td><td>一块裸设备（/dev/sdb），没有文件系统</td><td>格式化后 mount，或者直接被数据库用裸设备</td><td>云盘 / EBS、iSCSI、本地 NVMe、SAN</td><td>数据库、需要低延迟随机读写、单机强一致</td></tr>
+    <tr><td><b>文件存储</b></td><td>一个可以挂载的目录，POSIX 语义</td><td>mount -t nfs，然后当本地目录用</td><td>NFS、CIFS/SMB、云 NAS、EFS</td><td>多机共享、配置文件、制品库、CI 缓存、容器共享卷</td></tr>
+    <tr><td><b>对象存储</b></td><td>一个 HTTP 接口，bucket + key</td><td>GET / PUT / DELETE / LIST，走 HTTP</td><td>S3、OSS、COS、MinIO、Ceph RGW</td><td>图片视频、备份归档、日志、静态资源、数据湖</td></tr>
+  </table>
+  <p>三个判断标准可以帮你一秒分清：<b>能不能 mount</b>（块和文件可以，对象不行，除非用 FUSE 桥接，但那会牺牲性能和语义）；<b>能不能 seek</b>（块和文件可以随机读写，对象只能整体覆盖）；<b>能不能多机同时写同一个文件</b>（只有文件存储天生支持，块存储需要集群文件系统，对象存储是「最后写获胜」）。</p>
+  <p>块存储的语义最「原始」：它只知道扇区。你可以在上面建 ext4、建 XFS、建 LVM，也可以让 MySQL 直接用它。代价是<b>它天然只属于一台机器</b>——同一块云盘挂到两台机器上，两个操作系统各自缓存文件系统元数据，几乎必然把文件系统写坏。要共享，得用集群文件系统（如 GFS2、OCFS2）或者干脆换文件存储。</p>
+  <p>文件存储的语义最「熟悉」，也最容易踩坑：它看起来像本地目录，但每一次 <span class="k">stat</span>、<span class="k">open</span>、<span class="k">fsync</span> 背后都是一次网络往返和一套缓存协议。所以「NFS 上的 git 仓库特别慢」「NFS 上的 MySQL 会莫名其妙卡住」这类问题，本质都是<b>把网络文件系统当本地磁盘用了</b>。</p>
+  <p>对象存储的语义最「反直觉」：没有目录（只有带斜杠的前缀）、不能追加写、不能重命名（rename 等价于复制加删除，而且不是原子的）、不能对同一个 key 做并发追加（最后写入的覆盖前面的）。它的优势是<b>无限扩容和按量计费</b>，代价是<b>延迟高（几十毫秒起）和语义弱</b>。</p>
+  <div class="callout warn">
+    <b>一个常见的架构错误：把对象存储挂载成目录给应用用。</b>用 s3fs 之类的 FUSE 工具挂上去，应用以为自己拿到了一个文件系统，实际上每次 <span class="k">ls</span> 都是一次 LIST 请求，每次追加写都要重传整个对象。小文件多、频繁改写的场景下，性能会差到不可用，账单也会很难看。
+  </div>
+  <p><b>面试怎么答：</b>「块存储给的是裸设备，要自己建文件系统，延迟最低但只能单机挂；文件存储给的是 POSIX 目录，能多机共享，代价是每次元数据操作都有网络开销；对象存储是 HTTP 接口，bucket 加 key，扁平结构，能无限扩容，但没有目录、不能随机写、rename 是复制加删除。判断用哪个，看三个问题：要不要 mount、要不要随机写、要不要多机同时写。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>「磁盘满了 du 看不到」：四种成因，四组命令</h2></div>
+  <p class="lead">这是存储面试最高频的一道题，也是真实值班里最常见的场景。标准答案不是「用 find 找大文件」，而是<b>先分清是块满了还是 inode 满了，再分清是「没人用」还是「有人占着」</b>。</p>
+  <p><b>第一种：inode 用完了。</b>文件系统给每个文件分配一个 inode（存元数据），数量在格式化时就定了（XFS 例外，它动态分配）。如果目录里塞了几百万个小文件，块可能只用了 30%，inode 却已经 100%。此时写入报 <span class="k">No space left on device</span>，而 <span class="k">df -h</span> 看着还有空间——因为 df -h 显示的是块，不是 inode。</p>
+  <p><b>第二种：文件被删了，但还有进程握着句柄。</b>Linux 的删除是「解除目录项引用」，只有当链接数为 0 <b>且</b>没有进程打开它时，数据块才真正释放。所以 <span class="k">rm</span> 一个正被 nginx 写着的 50G 日志，<span class="k">du</span> 立刻看不到它了，但 <span class="k">df</span> 一点没变。这类文件在 <span class="k">lsof +L1</span> 里能看到（link count 小于 1），状态列是 deleted。</p>
+  <p><b>第三种：挂载点把原目录盖住了。</b>如果 /data 是根分区上的一个普通目录，里面已经有 200G 数据，然后你 <span class="k">mount /dev/sdb1 /data</span>，那 200G 就被遮住了：路径上看不见，但它仍然占着根分区的块。这时 df 显示根分区满，du -x / 却数不到那 200G——因为它「藏在」挂载点下面。</p>
+  <p><b>第四种：ext4 的保留块。</b>ext4 默认把 5% 的块保留给 root，防止普通用户把盘写满导致系统无法运行。df 的 Avail 列已经扣掉了这部分，所以非 root 用户会在「Used% 接近 100%」时写失败，而 root 还能写。<span class="k">tune2fs -l</span> 里的 Reserved block count 就是这个数。</p>
+  <pre><span class="c"># 第 1 步：块和 inode 一起看，两个都可能报同一句 No space</span>
+df -hT
+df -i
+
+<span class="c"># 第 2 步：被删但未释放的文件（注意 +L1 是"链接数小于 1"）</span>
+lsof +L1 2&gt;/dev/null | head -20
+<span class="c"># 只看某个分区上的</span>
+lsof +L1 2&gt;/dev/null | awk '$NF ~ /^\/data/ {print $1, $2, $7, $NF}'
+
+<span class="c"># 第 3 步：统计必须加 -x，只算当前文件系统，否则会跨到别的盘</span>
+du -xhd1 / | sort -h | tail -10
+
+<span class="c"># 第 4 步：ext4 的保留块比例（XFS 用 xfs_info 看，没有这个概念）</span>
+tune2fs -l /dev/sdb1 | grep -i 'reserved block count\|block count'
+
+<span class="c"># 第 5 步：挂载关系是否和你想的一样（这一条最容易被跳过）</span>
+findmnt -T /data
+lsblk -f</pre>
+  <p>关于 <span class="k">du -x</span>，有个细节必须说清：GNU du 默认<b>会</b>递归进入挂载点，把别的文件系统也算进来。所以「du 的数字比 df 大」和「du 的数字比 df 小」都可能是统计口径问题。要跟 df 对比，就得加 <span class="k">-x</span>（--one-file-system），只统计同一个文件系统。</p>
+  <p>还有一个容易误导人的因素：<b>稀疏文件</b>。<span class="k">du</span> 默认按实际占用的块算，<span class="k">ls -l</span> 按文件逻辑大小算。一个 100G 的稀疏文件可能只占 1G，所以「ls 加起来 500G，du 只有 50G」是正常的，不是故障。反过来，大量小文件时 <span class="k">du</span> 会把每个文件的块对齐开销也算进去（一个 1 字节文件也占 4K），所以 du 会比 ls 大。</p>
+  <div class="callout danger">
+    <b>处理「被删未释放」的正确姿势，不是立刻重启服务。</b>重启确实能释放（进程退出，句柄关闭），但那是一次计划外的可用性损失。更好的做法是找到持有者（lsof 的 PID），确认它在写什么，然后：如果是日志，用 <span class="k">truncate -s 0 /proc/PID/fd/N</span> 把文件截断（句柄还在，但空间立即释放）；如果是数据文件，先让它写完再处理。<b>最忌讳的是先 rm 再重启，因为 rm 之后你连「是哪个文件」都查不到了。</b>
+  </div>
+  <p><b>面试怎么答：</b>「先跑 df -h 和 df -i，分清是块满了还是 inode 满了。块满了但 du 对不上，用 lsof +L1 查被删但还被进程打开的文件——这类文件 du 看不见，空间也不释放。还要用 du -x 排除跨挂载点的影响，并确认没有挂载点把有数据的目录盖住。ext4 的话再看一下保留块比例，默认 5% 是留给 root 的。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>inode 与目录：为什么小文件多会先耗尽 inode</h2></div>
+  <p class="lead">inode 这个名字天天见，但能说清「它存什么、不存什么」的人不多。而这一点恰好解释了硬链接、软链接、目录项、以及「为什么删了几百万文件后 df 还是满的」。</p>
+  <p>一个 inode 里存的是文件的<b>元数据</b>：权限、属主、三个时间戳（atime/mtime/ctime）、大小、链接数、数据块的位置（ext4 用 extent 树，XFS 用 B+ 树）。它<b>不存文件名</b>。文件名存在目录里——目录本身也是一个文件，内容是「文件名 → inode 号」的映射表（ext4 用 htree 索引，为了在大目录里快速查找）。</p>
+  <p>这个结构一旦理解，很多现象就顺了：<b>硬链接</b>就是「多个目录项指向同一个 inode」，所以删掉其中一个不影响数据，链接数减到 0 且没有打开句柄时才真正释放；<b>软链接</b>是一个独立文件，内容是目标路径字符串，所以目标删了它就断了；<b>硬链接不能跨文件系统</b>，因为 inode 号只在单个文件系统内唯一；<b>硬链接不能指向目录</b>，否则会产生环，让 fsck 无法收敛。</p>
+  <p>回到 inode 耗尽：ext4 在 <span class="k">mkfs</span> 时就按「平均每个文件多大」的比例把 inode 数量定死了。默认大约每 16KB 空间一个 inode（不同发行版和参数会有差异），也就是说一个 1TB 的盘大约有 6000 多万个 inode。如果你的业务是「存 100 亿张 20KB 的小图」，那块的利用率可能只有 60%，inode 早就用完了。</p>
+  <table>
+    <tr><th style="width:160px">现象</th><th>说明</th><th>怎么确认</th></tr>
+    <tr><td>df -h 有余量，写入报 No space</td><td>典型 inode 耗尽</td><td><span class="k">df -i</span> 的 IUse% 到 100%</td></tr>
+    <tr><td>某个目录下 ls 卡住很久</td><td>目录项太多，即使是 htree，readdir 也要遍历</td><td><span class="k">ls -f | wc -l</span> 数条目数，比 ls -l 快</td></tr>
+    <tr><td>删了几百万小文件，df 半天不降</td><td>unlink 是逐个进行的，元数据更新有开销</td><td>观察 df 变化速度；XFS 上通常更快</td></tr>
+    <tr><td>同一份数据 cp 一份，空间没翻倍</td><td>XFS 的 reflink 做了写时复制</td><td><span class="k">cp --reflink=always</span> 成功即支持</td></tr>
+  </table>
+  <pre><span class="c"># 数一个目录下的条目总数（-f 不排序、不 stat，最快）</span>
+ls -f /data/uploads | wc -l
+
+<span class="c"># 看 inode 的分配情况</span>
+df -i
+<span class="c"># Filesystem      Inodes  IUsed   IFree IUse% Mounted on</span>
+<span class="c"># /dev/sdb1      6553600 6553600     0  100% /data      ← 块还有空，inode 没了</span>
+
+<span class="c"># 找 inode 消耗大户：按目录统计文件数</span>
+find /data -xdev -type f | awk -F/ '{print "/"$2"/"$3}' | sort | uniq -c | sort -rn | head
+
+<span class="c"># 单个文件的 inode 信息（能看到块数、链接数、extent 数）</span>
+stat /data/a.jpg
+
+<span class="c"># 硬链接与软链接的区别，用 inode 号验证</span>
+ln /data/a.jpg /data/b.jpg &amp;&amp; ls -i /data/a.jpg /data/b.jpg    <span class="c"># 同一个 inode 号</span>
+ln -s /data/a.jpg /data/c.jpg &amp;&amp; ls -i /data/c.jpg             <span class="c"># 独立 inode</span></pre>
+  <p>XFS 在这里有个结构性优势：<b>inode 是动态分配的</b>，用多少分配多少（受 <span class="k">imaxpct</span> 和剩余空间约束），所以不会出现「格式化时定少了」这种问题。这是「小文件多的场景 XFS 比 ext4 省心」的一个具体原因，也是 XFS 被推荐给容器镜像仓库、邮件系统这类场景的理由之一。</p>
+  <p>但 XFS 也不是没有上限：inode 本身要占空间，几十亿小文件会把元数据撑得很大，而且 <span class="k">xfs_repair</span> 在这种规模下可能跑很久。真正的解法通常不在文件系统层，而在业务层——<b>小文件合并成大文件、按时间分目录、或者干脆换对象存储</b>。</p>
+  <div class="callout">
+    <b>面试里可以主动补一句：</b>「inode 耗尽的应急处理，不是删文件，是先确认还有没有救。」如果 inode 100% 且块还有空，删掉一批小文件立刻能恢复写入；如果是块满且 inode 也满，删文件同样有效，但要小心别删到正在被写的。真正的预防是在建文件系统时用 <span class="k">mkfs.ext4 -i</span> 或 <span class="k">-N</span> 调大 inode 数量，但那是不可逆的（重新格式化才行），所以要在规划阶段就算清楚。
+  </div>
+  <p><b>面试怎么答：</b>「inode 存元数据不存文件名，文件名在目录项里，所以硬链接是多个目录项指向同一个 inode，软链接是一个独立文件存路径。ext4 的 inode 数量在格式化时就定了，小文件多的场景会先耗尽 inode，这时候 df -h 还有空间但写入报 No space，要用 df -i 确认。XFS 是动态分配 inode，不会出现这个问题，这也是它适合大量小文件的原因之一。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>ext4 与 XFS：差别不在性能数字，在「能不能改小」</h2></div>
+  <p class="lead">这两个文件系统被问到的频率极高，但真正需要记住的只有几条：<b>XFS 不能缩容，ext4 能；XFS 的 inode 动态分配，ext4 是固定的；XFS 只记元数据日志，ext4 可以记数据日志</b>。其余的都是推论。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>ext4</th><th>XFS</th></tr>
+    <tr><td><b>缩容</b></td><td>支持，但必须卸载后离线做</td><td><b>不支持</b>，官方明确只能扩不能缩</td></tr>
+    <tr><td><b>扩容</b></td><td>支持在线扩容（resize2fs）</td><td>支持在线扩容（xfs_growfs，挂载状态即可）</td></tr>
+    <tr><td><b>inode</b></td><td>格式化时按比例固定分配，可能耗尽</td><td>动态分配，用多少给多少</td></tr>
+    <tr><td><b>日志</b></td><td>三种数据模式：ordered（默认）、writeback、journal</td><td>只对元数据做日志，不记数据</td></tr>
+    <tr><td><b>reflink / 快照式拷贝</b></td><td>不支持</td><td>支持写时复制（cp --reflink）</td></tr>
+    <tr><td><b>修复工具</b></td><td>e2fsck，可以对未挂载的分区跑</td><td>xfs_repair，必须在未挂载状态；大文件系统耗时长</td></tr>
+    <tr><td><b>典型默认</b></td><td>Debian / Ubuntu 系常见默认</td><td>RHEL / CentOS 7 起默认</td></tr>
+    <tr><td><b>擅长</b></td><td>通用、生态成熟、工具链完整</td><td>大文件、大容量、高并发元数据操作、并行 IO</td></tr>
+  </table>
+  <p>先讲最容易被追问的那条：<b>为什么 XFS 不能缩容？</b>因为 XFS 的设计里，空间是按「分配组」（allocation group）管理的，元数据用 B+ 树索引，这些结构假设了「空间只会增长」。要把文件系统改小，就得把末尾的分配组里的数据搬到前面、重建所有 B+ 树的索引、再截断——这在实现上极其复杂，所以 XFS 从一开始就没做，官方文档也一直写着「不支持缩小」。想变小只有一条路：备份、重建文件系统、恢复数据。</p>
+  <p>这条限制在实际运维里的后果很具体：<b>分区规划做大了，就没法缩回去</b>。云上还好（云盘可以换小规格？很多云厂商也不支持缩容云盘），物理机上就是白占着。所以用 XFS 时宁可先用 LVM 把容量管起来——LVM 层面可以缩小逻辑卷（虽然也要求文件系统支持），或者干脆留一部分空间不分配。</p>
+  <p>第二条差异是日志模式，它决定了掉电后你看到什么。ext4 的默认是 <span class="k">data=ordered</span>：数据块先写，元数据后写。这样掉电后你最多看到「文件丢了」，不会看到「文件在，但内容是一堆旧数据」。如果改成 <span class="k">data=writeback</span>，性能会好一点，但掉电后可能出现文件内容错乱；<span class="k">data=journal</span> 最安全但最慢（数据和元数据都写日志）。</p>
+  <p>XFS 只对元数据做日志，不保证数据块和元数据的写入顺序。所以极端情况下（掉电 + 覆盖写），可能出现「文件长度对、但尾部内容是零」的现象。这不是 bug，是设计取舍：XFS 选择了更快的写入路径，把「数据完整性」交给了应用层（比如数据库自己的 WAL、或者写入后 fsync）。<b>所以「数据库放 XFS 上更危险吗」这个问题，答案是「取决于应用有没有自己做持久化保证」</b>——MySQL 的 doublewrite 和 redo log 就是干这个的。</p>
+  <pre><span class="c"># 建文件系统：ext4 调 inode 密度，XFS 基本不用调</span>
+mkfs.ext4 -i 8192 -m 1 /dev/sdb1       <span class="c"># 每 8KB 一个 inode；保留块降到 1%</span>
+mkfs.xfs -f /dev/sdb1
+
+<span class="c"># 看 ext4 的日志模式和保留块</span>
+tune2fs -l /dev/sdb1 | grep -i 'filesystem features\|reserved block\|journal'
+dumpe2fs -h /dev/sdb1 2&gt;/dev/null | grep -i 'mount count\|state'
+
+<span class="c"># ext4 缩容：必须卸载，顺序是先缩文件系统，再缩分区（顺序反了就废）</span>
+umount /data
+e2fsck -f /dev/sdb1
+resize2fs /dev/sdb1 100G
+<span class="c"># 然后用 parted/fdisk 缩小分区，最后再 e2fsck 一次</span>
+
+<span class="c"># XFS 扩容：挂载状态直接做，参数是挂载点不是设备</span>
+xfs_growfs /data
+<span class="c"># XFS 缩容：不存在这个操作，官方不支持</span>
+
+<span class="c"># XFS 的 reflink：拷贝一个 10G 的虚机镜像，几乎瞬间完成、几乎不占空间</span>
+cp --reflink=always big.img big-copy.img</pre>
+  <p>关于「谁更适合大文件大容量」这句话，要说得有依据而不是背结论：XFS 的元数据操作是并行的（多个分配组可以同时分配空间），B+ 树对超大目录和超大文件更友好，延迟分配（delayed allocation）能把小的写合并成大块写；ext4 用的是全局的块位图和组描述符，并发分配时争用更明显。所以「几百 TB 的盘、单个文件几十 G、多线程同时写」这类场景，XFS 的结构更合适。反过来，「几百万个小文件、单线程、要缩容」这类场景，ext4 更省心。</p>
+  <div class="callout warn">
+    <b>不要在生产上「为了性能」改 ext4 的日志模式。</b>data=writeback 带来的性能提升在 SSD 上往往只有个位数百分比，而它带来的「掉电后文件内容错乱」风险是实打实的。真要提高写入性能，方向是批量写、减少 fsync 次数、换更好的盘，而不是拆掉一致性保证。
+  </div>
+  <p><b>面试怎么答：</b>「最关键的差别是 XFS 不支持缩容，只能扩；ext4 支持缩容，但必须卸载后离线做，顺序是先缩文件系统再缩分区。其次是 inode：ext4 格式化时固定分配，小文件多会耗尽，XFS 动态分配。日志方面 ext4 默认 data=ordered，保证数据先于元数据落盘；XFS 只记元数据日志，所以掉电后可能出现文件长度对但尾部是零。选型上大文件、大容量、高并发写选 XFS，要缩容或者小文件多选 ext4。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>挂载与 fstab：一个目录被「盖住」能藏几百 G</h2></div>
+  <p class="lead">挂载这个动作，很多人以为是「把盘接到目录上」。更准确的说法是：<b>把一个新的文件系统挂到目录树的某个点上，把这个点上原有的内容遮住</b>。理解「遮住」这个词，你就能解释「数据莫名消失」和「写错盘」这两类故障。</p>
+  <p>过程是这样的：/data 本来是根文件系统上的一个普通目录，里面可能有 200G 数据。执行 <span class="k">mount /dev/sdb1 /data</span> 之后，内核在 /data 这个位置换了一个「挂载点」，后续所有对 /data 的访问都走 sdb1。原来那 200G 没有消失，它还在根分区的块里，只是<b>没有路径能到达它了</b>——除非你把 sdb1 卸载掉，原目录才会重新露出来。</p>
+  <p>这就解释了一个经典事故：运维先在根分区上建了 /data 目录、跑了一周业务、写了 200G；然后加了新盘，挂上去。看上去一切正常，但根分区还是满的（那 200G 还在），新盘是空的（业务开始往新盘写）。而 <span class="k">du -x /</span> 数不到那 200G，因为它在挂载点「下面」，被遮住了。想找回它，只能 umount 之后再看——但这时候业务正在用新盘，umount 会造成中断。</p>
+  <table>
+    <tr><th style="width:170px">fstab 字段</th><th>含义</th><th>常见坑</th></tr>
+    <tr><td>第 1 列 设备</td><td>设备路径或 UUID</td><td>用 /dev/sdb 会在加盘后漂移，必须用 UUID 或 LABEL</td></tr>
+    <tr><td>第 2 列 挂载点</td><td>目录路径，必须已存在</td><td>目录不存在时 systemd 会尝试创建，但权限可能不对</td></tr>
+    <tr><td>第 3 列 类型</td><td>ext4 / xfs / nfs 等</td><td>写错会挂载失败，机器可能进 emergency mode</td></tr>
+    <tr><td>第 4 列 选项</td><td>defaults、noatime、nofail、ro 等</td><td>漏了 nofail，云上数据盘没挂上就起不来</td></tr>
+    <tr><td>第 5 列 dump</td><td>一般写 0</td><td>基本已废弃，别改</td></tr>
+    <tr><td>第 6 列 pass</td><td>fsck 顺序，根分区 1，其他 2，不检查 0</td><td>给大数据盘设 1 会让开机 fsck 跑很久</td></tr>
+  </table>
+  <p><span class="k">nofail</span> 这个选项值得单独讲，因为它是云上最常见的「机器起不来」原因。默认情况下，fstab 里的一个设备挂不上，systemd 会认为本地文件系统没准备好，直接进入 emergency mode——机器 ping 得通但 SSH 进不去，控制台一看是「Welcome to emergency mode」。而云上的数据盘在实例重建、跨可用区迁移、或者挂载脚本失败时，确实可能不在。<b>给非系统盘加 nofail，是把自己从「必须进控制台」变成「少挂一块盘但机器还活着」。</b></p>
+  <p>还有几个选项在实际运维里经常用到：<span class="k">noatime</span> 关掉「读文件时更新访问时间」，能省掉大量元数据写（尤其是读多写少的场景，收益明显）；<span class="k">nodiratime</span> 只对目录生效；<span class="k">ro</span> 在故障排查时很有用（把盘挂成只读，防止进一步写坏）；<span class="k">discard</span> 让删除操作实时通知 SSD（也可以不用它，改用定期 fstrim）。</p>
+  <pre><span class="c"># 1. 先看现在的挂载关系，别猜</span>
+findmnt -T /data            <span class="c"># 这个路径属于哪个文件系统、哪个设备</span>
+findmnt --real              <span class="c"># 只看真实挂载，过滤掉 proc/sysfs 这类</span>
+cat /proc/mounts | column -t
+
+<span class="c"># 2. 确认有没有"被盖住"的目录：先 umount 再 du，或者直接看同名的下层</span>
+<span class="c">#    不能 umount 时，用绑定挂载把根分区挂到别处看</span>
+mkdir -p /mnt/rootview &amp;&amp; mount --bind / /mnt/rootview
+du -xhd1 /mnt/rootview/data
+
+<span class="c"># 3. 用 UUID 写 fstab，避免设备名漂移</span>
+blkid /dev/sdb1
+<span class="c"># UUID=xxxx-xxxx  /data  xfs  defaults,noatime,nofail  0 2</span>
+
+<span class="c"># 4. 改完 fstab 必须验证，否则下次重启就是事故</span>
+mount -a
+findmnt -T /data
+
+<span class="c"># 5. 排查挂载卡住：看是不是 NFS 的 hard 模式在无限重试</span>
+mount | grep nfs
+ps -eo stat,pid,comm | awk '$1 ~ /^D/'</pre>
+  <p>最后那个 <span class="k">mount --bind</span> 的技巧很实用：不卸载也能看到「被盖住」的原目录。原理是把根文件系统再挂一次到 /mnt/rootview，从这个新路径看下去，/data 就是根分区上的普通目录，没有被 sdb1 遮住。这是查「空间到底被谁占了」时最有用的手段之一。</p>
+  <div class="callout danger">
+    <b>最危险的一类操作：在已经挂载的目录上再挂一次。</b>Linux 允许多层挂载（同一个目录上叠多个文件系统），后挂的遮住先挂的，而且 <span class="k">umount</span> 只卸载最上面那层。如果你在 /data 上叠了三层，umount 两次之后才看到真正的数据，中间很容易搞错。所以每次 mount 之后都跑一次 <span class="k">findmnt -T</span> 确认，成本一秒，收益是不用半夜猜。
+  </div>
+  <p><b>面试怎么答：</b>「挂载不是合并，是遮盖。往一个已有数据的目录上挂文件系统，原数据还在原分区里，只是路径上看不见了。所以会出现 df 满、du 数不到的情况，可以用 du -x 限定文件系统，或者用 mount --bind 把根分区挂到别处去看被遮住的目录。fstab 里要用 UUID 不用设备名，非系统盘一定要加 nofail，否则盘没挂上机器会进 emergency mode。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>NFS：为什么数据库绝对不能放上去</h2></div>
+  <p class="lead">「NFS 就是个网络目录，为什么不能放数据库？」这个问题如果你答「因为慢」，面试官会追一句「那 SSD 做的 NAS 呢」。真正的答案不在速度，在<b>语义</b>：NFS 提供的 POSIX 语义是「大部分兼容」，而数据库要的是「完全正确」。</p>
+  <p>先把版本差异说清：NFSv3 是<b>无状态</b>协议，服务端不记客户端状态，所以文件锁要靠额外的 NLM（lockd/statd）来实现，服务端重启后锁的恢复很不可靠；NFSv4 是<b>有状态</b>的，锁内建在协议里，只用 2049 一个端口（对防火墙友好），还带了委托（delegation）等优化。生产上如果没有特殊理由，用 v4.1 或更高。</p>
+  <table>
+    <tr><th style="width:170px">语义</th><th>本地文件系统</th><th>NFS 上</th><th>对数据库的影响</th></tr>
+    <tr><td><b>fsync 落盘保证</b></td><td>返回即代表已提交到设备（配合 write barrier）</td><td>承诺弱于本地，服务端缓存、网络重传都可能让「已 fsync」的数据在掉电后消失</td><td>事务提交了但数据没了，这是最致命的</td></tr>
+    <tr><td><b>文件锁</b></td><td>内核本地实现，可靠</td><td>v3 依赖 NLM，服务端重启/网络分区时可能丢锁或死锁</td><td>两个实例同时写同一份数据文件，直接损坏</td></tr>
+    <tr><td><b>缓存一致性</b></td><td>单机缓存，一致</td><td>客户端有属性缓存（acregmin/acregmax），多客户端看到的 mtime、大小可能不一致</td><td>主从复制判断「文件变了没有」会误判</td></tr>
+    <tr><td><b>mmap 共享写</b></td><td>可靠</td><td>语义弱，跨客户端几乎不可用</td><td>很多存储引擎依赖 mmap</td></tr>
+    <tr><td><b>rename 的持久性</b></td><td>原子且落盘</td><td>操作本身在服务端是原子的，但持久性依赖 COMMIT，客户端还有属性与目录缓存</td><td>「写临时文件再 rename」这种原子发布，掉电后可能回退到旧状态</td></tr>
+    <tr><td><b>网络分区</b></td><td>不存在</td><td>hard 模式会无限重试，进程进入 D 状态且不可杀</td><td>数据库进程卡死，kill -9 也杀不掉</td></tr>
+  </table>
+  <p>其中最要命的是第一条和第六条。<b>fsync 的语义</b>决定了「事务持久性」这个承诺能不能兑现——如果存储层不能保证「fsync 返回后数据一定在盘上」，那数据库的 WAL 就是假的。所以 MySQL 官方文档对 NFS 的态度一直是「不推荐/不支持数据目录放在网络文件系统上」，Oracle 也一样（除非使用专门的 Direct NFS 客户端这类经过认证的方案）。</p>
+  <p><b>网络分区</b>那条则是运维层面的噩梦。NFS 的 hard 模式（默认）在服务端不可达时会无限重试，进程进入不可中断睡眠（D 状态），这时候 <span class="k">kill -9</span> 都杀不掉——因为进程根本没在用户态运行，它在等内核把 IO 完成。你只能等网络恢复，或者强制重启机器。如果这个进程是数据库，那就是一次计划外的宕机，而且是你自己「选择」的（因为你用了 hard）。</p>
+  <p>那 soft 模式呢？soft 会在超时后返回 EIO，进程能继续跑，但<b>上层可能收到一个「读失败」而认为数据损坏</b>，或者更糟——写操作返回失败但实际已经写进去了，应用重试造成重复。所以 soft 也不是答案，它只是把「卡死」换成了「数据可能不一致」。</p>
+  <pre><span class="c"># 看服务端导出了什么、允许谁挂</span>
+showmount -e nfs-server
+
+<span class="c"># 挂载：生产上明确指定版本，不要靠协商</span>
+mount -t nfs -o vers=4.1,hard,timeo=600,retrans=2,noatime nfs-server:/export/data /data
+
+<span class="c"># 关键参数的取舍</span>
+<span class="c"># hard      服务端不可达时无限重试，数据安全但进程可能卡死（数据库场景反而不能接受）</span>
+<span class="c"># soft      超时返回错误，进程不卡但可能读到半截数据</span>
+<span class="c"># timeo     重传超时，单位是 0.1 秒（600 = 60 秒）</span>
+<span class="c"># retrans   重传次数</span>
+<span class="c"># nolock    关闭文件锁（只在确认不需要锁时用，比如只读共享）</span>
+
+<span class="c"># 排查：NFS 上的"幽灵文件"，进程删除后仍打开，名字变成 .nfsXXXX</span>
+ls -la /data | grep '.nfs'
+lsof | grep '/data' | head
+
+<span class="c"># 统计：重传、超时、badcalls 是否在增长</span>
+nfsstat -c
+nfsstat -s        <span class="c"># 在服务端看</span>
+
+<span class="c"># 卡在 D 状态的进程，先确认它在等 NFS 还是等本地盘</span>
+cat /proc/PID/stack 2&gt;/dev/null | head
+ps -eo stat,pid,wchan:20,comm | awk '$1 ~ /^D/'</pre>
+  <p>那 NFS 到底该用来干什么？<b>共享「变化不频繁、不需要强一致」的数据</b>：配置文件、部署制品、静态资源、CI 的构建缓存、日志归档、容器共享的只读卷。这些场景的共同点是「读多写少、丢了能重建、并发写不常见」。</p>
+  <p>一个具体的技术细节：NFS 上被删除但还被进程打开的文件，会被重命名成 <span class="k">.nfsXXXX</span> 留在目录里（为了让客户端能继续用同一个文件句柄）。所以你会看到「删了文件空间没释放，目录里多了一堆 .nfs 开头的怪文件」——这不是病毒，是 NFS 的正常机制。处理方式和本地文件系统一样：找到持有它的进程，或者重启进程。</p>
+  <div class="callout warn">
+    <b>「我们用 NAS，性能很好」不能反驳「数据库不能放 NFS」。</b>因为问题不在 IOPS，在语义。一个 100 万 IOPS 的 NAS 依然可能因为 fsync 保证不足、锁恢复不可靠、网络分区导致 D 状态而在数据库场景下出错。反过来，本地一块便宜的 SATA SSD 在语义上是完整的。这就是为什么云厂商会单独提供「块存储」而不是让你把数据库放 NAS 上。
+  </div>
+  <p><b>面试怎么答：</b>「NFS 的问题是语义不是性能。第一，fsync 的落盘保证弱于本地文件系统，数据库的 WAL 依赖这个承诺；第二，v3 的锁依赖 NLM，服务端重启或网络分区时可能丢锁；第三，客户端有属性缓存，多客户端看到的不一致；第四，hard 模式在网络分区时会无限重试，进程进 D 状态 kill 不掉，soft 模式又会返回错误导致数据可能不一致。所以数据库的数据目录必须放块存储，NFS 适合共享配置、制品、静态资源和只读卷。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>RAID：重建期间是整套系统最脆的时候</h2></div>
+  <p class="lead">「RAID5 能坏一块盘」这句话是对的，但它没说的是：<b>坏盘之后的重建过程，是整个阵列最危险的时刻</b>——盘越大，这段窗口越长，而在窗口里再坏一块，数据就全没了。</p>
+  <table>
+    <tr><th style="width:100px">级别</th><th>最少盘</th><th>可用容量</th><th>容错</th><th>随机写开销</th><th>适合</th></tr>
+    <tr><td><b>RAID0</b></td><td>2</td><td>100%</td><td>0（坏一块全丢）</td><td>1 次</td><td>临时数据、缓存、可重建的中间结果</td></tr>
+    <tr><td><b>RAID1</b></td><td>2</td><td>50%</td><td>1</td><td>2 次</td><td>系统盘、小容量高可靠</td></tr>
+    <tr><td><b>RAID5</b></td><td>3</td><td>(n-1)/n</td><td>1</td><td><b>4 次</b></td><td>读多写少、盘不大</td></tr>
+    <tr><td><b>RAID6</b></td><td>4</td><td>(n-2)/n</td><td>2</td><td>6 次</td><td>大容量盘、冷数据、归档</td></tr>
+    <tr><td><b>RAID10</b></td><td>4</td><td>50%</td><td>每组 1 块</td><td>2 次</td><td>数据库、高 IOPS、写密集</td></tr>
+  </table>
+  <p>「随机写开销 4 次」是怎么来的？RAID5 的一次随机小块写，需要：读旧数据块、读旧校验块、算出新校验、写新数据块、写新校验块——也就是 2 读 2 写，合计 4 次 IO。这叫<b>写惩罚</b>（write penalty）。RAID6 有两份校验，所以是 6 次。这意味着：<b>RAID5 的随机写 IOPS 只有裸盘的四分之一</b>。如果你拿 8 块 SSD 组 RAID5 跑数据库，理论 IOPS 是 8 块的四分之一再打个折，可能还不如两块 RAID1。</p>
+  <p>写惩罚还有另一种情况：如果一次写正好覆盖整个条带（full stripe write），就不需要读旧数据和旧校验，直接算新校验写下去。所以<b>顺序大块写对 RAID5 很友好，随机小块写对 RAID5 很致命</b>——这也解释了为什么日志、数据库这类随机写场景要选 RAID10。</p>
+  <p>重建风险要说清机制：一块盘坏了之后，控制器要用剩下的盘（包括校验盘）把丢失的数据算出来，写到热备盘上。这个过程要<b>读完整个阵列的所有扇区</b>。一块 8TB 的盘，按 150MB/s 算大约要 15 小时，实际因为重建时还要服务正常 IO，往往更久。在这十几个小时里：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>阵列处于降级状态</b>：RAID5 已经没有任何冗余，再坏一块就丢数据；RAID6 还剩一层保护。</div></div>
+    <div class="step"><div class="txt"><b>性能下降</b>：重建占用大量带宽和 IOPS，业务会明显变慢，慢到可能触发上层超时。</div></div>
+    <div class="step"><div class="txt"><b>要读完全盘，就会遇到「不可恢复读错误」</b>：机械盘上存在少量坏扇区是常态，平时读不到就没事，重建时必须读每一个扇区，撞上了就重建失败。</div></div>
+    <div class="step"><div class="txt"><b>撞上之后整个阵列可能直接掉线</b>：因为 RAID5 已经没有冗余来重建那个坏扇区，这就是「RAID5 重建失败」的典型场景。</div></div>
+  </div>
+  <p>所以业界的共识是：<b>单盘容量越大，越不该用 RAID5</b>。几 TB 的盘还能接受，十几 TB 的盘应该用 RAID6 或 RAID10。RAID6 牺牲一块盘的容量，换来「重建期间再坏一块也不丢」，这个交换在大容量时代是划算的。</p>
+  <pre><span class="c"># 软 RAID：看阵列状态、降级情况、重建进度</span>
+cat /proc/mdstat
+mdadm --detail /dev/md0
+
+<span class="c"># 硬件 RAID：厂商工具，命令名各不相同（以你环境为准）</span>
+<span class="c"># storcli / perccli / megacli / ssacli 都能看 virtual drive 和 rebuild 进度</span>
+storcli /c0/v0 show all
+storcli /c0/eall/sall show rebuild
+
+<span class="c"># 盘的 SMART：重点看重映射扇区、待定扇区、UDMA CRC 错误</span>
+smartctl -a /dev/sda | grep -iE 'Reallocated|Pending|Uncorrect|CRC'
+smartctl -H /dev/sda
+
+<span class="c"># 找到"已经出问题但还没掉线"的盘，这是最该处理的</span>
+for d in /dev/sd?; do echo "== $d"; smartctl -H $d | tail -2; done
+
+<span class="c"># 云上：多副本由云盘自己保证，不需要在实例内再做 RAID</span>
+lsblk -o NAME,SIZE,TYPE,MOUNTPOINT</pre>
+  <p>还有两个常被忽略的动作。<b>一是巡检（patrol read / consistency check）</b>：定期主动读一遍所有扇区，提前发现坏道，而不是等重建时才发现。<b>二是热备盘</b>：有了热备，坏盘后能自动开始重建，不用等人半夜换盘——但热备盘本身也要定期检查，很多人配了热备就再也不看它是不是好的。</p>
+  <p>最后一条必须说：<b>RAID 不是备份。</b>它防的是「盘坏」，不防「误删」「勒索软件」「逻辑损坏」「机房着火」。删库的时候 RAID 会忠实地把删除同步到每一块盘上。备份必须是「另一份介质、另一个位置、能独立恢复」。</p>
+  <div class="callout danger">
+    <b>一个真实存在的连锁：重建 → 业务变慢 → 上层超时 → 重试 → 压力翻倍 → 重建更慢。</b>很多「RAID 重建把业务拖挂」的事故，根因不是磁盘，而是重建期的性能下降触发了应用层的重试风暴。所以计划内的换盘应该在低峰做，并且提前把限流阈值调低、把重试关掉。
+  </div>
+  <p><b>面试怎么答：</b>「RAID5 一次随机写要 2 读 2 写，共 4 次 IO，所以随机写 IOPS 只有裸盘的四分之一，RAID6 是 6 次。RAID5 的重建要读完全盘，几 TB 的盘要十几小时，这段时间没有冗余，而且可能撞上不可恢复读错误导致重建失败。所以单盘容量大的时候应该用 RAID6 或 RAID10。另外 RAID 不是备份，它防不了误删和逻辑损坏。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>SSD：TRIM 不是优化，是「告诉盘哪些数据死了」</h2></div>
+  <p class="lead">「SSD 用久了会变慢」这句话半对半错。准确的说法是：<b>写满之后会变慢</b>，因为垃圾回收（GC）没有空闲块可以搬移。而 TRIM 的作用，就是让盘知道「这些块已经没用了，可以直接擦」，不用再傻乎乎地搬。</p>
+  <p>先理解物理结构：NAND 的读写单位是<b>页</b>（常见 4KB 到 16KB），擦除单位是<b>块</b>（包含很多页）。所以「覆盖写一个 4KB」在物理上不能原地改，必须：找到一个新页写入新数据，把旧页标记为无效。无效页攒够了，GC 会把整个块里还有效的页搬到新块，然后擦掉整块。</p>
+  <p>这个过程带来两个概念：<b>写放大</b>（WA）= 实际写进 NAND 的数据量 ÷ 主机写入的数据量。如果每次写都触发搬移，WA 可能是 3 甚至更高，意味着盘的寿命消耗是账面值的 3 倍。<b>预留空间</b>（OP，over-provisioning）就是留出一部分容量专门给 GC 周转，企业盘通常留得比消费盘多。</p>
+  <p>TRIM（ATA 命令叫 TRIM，SCSI 叫 UNMAP，NVMe 叫 Dataset Management）的作用是：文件系统告诉盘「这些 LBA 上的数据已经删了，你可以当它们是空的」。没有 TRIM，盘不知道数据「逻辑上已删」，仍把它们当有效数据搬来搬去，WA 白白升高，寿命白白消耗。</p>
+  <table>
+    <tr><th style="width:170px">概念</th><th>含义</th><th>怎么看 / 怎么配</th></tr>
+    <tr><td><b>TRIM / discard</b></td><td>文件系统通知 SSD 哪些块已无效</td><td>挂载选项 <span class="k">discard</span>，或定期 <span class="k">fstrim</span>（推荐后者）</td></tr>
+    <tr><td><b>写放大 WA</b></td><td>NAND 实际写入 ÷ 主机写入</td><td>厂商工具可读；RAID 卡会隐藏它</td></tr>
+    <tr><td><b>OP 预留空间</b></td><td>不给主机用的容量，GC 的周转区</td><td>企业盘固定；也可以自己少分一个分区</td></tr>
+    <tr><td><b>寿命 TBW / DWPD</b></td><td>总写入字节数 / 每天可全盘写多少次</td><td>按业务写入量估算，别只看容量买</td></tr>
+    <tr><td><b>SLC 缓存</b></td><td>用 SLC 模式加速写入，写满后掉速</td><td>消费盘常见，持续大量写会看到速度断崖</td></tr>
+  </table>
+  <pre><span class="c"># 看是不是 SSD：rota=0 表示非旋转介质</span>
+lsblk -d -o NAME,SIZE,ROTA,MODEL
+
+<span class="c"># 判断文件系统有没有开 discard</span>
+findmnt -o TARGET,SOURCE,FSTYPE,OPTIONS | grep -E 'discard|/data'
+
+<span class="c"># 推荐做法：不做实时 discard，用定时 fstrim（每周一次）</span>
+systemctl enable --now fstrim.timer
+fstrim -av
+
+<span class="c"># 看 SSD 的健康度和剩余寿命</span>
+smartctl -a /dev/nvme0n1 | grep -iE 'Percentage Used|Data Units Written|Media Errors|Available Spare'
+smartctl -a /dev/sda | grep -iE 'Total_LBAs_Written|Wear_Leveling|Media_Wearout'
+
+<span class="c"># 看真实的 IO 模式（绕过 page cache 才有意义，见下一节）</span>
+iostat -x 1 3</pre>
+  <p>为什么推荐「定时 fstrim」而不是「挂载时 discard」？因为 <span class="k">discard</span> 是<b>同步</b>的：每次删除文件，文件系统都要发一批 TRIM 命令，删除大量小文件时会明显变慢（删 100 万个文件，就是 100 万次元数据更新加批量 TRIM）。而 fstrim 是定期批量扫一遍空闲块，把删除的开销从「业务路径」挪到「后台任务」。副作用是「删了之后到下次 fstrim 之间，盘还不知道这些块空了」，但这对寿命的影响很小。</p>
+  <p>还有一个在虚拟化和 RAID 下容易踩的坑：<b>TRIM 需要整条链路都支持</b>。文件系统 → 虚拟磁盘（virtio-blk 要开 discard）→ 存储后端 → 物理盘，任何一层不支持，TRIM 就到不了盘。RAID 卡如果不开「SSD 透传/passthrough」，它连 TRIM 都不往下发。所以你会在 VM 里看到 <span class="k">fstrim</span> 跑完什么也没发生——不是命令错了，是链路断了。</p>
+  <p>关于性能特征，有三点和机械盘完全不同：<b>随机读极强</b>（没有寻道），所以数据库的随机读瓶颈会从盘转到 CPU 或锁；<b>随机写受 GC 影响</b>，稳态下（写满过一轮之后）的随机写性能才是真实性能，新盘跑分是「空盘红利」；<b>需要足够的队列深度</b>，NVMe 的多队列设计只有在并发请求够多时才能跑满，单线程同步小 IO 会浪费掉绝大部分能力。</p>
+  <div class="callout warn">
+    <b>别把消费级 SSD 放进数据库服务器。</b>消费盘通常没有掉电保护（PLP），写着「已 fsync」的数据在掉电时可能还在盘的缓存里没落 NAND；OP 也少，稳态写性能差；TBW 低，写入密集的业务一两年就把寿命写完了。企业盘贵的那部分钱，买的就是「掉电保护 + 更大的 OP + 更高的 TBW」。
+  </div>
+  <p><b>面试怎么答：</b>「SSD 的读写单位是页、擦除单位是块，覆盖写要写新页、旧页变无效，无效页多了要 GC 搬移有效页，这带来写放大。TRIM 是让文件系统告诉盘哪些块已经无效，减少无谓搬移，延长寿命。生产上一般不用挂载时的 discard（同步、删文件会变慢），而是用 fstrim.timer 定期批量做。另外 TRIM 要整条链路支持，虚拟化和 RAID 卡都可能把它挡住。稳态性能要看写满之后的，新盘跑分不作数。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>对象存储：强一致了，但它仍然不是文件系统</h2></div>
+  <p class="lead">关于 S3 有一个说法已经过时很久了：「S3 是最终一致的」。<b>从 2020 年底开始，S3 对新建对象的 PUT 和覆盖 PUT、以及 DELETE，都提供强一致的读后写和 LIST 一致性</b>。现在还在背「最终一致」的人，会在这个问题上丢分。</p>
+  <p>但强一致不等于「像文件系统」。对象存储的语义边界仍然很清楚：<b>只有一个扁平的名字空间</b>（bucket 里的 key，斜杠只是名字的一部分，不是目录）；<b>对象整体覆盖</b>（没有 append、没有随机写、没有部分更新）；<b>rename 是复制加删除</b>（不是原子操作，大对象代价很高）；<b>并发写同一个 key 是「最后完成者获胜」</b>（没有锁，没有冲突检测）。</p>
+  <table>
+    <tr><th style="width:180px">看起来像</th><th>实际是什么</th><th>后果</th></tr>
+    <tr><td>目录结构 /data/2024/01/a.jpg</td><td>一个 key 字符串，斜杠没有特殊含义</td><td>「列目录」是一次带前缀的 LIST，按 1000 个一页分页返回</td></tr>
+    <tr><td>重命名 mv a.jpg b.jpg</td><td>复制成新 key，再删旧 key</td><td>不是原子的，中途失败会留下两份或零份；大文件耗时且计费</td></tr>
+    <tr><td>追加日志到同一个文件</td><td>只能「读出全部 + 拼接 + 整体覆盖」</td><td>并发追加必然丢数据；日志要按对象分片写</td></tr>
+    <tr><td>文件锁 / 独占打开</td><td>没有这个概念</td><td>多个实例写同一个 key，谁最后完成谁赢，其他人白写</td></tr>
+    <tr><td>ETag 是文件的 MD5</td><td>单次 PUT 时是 MD5；分片上传时是「分片 MD5 的 MD5」加「-分片数」后缀</td><td>用 ETag 校验大文件完整性会算错</td></tr>
+  </table>
+  <p>预签名 URL 是对象存储里最常用的一个能力，也是最容易被误解的。<b>它的原理是「用长期密钥对一次具体请求签名」</b>：把要访问的 bucket、key、方法、过期时间拼成一个待签字符串，用 SecretKey 做 HMAC，把签名和 AccessKeyId 放进 URL 参数。拿到 URL 的人不需要任何凭证就能访问，直到过期。</p>
+  <p>关键点是：<b>预签名 URL 不能单独撤销</b>。因为签名是无状态的，服务端只验签不记录。想让某个 URL 提前失效，只能轮换密钥（影响所有 URL）、或者删除对象、或者临时改 bucket 策略。所以「给用户一个 7 天有效的下载链接」这种需求，要么接受「7 天内无法撤销」，要么在应用层加一层自己的令牌校验（由你的服务代理请求）。</p>
+  <pre><span class="c"># 生成一个 15 分钟有效的下载链接（各语言 SDK 都有 presign 方法）</span>
+aws s3 presign s3://my-bucket/report.pdf --expires-in 900
+
+<span class="c"># 分片上传：大文件必须用，否则单次 PUT 超时或失败就得从头来</span>
+aws s3api create-multipart-upload --bucket my-bucket --key big.iso
+aws s3api upload-part --bucket my-bucket --key big.iso --part-number 1 --body part1
+aws s3api complete-multipart-upload --bucket my-bucket --key big.iso \
+  --multipart-upload file://parts.json
+
+<span class="c"># LIST 是分页的：默认一页 1000 个，要循环拿 continuation token</span>
+aws s3api list-objects-v2 --bucket my-bucket --prefix logs/2024/ --max-keys 1000
+
+<span class="c"># 看对象的存储类型和大小，用来算成本</span>
+aws s3api head-object --bucket my-bucket --key report.pdf</pre>
+  <p>分片上传还有一个实用价值：<b>断点续传</b>。每一片上传成功后，服务端记着这一片，网络断了只需要重传失败的那几片。所以「几百 G 的文件上传」几乎都必须走分片，而不是单次 PUT。代价是 ETag 变了形状（带 <span class="k">-N</span> 后缀），用它做 MD5 校验会失败——要校验完整性，得自己在客户端算整个文件的哈希，或者在元数据里存一份。</p>
+  <p>成本结构也值得说一句，因为它是对象存储最容易失控的地方：<b>存储费按容量算，请求费按次数算，出网流量费按 GB 算</b>。所以「把对象存储当数据库用、每次都 LIST 一遍找文件」的架构，账单会被请求费吃掉；「跨区域复制 + 公网下载」的架构，账单会被流量费吃掉。设计的时候要把「谁在什么时候读、读多少次」算清楚。</p>
+  <div class="callout">
+    <b>一个判断标准：</b>如果业务需要「随机写文件中间的一段」「对同一个文件加锁」「高频率 rename」「目录级的原子移动」，那它要的是文件系统或数据库，不是对象存储。对象存储擅长的是「一次写入、多次读取、按 key 直接访问」——图片、视频、备份、日志分片、数据湖文件，都是这个形状。
+  </div>
+  <p><b>面试怎么答：</b>「S3 从 2020 年底开始对 PUT 和 DELETE 提供强一致的读后写和 LIST 一致性，所以『最终一致』这个说法已经过时了。但它仍然不是文件系统：扁平 key、不能追加写、rename 是复制加删除且不原子、并发写同一 key 是最后写获胜、ETag 在分片上传后不是 MD5。预签名 URL 是用长期密钥对一次请求签名，无状态，所以不能单独撤销，只能靠轮换密钥或改策略。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>IO 怎么量：IOPS、吞吐、延迟、队列深度四个数</h2></div>
+  <p class="lead">面试官问「这块盘性能怎么样」，如果你只答「IOPS 很高」，基本等于没答。因为这四个数互相约束：<b>并发 = 吞吐 × 延迟</b>，任何一块盘的极限都是「队列深度除以延迟」，脱离队列深度谈 IOPS 没有意义。</p>
+  <p>先把四个指标的关系摆清：<b>IOPS</b> 是每秒完成的 IO 次数；<b>吞吐</b> 是每秒传输的字节数（IOPS × 块大小）；<b>延迟</b> 是单次 IO 从发出到完成的时间；<b>队列深度</b> 是同时在飞的 IO 数量。它们的关系是 Little's law：<span class="k">队列深度 = IOPS × 延迟</span>。所以一块延迟 100 微秒的 NVMe，要在队列深度 32 时才能跑出几十万 IOPS；如果你用单线程同步读（队列深度 1），那 IOPS 上限就是 1 万。</p>
+  <table>
+    <tr><th style="width:150px">指标</th><th>怎么算 / 怎么看</th><th>容易误读的地方</th></tr>
+    <tr><td><b>IOPS</b></td><td>iostat 的 r/s + w/s；fio 的结果</td><td>不写块大小和读写比例的 IOPS 没有可比性</td></tr>
+    <tr><td><b>吞吐</b></td><td>iostat 的 rkB/s + wkB/s</td><td>大块顺序写的吞吐高，不代表随机性能好</td></tr>
+    <tr><td><b>延迟 await</b></td><td>iostat -x 的 await（含排队时间）</td><td>await 高可能是排队，也可能是设备慢，要结合 aqu-sz 看</td></tr>
+    <tr><td><b>队列深度</b></td><td>iostat -x 的 aqu-sz</td><td>aqu-sz 长期大于 1 说明有排队；SSD 上排队不一定是坏事</td></tr>
+    <tr><td><b>%util</b></td><td>设备忙的时间占比</td><td><b>在 SSD / NVMe / RAID 上会失真</b>，因为设备能并行处理，忙不等于满</td></tr>
+  </table>
+  <p>关于 <span class="k">%util</span> 要特别提醒：这个指标来自「设备有多少时间在处理请求」的统计，对机械盘（一次只能服务一个请求）非常准，接近 100% 就是真的满了。但 SSD 内部有多个通道、多个 die，能同时处理多个请求，所以 %util 长期 100% 而实际还有余量是常态。<b>在 SSD 上判断饱和，应该看 await 和 aqu-sz 的增长趋势，而不是 %util。</b></p>
+  <p>另一个大坑是 <b>page cache</b>。你写文件时，数据先进内存，几秒后才刷盘；你读文件时，第二次读根本不到盘。所以「用 dd 测磁盘速度」在大多数情况下测的是内存带宽。要测真实 IO，必须绕过缓存：<span class="k">dd iflag=direct</span>、<span class="k">fio --direct=1</span>、或者 O_DIRECT。</p>
+  <pre><span class="c"># 1. 先看现状：谁在读写、延迟多少、有没有排队</span>
+iostat -x 1 5
+<span class="c"># 关键列：r/s w/s（IOPS）、rkB/s wkB/s（吞吐）、await（延迟含排队）、aqu-sz（队列）、%util</span>
+
+<span class="c"># 2. 落到进程（iostat 只到设备级）</span>
+pidstat -d 1 5
+
+<span class="c"># 3. fio 压测：一定要 direct=1，否则测的是 page cache</span>
+fio --name=randread --rw=randread --bs=4k --iodepth=32 --numjobs=4 \
+    --direct=1 --runtime=60 --time_based --group_reporting --filename=/data/test.bin
+
+<span class="c"># 顺序写吞吐（大块、队列深度 1 就够）</span>
+fio --name=seqwrite --rw=write --bs=1M --iodepth=1 --numjobs=1 \
+    --direct=1 --size=4G --runtime=60 --time_based --filename=/data/test.bin
+
+<span class="c"># 4. 看文件系统层的元数据压力（小文件场景 IOPS 会被元数据吃掉）</span>
+<span class="c">#    inode 缓存命中率、dentry 缓存，用 slabtop 看</span>
+slabtop -o | head -15
+
+<span class="c"># 5. 单次 fsync 的真实延迟（数据库最关心这个）</span>
+<span class="c">#    用 fio 的 fsync 模式，比 dd 准</span>
+fio --name=fsync --rw=write --bs=4k --size=100M --fsync=1 --direct=1 --filename=/data/f.dat</pre>
+  <p>为什么说「数据库的 IO 模式」值得单独想一遍？因为它是混合的：<b>随机读 16KB 页</b>（buffer pool 未命中）、<b>顺序写 redo log</b>（还有频繁的 fsync）、<b>随机写脏页</b>（刷脏）。这三种模式的性能特征完全不同，而一块盘的总能力是有限的。所以「数据库慢」要分清是缺 IOPS（随机读多）、缺带宽（刷脏慢）、还是 fsync 延迟高（提交慢）——对应的解法分别是加盘、调刷脏参数、换带掉电保护的盘。</p>
+  <div class="callout ok">
+    <b>一套报告性能的模板：</b>「4K 随机读，队列深度 32，4 个 job，测出 8 万 IOPS，P99 延迟 0.4 毫秒；1M 顺序写，队列深度 1，测出 500MB/s；fsync 单次 0.2 毫秒。云盘的 baseline 是 2 万 IOPS，burst 可以到 3 万但只能维持 30 分钟。」——有块大小、有队列深度、有延迟分位数，才叫测过。
+  </div>
+  <p><b>面试怎么答：</b>「IOPS、吞吐、延迟、队列深度这四个数是互相约束的，队列深度等于 IOPS 乘延迟，所以不谈队列深度的 IOPS 没有意义。%util 在 SSD 上会失真，因为设备能并行处理，要看 await 和 aqu-sz 的趋势。测的时候一定要 direct，否则测的是 page cache。云盘还要区分 baseline 和 burst，burst 是有时间限制的。」</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">模块 11</span><h2>9 个坑：每一个都对应一次半夜起床</h2></div>
+  <p class="lead">这一节的坑有个共同点：<b>现象都很像，原因完全不同</b>。「磁盘满」至少有四个原因，「写入慢」至少有五个，「数据不见了」至少有三个。所以真正的能力不是记住解法，而是记住<b>区分的顺序</b>。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">看到 No space left on device 只查 df -h</div><div class="pd">inode 耗尽报的是同一句话。必须同时跑 df -i，否则你会对着「还有 20% 空间」的盘发呆一小时。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">先 rm 大日志，再看空间没释放就重启服务</div><div class="pd">rm 之后 du 看不到了，你连「是哪个文件」都查不到。正确顺序是 lsof +L1 找到持有者，再决定是 truncate 还是重启。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">在已有数据的目录上挂新盘</div><div class="pd">原数据被遮住，还占着原分区的空间。df 满、du 数不到，就是这个组合。挂之前先确认目录是空的，或者先备份。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">fstab 里非系统盘没加 nofail</div><div class="pd">云上数据盘没挂上，机器直接进 emergency mode，SSH 进不去。加 nofail 之后最坏是少挂一块盘，机器还能登录。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">fstab 用 /dev/sdb 而不是 UUID</div><div class="pd">加了一块盘、换了控制器顺序，设备名就可能变。挂错盘的后果比挂不上更严重——可能把数据盘当空盘格式化了。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">给 XFS 做缩容</div><div class="pd">XFS 不支持缩容，没有任何工具能做。想变小只有备份、重建、恢复。所以用 XFS 时容量规划要保守，或者用 LVM 留出余量。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">把数据库数据目录放在 NFS 上</div><div class="pd">fsync 保证不足、锁恢复不可靠、网络分区分区时进程进 D 状态杀不掉。这不是性能问题，是数据正确性问题，NAS 再快也不行。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用大容量盘组 RAID5</div><div class="pd">重建要十几小时，期间没有冗余，还可能撞上不可恢复读错误导致重建失败。单盘越大越该用 RAID6 或 RAID10。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把对象存储当文件系统：rename、append、并发写</div><div class="pd">rename 是复制加删除且不原子，append 只能整体覆盖，并发写同一 key 是最后写获胜。这三件事都会静默丢数据，而且很难复现。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个有排查过程的讲。「我们有台机器的根分区一直 100%，du 加起来只有 40%。先 df -i 排掉 inode，再 lsof +L1 发现一个已经被 rm 的 60G 日志文件还被 nginx 的 worker 打开着——因为日志轮转脚本用 rm 而不是 truncate。后来改成 logrotate 的 copytruncate，并且在监控里加了 lsof +L1 的检查。这件事让我记住：rm 不等于释放，inode 和块是两笔账。」</p>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="3">
+      <div class="qt">1. df 显示磁盘 100%，但 du 统计出来的总量远小于它。下面哪个<b>不是</b>可能的原因？</div>
+      <button class="opt">文件已被删除，但仍有进程持有它的句柄，数据块未释放</button>
+      <button class="opt">有挂载点把原本有数据的目录盖住了，那些数据仍在原分区占空间</button>
+      <button class="opt">du 统计时跨越了挂载点，把其他文件系统算进来，导致口径不一致</button>
+      <button class="opt">page cache 占用了磁盘块，导致 df 把它算成已使用</button>
+      <div class="ans">正确答案：<b>page cache 不占磁盘块</b>。page cache 是内存里的文件数据缓存，属于内存统计，不会让 df 的磁盘使用率上升。真正的原因通常是：被删未释放（lsof +L1 可见）、挂载点覆盖（du -x 后仍对不上）、du 跨挂载点导致口径不同，以及 ext4 的 5% 保留块（df 的 Avail 已扣除，非 root 用户会提前写失败）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. df -h 显示还有 20% 空间，但写文件报 <span class="k">No space left on device</span>。最可能的原因是？</div>
+      <button class="opt">磁盘有坏道，写不进去</button>
+      <button class="opt">inode 已经用完（df -i 显示 IUse% 100%）</button>
+      <button class="opt">文件系统类型不支持写入</button>
+      <button class="opt">page cache 满了，无法再缓存新数据</button>
+      <div class="ans">正确答案：<b>inode 耗尽</b>。ext4 的 inode 数量在格式化时按比例固定分配，小文件（几十 KB 的图片、日志分片、缓存文件）特别多时，块还没用完 inode 就先满了，而内核报的错误和块满完全一样。所以排查磁盘满必须同时跑 df -h 和 df -i。XFS 的 inode 是动态分配，一般不会出现这种情况。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. 关于 ext4 和 XFS 的扩容缩容，下面哪个说法是对的？</div>
+      <button class="opt">两者都支持在线扩容和在线缩容</button>
+      <button class="opt">ext4 不支持缩容，XFS 支持缩容</button>
+      <button class="opt">XFS 只能扩容不能缩容；ext4 支持缩容，但需要先卸载，并且要先缩文件系统再缩分区</button>
+      <button class="opt">XFS 可以缩容，只是需要先用 xfs_repair 修复</button>
+      <div class="ans">正确答案：<b>XFS 不能缩容</b>。XFS 官方明确不支持缩小文件系统，因为它按分配组管理空间、用 B+ 树索引元数据，结构上假设只增长。ext4 支持缩容，但必须离线（umount 后 e2fsck 再 resize2fs），且顺序是先缩文件系统、再缩分区——顺序反了会破坏数据。两者都支持在线扩容，XFS 用 xfs_growfs（参数是挂载点），ext4 用 resize2fs。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 为什么数据库的数据目录不应该放在 NFS 上？</div>
+      <button class="opt">NFS 的 fsync 落盘保证弱于本地文件系统，文件锁在服务端重启或网络分区时不可靠，hard 模式下进程还会进入不可中断睡眠</button>
+      <button class="opt">因为 NFS 的带宽一定比本地盘低</button>
+      <button class="opt">因为 NFS 不支持大于 2GB 的文件</button>
+      <button class="opt">因为 NFS 只能被一台机器挂载</button>
+      <div class="ans">正确答案：<b>语义问题不是性能问题</b>。数据库的 WAL 依赖「fsync 返回即已持久化」这个承诺，而 NFS 的保证弱于本地文件系统；v3 的锁依赖 NLM，服务端重启后锁恢复不可靠，可能导致两个实例同时写同一份文件；hard 模式在网络分区时会无限重试，进程进入 D 状态，kill -9 都杀不掉。所以即使 NAS 的 IOPS 很高，也不改变这个结论。NFS 适合共享配置、制品、静态资源和只读卷。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. RAID5 的一次随机小块写，为什么相当于 4 次 IO？</div>
+      <button class="opt">因为要同时写 4 块盘做冗余</button>
+      <button class="opt">因为 RAID5 会先把数据压缩再写，压缩要 2 次读写</button>
+      <button class="opt">要读旧数据块和旧校验块，算出新校验，再写新数据块和新校验块，共 2 读 2 写</button>
+      <button class="opt">因为 RAID5 的条带大小固定为 4KB</button>
+      <div class="ans">正确答案：<b>2 读 2 写</b>。RAID5 的校验是异或运算，改一个块就必须知道旧数据和新数据、旧校验，才能算出新校验，因此需要读旧数据、读旧校验、写新数据、写新校验。RAID6 有两份校验所以是 6 次。所以 RAID5 的随机写 IOPS 只有裸盘的四分之一。如果写正好覆盖整个条带（full stripe write），就不需要读旧数据，这是顺序大块写对 RAID5 友好的原因。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 关于对象存储（S3 兼容）的语义，下面哪个说法是对的？</div>
+      <button class="opt">S3 至今仍是最终一致，新建对象后立刻读可能读不到</button>
+      <button class="opt">S3 现在对 PUT 和 DELETE 提供强一致的读后写与 LIST 一致性，但 rename 仍然是复制加删除，不是原子操作</button>
+      <button class="opt">S3 支持对同一个 key 做并发追加写，由服务端保证顺序</button>
+      <button class="opt">S3 的 ETag 永远是文件内容的 MD5，可以用来校验任意大小的文件</button>
+      <div class="ans">正确答案：<b>强一致，但仍不是文件系统</b>。从 2020 年底起 S3 对新建和覆盖 PUT、以及 DELETE 提供强一致的读后写和 LIST 一致性，「最终一致」的说法已经过时。但它依然是扁平 key、整体覆盖的语义：rename 等于复制加删除且不原子，不支持并发追加（最后完成者获胜），分片上传后的 ETag 是「分片 MD5 的 MD5」加「-分片数」后缀，不是整个文件的 MD5。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s13">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:210px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>块存储</b></td><td>裸设备，要自己建文件系统，延迟最低，天然只属于一台机器</td></tr>
+    <tr><td><b>文件存储</b></td><td>POSIX 目录，可多机共享，每次元数据操作都是一次网络往返</td></tr>
+    <tr><td><b>对象存储</b></td><td>HTTP 接口，扁平 key，整体覆盖，能无限扩容但没有目录语义</td></tr>
+    <tr><td><b>inode</b></td><td>存元数据不存文件名；ext4 固定分配、XFS 动态分配</td></tr>
+    <tr><td><b>目录项</b></td><td>存「文件名 → inode 号」的映射，目录本身也是一个文件</td></tr>
+    <tr><td><b>硬链接 / 软链接</b></td><td>多个目录项指向同一 inode / 一个独立文件存目标路径</td></tr>
+    <tr><td><b>lsof +L1</b></td><td>列出链接数小于 1 的打开文件，用来找「已删除但未释放」</td></tr>
+    <tr><td><b>du -x</b></td><td>只统计同一文件系统，不跨挂载点，才能和 df 对比</td></tr>
+    <tr><td><b>挂载点覆盖</b></td><td>新文件系统挂上去会遮住原目录内容，原数据仍在原分区占空间</td></tr>
+    <tr><td><b>data=ordered</b></td><td>ext4 默认日志模式，数据块先于元数据落盘</td></tr>
+    <tr><td><b>reflink</b></td><td>XFS 的写时复制，拷大文件几乎瞬间完成且不占额外空间</td></tr>
+    <tr><td><b>写惩罚</b></td><td>RAID5 一次随机小写要 4 次 IO，RAID6 要 6 次</td></tr>
+    <tr><td><b>URE</b></td><td>不可恢复读错误，重建时要读全盘，撞上就重建失败</td></tr>
+    <tr><td><b>写放大</b></td><td>NAND 实际写入 ÷ 主机写入，GC 搬移会放大它</td></tr>
+    <tr><td><b>TRIM</b></td><td>告诉 SSD 哪些块已无效，减少无谓搬移；要整条链路支持</td></tr>
+    <tr><td><b>预签名 URL</b></td><td>用长期密钥对一次请求签名，无状态，因此不能单独撤销</td></tr>
+    <tr><td><b>分片上传</b></td><td>大文件切成多片上传，支持断点续传，但 ETag 不再是整文件 MD5</td></tr>
+    <tr><td><b>Little's law</b></td><td>队列深度 = IOPS × 延迟，脱离队列深度谈 IOPS 没有意义</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一台虚拟机，加两块盘，做一遍「建 ext4、灌满小文件到 inode 耗尽、用 df -i 确认、再删掉恢复」，然后对比 XFS 同样的操作——亲手看到「块还有余量但写不进去」，这一条就再也忘不掉。② 造一个「被删未释放」的场景：用 <span class="k">tail -f</span> 打开一个大文件，然后 rm 它，观察 df 不动、lsof +L1 能看到、truncate 之后空间立刻回来。③ 在 /data 上写点数据，然后挂一块新盘上去，用 <span class="k">mount --bind / /mnt/rootview</span> 把被遮住的内容找出来——这个技巧在真实故障里救命。<br><br>
+    <b>之后值得单独学：</b>第 02 期讲的是磁盘这一层的排查命令（df、du、iostat 在整条排障链里的位置）；第 04 期讲 IO 模型，能解释为什么 O_DIRECT 和 page cache 的差别会影响数据库；第 17 期讲 MySQL 的存储引擎与 redo log，会把这一篇里的 fsync、写放大、刷脏参数串起来。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 33 期 · 「磁盘满了」有四种原因，「数据不见了」有三种，区别它们靠顺序不靠灵感</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

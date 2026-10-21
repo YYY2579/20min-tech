@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux 故障排查：CPU / 内存 / IO / 磁盘 / 网络五条线</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 2 期</span>
+    <h1>Linux 故障排查：CPU / 内存 / IO / 磁盘 / 网络五条线</h1>
+    <p class="sub">排查不是靠猜，是靠<b>把现象收敛到某一层</b>。这张决策树能省掉 90% 的瞎试。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>5</b> 类现象</span>
+      <span class="chip"><b>30+</b> 条命令</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>1</b> 张决策树</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先回答一句：你说「机器很卡」的时候，卡的是 CPU、磁盘，还是网络？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：先别急着敲命令</h2></div>
+  <p class="lead">凌晨两点电话响，值班的同学说「机器很卡」。你登上机器，手第一下落在哪？大部分人落在 <span class="k">top</span>。这个动作本身没错，但它只是「看一眼」，还称不上排查。排查是<b>带着假设去看</b>：我怀疑哪一层，我用哪个指标证伪它。</p>
+  <p>下面三种现场在同一年里会反复出现，它们的共同点是——<b>你的第一直觉往往指向错误的那一层</b>。</p>
+  <table>
+    <tr><th style="width:150px">现场</th><th style="width:190px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td><b>load 12，CPU 8%</b></td><td>监控坏了，或者 CPU 不够</td><td>一堆进程卡在 D 状态（不可中断睡眠），等的是磁盘或网络文件系统。CPU 确实闲着，但任务是「卡住」而不是「跑满」</td></tr>
+    <tr><td><b>df 说满了，du 找不到</b></td><td>有隐藏目录，或者 du 算错了</td><td>文件被删了，但还有进程握着句柄。目录项没了，inode 和数据块还在，空间不释放</td></tr>
+    <tr><td><b>端口 telnet 通，业务报错</b></td><td>网络没问题，是应用 bug</td><td>三次握手成功只证明「有人在这个端口 listen」。accept 队列满、后端超时、TLS 握手失败，都能在端口通的前提下发生</td></tr>
+  </table>
+  <div class="callout">
+    <b>为什么先讲这三个：</b>它们分别对应「指标误读」「工具盲区」「层次混淆」三类错误。面试里问「你怎么排查」时，能主动说出这三类陷阱的人，比背十条命令的人可信得多——因为这说明你真的被坑过。
+  </div>
+  <p>这一篇的组织方式是：先给一套不会漏项的检查顺序，再按 CPU、内存、IO、磁盘、网络五条线各拆一层，最后收成一张决策树。每条线都落一句「面试怎么答」，因为这个专栏的目的是让你在 20 分钟里拿到能说出口的东西。</p>
+  <p><b>面试落点：</b>这三类陷阱可以当开场白用。「我排查一般先确认现象属于哪一层，因为最常见的三种错误是指标误读、工具盲区和层次混淆」——说完这句，面试官就知道你不是在背命令清单。</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>USE 方法与固定顺序：把「猜」变成「排除」</h2></div>
+  <p class="lead">USE 是 Brendan Gregg 提出的一套检查方法：对每一个资源，看三件事——<b>使用率</b>（Utilization，忙的时间占比）、<b>饱和度</b>（Saturation，排队排到什么程度）、<b>错误</b>（Errors，有没有报错计数）。它真正的价值不是那三个英文单词，而是给你一张<b>不会漏项</b>的表。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>使用率</div><div class="cd">资源忙的时间占比。它只回答「忙不忙」，不回答「排队没有」。80% 的使用率可能很健康，也可能已经在抖。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>饱和度</div><div class="cd">排队有多长。CPU 看 run queue，磁盘看 aqu-sz，网络看 accept 队列。它比使用率更接近用户实际感受到的延迟。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>错误</div><div class="cd">硬件、驱动、协议栈的错误计数。只要错误在增长，先处理错误，别去调性能参数——那是两件事。</div></div>
+  </div>
+  <p>为什么强调「不会漏项」？因为人在紧张时只看得见自己熟悉的东西。熟悉 MySQL 的人会先去翻慢查询，熟悉网络的人会先 tcpdump，结果查了四十分钟才发现是磁盘 inode 满了。<b>固定顺序的作用，是替你抵抗这种偏好。</b></p>
+  <table>
+    <tr><th style="width:90px">资源</th><th>使用率 U</th><th>饱和度 S</th><th>错误 E</th></tr>
+    <tr><td><b>CPU</b></td><td>top 的 us/sy 之和、mpstat 单核</td><td>vmstat 的 r 列、load/核数</td><td>dmesg 里的 MCE、machine check</td></tr>
+    <tr><td><b>内存</b></td><td>free 的 available、/proc/meminfo</td><td>vmstat 的 si/so、PSI 的 memory some</td><td>OOM killer 记录、malloc 失败</td></tr>
+    <tr><td><b>磁盘 IO</b></td><td>iostat -x 的 %util、实际吞吐</td><td>aqu-sz（平均队列长度）、await</td><td>/sys/block/*/device/ioerr_cnt、dmesg</td></tr>
+    <tr><td><b>存储空间</b></td><td>df -h、df -i</td><td>无（空间是硬上限，满了就是满了）</td><td>No space left on device</td></tr>
+    <tr><td><b>网络</b></td><td>sar -n DEV、ip -s link 的带宽</td><td>accept 队列、conntrack 用量、ss 的 Send-Q</td><td>nstat 的重传、drop、ListenOverflows</td></tr>
+  </table>
+  <h3>我自己的固定顺序</h3>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先圈影响面</b>：一台机器还是整个集群？一个接口还是全部？几点开始的？这三个答案能把范围砍掉一半，而且不影响线上任何一个字节。</div></div>
+    <div class="step"><div class="txt"><b>再看最近变更</b>：发布、配置、扩容、证书、DNS。线上 80% 的突发故障和变更有关，先问「十分钟前动了什么」比先看指标快得多。</div></div>
+    <div class="step"><div class="txt"><b>然后过 USE 表</b>：从最可能的那一行开始，但<b>每一行都要给一个结论</b>——正常、异常、还是没数据。没数据本身就是一个发现。</div></div>
+    <div class="step"><div class="txt"><b>收敛到进程</b>：资源异常一定对应到某个 pid。找不到对应进程，说明问题在更下层（内核、驱动、虚拟化层）。</div></div>
+    <div class="step"><div class="txt"><b>验证而不是宣布</b>：改一个变量，看指标是否跟着动。改了没变化，说明你的假设是错的，回去重来——这一步最容易被跳过。</div></div>
+  </div>
+  <div class="callout ok">
+    <b>面试怎么答：</b>「我不会一上来就 top。先用两分钟圈定影响面和最近变更，再按 USE 把 CPU、内存、IO、磁盘、网络过一遍，每一项都要落到具体进程。因为排查的本质是排除法，不是灵感。」
+  </div>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>CPU：load average 是被误读最多的指标</h2></div>
+  <p class="lead">面试官问「load 高怎么办」，十个候选人里八个回答「加 CPU」。这个答案在一种情况下是对的，在另外三种情况下会让你把故障搞大。</p>
+  <p>先把语义说准：Linux 的 load average 统计的是<b>处于可运行状态（R）和不可中断睡眠状态（D）的进程数</b>，再对 1、5、15 分钟做指数衰减平均。它不是 CPU 使用率，也不是「CPU 队列长度」——后者是 Solaris / AIX 上的语义，很多人把两套东西记混了，一张嘴就露馅。</p>
+  <p>D 状态是什么？进程发起一次磁盘读、一次 NFS 调用、一次某些类型的块设备操作时，会进入「不可中断睡眠」，意思是它连信号都不响应，必须等内核把那件事做完。这时候进程占着 load，但不占 CPU。<b>所以 load 高而 CPU 空闲，几乎可以断定有人在等 IO。</b></p>
+  <pre><span class="c"># 1. 先分清是「跑满」还是「卡住」</span>
+uptime                       <span class="c"># 例如 12.4 11.8 9.2：三个窗口都在涨，说明是持续性的</span>
+nproc                        <span class="c"># 8 核的话，load 12 已经排队 1.5 倍</span>
+vmstat 1 5                   <span class="c"># 关键看 r（可运行）、b（D 状态）、wa、si/so</span>
+
+<span class="c"># 2. 如果 b 列一直大于 0、wa 高，去 IO 线看</span>
+ps -eo stat,pid,ppid,wchan:24,comm | awk '$1 ~ /^D/'    <span class="c"># 谁在 D，卡在哪个内核函数</span>
+iostat -x 1 3
+
+<span class="c"># 3. 如果 r 列远大于核数，CPU 真的不够或有人在空转</span>
+mpstat -P ALL 1 3            <span class="c"># 看是全部打满，还是某一个核打满</span>
+pidstat -u 1 5               <span class="c"># 落到进程：%usr 高还是 %system 高</span>
+perf top -p $(pgrep -f java | head -1)   <span class="c"># 看热点函数，需要 perf 和调试符号</span></pre>
+  <p>单核打满是个特别常见的坑。一个单线程的 Python 服务、一个只有一条 Reactor 线程的旧网关、一个 GC 线程受限的 JVM，都能把 8 核机器里的 1 个核吃到 100%，整体 CPU 看着只有 12%，但延迟已经崩了。<span class="k">mpstat -P ALL</span> 一眼就能看出来，而 <span class="k">top</span> 的默认汇总视图会把它平均掉。</p>
+  <table>
+    <tr><th style="width:160px">现象</th><th>大概率的原因</th><th>下一步</th></tr>
+    <tr><td>%us 高、%sy 低</td><td>应用自己在算：死循环、正则回溯、大 JSON 序列化、GC</td><td>pidstat -u 找进程 → perf top 找函数 → 线程栈（jstack / py-spy）</td></tr>
+    <tr><td>%sy 高</td><td>系统调用太频繁、锁竞争、上下文切换多</td><td>vmstat 看 cs 和 in；pidstat -w 看自愿/非自愿切换；strace -c 统计调用</td></tr>
+    <tr><td>%wa 高</td><td>等磁盘或网络文件系统</td><td>直接转 IO 线，不要在 CPU 上花时间</td></tr>
+    <tr><td>%si 高</td><td>软中断：网卡收包压力大</td><td>cat /proc/softirqs 看 NET_RX；考虑多队列、RPS、减少小包</td></tr>
+    <tr><td>%st 高</td><td>宿主机把 CPU 抢走了（你在虚机/容器里）</td><td>这不是你的问题，找平台方要资源或换规格</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>别急着调优先级。</b>有人一见 load 高就 <span class="k">renice</span> 或把进程绑核，这只是在挪排队顺序，吞吐不会变好，还可能把另一个服务拖慢。先定位是「算得太多」还是「等得太久」，这两种的处理方向完全相反。
+  </div>
+  <p><b>面试落点：</b>「load 高我先看 vmstat 的 b 列和 wa。如果 b 大于 0、CPU 空闲，那是 D 状态进程在等 IO，加 CPU 一点用没有；如果 r 远大于核数、us 高，那才是真的算不过来。判断完再决定是优化代码、加副本，还是查磁盘。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>内存：free 那一列不是「可用内存」</h2></div>
+  <p class="lead">「内存只剩 200M 了，快挂了」——这句话每天在无数群里出现，其中大部分是误判。Linux 会把空闲内存拿去做 page cache，这是设计，不是故障。</p>
+  <p><span class="k">free -h</span> 的 <b>free</b> 列是「完全没被用过的内存」，<b>buff/cache</b> 是「用来缓存文件数据、但随时可以回收的内存」，<b>available</b> 才是「在不触发换页的前提下，大概还能申请到多少」。判断内存够不够，只看 available。</p>
+  <pre><span class="c"># 看 available，不看 free</span>
+free -h
+<span class="c">#               total        used        free      shared  buff/cache   available</span>
+<span class="c"># Mem:           15Gi       9.1Gi       210Mi       380Mi       6.2Gi       5.8Gi</span>
+
+<span class="c"># 真正的换页信号：si/so 持续不为 0</span>
+vmstat 1 5                   <span class="c"># si=从 swap 读入, so=写入 swap，长期大于 0 才叫在换页</span>
+
+<span class="c"># 拆开看内存都被谁占了</span>
+grep -E 'MemTotal|MemAvailable|^Cached|^Dirty|^Writeback|^Slab|^SReclaimable|^AnonPages' /proc/meminfo
+
+<span class="c"># 找内存大户（RSS 会把共享库重复计算，PSS 更准）</span>
+ps -eo rss,pid,comm --sort=-rss | head -10
+smem -tk 2>/dev/null | tail -5</pre>
+  <p>几个必须分清的判断：</p>
+  <ul>
+    <li><b>buff/cache 大不是问题。</b>它会在别人需要内存时被回收。真正不可回收的是 Dirty（还没落盘的脏页）和内核的不可回收 slab，这两块突然变大才值得警惕。</li>
+    <li><b>si/so 是换页，不是 swap 使用量。</b>swap 里躺着 2G 数据但 si/so 为 0，说明那是很早以前换出去的冷页，不影响性能；反过来 swap 只用了 200M 但 si/so 一直在跳，说明系统在反复颠簸（thrashing），这比 OOM 更难受——它不杀进程，只是让一切变慢。</li>
+    <li><b>RSS 会被高估。</b>多个进程映射同一个 so 或同一份 mmap 文件时，RSS 会各算一遍。要准确看 PSS（<span class="k">smem</span> 或 <span class="k">/proc/PID/smaps_rollup</span>）。</li>
+  </ul>
+  <h3>OOM killer：它不是随机杀人</h3>
+  <p>内存真的不够时，内核会挑一个进程杀掉。挑选依据是 <span class="k">oom_score</span>，用户可以用 <span class="k">oom_score_adj</span>（范围 -1000 到 1000）调整权重，-1000 表示「尽量别杀我」。注意 <b>adj 是 bias 不是绝对优先级</b>，把它设成 -1000 也不能保证一定不被杀。</p>
+  <pre><span class="c"># 谁被杀了、杀了多大</span>
+dmesg -T | grep -i -E 'killed process|out of memory'
+journalctl -k --since "1 hour ago" | grep -i oom
+
+<span class="c"># 容器场景：cgroup 级 OOM 先发生，宿主机看不到全局 OOM</span>
+cat /sys/fs/cgroup/memory.max                      <span class="c"># cgroup v2</span>
+cat /sys/fs/cgroup/memory.events                   <span class="c"># 看 oom / oom_kill 计数</span>
+
+<span class="c"># 调整某个进程的权重（-1000 ~ 1000）</span>
+echo -500 &gt; /proc/$(pgrep -f myapp)/oom_score_adj</pre>
+  <div class="callout danger">
+    <b>线上别 echo 3 &gt; /proc/sys/vm/drop_caches。</b>它会把 page cache 全清掉，接下来所有读请求都打回磁盘，延迟瞬间抬高，而且缓存很快又会被填满——你只是制造了一次抖动，什么也没解决。要验证「是不是缓存导致内存高」，看 available 就够了。
+  </div>
+  <p><b>面试落点：</b>「判断内存够不够看 available，不看 free。buff/cache 是可回收的，free 小是正常的。真正的危险信号是 si/so 持续非 0（在颠簸），或者 dmesg 里出现 oom-killer。容器里还要看 cgroup 的 memory.max 和 memory.events，因为容器 OOM 常常不体现在宿主机层面。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>IO：await、util、aqu-sz 三个数怎么一起读</h2></div>
+  <p class="lead">磁盘这条线最容易「看错数」。因为 iostat 输出的列名很像，含义却差很远；更麻烦的是，<b>同一个 %util，在机械盘和 NVMe 上代表的含义完全不同</b>。</p>
+  <pre><span class="c"># -x 出扩展指标，1 秒一次，共 5 次</span>
+iostat -x 1 5
+<span class="c"># Device  r/s   rkB/s  r_await  w/s   wkB/s  w_await  aqu-sz  %util</span>
+<span class="c"># sda    120   4800.0     1.20  860  34000.0    18.60    8.42   99.8</span>
+
+<span class="c"># 老版本 sysstat 里这一列叫 avgqu-sz，新版本叫 aqu-sz，是同一个东西</span>
+<span class="c"># 压力更大时用 PSI 看「有多少时间在等 IO」</span>
+cat /proc/pressure/io</pre>
+  <table>
+    <tr><th style="width:110px">指标</th><th>它到底在说什么</th><th>怎么用</th></tr>
+    <tr><td><b>await</b></td><td>一个 IO 从提交到完成平均花了多少毫秒，<b>包含排队时间</b></td><td>和业务延迟对比。await 涨、吞吐不涨，就是排队了</td></tr>
+    <tr><td><b>r_await / w_await</b></td><td>读写分开的 await</td><td>写慢多半是 fsync 或日志盘；读慢可能是缓存没命中</td></tr>
+    <tr><td><b>aqu-sz</b></td><td>平均有多少个 IO 在队列里等</td><td>持续大于 1~2 说明设备处理不过来，是<b>饱和度</b>最直接的证据</td></tr>
+    <tr><td><b>%util</b></td><td>设备「有 IO 在处理」的时间占比</td><td>机械盘接近 100% 基本等于饱和；NVMe/RAID 因为能并行，100% 也可能还有余量</td></tr>
+    <tr><td><b>svctm</b></td><td>老版本里的服务时间</td><td>官方早已标注不可信，新版本已移除，<b>别拿它下结论</b></td></tr>
+  </table>
+  <p>为什么 %util 会误导？它的算法大致是「设备忙的累计时间 / 总时间」。一块能同时处理几十个请求的 NVMe，只要一直有请求在飞，这个比例就会贴着 100%，但它其实还能再塞更多。这时候该看的是 <b>await 有没有随着并发上升而变长</b>——变长了才是真饱和，没变长说明还在线性区。</p>
+  <p>定位到进程只有一条路：<b>找 D 状态</b>。</p>
+  <pre><span class="c"># 谁在等 IO，等在内核的哪个函数上</span>
+ps -eo stat,pid,ppid,wchan:28,comm | awk '$1 ~ /^D/'
+cat /proc/12345/stack 2>/dev/null      <span class="c"># 需要 root，能看到内核调用栈</span>
+
+<span class="c"># 按进程看实际读写量（-o 只显示有 IO 的，-P 按进程，-a 累计）</span>
+iotop -oPa
+
+<span class="c"># 块层视角：谁在发 IO、发多大、合并情况</span>
+cat /proc/diskstats
+blktrace -d /dev/sda -o - | blkparse -i -   <span class="c"># 需要装 blktrace，开销不小，短时间用</span></pre>
+  <div class="callout warn">
+    <b>文件系统层和块设备层不是一回事。</b>iostat 看的是块设备，一次 4K 随机写可能在文件系统层被日志、extent 分配放大成好几次 IO；反过来，page cache 命中时应用觉得「写完了」，iostat 上什么也看不到。所以「应用慢但 iostat 很闲」是成立的，这时候要看 fsync 次数和文件系统日志，而不是怀疑 iostat 坏了。
+  </div>
+  <p><b>面试落点：</b>「我先看 aqu-sz 和 await，再看 %util。%util 对能并行的 SSD 会高估饱和度，所以我更信『await 随并发上升而变长』这个信号。定位到进程之后看 wchan，能知道它是卡在文件读写、fsync 还是网络文件系统上。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>磁盘：df 和 du 打架，多半是句柄没放</h2></div>
+  <p class="lead">这是运维面试的保留曲目：「df 显示磁盘满了，du 加起来只有一半，为什么？」答不上来，说明你没在真实环境里删过日志。</p>
+  <p>机制很简单：Linux 里文件名是目录项，指向 inode，inode 再指向数据块。<b>删一个文件，只是把目录项摘掉、把 inode 的链接计数减一</b>；只要还有进程握着这个文件的句柄（fd），链接计数就不为 0，数据块不会释放。于是 df 按「已分配块」算，空间还是满的；du 按「目录树」遍历，根本看不到这个文件。</p>
+  <pre><span class="c"># 1. 确认是「块满了」还是「inode 满了」——两者报错一样，原因完全不同</span>
+df -h
+df -i
+
+<span class="c"># 2. 找已删除但仍被打开的文件（link count = 0）</span>
+lsof +L1
+<span class="c"># COMMAND  PID USER   FD   TYPE DEVICE   SIZE NLINK   NAME</span>
+<span class="c"># nginx   8123 root    5w   REG  253,0  18.4G     0 /var/log/nginx/access.log (deleted)</span>
+
+<span class="c"># 没有 lsof 时的兜底：直接翻 fd 目录</span>
+find /proc/*/fd -ls 2&gt;/dev/null | grep deleted | head
+
+<span class="c"># 3. 处理：让进程重新打开文件，而不是删了再删</span>
+<span class="c">#    正确姿势1：truncate 文件（如果路径还在）</span>
+: &gt; /var/log/nginx/access.log
+<span class="c">#    正确姿势2：reload/restart 进程，让它重新打开</span>
+nginx -s reopen</pre>
+  <div class="callout danger">
+    <b>别用 rm 处理正在写的日志。</b><span class="k">rm</span> 摘掉目录项，进程还握着 fd，空间一点不还，你会在十分钟后再收到一次「磁盘满」。要么用 <span class="k">: &gt; file</span> 截断，要么让进程 reopen。日志轮转配置里的 <span class="k">copytruncate</span> 就是为这个场景准备的（代价是复制期间可能丢几行）。
+  </div>
+  <h3>inode 满：另一种「没空间」</h3>
+  <p>报错同样是 <b>No space left on device</b>，但 <span class="k">df -h</span> 显示还有一半空间——因为 inode 用完了。典型制造者：session 文件、邮件队列、缓存小文件、跑飞的临时文件。<span class="k">df -i</span> 的 IUse% 会直接告诉你。找凶手用「按目录数文件」：</p>
+  <pre><span class="c"># 当前目录下每个子目录的文件数，从多到少</span>
+for d in */; do echo "$(find "$d" -xdev | wc -l)  $d"; done | sort -rn | head
+
+<span class="c"># du 不要跨文件系统，否则挂载点会被重复统计</span>
+du -x -h --max-depth=1 / | sort -h | tail -10
+
+<span class="c"># ext4 默认给 root 保留 5% 空间，纯数据盘可以调小</span>
+tune2fs -m 1 /dev/sdb1</pre>
+  <p>还有一个常被忽略的点：<b>磁盘满会让一切变慢，而不只是写失败。</b>ext4 在空间紧张时分配策略退化，日志写入可能阻塞，数据库直接进入只读或者报错。所以「还剩 2%」就已经是故障状态了，容量告警应该设在 80%~85%，而不是 95%。</p>
+  <p><b>面试落点：</b>「df 和 du 不一致，我第一反应是文件被删但句柄没释放，用 lsof +L1 确认，然后 truncate 或让进程 reopen。同时我会先 df -i 排除 inode 满，因为这两种情况报错文案一样，但处理方式完全不同。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>网络：ss 的三个数就够判断大半</h2></div>
+  <p class="lead">网络排查在单机上不需要上来就 tcpdump。先用 <span class="k">ss</span> 看三件事：<b>监听在不在、连接堆在哪、队列堵不堵</b>。这三个看完了，八成问题已经有方向。</p>
+  <pre><span class="c"># 总览：各状态各有多少</span>
+ss -s
+
+<span class="c"># 谁在监听哪个端口（-l listen, -n 数字, -t tcp, -p 进程）</span>
+ss -lntp
+
+<span class="c"># 当前连接状态分布，按状态聚合</span>
+ss -tan | awk 'NR&gt;1{print $1}' | sort | uniq -c | sort -rn
+
+<span class="c"># 只看某状态的连接（注意 state 后面接的是内核里的状态名）</span>
+ss -tan state established '( sport = :8080 )' | wc -l
+ss -tan state time-wait | wc -l</pre>
+  <table>
+    <tr><th style="width:120px">你看到的</th><th>含义</th><th>该查什么</th></tr>
+    <tr><td><b>LISTEN 的 Recv-Q</b></td><td>已经完成三次握手、但应用还没 accept 的连接数</td><td>把它和 Send-Q（backlog 上限）比。贴近上限就是 accept 太慢</td></tr>
+    <tr><td><b>LISTEN 的 Send-Q</b></td><td>listen backlog 的上限值</td><td>应用层 backlog 与内核 somaxconn 取小值，两边都要够</td></tr>
+    <tr><td><b>ESTAB 的 Recv-Q</b></td><td>内核收到了但应用还没读走的字节数</td><td>持续很大说明应用读得慢，是应用层问题</td></tr>
+    <tr><td><b>ESTAB 的 Send-Q</b></td><td>已发出但还没被对端确认的字节数</td><td>持续很大说明对端收得慢或链路拥塞</td></tr>
+    <tr><td><b>大量 CLOSE_WAIT</b></td><td>对端关了，本端没调 close</td><td>代码 bug（连接泄漏），不是内核参数问题</td></tr>
+  </table>
+  <p>accept 队列溢出是最隐蔽的一类：客户端看到的是「连接超时」，服务端 <span class="k">ss</span> 里看不出任何异常，因为连接压根没被建立到应用层。它记在计数器里：</p>
+  <pre><span class="c"># 半连接/全连接队列溢出、重传、丢包，都在这</span>
+nstat -az | grep -i -E 'ListenOverflows|ListenDrops|RetransSegs|TCPTimeouts'
+netstat -s | grep -i -E 'listen|retrans'
+
+<span class="c"># 网卡层面的丢包与错误</span>
+ip -s link show eth0
+ethtool -S eth0 | grep -i -E 'drop|err|miss|fifo'
+
+<span class="c"># conntrack 表满会静默丢包，dmesg 里有 nf_conntrack: table full</span>
+cat /proc/sys/net/netfilter/nf_conntrack_count
+cat /proc/sys/net/netfilter/nf_conntrack_max</pre>
+  <div class="callout">
+    <b>分层再记一遍：</b>链路（网线/网卡）→ IP（路由/防火墙）→ 端口（listen/队列）→ 协议（重传/MTU）→ 应用（超时/序列化）。<span class="k">ping</span> 通只覆盖到 IP 层，<span class="k">telnet</span> 通只覆盖到端口层，两者都通而业务失败，问题一定在上面两层。
+  </div>
+  <p><b>面试落点：</b>「我先 ss -lntp 确认监听，再看 ss -s 的状态分布和 Recv-Q，然后查 nstat 的 ListenOverflows 和重传。ping 通不等于没问题，它只证明 ICMP 那一层通。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>进程与系统调用：把「慢」翻译成具体的等待</h2></div>
+  <p class="lead">前面五条线最终都要落到一个进程上。<span class="k">ps</span> 只告诉你它在不在，<span class="k">/proc</span> 和 <span class="k">strace</span> 才告诉你它在等什么。</p>
+  <table>
+    <tr><th style="width:70px">状态</th><th>含义</th><th>排查意义</th></tr>
+    <tr><td><b>R</b></td><td>正在运行或可运行</td><td>很多 R 且核数不够，才是 CPU 瓶颈</td></tr>
+    <tr><td><b>S</b></td><td>可中断睡眠，等事件</td><td>正常。睡在 epoll_wait 上的服务大部分时间是 S</td></tr>
+    <tr><td><b>D</b></td><td>不可中断睡眠</td><td>等 IO。连 kill -9 都要等它醒过来</td></tr>
+    <tr><td><b>T</b></td><td>被 SIGSTOP 停住</td><td>有人调试或用 kill -STOP 冻过</td></tr>
+    <tr><td><b>Z</b></td><td>僵尸，已退出但父进程没 wait</td><td>占 pid 不占资源，多了会耗尽 pid</td></tr>
+    <tr><td><b>I</b></td><td>内核线程的空闲态（较新内核）</td><td>不占 load，别把它当成异常</td></tr>
+  </table>
+  <pre><span class="c"># 进程的完整画像：内存、线程数、上下文切换、fd 用量</span>
+cat /proc/12345/status | grep -E 'State|VmRSS|Threads|voluntary'
+cat /proc/12345/limits | grep -E 'open files|processes'
+ls /proc/12345/fd | wc -l
+
+<span class="c"># 它打开了哪些文件、哪个端口</span>
+lsof -p 12345 | head -30
+lsof -i :8080
+
+<span class="c"># 线程视图：哪个线程在吃 CPU</span>
+top -H -p 12345
+ps -L -p 12345 -o tid,stat,pcpu,comm | sort -k3 -rn | head</pre>
+  <p><span class="k">strace</span> 是「翻译器」：它把进程的每一次系统调用打出来，你能直接看到它在 <span class="k">read</span> 上等了 3 秒，或者在疯狂 <span class="k">stat</span> 同一个不存在的路径。</p>
+  <pre><span class="c"># 统计模式：哪些系统调用最耗时、失败最多——先看这个，开销相对可控</span>
+strace -c -p 12345
+<span class="c"># % time     seconds  usecs/call     calls    errors syscall</span>
+<span class="c">#  92.31    8.421000      4210.5      2000           futex</span>
+
+<span class="c"># 跟踪模式：带时间戳、带耗时、跟子进程</span>
+strace -f -tt -T -p 12345 -e trace=network,file
+<span class="c"># 只盯某个调用，减少噪音</span>
+strace -f -T -e trace=connect,recvfrom -s 200 -p 12345</pre>
+  <div class="callout warn">
+    <b>strace 是靠 ptrace 让目标进程停下来的，开销可能是几倍到几十倍。</b>在生产核心进程上直接挂，等于自己制造一次故障。要挂就限时间（<span class="k">timeout 10 strace ...</span>）、限调用（<span class="k">-e trace=</span>）、先挑一台流量小的实例。面试里主动说出这个限制，比背参数加分。
+  </div>
+  <p>还有一类「慢」是 fd 泄漏：进程 <span class="k">ls /proc/PID/fd | wc -l</span> 一路涨到 <span class="k">limits</span> 里的上限，然后开始报 <b>Too many open files</b>。<span class="k">ulimit -n</span> 只影响当前 shell 及其子进程，systemd 起的服务要改 unit 里的 <span class="k">LimitNOFILE</span>，这是很多人改了没生效的原因。</p>
+  <p><b>面试落点：</b>「应用慢的时候我会看它在哪个状态。S 是正常的等事件，D 是等 IO，R 多才是 CPU 不够。然后用 /proc/PID 看线程数、fd 用量和 limits，最后才上 strace，而且会限时间和限调用范围。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>内核日志：OOM、hung task、丢包都在这里留了证据</h2></div>
+  <p class="lead">应用日志告诉你「它认为自己出了什么问题」，内核日志告诉你「内核替它做了什么决定」。很多「莫名其妙重启」「莫名丢连接」，答案只在 dmesg 里。</p>
+  <pre><span class="c"># -T 把单调时钟换算成人类时间（注意：休眠/时钟调整后可能对不准）</span>
+dmesg -T | tail -50
+dmesg -T -l err,warn | tail -50          <span class="c"># 只看错误和警告级别</span>
+
+<span class="c"># systemd 系统上，内核日志也在 journal 里，好处是能按时间窗过滤</span>
+journalctl -k -p err --since "30 min ago"
+journalctl --since "2026-10-21 02:00" --until "2026-10-21 02:30" -p warning
+
+<span class="c"># 关键字搜索：这几类信息值得记住长相</span>
+dmesg -T | grep -i -E 'oom|killed process|hung task|soft lockup|call trace'</pre>
+  <table>
+    <tr><th style="width:150px">日志长相</th><th>含义</th><th>处置方向</th></tr>
+    <tr><td>Out of memory: Killed process</td><td>OOM killer 动手了，后面会带 pid、进程名和总虚拟内存</td><td>看是谁吃了内存、有没有 limit、是不是泄漏</td></tr>
+    <tr><td>blocked for more than 120 seconds</td><td>hung task：某进程在 D 状态超过阈值（默认 120s）</td><td>基本等于存储或驱动卡死，查内核栈和硬件</td></tr>
+    <tr><td>BUG: soft lockup</td><td>某个 CPU 在内核态长时间不让出</td><td>驱动 bug 或内核 bug，看调用栈，考虑升级内核</td></tr>
+    <tr><td>nf_conntrack: table full</td><td>连接跟踪表满，新连接被丢</td><td>调大 max 或缩短 established 超时，先确认为什么连接这么多</td></tr>
+    <tr><td>TCP: too many orphaned sockets</td><td>孤儿连接太多，内存压力</td><td>查短连接、TIME_WAIT 复用、tcp_max_orphans</td></tr>
+    <tr><td>mce / EDAC / I/O error</td><td>硬件层错误：内存位翻转、磁盘坏道</td><td>换硬件，别在软件层兜圈子</td></tr>
+  </table>
+  <p>有个现实问题：dmesg 是环形缓冲区，量大了会覆盖。默认大小通常只有几百 KB，高频报错几分钟就能把最早的证据冲掉。如果你要事后复盘，得确认 <span class="k">kernel.printk</span> 和 rsyslog/journald 有没有把 kern 日志落盘，而不是等出事了再敲 dmesg。</p>
+  <div class="callout ok">
+    <b>一个习惯：</b>处理完任何一次故障，把当时的 <span class="k">dmesg -T | tail -100</span> 和 <span class="k">journalctl -k --since</span> 存一份到工单里。三个月后再出同类问题，这份日志比你的记忆可靠得多。
+  </div>
+  <p><b>面试落点：</b>「应用无故重启，我会先看 dmesg 里有没有 oom-killer 和 hung task。这两个是内核替应用做的决定，应用自己的日志里通常什么都没有。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>一张决策树：从现象到第一条命令</h2></div>
+  <p class="lead">把前面五条线收成一张图。它的用法是：<b>不要从头读，从你手上的现象那一行进去</b>。</p>
+  <pre>「机器/服务慢」
+│
+├─ 先问：影响面多大？多久了？十分钟前改了什么？
+│   （这三问不改任何东西，但能砍掉一半排查量）
+│
+├─ load 高？
+│   ├─ CPU 也高（us+sy）──────► 算不过来：pidstat -u → perf top → 线程栈
+│   ├─ CPU 低、b 列 &gt; 0 ──────► 等 IO：ps 找 D → iostat -x → 设备/存储
+│   ├─ %st 高 ────────────────► 宿主机抢资源：找平台方，别自己调参
+│   └─ 只有某 1 核满 ─────────► 单线程瓶颈：mpstat -P ALL 确认后改并发模型
+│
+├─ 内存告警？
+│   ├─ available 还够 ────────► 正常，buff/cache 可回收，别动 drop_caches
+│   ├─ si/so 持续非 0 ────────► 在颠簸：查谁在占内存、limit 是否过小
+│   └─ dmesg 有 Killed ───────► OOM：看 oom_score、容器 memory.max
+│
+├─ 磁盘告警？
+│   ├─ df -h 满、du 不满 ─────► lsof +L1 → truncate 或 reopen
+│   ├─ df -i 满 ──────────────► inode 耗尽：找小文件目录
+│   └─ 都正常但写慢 ──────────► fsync/日志盘：iostat 看 w_await
+│
+├─ 网络告警？
+│   ├─ ss -lntp 没监听 ───────► 进程没起来 / 绑错地址（127.0.0.1 vs 0.0.0.0）
+│   ├─ LISTEN Recv-Q 贴近上限 ► accept 太慢：应用线程/backlog
+│   ├─ 大量 CLOSE_WAIT ───────► 代码没 close，改代码不是改内核参数
+│   ├─ ListenOverflows 增长 ──► 队列溢出：somaxconn + 应用 backlog
+│   └─ 重传/丢包在涨 ─────────► ip -s link、ethtool -S、conntrack
+│
+└─ 都正常，但应用就是慢？
+    └─ 进进程：/proc/PID/{status,limits,fd} → strace -c → 应用自身日志/链路追踪</pre>
+  <table>
+    <tr><th style="width:170px">现象</th><th style="width:170px">第一条命令</th><th>看完再决定</th></tr>
+    <tr><td>「特别卡」但说不清哪卡</td><td>uptime + vmstat 1 5</td><td>b 列、wa、si/so，三个数决定往哪条线走</td></tr>
+    <tr><td>接口 P99 突然翻倍</td><td>先看变更记录，再看 ss -s</td><td>没有变更就查连接状态分布和 accept 队列</td></tr>
+    <tr><td>磁盘告警</td><td>df -h; df -i</td><td>两种「满」的处理完全不同</td></tr>
+    <tr><td>进程被重启</td><td>dmesg -T | grep -i oom</td><td>有 OOM 就查内存，没有就查退出码和 supervisor 日志</td></tr>
+    <tr><td>写文件报错</td><td>df -h; ls -ld 目标目录</td><td>空间、inode、权限、只读挂载（ro）四选一</td></tr>
+  </table>
+  <div class="cmds">
+    <div class="crow"><code>uptime</code><span class="desc">三个 load 值加运行时长，判断是突发还是已经持续几个小时</span><button class="copy">复制</button></div>
+    <div class="crow"><code>vmstat 1 5</code><span class="desc">r、b、si、so、wa 五个数，一刀切开「算不过来」和「等太久」</span><button class="copy">复制</button></div>
+    <div class="crow"><code>iostat -x 1</code><span class="desc">await 与 aqu-sz，看设备到底排没排队</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ps -eo stat,pid,wchan:28,comm | awk '$1 ~ /^D/'</code><span class="desc">谁卡在 D 状态，卡在内核的哪个函数上</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -s</code><span class="desc">连接状态分布，先扫一眼有没有 CLOSE_WAIT 堆积</span><button class="copy">复制</button></div>
+    <div class="crow"><code>lsof +L1</code><span class="desc">已删除但句柄没放的文件，df 满而 du 不满时的第一选择</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout">
+    <b>决策树的价值在「剪枝」，不在「全」。</b>面试时你不可能背完整棵树，但你可以说清楚「我先用哪两个指标把范围劈成两半」。这种表达方式比罗列命令有说服力得多。
+  </div>
+  <p><b>面试落点：</b>「我的排查顺序是先圈影响面和变更，再用 load 和 IO 等待把问题劈成『算不过来』和『等太久』两类，然后顺着一条线走到具体进程。每一层我都要拿到一个明确的结论，拿不到就说明还差一个观测手段。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：面试官最爱在这里追问</h2></div>
+  <p class="lead">下面这些不是知识错误，是判断错误。它们的共同点是：<b>动作很快，方向错了</b>，在线上会直接放大故障。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">load 高就加 CPU</div><div class="pd">load 里含 D 状态进程。IO 卡住时 load 能到几十，CPU 却闲得发慌。加机器只会让更多进程一起去等同一块磁盘。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">看 free 的 free 列判断内存不足</div><div class="pd">那一列是「完全没用过的内存」。Linux 主动拿空闲内存做 page cache，free 接近 0 是常态。要看 available。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">觉得 buff/cache 大就 drop_caches</div><div class="pd">缓存是可回收的，清掉只会让后续读请求打回磁盘，制造一次延迟抖动，几分钟后缓存又长回来。问题一点没解决。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">df 满了就 rm 正在写的日志</div><div class="pd">文件被删但句柄还在，空间不释放。十分钟后你会收到第二张工单。正确做法是 truncate 或让进程 reopen。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">%util 100% 就断定磁盘到极限</div><div class="pd">这个指标对能并行的 SSD/NVMe 会高估饱和度。更可靠的信号是 await 随并发上升而变长、aqu-sz 持续大于 1。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">直接在生产核心进程上挂 strace</div><div class="pd">ptrace 会让目标进程反复停下来，开销可能几倍到几十倍，一次排查变成一次事故。要限时间、限调用、挑低流量实例。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">ping 通就说网络没问题</div><div class="pd">ICMP 通只证明到 IP 层。端口没监听、accept 队列满、TLS 握手失败，全都能在 ping 通的前提下发生。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">CLOSE_WAIT 多去调内核参数</div><div class="pd">CLOSE_WAIT 是「对端关了、本端没 close」，这是应用没释放连接，改 tcp_fin_timeout 之类完全无效。TIME_WAIT 多才是主动关闭 + 短连接。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">先重启再说</div><div class="pd">重启会把现场（D 状态进程、fd、内核日志中的计数）全部抹掉。除非影响面在扩大且没有其他止血手段，否则先留证据再动手。</div></div></div>
+  <p><b>面试落点：</b>「你踩过什么坑」这类问题，答一个具体的、有前后因果的就够了。比如「我用 rm 删过一次正在写的 access.log，df 一点没降，后来才知道是句柄没释放」——比罗列五个坑名可信得多，因为它带着你当时的错误判断。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 8 核机器 load average 是 12，top 显示 CPU 使用率 8%，%wa 也不高。最可能的情况是？</div>
+      <button class="opt">监控采集有问题，load 不可能高于 CPU 使用率这么多</button>
+      <button class="opt">CPU 核数多，load 被平均掉了，属于正常</button>
+      <button class="opt">有大量进程处于 D 状态，卡在磁盘、NFS 或某些块设备操作上</button>
+      <button class="opt">内存不足导致频繁换页，CPU 在等 swap</button>
+      <div class="ans">正确答案：<b>D 状态进程堆积</b>。Linux 的 load 统计「可运行 + 不可中断睡眠」的进程数，D 状态进程等 IO 时既不占 CPU 也照样计入 load，所以会出现 load 高、CPU 闲的组合。换页会体现在 si/so 和 %wa 上，与题干的「%wa 也不高」不符。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 判断一台机器内存是否紧张，应该看 free -h 的哪一列？</div>
+      <button class="opt">free 列，它表示还剩多少空闲内存</button>
+      <button class="opt">available 列，它估算的是在不触发换页的前提下还能申请到多少</button>
+      <button class="opt">buff/cache 列，它越小越安全</button>
+      <button class="opt">shared 列，共享内存是主要消耗</button>
+      <div class="ans">正确答案：<b>available</b>。free 列只是「完全没被用过」的内存，Linux 会主动把空闲内存用作 page cache，所以 free 很小是正常的；buff/cache 大部分可回收；available 才是内核给出的「还能用多少」的估算。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. <span class="k">df -h</span> 显示磁盘 100%，但 <span class="k">du -sh /*</span> 加起来只有一半。下一步最该做什么？</div>
+      <button class="opt">用 find 找隐藏文件，多半是被 . 开头的目录占了</button>
+      <button class="opt">重启机器，让内核重新统计磁盘占用</button>
+      <button class="opt">用 lsof +L1 查已删除但仍被进程持有的文件</button>
+      <button class="opt">执行 fsck 修复文件系统元数据</button>
+      <div class="ans">正确答案：<b>lsof +L1</b>。文件被删除后，只要还有进程握着 fd，inode 和与其链接的数据块就不会释放：df 按已分配块统计仍然满，du 遍历目录树看不到它。确认后 truncate 该文件或让进程 reopen，而不是重启。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. iostat -x 显示某 NVMe 盘 %util 长期 99%，但业务延迟没有明显变化。应该怎么判断？</div>
+      <button class="opt">%util 是按「设备忙时间」估算的，对可并行处理的设备会高估饱和度，要看 await 和 aqu-sz 是否随并发恶化</button>
+      <button class="opt">%util 99% 就是磁盘饱和，立刻扩容或换盘</button>
+      <button class="opt">%util 只对机械盘有效，SSD 上应该直接忽略所有 iostat 指标</button>
+      <button class="opt">说明有进程在疯狂读写，用 kill -9 杀掉即可</button>
+      <div class="ans">正确答案：<b>看 await 和 aqu-sz</b>。%util 近似等于「有 IO 在处理的时间占比」，能并行的 SSD/NVMe 只要一直有请求在飞就会贴着 100%，并不代表没有余量。真正的饱和信号是排队变长、await 上升、吞吐不再增长。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">5. 写文件时报 <b>No space left on device</b>，但 <span class="k">df -h</span> 显示还有 40% 空闲。最可能的原因是？</div>
+      <button class="opt">磁盘有坏道，写入被内核拒绝</button>
+      <button class="opt">文件系统被挂载成了只读</button>
+      <button class="opt">目录权限不足，root 也不能写</button>
+      <button class="opt">inode 耗尽，用 df -i 可以看到 IUse% 到 100%</button>
+      <div class="ans">正确答案：<b>inode 耗尽</b>。块空间和 inode 是两套独立资源，海量小文件（session、缓存、邮件队列）会把 inode 用光，报错文案和空间不足完全一样。用 df -i 一眼确认，然后再去找是哪个目录在制造小文件。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 服务端 <span class="k">ss -s</span> 显示大量 CLOSE_WAIT，正确的判断是？</div>
+      <button class="opt">主动关闭太多，应该调小 tcp_fin_timeout 加快回收</button>
+      <button class="opt">对端已关闭连接而本端没有调用 close，属于应用层连接泄漏，要改代码</button>
+      <button class="opt">说明遭受了 SYN Flood，需要开启 syncookies</button>
+      <button class="opt">说明端口耗尽，需要扩大本地端口范围</button>
+      <div class="ans">正确答案：<b>应用没 close</b>。CLOSE_WAIT 表示本端收到了对端的 FIN、回了 ACK，但应用始终没有调用 close，所以停在这个状态不动。它和内核参数基本无关，堆得越多说明泄漏越严重。TIME_WAIT 才是主动关闭方的正常状态。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>USE</b></td><td>对每个资源检查使用率、饱和度、错误三项的方法论，用来保证不漏项</td></tr>
+    <tr><td><b>load average</b></td><td>Linux 上「可运行 + 不可中断睡眠」进程数的 1/5/15 分钟指数衰减平均</td></tr>
+    <tr><td><b>D 状态</b></td><td>不可中断睡眠，进程在等内核完成一件不能被打断的事（典型是磁盘或 NFS）</td></tr>
+    <tr><td><b>available</b></td><td>/proc/meminfo 里对「不触发换页还能申请多少内存」的估算，判断内存是否够用的依据</td></tr>
+    <tr><td><b>page cache</b></td><td>内核用空闲内存缓存文件数据，可回收，不算内存泄漏</td></tr>
+    <tr><td><b>thrashing</b></td><td>内存不足导致页面在内存和 swap 之间反复进出，系统极慢但不一定 OOM</td></tr>
+    <tr><td><b>OOM killer</b></td><td>内存耗尽时内核按 oom_score 选择并杀死进程的机制</td></tr>
+    <tr><td><b>await</b></td><td>单个 IO 从提交到完成的平均耗时，含排队时间，单位毫秒</td></tr>
+    <tr><td><b>aqu-sz</b></td><td>平均 IO 队列长度，老版本 iostat 里叫 avgqu-sz，反映饱和度</td></tr>
+    <tr><td><b>inode</b></td><td>文件的元数据结构，存放权限、大小、数据块位置；inode 耗尽同样会「没空间」</td></tr>
+    <tr><td><b>ListenOverflows</b></td><td>全连接队列溢出次数，客户端表现为连接超时，服务端 ss 里看不出异常</td></tr>
+    <tr><td><b>conntrack</b></td><td>连接跟踪表，表满后新连接被静默丢弃，dmesg 里有明确提示</td></tr>
+    <tr><td><b>PSI</b></td><td>Pressure Stall Information，较新内核提供的资源压力指标，直接告诉你「有多少时间在等」</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 找一台测试机，起一个压测进程和 <span class="k">dd</span> 大文件写入，把 uptime、vmstat、iostat 三组数对照着看一遍，亲手确认 load 和 CPU 可以脱钩；② 故意删掉一个正在被 <span class="k">tail -f</span> 的大文件，用 lsof +L1 找回来，再 truncate 体验一次；③ 把 <span class="k">ulimit -n</span> 调到很小，用一个循环打开文件跑出 Too many open files，记住报错长相。<br><br>
+    <b>之后值得单独学：</b>第 3 期讲命令的「为什么」——find 为什么比 ls 管道快、awk 怎么一亿行不炸内存；第 5、6 期把网络那条线拆到 TCP 状态机和 TLS 层；第 8、11 期讲容器与 K8s 里这些指标怎么变形（容器里看到的 load 是宿主机的，这一点很坑）。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 2 期 · 排查的功夫不在命令，在于你能不能用两个指标把范围劈成两半</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

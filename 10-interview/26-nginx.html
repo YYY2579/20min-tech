@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nginx 面试：配置、反向代理与 502 家族</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 26 期</span>
+    <h1>Nginx 面试：配置、反向代理与 502 家族</h1>
+    <p class="sub">location 的匹配优先级、proxy_pass 的尾斜杠、缓冲与超时——这三处答错，等于说你<b>没调过线上</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>10</b> 大模块</span>
+      <span class="chip"><b>20</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>18</b> 条命令与配置</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：proxy_pass 后面多写一个斜杠，后端收到的路径会变成什么？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场，全都不是「Nginx 坏了」</h2></div>
+  <p class="lead">值班群里最常见的句式是「Nginx 又 502 了，重启一下」。重启确实有时能好，因为重启把卡住的上游连接全断了；但三五分钟后又复发，原因一个字都没查。Nginx 在绝大多数故障里不是被告，是<b>唯一的目击者</b>——它手里有上游的状态码、耗时、连接错误，只是没人去看它的日志。</p>
+  <p>先把三个高频现场摆出来，它们的共同点是「直觉指向 Nginx，证据指向别处」。</p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:180px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>新加了一条 <span class="k">location /api</span>，老接口突然 404</td><td>Nginx 按书写顺序从上往下匹配，写在后面的没生效</td><td>正则 location 的优先级高于普通前缀。<span class="k">~ \.php$</span> 这类规则一旦命中，最长前缀就被丢掉；想保住前缀得用 <span class="k">^~</span></td></tr>
+    <tr><td>同一个后端，A 域名正常、B 域名 404</td><td>后端服务对不同域名处理不一致</td><td>两个 server 里 <span class="k">proxy_pass</span> 一个带 URI、一个不带。带 URI 时匹配到的那段前缀会被替换掉，后端收到的路径根本不是它预期的</td></tr>
+    <tr><td>502 突增，重启 Nginx 缓解十分钟又复发</td><td>Nginx 进程有问题，或者并发太高</td><td>重启只是把上游连接池清空了。真实原因是上游连接被拒、全连接队列满、或响应头超过 <span class="k">proxy_buffer_size</span>，日志里 <span class="k">upstream</span> 那一行写得清清楚楚</td></tr>
+  </table>
+  <div class="callout">
+    <b>为什么先讲这三个：</b>它们分别对应「匹配规则记错」「路径改写没算清」「把转发者当责任方」。面试官问 Nginx，八成不是考你背不背得下 <span class="k">proxy_set_header</span>，而是考你能不能说清<b>一个请求在哪一层被改成了什么样</b>。配置是结果，不是原因。
+  </div>
+  <p>这一篇按「一个请求进来以后发生什么」组织：先看进程模型和它为什么快，再看配置是怎么一层层继承的，然后是 location 怎么选中、URI 怎么被改写、客户端 IP 怎么丢的，接着是超时、缓冲、502 家族，之后是限流和静态资源，收在十个坑。</p>
+  <p><b>面试怎么答：</b>「Nginx 的题我一般从请求路径讲：进来先过 server 匹配，再选 location，然后决定 URI 要不要改写，再决定用不用缓冲、超时给多少，出错时看 upstream 那一行。把这五步说清，配置题基本都能推出来。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>master 与 worker：快不是因为「用了 epoll」</h2></div>
+  <p class="lead">「Nginx 为什么快」的标准答案是「epoll 加多路复用」。这句话不算错，但它解释不了为什么同样用 epoll 的很多服务没这么快，也解释不了为什么 Nginx 的 worker 数一般就等于核数，而不是几百个。</p>
+  <p>先看进程结构。<b>master 不处理任何请求</b>，它只做四件事：读配置、绑端口、管 worker、接信号。真正干活的是 worker，每个 worker 是单线程的，各自跑一个事件循环，彼此不共享连接状态。所以 Nginx 的性能不来自「线程多」，来自<b>每个连接的处理成本极低</b>：没有线程栈、没有锁竞争、没有为每个连接开协程，一个连接就是一个 fd 加一小块内存。</p>
+  <p>快的原因拆开是四条：<b>事件驱动</b>，一个 worker 用 epoll 同时盯上万 fd，谁就绪处理谁；<b>进程数少</b>，避免了大量上下文切换和缓存失效；<b>零拷贝</b>，静态文件走 <span class="k">sendfile</span>，数据不经过用户态；<b>内存池</b>，每个连接的生命周期内少次分配、少次释放。epoll 只是第一条里的一块。</p>
+  <table>
+    <tr><th style="width:210px">配置项</th><th>它真正限制的东西</th><th>常见误判</th></tr>
+    <tr><td><span class="k">worker_processes auto</span></td><td>worker 数量，auto 等于 CPU 核数</td><td>调大不会更快。超过核数只增加调度开销，除非大量阻塞型第三方模块</td></tr>
+    <tr><td><span class="k">worker_connections</span></td><td>单个 worker 能同时打开多少连接</td><td>它不是「客户端并发数」。反向代理时一个客户端占两条连接，客户端并发大约只有一半</td></tr>
+    <tr><td><span class="k">worker_rlimit_nofile</span></td><td>worker 进程的 fd 上限</td><td>只调 worker_connections 而 fd 上限卡在 1024，超了直接报 too many open files</td></tr>
+    <tr><td><span class="k">multi_accept</span></td><td>一次是否尽量多 accept</td><td>高并发下开它有帮助，低并发下没意义</td></tr>
+    <tr><td><span class="k">accept_mutex</span> / <span class="k">reuseport</span></td><td>多个 worker 抢同一个 listen socket 的方式</td><td>这是「惊群」问题，不是性能开关。reuseport 让内核按四元组散列到 worker，通常更省事</td></tr>
+  </table>
+  <p>算并发上限时要把两段都算进去：<b>客户端连接数上限约等于 worker_processes × worker_connections ÷ 2</b>（反向代理场景），而且 <span class="k">worker_rlimit_nofile</span> 要大于等于这个数。见过把 <span class="k">worker_connections</span> 调到 65535、fd 上限还是 1024 的配置，跑了半年没出事，因为流量从来没到过那个水位——这种「配置看着很猛」的现场，一问峰值就露馅。</p>
+  <p>另一个必问点是 <b>reload 为什么不断连接</b>。执行 reload 时 master 重新解析配置、起一批新 worker，然后给旧 worker 发信号：别再接新连接了，把手上的处理完就退出。所以正在传输的请求不会被打断。代价是<b>长连接和大文件会拖住旧 worker</b>——一个跑着 WebSocket 的 worker 可能几个小时都退不掉，这段时间新旧两套配置同时在跑，内存翻倍。要兜底就配 <span class="k">worker_shutdown_timeout</span>，到点强退。</p>
+  <pre><span class="c"># 看 worker 数量和各自吃掉的 CPU（正常应该比较均匀）</span>
+ps -eo pid,ppid,pcpu,rss,comm | grep nginx
+top -H -p $(cat /run/nginx.pid)
+
+<span class="c"># 看监听队列水位：Recv-Q 接近 Send-Q 就是 accept 跟不上</span>
+ss -lnt | grep -E ':80|:443'
+
+<span class="c"># 打开状态页后，这三个数字比任何监控都直接</span>
+<span class="c"># curl -s http://127.0.0.1/nginx_status</span>
+<span class="c"># Active connections: 291</span>
+<span class="c"># server accepts handled requests</span>
+<span class="c">#  16630948 16630948 31070465</span>
+<span class="c"># Reading: 6 Writing: 179 Waiting: 106</span>
+
+<span class="c"># Waiting 高说明连接闲着（keepalive），Writing 高说明在回数据</span></pre>
+  <p>状态页里 <span class="k">accepts</span> 和 <span class="k">handled</span> 如果不相等，说明有连接被丢弃过，通常是队列溢出或资源不足；<span class="k">Waiting</span> 是空闲的 keepalive 连接，它高不代表慢，只代表连接复用做得好。</p>
+  <p><b>面试怎么答：</b>「Nginx 快是几个因素叠加：单线程事件循环、worker 数等于核数所以没有线程切换、静态文件走 sendfile 零拷贝、连接级内存池。epoll 只是其中一环。并发上限要把 worker_connections 乘 worker 数，反向代理还要除以二，因为一个请求占两条连接。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>配置层级：继承不是合并，是覆盖</h2></div>
+  <p class="lead">一个很典型的现场：安全扫描说响应缺 <span class="k">X-Frame-Options</span>，你去 http 块里加了一行 <span class="k">add_header</span>，全站生效了。过了两周，某个业务在 server 里加了一行 <span class="k">add_header Cache-Control</span>，那个站点的安全头全部消失，扫描又报。</p>
+  <p>原因是 Nginx 的继承规则分两类。<b>值型指令</b>（比如 <span class="k">client_max_body_size</span>、<span class="k">proxy_read_timeout</span>）是「子层没写就继承父层，写了就用子层的」。<b>数组型指令</b>（<span class="k">add_header</span>、<span class="k">proxy_set_header</span>）更狠：<b>子层只要出现一条，父层的同类指令就完全不继承</b>，而且不会合并。这就是「加了一行缓存头，丢了三个安全头」的机制。</p>
+  <table>
+    <tr><th style="width:150px">层级</th><th>能放什么</th><th>典型错误</th></tr>
+    <tr><td><b>main</b></td><td>user、worker_processes、pid、error_log</td><td>把 server 块写在这里，启动直接报错</td></tr>
+    <tr><td><b>events</b></td><td>worker_connections、multi_accept、use</td><td>以为 worker_connections 是全局上限</td></tr>
+    <tr><td><b>http</b></td><td>mime、log_format、gzip、upstream、include</td><td>在 http 里写 proxy_pass，非法</td></tr>
+    <tr><td><b>server</b></td><td>listen、server_name、root、location</td><td>两个 server 抢同一个 server_name，前一个静默生效</td></tr>
+    <tr><td><b>location</b></td><td>proxy_pass、try_files、limit_req、alias</td><td>以为 location 里的配置能反向影响 server</td></tr>
+    <tr><td><b>if / limit_except</b></td><td>极少数指令</td><td>在 if 里写 proxy_pass，行为不可预期</td></tr>
+  </table>
+  <p>组织配置的常规做法是主文件只留全局项，站点拆到 <span class="k">conf.d/*.conf</span> 或 <span class="k">sites-enabled/*</span>，用 <span class="k">include</span> 引进来。通配符是按<b>字典序</b>展开的，所以文件名前面的数字有意义：<span class="k">00-default.conf</span> 会排在 <span class="k">10-api.conf</span> 前面。默认 server（<span class="k">listen 80 default_server</span>）最好显式指定，否则就是第一个被加载的那个，改个文件名可能就把默认站点换了。</p>
+  <p>排「配置到底生效了没」只有一个可靠办法：<span class="k">nginx -T</span> 把所有 include 展开后打印出来，直接搜关键字。<span class="k">nginx -t</span> 只做语法检查，它不保证你改的那份文件被 include 了——这是新手最常踩的空转。</p>
+  <pre><span class="c"># 语法检查 + 打印最终生效的完整配置（含所有 include）</span>
+nginx -t
+nginx -T 2&gt;/dev/null | grep -n -A3 'server_name api.example.com'
+
+<span class="c"># reload 的正确姿势：先测再重载，失败时老进程仍按老配置跑</span>
+nginx -t &amp;&amp; nginx -s reload
+systemctl reload nginx
+
+<span class="c"># 确认 reload 真的换了 worker（PID 应该变了）</span>
+ps -eo pid,lstart,cmd | grep 'nginx: worker'</pre>
+  <div class="callout warn">
+    <b>reload 失败不会中断服务，这是好事也是坑。</b><span class="k">nginx -t</span> 不过就直接 reload，命令返回非零，但老进程照样服务，监控上什么都看不出来，你会以为改完了。所以「改完没生效」的第一步永远是看 reload 的返回码和 <span class="k">error_log</span>，不是怀疑浏览器缓存。
+  </div>
+  <p><b>面试怎么答：</b>「Nginx 的配置是树形继承，值型指令子层覆盖父层，数组型指令子层一旦出现就完全不继承父层，add_header 丢安全头就是这么来的。查配置有没有生效我不看文件，直接 nginx -T 看展开后的结果。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>location：先最长前缀，再正则，^~ 是刹车</h2></div>
+  <p class="lead">「location 的匹配顺序是什么」这题，能背出「精确、前缀、正则、通用」四个词的很多，但给一段真实配置问「这个请求命中哪个」，答对的很少。因为顺序不是一条链，是两轮。</p>
+  <p>准确的流程是这样：先找<b>精确匹配</b> <span class="k">=</span>，命中就结束。没有精确匹配，就在所有普通前缀里找<b>最长的那条</b>，先记下来但不定。如果这条最长前缀带 <span class="k">^~</span>，就用它，不再看正则。否则按<b>配置文件里出现的顺序</b>逐个试正则 <span class="k">~</span> 和 <span class="k">~*</span>，<b>第一个命中的直接胜出</b>，也不再看更长的前缀。正则全不命中，才回到刚才记住的最长前缀。</p>
+  <table>
+    <tr><th style="width:90px">修饰符</th><th style="width:170px">含义</th><th>命中后</th><th>什么时候用</th></tr>
+    <tr><td><span class="k">=</span></td><td>完全相等</td><td>立即结束，优先级最高</td><td><span class="k">= /health</span> 这类探针，省掉所有匹配开销</td></tr>
+    <tr><td><span class="k">^~</span></td><td>前缀匹配，且不再试正则</td><td>用最长的那条，跳过正则</td><td>静态目录、上传目录，防止被一条 .php 正则抢走</td></tr>
+    <tr><td><span class="k">~</span></td><td>区分大小写的正则</td><td>按出现顺序，第一个命中即用</td><td>后缀、路径重写、UA 判断</td></tr>
+    <tr><td><span class="k">~*</span></td><td>不区分大小写的正则</td><td>同上</td><td>图片后缀这类大小写混用的场景</td></tr>
+    <tr><td>无</td><td>普通前缀</td><td>记住最长的一条，参与第二轮比较</td><td>绝大多数业务路由</td></tr>
+    <tr><td><span class="k">@name</span></td><td>命名 location</td><td>不参与外部匹配</td><td>只给 <span class="k">error_page</span>、<span class="k">try_files</span> 内部跳转用</td></tr>
+  </table>
+  <p>两个细节最容易答错。第一，<b>前缀匹配是字符串前缀，不是路径段</b>：<span class="k">location /api</span> 会匹配 <span class="k">/apiary</span>，所以业务路由最好带上尾部斜杠写成 <span class="k">/api/</span>。第二，<b>正则的先后是书写顺序，不是长度顺序</b>，两条正则都能命中时，写在前面那条赢，哪怕它更短。</p>
+  <p><span class="k">^~</span> 存在的意义值得单独说。它不只是性能优化，更是<b>意图声明</b>：我这段路径不参与正则竞争。线上事故里很常见的一条是 <span class="k">location ~ \.(gif|jpg|png)$</span> 把 <span class="k">/upload/2024/logo.png</span> 抢去走了动态代理，结果这个路径本该由静态目录处理。<span class="k">location ^~ /upload/</span> 一写，问题就没了。</p>
+  <pre><span class="c"># 匹配演示：请求 /static/img/logo.png</span>
+location = /health            { return 200 'ok'; }          <span class="c"># 只有完全等于才命中</span>
+location ^~ /static/          { root /data/www; }            <span class="c"># 命中，且不再看正则</span>
+location ~* \.(png|jpg|gif)$  { proxy_pass http://img_up; }  <span class="c"># 被 ^~ 挡住，不参与</span>
+location /                    { proxy_pass http://web_up; }  <span class="c"># 兜底</span>
+
+<span class="c"># 验证命中了哪条：给每条加一个独有的响应头，比看日志快</span>
+curl -sI https://example.com/static/img/logo.png | grep -i x-route
+
+<span class="c"># 或者直接看 debug 日志里的 matching 过程（需要 debug 版本）</span>
+<span class="c"># error_log /var/log/nginx/error.log debug;</span>
+<span class="c"># grep 'using configuration' /var/log/nginx/error.log | tail</span></pre>
+  <p>还有一个隐藏的交互：<span class="k">rewrite ... last</span> 会<b>重新走一遍 location 匹配</b>，而 <span class="k">rewrite ... break</span> 停在当前 location 继续往下执行。server 级的 rewrite 又在 location 选择之前执行。所以一段配置里同时有 rewrite 和 location 时，别靠猜，看日志里的 <span class="k">using configuration</span> 那一行。</p>
+  <p><b>面试怎么答：</b>「location 分两轮：先精确匹配，再找最长前缀并记住；如果最长前缀带 ^~ 就直接用，否则按书写顺序试正则，第一个命中就赢，都不中才回到最长前缀。所以正则不是比长度，是比顺序；前缀也不是按路径段，是字符串前缀。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>proxy_pass 的尾斜杠：一个字符换一个路径</h2></div>
+  <p class="lead">后端同学说「接口 404，路径是 <span class="k">/v1/users</span>，但我网关明明转发的是 <span class="k">/api/v1/users</span>」。这不是后端的问题，是 <span class="k">proxy_pass</span> 后面那个斜杠把前缀吃掉了，而写配置的人以为它只是个格式习惯。</p>
+  <p>规则只有一句话：<b>看 <span class="k">proxy_pass</span> 后面有没有 URI（哪怕只有一个 <span class="k">/</span>）</b>。有 URI，就把「location 匹配到的前缀」替换成这个 URI，剩下的部分拼在后面；没有 URI（只有 <span class="k">http://upstream</span>），就把原始请求 URI 原样传过去。</p>
+  <table>
+    <tr><th style="width:150px">location</th><th style="width:190px">proxy_pass</th><th>请求 /api/v1/users 转发成</th></tr>
+    <tr><td><span class="k">/api/</span></td><td><span class="k">http://backend</span></td><td><span class="k">/api/v1/users</span>（原样，最不容易错）</td></tr>
+    <tr><td><span class="k">/api/</span></td><td><span class="k">http://backend/</span></td><td><span class="k">/v1/users</span>（前缀被替换成 /）</td></tr>
+    <tr><td><span class="k">/api/</span></td><td><span class="k">http://backend/v2/</span></td><td><span class="k">/v2/v1/users</span>（前缀被替换成 /v2/）</td></tr>
+    <tr><td><span class="k">/api</span></td><td><span class="k">http://backend/</span></td><td><span class="k">/v1/users</span>，而且 <span class="k">/apix</span> 也会被匹配成 <span class="k">/x</span></td></tr>
+    <tr><td><span class="k">~ ^/api/(.*)$</span></td><td><span class="k">http://backend/$1</span></td><td>正则 location 里带 URI 会直接报配置错误，只能用变量拼</td></tr>
+  </table>
+  <p>正则 location 里写 <span class="k">proxy_pass http://backend/;</span> 是启动就失败的，报错大意是「正则 location、命名 location、if 块、limit_except 里不允许 proxy_pass 带 URI」。想改写路径就在正则里捕获，用变量拼出来，但要注意<b>一旦 proxy_pass 里出现变量，Nginx 就不再用 upstream 块，而是走 resolver 动态解析</b>，行为和性能都不一样。</p>
+  <p>顺着这条线，面试官一定会追问 <b>upstream 的 keepalive</b>。默认情况下 Nginx 到上游用的是 HTTP/1.0 且带 <span class="k">Connection: close</span>，每个请求建一条连接，高 QPS 下上游机器上会堆满 TIME_WAIT。要复用必须三件套一起配：upstream 里写 <span class="k">keepalive 32</span>，location 里写 <span class="k">proxy_http_version 1.1</span>，再把 <span class="k">Connection</span> 头置空。少一条都不生效，这是「配了没用」的典型。</p>
+  <pre><span class="c"># 前缀替换：/api/ 之后的内容拼到 / 后面</span>
+location /api/ {
+    proxy_pass http://backend/;          <span class="c"># 注意这个斜杠</span>
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";     <span class="c"># 复用上游连接的关键</span>
+    proxy_set_header Host $host;
+}
+
+upstream backend {
+    server 10.0.0.21:8080;
+    server 10.0.0.22:8080;
+    keepalive 32;                        <span class="c"># 每个 worker 保持的空闲连接数</span>
+}
+
+<span class="c"># 验证：直接打后端，看它眼里的路径到底是什么</span>
+curl -s http://10.0.0.21:8080/api/v1/users -o /dev/null -w '%{http_code}\n'
+curl -sI https://example.com/api/v1/users | grep -i '^location'</pre>
+  <div class="callout">
+    <b>上游返回重定向时还有一层。</b>后端返回 <span class="k">Location: http://10.0.0.21:8080/login</span>，客户端拿到这个内网地址是打不开的。<span class="k">proxy_redirect</span> 负责改写它，默认值 <span class="k">default</span> 会按 location 和 proxy_pass 推导；路径一改，推导就错，所以要么显式写替换规则，要么确认不需要就直接 <span class="k">off</span>。这个点在「登录后跳转到了内网 IP」的故障里出场率极高。
+  </div>
+  <p><b>面试怎么答：</b>「proxy_pass 只看有没有 URI：没有 URI 就原样透传，有 URI 就把 location 前缀替换掉。所以 /api/ 配 http://backend/ 会让后端少一层前缀。上游要复用连接得同时配 keepalive、HTTP/1.1 和清空 Connection 头，少一个都退化成短连接。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>真实客户端 IP：$remote_addr 一定不是你以为的那个人</h2></div>
+  <p class="lead">风控说「这批请求全来自同一个 IP」，你一看日志，确实是同一个，于是把那个 IP 封了。五分钟后客服炸了——被封的是你们自己的四层负载均衡，全站用户都变成了这一个 IP。</p>
+  <p>原因很直接：<span class="k">$remote_addr</span> 是 <b>TCP 连接对端的地址</b>，不是用户的地址。请求经过 SLB、CDN、Ingress 之后，对端永远是最近的那一跳。用户真实 IP 藏在 <span class="k">X-Forwarded-For</span> 里，而这个头是<b>追加</b>的：每经过一个代理，代理把自己的对端地址加到末尾，所以它是一条链，不是单个值。</p>
+  <table>
+    <tr><th style="width:210px">变量/头</th><th>含义</th><th>能不能直接用</th></tr>
+    <tr><td><span class="k">$remote_addr</span></td><td>TCP 对端地址，realip 模块生效后会被替换</td><td>没配 realip 时，它就是上一跳代理</td></tr>
+    <tr><td><span class="k">$http_x_forwarded_for</span></td><td>客户端送来的 XFF 原值，一条逗号分隔的链</td><td>不能，客户端可以随便伪造</td></tr>
+    <tr><td><span class="k">$proxy_add_x_forwarded_for</span></td><td>原 XFF 加上 <span class="k">$remote_addr</span></td><td>转发给上游时用这个，是标准做法</td></tr>
+    <tr><td><span class="k">X-Real-IP</span></td><td>单值，通常是第一跳代理写入的</td><td>只在整条链路都约定用它时可信</td></tr>
+    <tr><td><span class="k">$realip_remote_addr</span></td><td>realip 改写之前的原始对端地址</td><td>排查「到底是谁连进来的」时有用</td></tr>
+  </table>
+  <p>正确做法是 <b>realip 模块 + 白名单</b>：用 <span class="k">set_real_ip_from</span> 声明「只有这些网段发来的 XFF 我才信」，再用 <span class="k">real_ip_header</span> 指定取哪个头。<span class="k">real_ip_recursive on</span> 表示从右往左跳过所有可信地址，取第一个不可信的作为客户端 IP。多层代理时不开递归，取到的是倒数第二跳。</p>
+  <p>这里有个安全边界必须说清：<b>如果 Nginx 直接暴露在公网，又无条件相信 XFF，任何人都能伪造 IP</b>。限流按 IP 做、审计日志按 IP 记、后台白名单按 IP 放行，全都可被绕过。所以 <span class="k">set_real_ip_from</span> 里只能写自己的负载均衡网段，不能写 <span class="k">0.0.0.0/0</span>。</p>
+  <p>还有一个时序细节值得知道：realip 在请求处理的早期阶段执行，<b>早于 limit_req 和 limit_conn</b>。所以只要 realip 配对，限流 key 用 <span class="k">$binary_remote_addr</span> 拿到的就是真实 IP；反过来，realip 没配，你的按 IP 限流实际上是在按「上一跳代理」限流，等于给全站设了一个总闸。</p>
+  <pre><span class="c"># 只信任自己的 LB 网段，递归取最左侧的不可信地址</span>
+set_real_ip_from 10.0.0.0/8;
+set_real_ip_from 172.16.0.0/12;
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+
+<span class="c"># 日志里同时打两个，排查时能立刻看出有没有被改写</span>
+log_format main '$remote_addr [$time_local] "$request" $status '
+                'real=$realip_remote_addr xff="$http_x_forwarded_for" '
+                'urt=$upstream_response_time rt=$request_time';
+
+<span class="c"># 验证：伪造一个 XFF，看服务端认不认</span>
+curl -s -H 'X-Forwarded-For: 1.2.3.4' https://example.com/whoami
+
+<span class="c"># 注意：请求如果直连 Nginx（不经过可信代理），XFF 应该被忽略</span></pre>
+  <div class="callout danger">
+    <b>「把 XFF 第一个值当客户端 IP」是另一个常见错误。</b>第一个值恰恰是<b>客户端自己可以随便写</b>的那一段。正确的是从右往左，跳过你信任的代理，取第一个不在白名单里的地址——这也正是 <span class="k">real_ip_recursive on</span> 做的事。自己写脚本解析 XFF 时，顺序搞反等于把伪造权交给了攻击者。
+  </div>
+  <p><b>面试怎么答：</b>「$remote_addr 是 TCP 对端，过代理后就是上一跳。真实 IP 要从 XFF 里取，但不能无条件信：必须用 set_real_ip_from 限定可信代理，开 real_ip_recursive 从右往左取第一个不可信地址。realip 在 limit_req 之前执行，所以配对之后按 IP 限流才是按真实用户限流。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>超时三兄弟：read_timeout 不是「总时长」</h2></div>
+  <p class="lead">「接口 30 秒就断了，我把 <span class="k">proxy_read_timeout</span> 从 60 调到 300，还是 30 秒断。」这句话里有两个误会：断它的可能根本不是 Nginx，而 <span class="k">proxy_read_timeout</span> 管的也不是「一个请求最多花多久」。</p>
+  <p>三个 proxy 超时各管一段：<b>connect</b> 是跟上游建 TCP 连接的时间；<b>send</b> 是往上游写请求时，<b>两次写操作之间</b>的最大间隔；<b>read</b> 是从上游读响应时，<b>两次读操作之间</b>的最大间隔。三个都是「两次 I/O 之间」的间隔，不是整个请求的墙钟时间。所以一个持续慢慢吐数据的接口，总耗时可以远超 read_timeout 而不断开——因为每次读之间都没超。</p>
+  <table>
+    <tr><th style="width:230px">指令</th><th>管的是</th><th>超时后的现象</th></tr>
+    <tr><td><span class="k">proxy_connect_timeout</span></td><td>与上游建立连接</td><td>502，日志 <span class="k">connect() failed</span> 或 timeout</td></tr>
+    <tr><td><span class="k">proxy_send_timeout</span></td><td>向上游发送请求的两次写之间</td><td>502，日志 <span class="k">upstream timed out while sending request</span></td></tr>
+    <tr><td><span class="k">proxy_read_timeout</span></td><td>从上游读响应的两次读之间</td><td>504，日志 <span class="k">upstream timed out while reading response header</span></td></tr>
+    <tr><td><span class="k">client_header_timeout</span></td><td>读完客户端请求头</td><td>408，慢速攻击的防线之一</td></tr>
+    <tr><td><span class="k">client_body_timeout</span></td><td>读客户端请求体的两次读之间</td><td>408，大文件上传慢会撞上</td></tr>
+    <tr><td><span class="k">send_timeout</span></td><td>向客户端发响应的两次写之间</td><td>连接被关，客户端看到空响应</td></tr>
+    <tr><td><span class="k">keepalive_timeout</span></td><td>客户端空闲连接保留多久</td><td>不是错误，是复用窗口</td></tr>
+  </table>
+  <p>那「30 秒断」是谁干的？按可能性排：客户端自己的超时（最常见，SDK 默认 30 秒）、上游应用服务器的处理超时、四层负载均衡的空闲超时，排在末位的才是 Nginx。判断方法很简单：看 Nginx 日志里有没有对应的 504，没有就说明请求根本没在 Nginx 这一层超时，是客户端先走了。</p>
+  <p>缓冲是这条线上的另一半。<span class="k">proxy_buffering</span> 默认开着：Nginx 尽快把上游的响应读进内存缓冲区（默认 <span class="k">proxy_buffers 8 4k/8k</span>），读完就释放上游连接，然后按客户端的消费速度慢慢发。这样做的好处是慢客户端不会拖住上游；坏处是响应头超过 <span class="k">proxy_buffer_size</span> 时直接 502，日志写 <span class="k">upstream sent too big header</span>——大 Cookie、超长 JWT 就是典型肇事者。</p>
+  <p>有些场景必须关缓冲：SSE、WebSocket 之外的流式输出、大文件下载、需要实时看到进度的接口。关了之后上游连接会被客户端速度绑住，一个慢用户就占一个上游连接，并发容量要重新算。</p>
+  <pre><span class="c"># 普通 API：开缓冲，超时按上游 P99 留 2~3 倍余量</span>
+location /api/ {
+    proxy_pass http://backend;
+    proxy_connect_timeout 3s;
+    proxy_send_timeout 10s;
+    proxy_read_timeout 30s;
+    proxy_buffering on;
+    proxy_buffer_size 8k;          <span class="c"># 响应头，大 Cookie 场景要调</span>
+    proxy_buffers 16 8k;
+}
+
+<span class="c"># 流式接口：关缓冲，并且禁止 Nginx 攒包</span>
+location /api/stream {
+    proxy_pass http://backend;
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 3600s;      <span class="c"># 长连接按业务定</span>
+}
+
+<span class="c"># 大文件上传：先落盘再转发，避免占满上游连接</span>
+client_max_body_size 200m;
+proxy_request_buffering off;</pre>
+  <div class="callout warn">
+    <b>别用调大超时来「解决」超时。</b>504 说明上游在给定时间内没吐出数据，把它从 30 秒调到 300 秒，只是让用户多等 270 秒再看到错误，同时把 worker 连接多占 270 秒。正确顺序是：先看上游为什么慢（慢查询、锁、下游依赖），再决定这个接口该不该同步等这么久。
+  </div>
+  <p><b>面试怎么答：</b>「proxy 的三个超时都是两次 I/O 之间的间隔，不是请求总时长。read_timeout 超了是 504，connect 超了是 502。缓冲默认开着，能保护上游不被慢客户端拖住，但响应头超过 proxy_buffer_size 会 502，流式接口要显式关掉。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>502 / 504 / 499 / 413：谁产生的，去谁的日志里找</h2></div>
+  <p class="lead">「502 是什么原因」——这个问题如果没有限定条件，答案有十几种。但面试官想听的不是清单，是<b>你按什么顺序把清单缩短</b>。第一刀永远是把状态码和「谁产生的」对上。</p>
+  <p>关键认知：<b>502 和 504 是 Nginx 代表上游写给客户端的</b>，它说明「我跟上游之间出了问题」，而不是「Nginx 自己出了问题」。499 反过来，是客户端在 Nginx 发出响应之前就关了连接，Nginx 自己记的一个内部状态码。413 是 Nginx 直接拒的，请求根本没出去。</p>
+  <table>
+    <tr><th style="width:80px">状态码</th><th style="width:130px">谁产生</th><th>日志里的关键字</th><th>先查什么</th></tr>
+    <tr><td><b>502</b></td><td>Nginx（代上游）</td><td><span class="k">connect() failed (111: Connection refused)</span></td><td>上游端口没监听、进程挂了、端口配错、只监听了 127.0.0.1</td></tr>
+    <tr><td><b>502</b></td><td>Nginx（代上游）</td><td><span class="k">no live upstreams</span></td><td>所有后端都被 max_fails 摘了，或健康检查全失败</td></tr>
+    <tr><td><b>502</b></td><td>Nginx（代上游）</td><td><span class="k">upstream prematurely closed connection</span></td><td>上游处理到一半自己断了：崩溃、OOM、超时主动 close</td></tr>
+    <tr><td><b>502</b></td><td>Nginx（代上游）</td><td><span class="k">upstream sent too big header</span></td><td>响应头超过 proxy_buffer_size，调大缓冲而不是查上游</td></tr>
+    <tr><td><b>504</b></td><td>Nginx（代上游）</td><td><span class="k">upstream timed out</span></td><td>上游慢：数据库、下游依赖、GC、线程池排队</td></tr>
+    <tr><td><b>499</b></td><td>Nginx 自己记</td><td>请求行 + 499，通常带很长的 request_time</td><td>客户端先超时断开。查客户端超时设置和后端真实耗时</td></tr>
+    <tr><td><b>413</b></td><td>Nginx 直接拒</td><td><span class="k">client intended to send too large body</span></td><td><span class="k">client_max_body_size</span> 默认 1m，上传接口必须调</td></tr>
+    <tr><td><b>400 / 494</b></td><td>Nginx 直接拒</td><td><span class="k">request header too large</span></td><td>Cookie 太大、请求行太长，调 large_client_header_buffers</td></tr>
+  </table>
+  <p>502 里最容易被误判的是 <span class="k">Connection refused</span> 和 <span class="k">timeout</span> 的区别。前者说明包到了对端、对端回了 RST，也就是「这台机器活着，但这个端口没人听」——去查进程和端口。后者说明包发出去没有任何回应，通常是防火墙 DROP、路由不通、或者全连接队列满了把 SYN 丢了。一个 RST 一个静默，排查方向完全不同。</p>
+  <p>还有一层重试逻辑要知道：<span class="k">proxy_next_upstream</span> 默认只对 <span class="k">error</span> 和 <span class="k">timeout</span> 重试，<b>不包括 502</b>。所以「上游返回 502 时自动换一台」这个需求，必须显式加上 <span class="k">http_502</span>。但要注意，非幂等请求（POST 下单、支付）重试会造成重复提交，这个开关不能无脑开。</p>
+  <pre><span class="c"># 日志里按 upstream 状态聚合，比看状态码有用得多</span>
+awk '{print $9, $10}' /var/log/nginx/access.log | sort | uniq -c | sort -rn | head
+
+<span class="c"># 只看 502/504 的 upstream 那一行</span>
+grep -E ' (502|504) ' /var/log/nginx/access.log | \
+  grep -o 'upstream=[^,]*' | sort | uniq -c | sort -rn
+
+<span class="c"># 关键字段：上游状态、上游耗时、总耗时</span>
+log_format up '$remote_addr "$request" $status ua=$upstream_addr '
+              'us=$upstream_status ut=$upstream_response_time rt=$request_time';
+
+<span class="c"># 对比：request_time 远大于 upstream_response_time，说明慢在 Nginx 或客户端</span></pre>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>连不上</div><div class="cd">refused、timeout、no live upstreams。先确认端口、进程、网络策略，这一步还轮不到看应用日志。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>连上了又断</div><div class="cd">prematurely closed。上游崩溃、被 OOM、或者自己超时关了连接，去查上游的退出记录和错误日志。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>回了但读不下</div><div class="cd">too big header。响应头超过缓冲区，调 proxy_buffer_size，跟上游代码没关系。</div></div>
+  </div>
+  <p>看 <span class="k">request_time</span> 和 <span class="k">upstream_response_time</span> 的差值，是定位「慢在谁身上」最快的办法。差值大，说明时间花在等客户端收数据、或者卡在 Nginx 的缓冲区；差值接近，说明时间全在上游，直接去查应用和数据库。</p>
+  <p><b>面试怎么答：</b>「502 和 504 都是 Nginx 代上游写的，说明 Nginx 到上游这一段有问题，不是 Nginx 自身。502 看日志关键字分三类：连接被拒是端口没监听，no live upstreams 是全被摘了，响应头过大是缓冲区太小。504 是上游慢，499 是客户端先断。Nginx 的日志里 upstream 那一行基本能直接给出答案。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>限流：limit_req 是速率，limit_conn 是并发</h2></div>
+  <p class="lead">「我们配了限流，怎么还是被打挂了？」一看配置：<span class="k">limit_req zone=api burst=1000 nodelay</span>。burst 给了 1000 又加了 nodelay，等于允许瞬时 1000 个请求全部放行——这不是限流，是把闸门焊死在全开位置。</p>
+  <p>两个模块管的事完全不同。<span class="k">limit_req</span> 用<b>漏桶</b>控制速率，单位是每秒（或每分钟）请求数；<span class="k">limit_conn</span> 控制<b>同时存在的连接数</b>。前者防「一瞬间来太多」，后者防「一个客户端占着不放」——比如慢接口、大文件下载、被恶意保持的长连接。</p>
+  <table>
+    <tr><th style="width:150px">参数</th><th>作用</th><th>写错的后果</th></tr>
+    <tr><td><span class="k">zone=name:10m</span></td><td>共享内存区，存每个 key 的状态</td><td>太小会频繁淘汰，限流不准；能存多少 key 取决于实现，以官方文档为准</td></tr>
+    <tr><td><span class="k">rate=10r/s</span></td><td>每个 key 的平均速率</td><td>写成 10r/m 就是每 6 秒一个，容易被误读</td></tr>
+    <tr><td><span class="k">burst=20</span></td><td>允许排队的突发量</td><td>不给 burst，超出速率的请求直接 503，抖动很大</td></tr>
+    <tr><td><span class="k">nodelay</span></td><td>burst 内的请求立即处理，不排队延迟</td><td>配大 burst + nodelay 等于没限流</td></tr>
+    <tr><td><span class="k">delay=8</span></td><td>burst 里前 8 个延迟处理，其余立即</td><td>需要较新版本支持，老版本不认这个参数</td></tr>
+    <tr><td><span class="k">limit_conn addr 10</span></td><td>单 key 最大并发连接</td><td>和速率是两回事，只配一个挡不住另一类攻击</td></tr>
+    <tr><td><span class="k">limit_req_status</span></td><td>被限流时返回什么码</td><td>默认 503，会被算进 5xx 告警，建议改成 429 单独统计</td></tr>
+  </table>
+  <p>选 key 比调参数更重要。按 <span class="k">$binary_remote_addr</span> 限流，在 NAT 和移动网络下会把一整栋楼、一整个运营商出口的用户算成一个人；按 <span class="k">$http_x_api_key</span> 或用户 ID 限流更公平，但需要网关层先做完认证。真实系统里通常两层都做：入口按 IP 挡扫描，业务按租户限速。</p>
+  <p>还有一个架构层面的事实：<b>Nginx 的限流是单机的</b>。10 个副本、每台限 100 r/s，实际总放行是 1000 r/s。要精确的全局限流，得把计数放到 Redis 或者服务网格层，代价是多一次网络往返。面试里能主动说出「单机限流乘以副本数」这个乘法效应，比背参数名有价值得多。</p>
+  <pre><span class="c"># 定义区必须在 http 块里，只能定义一次</span>
+limit_req_zone  $binary_remote_addr zone=perip:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=connip:10m;
+
+server {
+    location /api/ {
+        limit_req zone=perip burst=40 nodelay;
+        limit_req_status 429;              <span class="c"># 别混进 5xx 告警</span>
+        limit_conn connip 20;
+        limit_conn_status 429;
+        proxy_pass http://backend;
+    }
+
+    <span class="c"># 登录接口单独一个更严的桶</span>
+    location = /api/login {
+        limit_req zone=perip burst=5;
+        proxy_pass http://backend;
+    }
+}
+
+<span class="c"># 验证：并发 50 个请求打 5 次，看 429 的比例</span>
+seq 50 | xargs -P50 -I{} curl -s -o /dev/null -w '%{http_code}\n' https://example.com/api/login
+grep -c ' 429 ' /var/log/nginx/access.log</pre>
+  <div class="callout ok">
+    <b>限流要配「可观测」。</b>至少要知道三个数：被限流的请求数、被限流的 key 的分布、限流前后的上游 QPS。只配不限流等于没配，配了不观测等于不知道闸门在哪。生产上建议把 429 单独打一个日志文件或者单独一个指标，别和真正的错误混在一起。
+  </div>
+  <p><b>面试怎么答：</b>「limit_req 控速率、limit_conn 控并发，两个都要配。burst 是排队空间，nodelay 是让 burst 内的请求不延迟直接过，两个一起放大就等于没限流。key 的选择决定公平性，按 IP 在 NAT 下会误伤。还有 Nginx 限流是单机的，多副本时总阈值要乘以副本数。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>静态资源：root 与 alias 差一个斜杠，缓存头差一个数量级</h2></div>
+  <p class="lead">「图片 404，路径明明存在。」打开配置：<span class="k">location /static/ { alias /data/www/static; }</span>。文件在 <span class="k">/data/www/static/logo.png</span>，请求是 <span class="k">/static/logo.png</span>，按理说该命中——但 alias 把 location 前缀替换成指定路径时，拼接结果变成了 <span class="k">/data/www/staticlogo.png</span>。</p>
+  <p>规则是：<b>alias 的路径结尾斜杠要和 location 的结尾斜杠对齐</b>。<span class="k">location /static/</span> 配 <span class="k">alias /data/www/static/</span>，替换后才拼得对。而 <span class="k">root</span> 的语义完全不同：它不替换前缀，而是把完整 URI 拼在 root 后面，所以 <span class="k">root /data/www</span> 加请求 <span class="k">/static/logo.png</span> 得到 <span class="k">/data/www/static/logo.png</span>，天然对齐。</p>
+  <table>
+    <tr><th style="width:130px">写法</th><th>请求 /static/a.png 对应的文件</th><th>适用</th></tr>
+    <tr><td><span class="k">root /data/www;</span></td><td><span class="k">/data/www/static/a.png</span></td><td>目录结构和 URI 一致，首选</td></tr>
+    <tr><td><span class="k">alias /data/www/;</span>（location /static/）</td><td><span class="k">/data/www/a.png</span></td><td>URI 和磁盘目录不一致，比如映射到版本目录</td></tr>
+    <tr><td><span class="k">alias /data/www;</span>（location /static/）</td><td><span class="k">/data/wwwa.png</span></td><td>错的，少一个斜杠就拼错</td></tr>
+    <tr><td><span class="k">try_files $uri $uri/ /index.html;</span></td><td>依次尝试，最后回落</td><td>单页应用的前端路由</td></tr>
+  </table>
+  <p>性能上有三个开关要一起看：<span class="k">sendfile on</span> 让文件数据不经过用户态；<span class="k">tcp_nopush on</span> 把响应头和文件开头合并成一个包发；<span class="k">tcp_nodelay on</span> 在 keepalive 连接上禁用 Nagle，降低小包延迟。前两个是吞吐，第三个是延迟，它们不冲突。</p>
+  <p>缓存头是另一个高频考点。做法是按文件名分两类：<b>带内容哈希的静态资源</b>（<span class="k">app.3f9a2c.js</span>）可以设一年 immutable，因为内容变了文件名就变了；<b>入口 HTML</b> 必须短缓存甚至 no-cache，否则用户会一直拿到旧版本引用旧资源。搞反的后果是「发布后用户白屏，强刷才好」。</p>
+  <p>gzip 的默认值也要记清：<span class="k">gzip</span> 默认是 <b>off</b>，开了之后 <span class="k">gzip_types</span> 默认只压 <span class="k">text/html</span>，CSS 和 JS 不加进列表就不会被压。压缩级别 1 到 2 的性价比最高，往 9 调 CPU 涨得很快而体积降得很少。已经压过的格式（jpg、png、mp4、woff2）不要再压，白烧 CPU。</p>
+  <pre><span class="c"># 带哈希的静态资源：长缓存 + immutable</span>
+location ^~ /assets/ {
+    root /data/www;
+    expires 1y;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    access_log off;
+}
+
+<span class="c"># 入口 HTML：必须回源验证，不能长缓存</span>
+location = /index.html {
+    root /data/www;
+    add_header Cache-Control "no-cache";
+}
+
+<span class="c"># 单页应用路由回落（注意别把 /api 也吞了）</span>
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+gzip on;
+gzip_comp_level 2;
+gzip_min_length 1024;
+gzip_vary on;
+gzip_types text/css application/javascript application/json image/svg+xml;
+
+<span class="c"># 验证响应头，别靠猜</span>
+curl -sI https://example.com/assets/app.3f9a2c.js | grep -Ei 'cache-control|content-encoding|expires'</pre>
+  <div class="callout">
+    <b>gzip 和流式接口是冲突的。</b>压缩需要攒数据才能出效果，而 SSE 要求每条消息立刻到达。给 <span class="k">text/event-stream</span> 开了 gzip，轻则消息延迟，重则整个连接卡住不吐数据。流式接口的 location 里应该显式 <span class="k">gzip off</span>，同时 <span class="k">proxy_buffering off</span>。
+  </div>
+  <p><b>面试怎么答：</b>「root 是把完整 URI 拼在 root 后面，alias 是把 location 前缀替换掉，所以 alias 两边的尾斜杠必须对齐。缓存策略按文件名分：带哈希的长缓存加 immutable，入口 HTML 用 no-cache。gzip 默认关，gzip_types 默认只压 html，这两点最容易被忽略。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>十个坑：每一个都能让线上多一次故障</h2></div>
+  <p class="lead">下面这些不是「配置写错一个字母」那种错，是<b>判断方向错</b>。它们的共同点是：看起来很有道理，改完当时也「好像好了」，但根因还在，下一次流量高峰照样复发。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">以为 location 按从上到下的顺序匹配</div><div class="pd">普通前缀比的是长度，正则比的是书写顺序，而且正则优先于普通前缀。真按「从上到下」去推理，加一条规则就可能把另一条挤掉，而且不会有任何报错。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">proxy_pass 尾斜杠随手写</div><div class="pd">带 URI 就替换前缀，不带就原样透传。这个差异不会报错，只会让后端收到一个不认识的路径。<b>写完必须用 curl 打一次后端，看它实际收到的 URI。</b></div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 proxy_read_timeout 当成请求总超时</div><div class="pd">它管的是两次读之间的间隔。慢慢吐数据的接口可以跑十分钟不断，而一个卡住不吐的接口 60 秒就 504。想限制总时长得在应用层做，Nginx 没有这个指令。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">502 就重启 Nginx</div><div class="pd">502 是 Nginx 转述上游的问题，重启只能清掉连接池，根因一点没动。正确动作是 grep 日志里 upstream 那一行，先分清是 refused、timeout 还是 header too big。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">不配 set_real_ip_from 就信 XFF</div><div class="pd">直接暴露的 Nginx 无条件相信 XFF，等于让客户端自己决定「我是谁」。限流、审计、IP 白名单全部可绕过。信任列表里只能写自己的代理网段，绝不能是 0.0.0.0/0。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为 reload 一定平滑</div><div class="pd">reload 只是不再给旧 worker 派新连接。跑着 WebSocket、SSE、大文件下载的旧 worker 会一直不退出，新旧两套配置同时存在，内存翻倍。要配 worker_shutdown_timeout 兜底。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">在子层加一条 add_header，把父层全冲掉</div><div class="pd">数组型指令不合并。子层只要出现一条 add_header，父层的安全头就全部失效。安全头要么全部下沉到每个 server，要么用 include 引入同一份片段。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">把 worker_connections 当成客户端并发上限</div><div class="pd">反向代理时一个请求占两条连接，客户端并发大约只有一半；而且还要 worker_rlimit_nofile 撑得住。只调一个数，另一个还是 1024，照样报 too many open files。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">burst 配很大还加 nodelay</div><div class="pd">这等于允许瞬时一大波全部通过。想削峰就别用 nodelay，让请求在桶里排队；想低延迟就用小 burst 加 nodelay。两者都想要，用 delay 参数分批。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">以为 gzip 开了就全都压</div><div class="pd">gzip_types 默认只有 text/html，CSS、JS、JSON 不加进去不会被压。反过来给图片、视频开压缩是纯浪费 CPU。流式接口还必须显式关掉 gzip，否则消息会被攒住。</div></div></div>
+  <p><b>面试怎么答：</b>这十个里挑一个讲，别只说「我踩过」。讲法固定三段：当时怎么判断的、错误判断造成了什么后果、后来用什么命令或者什么规则纠正了。第三段才是加分项，它证明你建立了检查机制，而不只是记住了这一次。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 配置里有 <span class="k">location ^~ /static/</span>、<span class="k">location ~* \.(png|jpg)$</span>（写在后面）、<span class="k">location /</span>。请求 <span class="k">/static/logo.png</span> 命中哪一条？</div>
+      <button class="opt">命中正则那条，因为正则优先级最高</button>
+      <button class="opt">命中 <span class="k">location /</span>，因为前缀匹配按书写顺序</button>
+      <button class="opt">命中 <span class="k">^~ /static/</span>，因为它是最长前缀且 ^~ 会跳过后面的正则</button>
+      <button class="opt">配置非法，^~ 和正则不能共存</button>
+      <div class="ans">正确答案：<b>^~ /static/</b>。匹配分两轮：先找最长前缀，<span class="k">/static/</span> 比 <span class="k">/</span> 长；这条前缀带 <span class="k">^~</span>，于是直接采用，不再检查正则。如果没有 <span class="k">^~</span>，才会按书写顺序试正则，此时那条 <span class="k">~*</span> 会赢。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. <span class="k">location /api/ { proxy_pass http://backend/; }</span>，请求 <span class="k">/api/v1/users</span>，后端收到的路径是？</div>
+      <button class="opt"><span class="k">/api/v1/users</span></button>
+      <button class="opt"><span class="k">/v1/users</span></button>
+      <button class="opt"><span class="k">/api/v1/users/</span></button>
+      <button class="opt"><span class="k">//api/v1/users</span></button>
+      <div class="ans">正确答案：<b>/v1/users</b>。<span class="k">proxy_pass</span> 带了 URI（那个 <span class="k">/</span>），所以把 location 匹配到的前缀 <span class="k">/api/</span> 替换成 <span class="k">/</span>，剩下的 <span class="k">v1/users</span> 拼上去。写成 <span class="k">http://backend</span>（不带斜杠）才是原样透传。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 关于 <span class="k">proxy_read_timeout 60s</span>，下面哪个说法正确？</div>
+      <button class="opt">一个请求从进来到返回，最多 60 秒</button>
+      <button class="opt">客户端两次发送数据之间的最大间隔</button>
+      <button class="opt">上游建立 TCP 连接最多等 60 秒</button>
+      <button class="opt">从上游读响应时，两次读操作之间的最大间隔</button>
+      <div class="ans">正确答案：<b>两次读之间</b>。它是 I/O 间隔超时，不是总时长。所以持续慢慢吐数据的接口可以超过 60 秒不断开，而卡住不吐的接口 60 秒就 504。建连是 <span class="k">proxy_connect_timeout</span>，写请求是 <span class="k">proxy_send_timeout</span>。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 访问日志里出现大量 499，最合理的判断是？</div>
+      <button class="opt">客户端在 Nginx 返回响应之前就关闭了连接，通常是客户端超时短于后端耗时</button>
+      <button class="opt">上游返回了 499，需要查后端应用日志</button>
+      <button class="opt">Nginx 内部错误，应该重启 worker</button>
+      <button class="opt">请求被限流模块拒绝</button>
+      <div class="ans">正确答案：<b>客户端先断</b>。499 是 Nginx 自定义的状态码，含义是「客户端关闭连接时我还没把响应发出去」。它最常见的成因是客户端超时（比如 SDK 默认 30 秒）比后端真实耗时短。看到 499 要同时看 <span class="k">request_time</span>，确认是不是后端慢导致的。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 要用 X-Forwarded-For 取真实客户端 IP，哪组配置是安全的？</div>
+      <button class="opt"><span class="k">real_ip_header X-Forwarded-For;</span> 单独一行，取第一个值</button>
+      <button class="opt"><span class="k">set_real_ip_from 0.0.0.0/0;</span> 加 <span class="k">real_ip_header X-Forwarded-For;</span></button>
+      <button class="opt"><span class="k">set_real_ip_from</span> 只写自己的代理网段，加 <span class="k">real_ip_recursive on</span></button>
+      <button class="opt">直接用 <span class="k">$http_x_forwarded_for</span> 做限流 key</button>
+      <div class="ans">正确答案：<b>限定可信网段 + 递归</b>。只相信自己的代理发来的 XFF，并用 <span class="k">real_ip_recursive on</span> 从右往左跳过可信地址，取第一个不可信的。信任 <span class="k">0.0.0.0/0</span> 或直接取第一个值，都等于让客户端自己声明身份。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 一个反向代理的 Nginx，<span class="k">worker_processes 4</span>、<span class="k">worker_connections 1024</span>，客户端并发大约能到多少？</div>
+      <button class="opt">约 4096，直接相乘</button>
+      <button class="opt">约 2048，因为每个客户端请求同时占用下游和上游两条连接</button>
+      <button class="opt">约 1024，worker_connections 就是全局上限</button>
+      <button class="opt">无法估算，取决于 CPU</button>
+      <div class="ans">正确答案：<b>约 2048</b>。上限是 4 × 1024 = 4096 条连接，但反向代理时一个客户端请求要占「客户端到 Nginx」和「Nginx 到上游」两条，所以客户端并发大约减半。另外 <span class="k">worker_rlimit_nofile</span> 必须大于等于 4096，否则 fd 会先耗尽。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>master / worker</b></td><td>master 只管配置、端口、信号；worker 单线程跑事件循环，真正处理请求</td></tr>
+    <tr><td><b>worker_connections</b></td><td>单个 worker 的连接上限，不是客户端并发上限</td></tr>
+    <tr><td><b>惊群</b></td><td>多个 worker 同时被唤醒抢同一个新连接，accept_mutex 和 reuseport 是两种解法</td></tr>
+    <tr><td><b>平滑 reload</b></td><td>新 worker 接班、旧 worker 处理完手上的请求再退出，期间不断连接</td></tr>
+    <tr><td><b>location 修饰符</b></td><td><span class="k">=</span> 精确、<span class="k">^~</span> 前缀且跳正则、<span class="k">~</span> / <span class="k">~*</span> 正则、无修饰为普通前缀</td></tr>
+    <tr><td><b>最长前缀</b></td><td>普通前缀里字符串最长的那条，先记住，等正则全部落选才用它</td></tr>
+    <tr><td><b>proxy_pass URI</b></td><td>带 URI 就替换 location 前缀，不带就原样透传</td></tr>
+    <tr><td><b>proxy_redirect</b></td><td>改写上游返回的 Location 头，避免客户端被跳到内网地址</td></tr>
+    <tr><td><b>X-Forwarded-For</b></td><td>代理追加的客户端 IP 链，从右往左才是可信顺序</td></tr>
+    <tr><td><b>realip 模块</b></td><td>按可信代理白名单改写 <span class="k">$remote_addr</span>，执行阶段早于限流</td></tr>
+    <tr><td><b>proxy_buffering</b></td><td>先把上游响应读进缓冲区再发给客户端，保护上游不被慢客户端拖住</td></tr>
+    <tr><td><b>499</b></td><td>Nginx 自定义：客户端在响应发出前关闭了连接</td></tr>
+    <tr><td><b>limit_req</b></td><td>漏桶限速，burst 是排队空间，nodelay 让队列内立即处理</td></tr>
+    <tr><td><b>limit_conn</b></td><td>限制单 key 的并发连接数，和速率是两个维度</td></tr>
+  </table>
+
+  <div class="cmds">
+    <div class="crow"><code>nginx -t &amp;&amp; nginx -s reload</code><span class="desc">先验语法再重载，失败时老进程仍在服务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nginx -T | grep -n 'server_name'</code><span class="desc">看 include 展开后真正生效的配置</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ss -lnt</code><span class="desc">Recv-Q 接近 Send-Q 就是 accept 队列满了</span><button class="copy">复制</button></div>
+    <div class="crow"><code>grep -o 'upstream=[^,]*' access.log | sort | uniq -c</code><span class="desc">按上游状态聚合，比只看状态码有用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>curl -sI https://host/path | grep -i cache-control</code><span class="desc">验证缓存头和压缩是否真的生效</span><button class="copy">复制</button></div>
+  </div>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 本地起一个 Nginx 加两个后端（<span class="k">python -m http.server</span> 就够），把 <span class="k">proxy_pass</span> 的四种写法各配一遍，用 <span class="k">curl</span> 看后端访问日志里的路径，一次就能记住；② 故意把 <span class="k">client_max_body_size</span> 留在默认值，上传一个 2MB 文件，看 413 和日志；③ 用 <span class="k">ab</span> 或 <span class="k">hey</span> 打一个配了 <span class="k">limit_req</span> 的接口，观察 429 的比例随着 burst 变化。<br><br>
+    <b>之后值得单独学：</b>第 29 期讲负载均衡，会把四层和七层的分工、LVS 与 Nginx 的取舍讲清，那一篇能解释「为什么有时候 Nginx 前面还要再加一层」；第 6 期讲网络排障，会把 502、504 放进完整的链路里；第 12 期讲 K8s 网络，那里的 Ingress 其实就是一套自动生成配置的 Nginx。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 26 期 · 面试问 Nginx，考的不是你背得下多少指令，是你能不能说出一个请求在哪一层被改成了什么样</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

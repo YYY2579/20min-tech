@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Git 面试：分支模型、reset 与救火</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 27 期</span>
+    <h1>Git 面试：分支模型、reset 与救火</h1>
+    <p class="sub">问 rebase 和 merge 的区别，其实在问「你懂不懂 <b>commit 是快照、分支只是指针</b>」。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 条命令</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>3</b> 类事故</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：git reset --hard 之后，那些提交是真的被删了吗？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个求救，三种不同的无知</h2></div>
+  <p class="lead">同一个下午，群里三个人分别喊救命。第一个说「我把 hotfix rebase 到 main 之后 push 了，同事拉下来一团乱」。第二个说「reset --hard 了一下，三个小时的活没了」。第三个说「分支被我删了，还没合并」。三个人的第一反应都是「能不能找回来」，但答案完全不同：一个不该救，一个能救，一个要看你有没有提交过。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:180px">直觉答案</th><th>真实情况</th></tr>
+    <tr><td>rebase 了已推送的分支，同事的历史全乱</td><td>让同事也 rebase 一下就好了</td><td>rebase 会重写提交，生成全新的 commit。别人基于旧提交做的工作失去了共同祖先，越「同步」越乱。公共分支只能 revert，不能改写</td></tr>
+    <tr><td>reset --hard 丢了三个小时</td><td>提交没了，只能重写</td><td>提交还在。分支指针往回退了，但对象没有被删除，<span class="k">git reflog</span> 里有完整轨迹。真正救不回的是<b>从没 add 过</b>的改动</td></tr>
+    <tr><td>误删了未合并的分支</td><td>远端还有一份，重新拉就行</td><td>远端如果有就是最省事的；如果只在本地，删分支只是删了一个指针，提交本身还在，用 reflog 里的 SHA 重建分支名即可</td></tr>
+  </table>
+  <div class="callout">
+    <b>这三件事的底层是同一句话：</b>Git 的提交一旦生成就不可变，能移动的只有「指向它的指针」。分支、HEAD、tag 全是指针。理解了这一点，rebase 为什么危险、reset 为什么能撤销、reflog 为什么能救命，全都是推论，不用背。
+  </div>
+  <p>面试里关于 Git 的追问链通常这样走：commit 里到底存了什么 → 分支是什么 → checkout 和 reset 有什么区别 → 为什么 rebase 之后要 force push → 线上误操作你怎么救。每一问都在检查同一个模型，模型对了，细节可以现场推。</p>
+  <p><b>面试怎么答：</b>「我把 Git 理解成一个内容寻址的对象库，加一堆可移动的指针。commit 是整棵目录树的快照，分支和 HEAD 只是指向某个 commit 的引用。所以改写历史本质是造新对象、挪指针，旧对象还在，这就是 reflog 能救火的原因。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>四个对象与三个区：所有命令都是在挪东西</h2></div>
+  <p class="lead">「commit 里存的是 diff 还是文件」——这个问题看起来学术，其实决定了你会不会用 <span class="k">git show</span>、会不会理解 rebase 的代价。答「存 diff」的人，往往也解释不清为什么 rebase 之后每个 commit 的哈希都变了。</p>
+  <p>Git 有四类对象。<b>blob</b> 存文件内容，不含文件名；<b>tree</b> 存一层目录结构，把名字映射到 blob 或子 tree；<b>commit</b> 指向一棵 tree（也就是整个项目的快照），外加父提交、作者、时间、message；<b>tag</b> 是带注释的引用对象，指向某个 commit。文件名在 tree 里，不在 blob 里——所以两个内容完全相同的文件只存一份，这是 Git 省空间的第一个机制。</p>
+  <p>对象 ID 是<b>内容加头部的哈希</b>。同一个文件内容，在任何仓库里算出来的 blob ID 都一样；commit 因为包含父提交、时间、message，改一个字节 ID 就全变。<b>不可变</b>不是设计口号，是哈希的数学结果。所以「修改提交」在 Git 里从来不是修改，是<b>造一个新的、让分支指过去</b>。</p>
+  <table>
+    <tr><th style="width:120px">对象</th><th>存什么</th><th>被谁指向</th><th>对应命令</th></tr>
+    <tr><td><b>blob</b></td><td>文件内容（无文件名）</td><td>tree</td><td><span class="k">git cat-file -p &lt;sha&gt;</span></td></tr>
+    <tr><td><b>tree</b></td><td>目录：名字 → blob / 子 tree</td><td>commit、父 tree</td><td><span class="k">git ls-tree HEAD</span></td></tr>
+    <tr><td><b>commit</b></td><td>根 tree + 父提交 + 作者 + message</td><td>分支、HEAD、tag</td><td><span class="k">git cat-file -p HEAD</span></td></tr>
+    <tr><td><b>tag</b></td><td>指向 commit 的带注释引用</td><td>refs/tags/*</td><td><span class="k">git tag -a v1.0 -m …</span></td></tr>
+  </table>
+  <p>再看三个区。<b>工作区</b>是你看到的文件；<b>暂存区</b>（index）是一份「下次提交要长什么样」的清单；<b>版本库</b>是已经生成的对象。加上 HEAD（当前所在的分支引用），所有日常命令都能归位：<span class="k">add</span> 是把工作区写进 index，<span class="k">commit</span> 是把 index 固化成 tree 加 commit，<span class="k">reset</span> 是移动指针并按模式重置 index 或工作区，<span class="k">checkout</span> 是把某个版本的內容填回工作区。</p>
+  <p>为什么要有暂存区这一层？两个实际好处：<b>部分提交</b>——改了五个文件但只想提交其中两个相关的，<span class="k">git add</span> 挑着加；<b>合并的基础</b>——三方合并需要知道「共同祖先长什么样」，index 让这个过程可以分步、可以中断。说「暂存区是多余的一步」的人，通常没用过 <span class="k">git add -p</span>。</p>
+  <pre><span class="c"># 直接看对象，比看任何教程都直观</span>
+git cat-file -p HEAD
+<span class="c"># tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904</span>
+<span class="c"># parent 8f3c...</span>
+<span class="c"># author ...  committer ...</span>
+
+git ls-tree HEAD                    <span class="c"># 这一层目录里有什么</span>
+git cat-file -p HEAD:README.md      <span class="c"># 直接读某个版本的文件内容</span>
+git rev-parse HEAD                  <span class="c"># 当前 commit 的完整 SHA</span>
+
+<span class="c"># 三个区各看一次差异，概念立刻清楚</span>
+git diff                            <span class="c"># 工作区 vs 暂存区</span>
+git diff --cached                   <span class="c"># 暂存区 vs HEAD</span>
+git diff HEAD                       <span class="c"># 工作区 vs HEAD（含已暂存）</span></pre>
+  <p>还有一个高频追问：<b>为什么同一个文件改了十次，仓库不会大十倍？</b>因为每次提交只新增变化了的 blob，未变的文件复用原来的对象；再加上打包时的增量压缩。但这也意味着<b>二进制大文件改十次就是十份</b>，压缩率极低——这就是「不要提交大文件」的底层原因，不是规矩，是存储模型决定的。</p>
+  <p><b>面试怎么答：</b>「commit 存的是一棵 tree 的引用，也就是整个目录的快照，不是 diff；diff 是拿两个快照现算的。对象 ID 是内容哈希，所以提交不可变，改提交其实是造新对象再挪指针。三个区是工作区、index、版本库，add 写 index，commit 固化 index，reset 按模式回退这三者。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>分支是一个 41 字节的文件，HEAD 是它的指针</h2></div>
+  <p class="lead">「为什么 Git 建分支这么快？」很多人答「因为设计得好」。更准确的回答是：建分支就是往 <span class="k">.git/refs/heads/</span> 写一个文件，内容是一个 40 字符的 SHA 加换行。没有任何文件被复制。</p>
+  <p>分支不是一个容器，是<b>一个指向 commit 的可移动指针</b>。你提交时，Git 造出新 commit（parent 指向原来的），然后把当前分支这个文件的内容改成新 SHA。所以「分支包含哪些提交」这个说法本身就不准确——分支只指向一个点，历史是靠 commit 的 parent 链回溯出来的。</p>
+  <p><span class="k">HEAD</span> 通常是一个符号引用，内容是 <span class="k">ref: refs/heads/main</span>，意思「我现在在 main 上」。这时候提交，main 会跟着走。如果 HEAD 里直接是一个 SHA，就叫 <b>detached HEAD</b>：你在某个提交上，但不在任何分支上。这时候提交是合法的，新 commit 也有 parent，<b>但没有分支指向它</b>，一旦你切走，它就只能靠 reflog 找回来。</p>
+  <table>
+    <tr><th style="width:190px">操作</th><th>HEAD 变了吗</th><th>分支指针变了吗</th><th>典型用途</th></tr>
+    <tr><td><span class="k">git commit</span></td><td>不变（仍指向分支）</td><td>当前分支前移</td><td>正常提交</td></tr>
+    <tr><td><span class="k">git checkout &lt;branch&gt;</span></td><td>改为指向该分支</td><td>不变</td><td>切分支</td></tr>
+    <tr><td><span class="k">git checkout &lt;sha&gt;</span></td><td>直接指向 SHA（detached）</td><td>不变</td><td>看历史、临时验证</td></tr>
+    <tr><td><span class="k">git reset &lt;sha&gt;</span></td><td>不变</td><td>当前分支回退或前移</td><td>撤销提交</td></tr>
+    <tr><td><span class="k">git branch -f &lt;b&gt; &lt;sha&gt;</span></td><td>不变</td><td>指定分支被挪动</td><td>救火时重建分支</td></tr>
+  </table>
+  <p>这张表能解释一个高频困惑：<b>为什么 reset 之后「当前分支」退了，但别的分支没动</b>。因为 reset 动的是 HEAD 所在的那个分支引用。也解释了 <span class="k">git checkout &lt;sha&gt;</span> 之后为什么提交「丢了」——HEAD 直接指向 SHA，没有分支跟着走。</p>
+  <p>切分支为什么有时会失败？因为切换要更新工作区的文件。如果工作区有未提交的改动，而且目标分支上这些文件内容不同，Git 会拒绝，防止覆盖你的东西。这不是 bug，是保护。要么提交，要么 <span class="k">git stash</span>。<span class="k">git switch</span> 和 <span class="k">git restore</span> 是较新版本拆出来的命令，语义更清楚：switch 管分支，restore 管文件，checkout 两者都能干所以容易误用。</p>
+  <pre><span class="c"># 眼见为实：分支就是一个文件</span>
+cat .git/HEAD                 <span class="c"># ref: refs/heads/main</span>
+cat .git/refs/heads/main      <span class="c"># 一个 40 字符的 SHA</span>
+git rev-parse main            <span class="c"># 同一个值</span>
+
+<span class="c"># 建分支、切分支、在 detached 状态提交</span>
+git switch -c feature/login
+git checkout v1.2.0           <span class="c"># detached HEAD</span>
+git status                    <span class="c"># 会提示 HEAD detached at v1.2.0</span>
+
+<span class="c"># 如果已经在 detached 上提交了，先给它一个名字再走</span>
+git switch -c rescue-detached</pre>
+  <div class="callout warn">
+    <b>detached HEAD 不是错误状态，是「临时查看」状态。</b>看历史、跑一次构建、验证某个 tag，都该用它。危险只发生在「在这里提交然后切走」。养成习惯：在 detached 上一旦要改代码，先 <span class="k">git switch -c</span> 起个分支，一秒的事。
+  </div>
+  <p><b>面试怎么答：</b>「分支就是一个指向 commit 的文件，HEAD 是指向分支的符号引用，所以建分支是 O(1)。提交时只有当前分支前移。HEAD 直接指向 SHA 就是 detached，这时提交不属于任何分支，但对象还在，能用 reflog 找回。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>merge 与 rebase：一个保留事实，一个修饰叙事</h2></div>
+  <p class="lead">「rebase 能让历史更干净」这句话对了一半。它确实线性、好看，但它是<b>重写</b>：每个被搬动的提交都会生成新的 SHA。你在享受干净历史的同时，也把「这段代码是什么时候、基于什么合进来的」这个事实抹掉了。</p>
+  <p>merge 做的是<b>三方合并</b>：以两个分支的共同祖先为基准，把两边的改动合起来，生成一个有两个 parent 的合并提交。历史是真实的树，谁什么时候从哪合进来，一目了然。默认如果目标分支可以直接快进（fast-forward），Git 就不造合并提交，只是把指针前移——这也是「为什么我的 merge 没有合并点」的原因，要保留就加 <span class="k">--no-ff</span>。</p>
+  <p>rebase 做的是<b>重放</b>：找到当前分支独有的提交，逐个应用到新基底上，每个都重新生成 commit。它不产生合并提交，历史是一条直线。代价有三个：哈希全变、冲突可能要解决多次（每个被重放的提交都可能冲突）、以及<b>别人基于旧提交的工作会失去祖先</b>。</p>
+  <table>
+    <tr><th style="width:150px">场景</th><th>推荐</th><th>原因</th></tr>
+    <tr><td>本地分支同步主干</td><td>rebase</td><td>还没推送，重写无成本，历史保持线性</td></tr>
+    <tr><td>功能分支合入主干</td><td>merge --no-ff 或平台 squash</td><td>保留「这是一个完整功能」的边界，回滚时一个提交就能撤</td></tr>
+    <tr><td>公共分支（main、release）</td><td>只 merge，绝不 rebase</td><td>别人的分支基于它，改写会让所有人分叉</td></tr>
+    <tr><td>多个零碎提交要整理</td><td>rebase -i</td><td>合并、改写 message、删掉调试提交，都在推送前做</td></tr>
+    <tr><td>hotfix 回合到多个版本</td><td>cherry-pick</td><td>只需要那一个改动，不需要整条历史</td></tr>
+  </table>
+  <p><b>黄金法则一句话：不要 rebase 任何已经被别人基于其工作过的提交。</b>判断标准不是「推没推送」，而是「有没有人拉过」。有些团队允许 rebase 自己的 PR 分支，因为约定只有作者本人在用；有些团队一律禁止，因为 review 期间别人可能拉下来看。这不是技术问题，是协作约定，面试里能说出「看团队约定」比背教条得分高。</p>
+  <p>squash merge 值得单独提一句。它把整个 PR 压成一个提交合入主干，历史非常干净，但<b>丢失了开发过程的粒度</b>：<span class="k">git bisect</span> 定位问题的精度下降，<span class="k">git blame</span> 也只会指向那一个提交。适合「一个 PR 就是一个完整变更」的团队，不适合需要细粒度追溯的项目。</p>
+  <pre><span class="c"># 看清两种历史的差别</span>
+git log --graph --oneline --all --decorate
+
+<span class="c"># 本地分支同步主干（还没推送）</span>
+git fetch origin
+git rebase origin/main
+
+<span class="c"># 冲突时：解决 → add → continue；想放弃就 abort</span>
+git rebase --continue
+git rebase --abort
+
+<span class="c"># 合并进主干，强制保留合并点</span>
+git switch main
+git merge --no-ff feature/login
+
+<span class="c"># 整理最近 3 个提交（只在自己分支上做）</span>
+git rebase -i HEAD~3</pre>
+  <div class="callout danger">
+    <b>rebase 到一半 abort，是安全的；rebase 完 push -f，才是危险的。</b><span class="k">--abort</span> 会把分支指针退回 ORIG_HEAD，等于什么都没发生。而 push -f 之后，远端历史被替换，别人 <span class="k">pull</span> 会把旧提交和新提交混在一起合并，产生一堆重复内容。真要改公共历史，先通知所有人，改完让他们重新 clone 或硬重置。
+  </div>
+  <p><b>面试怎么答：</b>「merge 是三方合并，保留分叉和合并点，历史真实；rebase 是把提交逐个重放到新基底，生成新哈希，历史线性但事实被改写。所以本地没推送的分支用 rebase 整理，公共分支只 merge。判断能不能 rebase 的标准是有没有人基于它工作过，不是推没推。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>reset 三模式：一个命令，三种破坏力</h2></div>
+  <p class="lead">「git reset 和 git checkout 有什么区别」——这题答「reset 撤销提交，checkout 切分支」只能算及格。真正的区别是：<b>reset 移动分支指针，checkout 移动 HEAD</b>。而 reset 的三个模式，差别在于它顺手把另外两个区也重置到什么程度。</p>
+  <table>
+    <tr><th style="width:110px">模式</th><th>分支指针</th><th>暂存区 index</th><th>工作区</th><th>什么时候用</th></tr>
+    <tr><td><span class="k">--soft</span></td><td>移动</td><td>不动</td><td>不动</td><td>撤销提交但保留全部改动在暂存区，适合「提交早了，想重新组织」</td></tr>
+    <tr><td><span class="k">--mixed</span>（默认）</td><td>移动</td><td>重置到目标提交</td><td>不动</td><td>撤销提交和暂存，改动留在工作区，适合「想重新挑文件提交」</td></tr>
+    <tr><td><span class="k">--hard</span></td><td>移动</td><td>重置</td><td><b>覆盖</b></td><td>彻底回到某个提交，未提交的改动全丢</td></tr>
+  </table>
+  <p>记忆方法：<b>三个模式的破坏力从 soft 到 hard 递增，hard 是唯一会动工作区的</b>。所以「reset --hard 丢代码」这个说法只对了一半：丢的是<b>没有提交的</b>改动。已经提交过的内容，对象还在，指针退回去了而已，reflog 能找回来。</p>
+  <p>还有一个语法差异常被忽略：<span class="k">git reset &lt;commit&gt;</span> 是移动分支；<span class="k">git reset &lt;path&gt;</span> 是「把某个文件在 index 里的版本重置为 HEAD 的版本」，也就是取消暂存，不移动分支。同名命令，两种语义，靠参数区分。取消暂存更推荐用 <span class="k">git restore --staged &lt;path&gt;</span>，意图更明确。</p>
+  <p>reset 能不能用于「撤销已经推送的提交」？技术上可以，但你需要 force push，而这会改写别人的历史。所以公共分支上的撤销一律用 revert。reset 的适用边界是<b>还没被别人拿走的本地历史</b>。</p>
+  <pre><span class="c"># 提交早了：撤销 commit，改动还在暂存区</span>
+git reset --soft HEAD~1
+git status                    <span class="c"># 改动仍是 staged</span>
+
+<span class="c"># 想重新挑文件：撤销 commit 和暂存，改动回到工作区</span>
+git reset HEAD~1              <span class="c"># 等价于 --mixed</span>
+
+<span class="c"># 彻底回退（危险：工作区被覆盖）</span>
+git reset --hard HEAD~1
+
+<span class="c"># 只取消某个文件的暂存，不动提交</span>
+git restore --staged config.yaml
+
+<span class="c"># 退回之后后悔了：先看 reflog，再 reset 回去</span>
+git reflog -5
+git reset --hard HEAD@{1}</pre>
+  <div class="callout warn">
+    <b>reset --hard 之前先 git stash。</b>如果工作区有没提交的东西，一条 <span class="k">git stash push -u</span> 就能把包括未跟踪文件在内的改动收起来，救回来只要 <span class="k">git stash pop</span>。这个动作只花两秒，但它把「不可逆」变成了「可逆」。真正不可逆的是没 add 过又被 <span class="k">checkout -- .</span> 冲掉的改动。
+  </div>
+  <p><b>面试怎么答：</b>「reset 移动的是当前分支指针，三个模式区别在于 index 和工作区要不要一起重置。soft 只挪指针，mixed 再重置 index，hard 连工作区一起覆盖。所以 hard 丢的是未提交的改动，已提交的对象还在 reflog 里。公共分支不能用 reset，只能 revert。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>revert：唯一能安全撤销「已推送」的动作</h2></div>
+  <p class="lead">「线上有个提交有问题，怎么撤？」如果这个提交已经在 main 上，正确答案只有一个：<span class="k">git revert</span>。它不改历史，而是造一个<b>反向提交</b>，把那次改动抵消掉。历史继续往前长，所有人都能正常 pull。</p>
+  <p>revert 和 reset 的区别，本质是「改写过去」和「在现在补偿」。前者需要所有人配合，后者不需要。所以团队协作里，<b>只要提交离开过你的机器，就用 revert</b>。这不是风格偏好，是协作成本的计算。</p>
+  <p>revert 一个 merge 提交会麻烦一点，因为合并提交有两个 parent，Git 不知道你想保留哪一边。必须用 <span class="k">-m 1</span> 指定「主线是第一个 parent」。这个数字很容易搞反：<span class="k">-m 1</span> 表示保留第一个 parent 那一侧的内容，撤销从第二个 parent 合进来的改动。合并的方向不同，1 和 2 的含义就不同，做之前先 <span class="k">git show --format=raw &lt;merge-sha&gt;</span> 看清两个 parent 分别是谁。</p>
+  <p>这里有个几乎人人踩一次的坑：<b>revert 了一个 merge 之后，再 merge 同一个分支，被撤掉的改动不会回来</b>。因为 Git 认为那个分支的历史「已经合并过了」，没有新提交可合。想恢复必须<b>先 revert 那次 revert</b>，把「撤销」这个动作本身撤销掉，然后再合并。面试里能主动说出这一点，说明你真的处理过。</p>
+  <table>
+    <tr><th style="width:190px">场景</th><th>做法</th><th>注意</th></tr>
+    <tr><td>普通提交已推送</td><td><span class="k">git revert &lt;sha&gt;</span></td><td>生成一个新提交，安全</td></tr>
+    <tr><td>连续多个提交</td><td><span class="k">git revert A..B</span></td><td>按从新到旧的顺序生成多个反向提交，可能冲突</td></tr>
+    <tr><td>合并提交</td><td><span class="k">git revert -m 1 &lt;merge-sha&gt;</span></td><td>必须指定 mainline，选错等于撤错半边</td></tr>
+    <tr><td>撤完又想恢复</td><td>revert 那次 revert</td><td>直接重新 merge 不会带回改动</td></tr>
+    <tr><td>只撤某个文件</td><td><span class="k">git checkout &lt;sha&gt; -- path</span></td><td>这会直接改工作区，要再提交一次</td></tr>
+  </table>
+  <pre><span class="c"># 撤销单个提交（会打开编辑器让你写 message）</span>
+git revert 3f9a2c1
+git revert --no-edit 3f9a2c1        <span class="c"># 用默认 message</span>
+
+<span class="c"># 撤销合并提交：先确认两个 parent 谁是主线</span>
+git show --format=raw --no-patch 8b7d4e2
+<span class="c"># parent 1: a1b2c3d   （main 那一侧）</span>
+<span class="c"># parent 2: e4f5a6b   （feature 那一侧）</span>
+git revert -m 1 8b7d4e2
+
+<span class="c"># 后悔了：把「撤销」再撤销一次</span>
+git revert &lt;revert 产生的那个 sha&gt;</pre>
+  <div class="callout">
+    <b>force push 不是完全不能用。</b>自己的 PR 分支、确定没有第二个人拉过、改完立刻合并——这种情况下 <span class="k">git push --force-with-lease</span> 是干净的。它比 <span class="k">--force</span> 多一道保险：如果远端在你 fetch 之后被别人推过，命令会拒绝执行。养成用 lease 的习惯，能避免一类「把同事的提交冲掉」的事故。
+  </div>
+  <p><b>面试怎么答：</b>「已推送的提交只能 revert，不能 reset 后强推，因为强推会让所有人的历史分叉。revert 是造一个反向提交，不改历史。revert 合并提交要用 -m 指定 mainline。还有一个坑：revert 过 merge 之后再 merge 同一分支，改动不会回来，得先把那次 revert 再 revert 掉。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>reflog：本地操作的流水账，最后的保命符</h2></div>
+  <p class="lead">「reset --hard 之后还能救吗？」能，但有个前提：<b>那些内容至少进过 Git 的对象库</b>。reflog 记录的是引用的移动，不是文件系统的变化。所以提交过、暂存过的东西有机会，纯手写没 add 的代码没有。</p>
+  <p>reflog 分两种：HEAD 的 reflog 记录「HEAD 去过哪些提交」，每个分支也有自己的 reflog 记录「这个分支指向过哪些提交」。它是一份纯本地的日志，<b>不会推送，也不会被克隆</b>。所以别人的 reflog 帮不了你，服务器上的 reflog 通常也不存在（裸仓库默认不记录那么细）。</p>
+  <p>默认保留时间是 90 天，不可达对象的 reflog 保留 30 天，具体由 <span class="k">gc.reflogExpire</span> 和 <span class="k">gc.reflogExpireUnreachable</span> 控制，<b>以你环境的配置为准</b>。真正执行 <span class="k">git gc --prune=now</span> 之后，未被引用的对象才会被物理删除——这也是为什么「删了分支」通常没事。</p>
+  <table>
+    <tr><th style="width:230px">事故</th><th>reflog 里长什么样</th><th>怎么恢复</th></tr>
+    <tr><td>reset --hard 退多了</td><td><span class="k">HEAD@{1}: reset: moving to HEAD~3</span></td><td>看前一条的 SHA，<span class="k">git reset --hard &lt;sha&gt;</span></td></tr>
+    <tr><td>rebase 搞砸了</td><td>一串 <span class="k">rebase (start)</span> / <span class="k">rebase (finish)</span></td><td>回到 rebase 开始前那条，或直接 <span class="k">git reset --hard ORIG_HEAD</span></td></tr>
+    <tr><td>误删分支</td><td>分支的 reflog 会随引用一起消失，但 HEAD reflog 里还有那些提交</td><td>找到最后一个 SHA，<span class="k">git branch &lt;name&gt; &lt;sha&gt;</span></td></tr>
+    <tr><td>amend 覆盖了原提交</td><td><span class="k">commit (amend)</span></td><td>取 amend 之前那条的 SHA</td></tr>
+    <tr><td>切到 detached 提交完又切走</td><td><span class="k">checkout: moving from ... to ...</span></td><td>找到那次 commit 的 SHA，建分支</td></tr>
+  </table>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>先停手。</b>发现丢了东西之后，别再执行 reset、checkout、gc 这类会继续挪指针或清理对象的命令。每多操作一次，可选项就少一个。</div></div>
+    <div class="step"><div class="txt"><b>再定位。</b><span class="k">git reflog --date=iso</span> 找最后一次「你确认是对的」那个状态，记下它前面的 SHA。带时间看，比只看哈希容易认。</div></div>
+    <div class="step"><div class="txt"><b>然后固定。</b><span class="k">git branch rescue &lt;sha&gt;</span> 建一个分支指向它。这个动作只加指针、不改任何现状，比直接 reset 安全。</div></div>
+    <div class="step"><div class="txt"><b>验证后合并。</b>切到 rescue 分支看 log 和 diff，确认内容完整，再决定是 merge 回原分支还是把原分支 reset 过来。</div></div>
+  </div>
+  <p>恢复的动作永远是同一个套路：<b>先用 reflog 定位到一个 SHA，再决定是用 <span class="k">reset</span> 把当前分支挪过去，还是用 <span class="k">branch</span> 新建一个分支指向它</b>。前者改变现状，后者只加一个指针、不动任何现有东西——所以救火时优先用后者，更安全。</p>
+  <p>reflog 救不了的情况也要能说清：从没 add 过的改动（不在对象库里）、被 <span class="k">git checkout -- .</span> 冲掉的工作区修改、已经 gc 掉的悬空对象、以及别人机器上的操作。回答「reflog 什么都能救」会被追问到答不上来。</p>
+  <pre><span class="c"># 带时间和动作看，比 --oneline 有用</span>
+git reflog --date=iso -20
+git reflog show main -10            <span class="c"># 只看某个分支的移动</span>
+
+<span class="c"># 救火标准动作：先建分支指向旧提交，确认没问题再合并</span>
+git branch rescue 3f9a2c1
+git switch rescue
+git log --oneline -5
+
+<span class="c"># 确认无误后，把原分支挪过去（或者直接 merge）</span>
+git switch main
+git reset --hard rescue
+
+<span class="c"># rebase 之后想整个退回</span>
+git reset --hard ORIG_HEAD</pre>
+  <div class="callout ok">
+    <b>把 reflog 当安全带，不是当刹车。</b>它保证「提交过的东西几乎不会真丢」，但不保证「你的操作没影响别人」。rewrite 历史之后再靠 reflog 退回，只救了自己，别人的仓库已经乱了。所以真正该练的是「破坏性操作前先看一眼有没有推送」。
+  </div>
+  <p><b>面试怎么答：</b>「reflog 记录 HEAD 和分支引用的移动，是本地日志，不推送。reset、rebase、amend、误删分支都能靠它找回，因为对象还在，只是没有引用。恢复时我优先 git branch rescue &lt;sha&gt; 建个新分支，而不是直接 reset，这样不动现状。它救不了没进过对象库的改动。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>cherry-pick：复制一个提交，也复制一份麻烦</h2></div>
+  <p class="lead">「把这个修复也发到 release 分支上。」最顺手的做法是 cherry-pick。它确实只拿一个改动，但它<b>造了一个新的提交</b>，和原提交没有任何关联。等到两个分支要合并时，同一处改动会以两个不同 SHA 的身份出现，冲突就是这么来的。</p>
+  <p>cherry-pick 的语义是「取某个提交引入的差异，应用到当前 HEAD 上，然后提交」。它是复制，不是移动；原分支上的提交不受影响。所以它适合<b>把单个修复搬到别的分支</b>，不适合「把整个功能搬过去」——后者应该 merge 或 rebase。</p>
+  <p><span class="k">-x</span> 参数会在 message 末尾追加一行「cherry picked from commit …」，把来源记下来。这个习惯在长期维护多版本的项目里非常值钱：半年后有人问「这个修复是不是也进了 1.8」，一行 grep 就能回答。</p>
+  <table>
+    <tr><th style="width:200px">用法</th><th>作用</th><th>注意</th></tr>
+    <tr><td><span class="k">git cherry-pick &lt;sha&gt;</span></td><td>复制单个提交</td><td>生成新 SHA</td></tr>
+    <tr><td><span class="k">git cherry-pick A..B</span></td><td>复制一段（不含 A，含 B）</td><td>区间语义容易记反，先 <span class="k">git log</span> 确认</td></tr>
+    <tr><td><span class="k">git cherry-pick -x &lt;sha&gt;</span></td><td>附带来源信息</td><td>多版本维护必备</td></tr>
+    <tr><td><span class="k">git cherry-pick -n &lt;sha&gt;</span></td><td>只应用改动，不自动提交</td><td>想合多个提交时用，避免一串碎提交</td></tr>
+    <tr><td><span class="k">git cherry-pick --continue</span></td><td>冲突解决后继续</td><td>也可以 <span class="k">--skip</span> / <span class="k">--abort</span></td></tr>
+  </table>
+  <p>最常见的误用是拿 cherry-pick 代替合并。一个功能拆成 8 个提交，为了「干净」挑其中 3 个过去，剩下 5 个留在原分支。三个月后两边合并，被挑过的 3 处会冲突，因为 Git 看到的是两套不同的改动。正确做法要么整条分支 merge，要么在目标分支上重新实现。<b>cherry-pick 是外科手术，不是搬家。</b></p>
+  <pre><span class="c"># 单个修复回合到 release</span>
+git switch release/1.8
+git cherry-pick -x 3f9a2c1
+
+<span class="c"># 冲突：解决后继续；不想干了就退出</span>
+git status
+git add fixed-file.go
+git cherry-pick --continue
+git cherry-pick --abort
+
+<span class="c"># 一次搬多个但不产生一堆提交</span>
+git cherry-pick -n A..B
+git commit -m "backport: rate limit fix"
+
+<span class="c"># 检查某个提交是否已经在当前分支（按 patch-id 比对）</span>
+git cherry -v main release/1.8</pre>
+  <p><span class="k">git cherry -v</span> 这个命令值得记住：它按补丁内容比对，告诉你哪些提交「等价地」已经在了（前面是减号），哪些还没（加号）。合并前跑一次，比人肉比对 commit message 可靠得多。</p>
+  <p><b>面试怎么答：</b>「cherry-pick 是把某个提交的差异复制到当前分支，生成新哈希，原分支不受影响。它适合单个 hotfix 回合，不适合代替合并，因为会产生内容重复的提交，后续合并必冲突。加 -x 记录来源，多版本维护时很有用。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>团队流程与三类事故：规则要写进机器里</h2></div>
+  <p class="lead">「你们团队用什么分支模型」这题，答「GitFlow」或「trunk-based」只是开头。面试官真正想听的是：<b>你的规则靠什么执行</b>。写在文档里的规范，第二天就没人看了；写成保护分支和 hook，才叫规则。</p>
+  <p>两种主流模型的取舍很清晰。GitFlow 有 develop、release、hotfix 多条长期分支，适合有明确版本发布周期的产品（客户端、私有化部署）；trunk-based 只有一条主干加大量短生命周期分支，适合持续部署的 Web 服务，因为它把合并频率拉到最高，冲突最小。中间路线是「主干 + release 分支」，发布时从主干切一条出来只接受 cherry-pick 的修复。</p>
+  <table>
+    <tr><th style="width:170px">规则</th><th>靠什么保证</th><th>效果</th></tr>
+    <tr><td>主干不可直接推</td><td>保护分支 + 必须 PR + 必须过 CI</td><td>挡住 90% 的误操作</td></tr>
+    <tr><td>提交前查密钥和大文件</td><td>pre-commit hook、服务端 pre-receive</td><td>避免历史污染，改历史成本极高</td></tr>
+    <tr><td>PR 小而聚焦</td><td>约定 + review 打回</td><td>review 质量上升，回滚粒度清晰</td></tr>
+    <tr><td>提交信息可读</td><td>commitlint / 模板</td><td>release notes 能自动生成</td></tr>
+    <tr><td>发布可追溯</td><td>annotated tag + 构建产物关联 SHA</td><td>线上出问题能定位到代码版本</td></tr>
+  </table>
+  <p>三类事故的处理方式要能背下来。<b>push 错分支</b>：如果刚推、没人拉，可以 <span class="k">reset</span> 后 <span class="k">push --force-with-lease</span>；如果已经有人拉了，只能 revert，别去改历史。<b>提交了大文件</b>：<span class="k">git rm --cached</span> 只能让后续提交不含它，历史里那份还在，仓库照样大；要彻底清掉必须重写历史（<span class="k">git filter-repo</span> 是现在推荐的工具），代价是所有人重新 clone。<b>误删分支</b>：本地用 reflog 重建，远端被删就看平台上的 PR 记录，那里通常存着 head SHA。</p>
+  <p>面试里还有一个很实用的小题：「线上跑的到底是哪个提交？」答案是<b>看构建产物里嵌入的 SHA</b>，不是看 tag——tag 可以移动，SHA 不会。规范做法是构建时把 <span class="k">git rev-parse --short HEAD</span> 写进镜像标签、二进制版本号或者页脚，出问题时一眼对上。</p>
+  <pre><span class="c"># 事故一：刚推到错分支，确认没人拉过再强推（带 lease）</span>
+git switch feature/right-branch
+git cherry-pick &lt;刚才那个 sha&gt;
+git switch wrong-branch
+git reset --hard origin/wrong-branch
+git push --force-with-lease
+
+<span class="c"># 事故二：大文件已经提交</span>
+git rm --cached big.iso
+git commit -m "remove big file from tracking"
+<span class="c"># 历史里仍有，需要重写（会影响所有人，先协调）</span>
+<span class="c"># git filter-repo --path big.iso --invert-paths</span>
+
+<span class="c"># 事故三：误删本地分支</span>
+git reflog -20
+git branch recovered 3f9a2c1
+
+<span class="c"># 确认线上版本</span>
+git rev-parse --short HEAD</pre>
+  <div class="callout danger">
+    <b>改历史是「一次操作，全员买单」。</b>filter-repo 之后所有 commit 的 SHA 都变，别人手里的仓库无法正常 pull，只能重新 clone。所以做之前必须：通知所有人、冻结推送、备份镜像、约定切换时间。这不是技术难度问题，是协调成本问题——面试里能说出这一层，比会敲命令更值钱。
+  </div>
+  <p><b>面试怎么答：</b>「分支模型我按发布节奏选：持续部署用 trunk-based 加短分支，有版本周期就用主干加 release 分支。但关键不是模型，是规则怎么落地——保护分支、必须过 CI、hook 拦大文件和密钥。事故处理分三种：没推送可以 reset 强推，推送了只能 revert，大文件要重写历史并让所有人重新 clone。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>九个坑：每一个都能让别人陪你加班</h2></div>
+  <p class="lead">Git 的坑有个特点：<b>本地操作几乎都能恢复，影响别人的操作几乎都不能</b>。所以下面九条里，凡涉及 push 的，后果都比你以为的严重一档。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">在公共分支上 rebase 然后强推</div><div class="pd">所有基于旧提交的分支都会失去共同祖先，同事 pull 之后会看到重复提交和满屏冲突。公共分支只允许 merge 和 revert，这是硬边界。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把 reset --hard 当成「撤销提交」的通用手段</div><div class="pd">它是唯一会覆盖工作区的模式。想撤销提交却保留改动，用 --soft 或 --mixed。养成习惯：执行前先 git stash，把不可逆变成可逆。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为 revert 了 merge 就干净了</div><div class="pd">之后再 merge 同一分支，被撤掉的改动<b>不会</b>回来，因为 Git 认为那条历史已经合并过。必须先把那次 revert 再 revert 掉，然后重新合并。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">用 checkout 恢复文件，冲掉了未提交的修改</div><div class="pd">git checkout -- &lt;file&gt; 是拿 index 或 HEAD 覆盖工作区，覆盖掉的内容不在对象库里，reflog 救不了。改文件用 restore，切分支用 switch，语义清楚就不容易误伤。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">以为 reflog 能救一切</div><div class="pd">它只记录引用移动。从没 add 过的改动、被覆盖的工作区内容、gc 之后的悬空对象，都救不回来。而且 reflog 是本地的，别人的机器上帮不了你。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">git add . 一把梭</div><div class="pd">把 .env、密钥、几百兆的测试数据一起提交。一旦进了历史，删掉文件也不够，得重写历史。提交前至少跑一次 git status 和 git diff --cached，看清到底加了什么。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">在 detached HEAD 上改代码，然后切走</div><div class="pd">提交是成功的，但没有分支指向它，git log 里看不到，看起来像凭空消失。切走之前先 git switch -c 起个名字，一秒的事。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用 cherry-pick 代替合并</div><div class="pd">同一处改动以两个不同 SHA 存在两条分支上，合并时必冲突，而且 git blame 会指到两个不同的人。cherry-pick 只适合搬单个修复，不适合搬功能。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 --force 而不是 --force-with-lease</div><div class="pd">--force 无条件覆盖远端，会把别人刚推的提交冲掉。--force-with-lease 会检查远端是否还是你上次看到的状态，不匹配就拒绝。多打几个字符，少一次事故。</div></div></div>
+  <p><b>面试怎么答：</b>挑一条讲，重点放在「后来我加了什么机制」。比如「我曾经 add . 提交过一个密钥，从那以后我在项目里加了 pre-commit 检查，并且把 .env 写进 .gitignore 模板」。只说踩过坑，说明你还会再踩；说出机制，才说明这事结束了。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个 commit 对象里存的是什么？</div>
+      <button class="opt">相对上一个版本的差异（diff）</button>
+      <button class="opt">只存改动的文件名和行号</button>
+      <button class="opt">指向一棵 tree 的引用，也就是整个目录的快照，外加父提交和元信息</button>
+      <button class="opt">工作区的完整拷贝，包括未跟踪文件</button>
+      <div class="ans">正确答案：<b>快照</b>。commit 指向一棵 tree，tree 里是该目录下所有文件对应的 blob，等于整个项目的快照。diff 是拿两个快照现算的，不是提交时存下来的。这也解释了为什么改一个字节，commit 的哈希就全变。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. <span class="k">git reset HEAD~1</span>（默认 mixed）执行后，下面哪句正确？</div>
+      <button class="opt">提交、暂存区、工作区全部回退，改动丢失</button>
+      <button class="opt">分支指针回退一个提交，暂存区被重置，工作区的改动保留</button>
+      <button class="opt">只取消暂存，分支指针不动</button>
+      <button class="opt">生成一个反向提交来抵消上一次改动</button>
+      <div class="ans">正确答案：<b>指针回退 + 暂存区重置 + 工作区保留</b>。mixed 是默认模式：移动当前分支指针、把 index 重置到目标提交、不动工作区。所以改动还在，只是变成了未暂存状态。soft 会保留暂存，hard 才会覆盖工作区。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 一个有问题的提交已经推到公共 main 分支，正确的撤销方式是？</div>
+      <button class="opt">git reset --hard HEAD~1 然后 git push --force</button>
+      <button class="opt">git rebase -i 删掉那个提交再强推</button>
+      <button class="opt">删掉远端分支重新推一次</button>
+      <button class="opt">git revert 那个提交，生成一个反向提交</button>
+      <div class="ans">正确答案：<b>revert</b>。已经有别人基于 main 工作时，改写历史会让所有人的仓库分叉。revert 造一个反向提交，历史继续前进，别人正常 pull 就行。force push 只适用于确认没人拉过的私有分支。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. rebase 之后发现搞错了，原来的提交还在吗？</div>
+      <button class="opt">在，reflog 里能找到 rebase 之前的 SHA，可以 reset 回去</button>
+      <button class="opt">不在，rebase 会立即删除旧提交，只能重写</button>
+      <button class="opt">在，但只能从远端拉回来</button>
+      <button class="opt">取决于有没有开 gc，默认一定被删</button>
+      <div class="ans">正确答案：<b>在</b>。rebase 只是造了新提交、把分支指针挪过去，旧提交变成不可达对象，但没被删除。reflog 里还留着操作前的 SHA，<span class="k">git reset --hard ORIG_HEAD</span> 或指向那个 SHA 就能回去。要等 gc 清理且过了保留期才会真消失。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 用 <span class="k">revert -m 1</span> 撤销了一个合并提交，过几天再 merge 同一个分支，会发生什么？</div>
+      <button class="opt">被撤销的改动会自动回来</button>
+      <button class="opt">merge 会失败，必须强推</button>
+      <button class="opt">改动不会回来，因为 Git 认为该分支已经合并过，需要先 revert 那次 revert</button>
+      <button class="opt">会产生冲突，解决冲突后改动就回来了</button>
+      <div class="ans">正确答案：<b>不会回来</b>。撤销合并后，那条分支上并没有新提交，Git 判断「已经合并过」，所以再 merge 不会带入任何东西。恢复的办法是把那次 revert 再 revert 一次，让「撤销」这个动作本身被抵消，然后重新合并。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 手写了两小时代码，从未 git add，不小心 <span class="k">git checkout -- .</span>。能用 reflog 救回来吗？</div>
+      <button class="opt">能，reflog 记录所有文件变化</button>
+      <button class="opt">不能，这些内容从未进入对象库，reflog 只记录引用移动</button>
+      <button class="opt">能，只要在 90 天内都可以</button>
+      <button class="opt">能，用 git fsck 可以恢复工作区文件</button>
+      <div class="ans">正确答案：<b>不能</b>。reflog 记录的是 HEAD 和分支引用的移动，不是文件系统的编辑历史。没 add 过的内容从来没变成 blob，Git 里没有任何副本。这也说明为什么「先 add 再实验」是个好习惯：进了 index 就有对象了。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>blob</b></td><td>存文件内容的对象，不含文件名，相同内容只存一份</td></tr>
+    <tr><td><b>tree</b></td><td>存一层目录结构，把文件名映射到 blob 或子 tree</td></tr>
+    <tr><td><b>commit</b></td><td>指向根 tree 的快照对象，带 parent、作者、时间和 message</td></tr>
+    <tr><td><b>HEAD</b></td><td>指向当前分支的符号引用；直接指向 SHA 时就是 detached</td></tr>
+    <tr><td><b>index / 暂存区</b></td><td>「下次提交长什么样」的清单，支持部分提交和分步合并</td></tr>
+    <tr><td><b>fast-forward</b></td><td>目标分支可以直接前移、不需要真正合并时，Git 默认不造合并提交</td></tr>
+    <tr><td><b>三方合并</b></td><td>以共同祖先为基准合并两边改动，merge 的核心算法</td></tr>
+    <tr><td><b>rebase</b></td><td>把提交逐个重放到新基底，生成新哈希，历史线性</td></tr>
+    <tr><td><b>squash</b></td><td>把多个提交压成一个，历史干净但丢失过程粒度</td></tr>
+    <tr><td><b>ORIG_HEAD</b></td><td>危险操作前的位置备份，rebase / reset 之后可以直接回退</td></tr>
+    <tr><td><b>reflog</b></td><td>本地引用移动的流水账，救 reset / rebase / 误删分支的主要手段</td></tr>
+    <tr><td><b>cherry-pick</b></td><td>复制单个提交的改动到当前分支，生成新哈希</td></tr>
+    <tr><td><b>mainline</b></td><td>revert 合并提交时用 -m 指定的那一侧 parent</td></tr>
+    <tr><td><b>force-with-lease</b></td><td>带远端状态校验的强推，比 --force 安全</td></tr>
+  </table>
+
+  <div class="cmds">
+    <div class="crow"><code>git reflog --date=iso -20</code><span class="desc">救火第一步，看引用都去过哪</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git branch rescue &lt;sha&gt;</code><span class="desc">先建分支指向旧提交，不动现状</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git reset --soft HEAD~1</code><span class="desc">撤销提交但保留改动在暂存区</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git revert -m 1 &lt;merge-sha&gt;</code><span class="desc">撤销合并提交，必须指定主线</span><button class="copy">复制</button></div>
+    <div class="crow"><code>git push --force-with-lease</code><span class="desc">只在确认没人拉过时用，带远端校验</span><button class="copy">复制</button></div>
+  </div>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 建一个临时仓库，故意 <span class="k">reset --hard</span> 三次，每次用 reflog 救回来，把这个动作练成肌肉记忆；② 造两条冲突的分支，一条 merge、一条 rebase，用 <span class="k">git log --graph</span> 对比历史形状；③ 制造一个合并提交，revert -m 1 之后重新 merge，亲眼看到改动不回来，然后再 revert 那次 revert。<br><br>
+    <b>之后值得单独学：</b>第 19 期讲 CI/CD，会解释为什么流水线里要用不可变制品、为什么构建产物必须带 SHA；第 24 期讲简历与项目，可以用 Git 历史讲「你怎么协作」；第 25 期的 Shell 脚本会用到 hook，把提交规范变成机器执行。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 27 期 · 面试问 Git，考的不是你记得几个命令，是你知不知道哪些操作只影响自己、哪些会让全组陪你改历史</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

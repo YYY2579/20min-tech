@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redis 面试：三大缓存问题、持久化与集群</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 18 期</span>
+    <h1>Redis 面试：三大缓存问题、持久化与集群</h1>
+    <p class="sub">穿透、击穿、雪崩看着像，<b>解法完全不同</b>——答混一个词，后面全崩。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>20</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>16</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：一个 key 过期引发数据库被打穿，这叫击穿还是雪崩？区别在哪一个词上？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个词，三种病，三张不同的药方</h2></div>
+  <p class="lead">面试官问「说说缓存击穿和雪崩的区别」，候选人答「一个是单个 key，一个是很多 key」——听起来对，但接着问「那为什么单个 key 要用互斥锁，很多 key 要用随机 TTL」，就答不出来了。<b>因为这两个问题的病灶根本不在一个位置。</b></p>
+  <p>把三件事拆到最细：<b>穿透</b>是查了一个根本不存在的数据，缓存永远不命中；<b>击穿</b>是一个热点 key 到期的那一瞬间，所有并发都涌向数据库；<b>雪崩</b>是大量 key 同时失效，或者 Redis 整体不可用。前两个是「命中率」问题，第三个是「可用性」问题。</p>
+  <table>
+    <tr><th style="width:100px">现象</th><th style="width:150px">病灶</th><th style="width:150px">关键特征</th><th>解法方向</th></tr>
+    <tr><td><b>穿透</b></td><td>数据不存在，缓存和数据库都没有</td><td>每次请求都穿过缓存打到库，QPS 与恶意请求量成正比</td><td>布隆过滤器提前拦截；空值缓存设短 TTL；参数合法性校验</td></tr>
+    <tr><td><b>击穿</b></td><td>单个热点 key 过期</td><td>某一秒数据库 QPS 尖刺，之后自动恢复</td><td>互斥重建（只放一个请求进库）；逻辑过期（永不阻塞读）</td></tr>
+    <tr><td><b>雪崩</b></td><td>大批 key 同时失效，或 Redis 挂了</td><td>数据库持续高压，不是尖刺而是平台期，往往伴随超时级联</td><td>TTL 打散；多级缓存；熔断限流；Redis 自身高可用</td></tr>
+  </table>
+  <p>另外两个高频误解也得先拆掉。第一，<b>「Redis 是单线程」这句话在 6.0 之后就不准确了</b>，但它快的原因确实和线程模型有关，第 1 节会讲清楚哪部分是单线程、为什么单线程反而快。第二，<b>「用了 SET NX 就是分布式锁」也不对</b>，锁的难点不在加锁，在释放、续期和主从切换。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>先看命中</div><div class="cd">缓存问题本质是命中率问题。命中率掉了，压力一定转移到数据库，这是所有连锁反应的第一环。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>再看并发</div><div class="cd">同一时刻有多少请求在等同一个 key。这个数字决定了要不要加锁、加锁会不会把 RT 拖长。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>最后看一致性</div><div class="cd">缓存和数据库谁先写、允许脏多久。这一层没有「完美方案」，只有「你接受多大的窗口」。</div></div>
+  </div>
+  <p>这篇的顺序是：先讲清 Redis 自己的能力边界（线程模型、数据结构、持久化、集群），再讲基于这些能力怎么解决缓存问题，最后落在分布式锁这种「用 Redis 做协调」的场景。因为绝大多数答错的根源，是把 Redis 当成了一个不会出错的抽象。</p>
+  <p><b>面试落点：</b>「这三个问题我按『谁失效』来分：数据不存在是穿透，单个热点 key 失效是击穿，批量失效或实例不可用是雪崩。穿透要挡、击穿要串行化重建、雪崩要分摊和兜底，处理手段不重叠。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>单线程的真实含义：命令执行是一条流水线</h2></div>
+  <p class="lead">「Redis 单线程为什么还这么快？」标准答案有三条：纯内存、IO 多路复用、单线程免锁。背完这三条只能拿及格分，因为面试官会追问：「那 6.0 为什么又加多线程？是不是推翻了原来的设计？」</p>
+  <p>先纠正一个事实：<b>Redis 从来不是「所有事情一个线程」。</b>它一直有后台线程处理 close 文件描述符、AOF fsync 这类耗时动作；6.0 引入的 <span class="k">io-threads</span> 是把<b>网络读写和协议解析</b>分摊到多个线程，<b>命令的执行仍然是单线程</b>。所以「单线程」指的是「命令串行执行」，不是「进程只有一个线程」。</p>
+  <p>为什么命令执行要坚持单线程？因为这样每个命令天然原子，不需要为数据结构加锁，省掉了锁竞争和上下文切换；配合 epoll 多路复用，一个线程就能同时盯着上万个连接。代价也很明确：<b>一条慢命令会挡住所有连接</b>，这是 Redis 最重要的一个约束。</p>
+  <table>
+    <tr><th style="width:200px">操作</th><th>复杂度</th><th>为什么要小心</th></tr>
+    <tr><td><span class="k">KEYS *</span></td><td>O(N)</td><td>百万 key 的实例上能阻塞几百毫秒到数秒，线上应该禁用，改用 SCAN</td></tr>
+    <tr><td><span class="k">HGETALL</span> 大 hash</td><td>O(N)</td><td>十万字段的 hash 一次返回，网络和内存双爆，还会阻塞后续命令</td></tr>
+    <tr><td><span class="k">DEL</span> 大 key</td><td>O(N)</td><td>释放几十万元素要很久，用 UNLINK 把释放动作丢给后台线程</td></tr>
+    <tr><td><span class="k">FLUSHALL</span></td><td>O(N)</td><td>同步清空，实例大时直接卡死，4.0 起可用 ASYNC 参数</td></tr>
+    <tr><td>长 Lua 脚本</td><td>不可中断</td><td>脚本执行期间整个实例停摆，必须控制执行时间</td></tr>
+  </table>
+  <pre><span class="c"># 慢日志：默认阈值 10000 微秒，先看有没有超过 10ms 的命令</span>
+SLOWLOG GET 10
+CONFIG SET slowlog-log-slower-than 5000
+CONFIG SET slowlog-max-len 256
+
+<span class="c"># 用 SCAN 代替 KEYS：游标迭代，每次只返回一小批</span>
+SCAN 0 MATCH shop:item:* COUNT 200
+
+<span class="c"># 删大 key 用 UNLINK（4.0+），把内存释放放到后台</span>
+UNLINK big:hash:2026
+
+<span class="c"># 6.0+ 的网络 IO 多线程，默认关闭；开了也别超过 CPU 核数</span>
+CONFIG GET io-threads
+CONFIG SET io-threads 4
+
+<span class="c"># 看一条命令到底有多慢、卡在什么阶段</span>
+LATENCY DOCTOR
+LATENCY HISTORY command</pre>
+  <div class="callout warn">
+    <b>Pipeline 不是万能的。</b>它能减少 RTT，把 100 次网络往返压成 1 次，但<b>不减少命令执行时间</b>，也不保证原子性——中间可能插入别的客户端的命令。要原子就用 MULTI/EXEC 或 Lua。另外 pipeline 一次塞太多命令，服务端要缓存整批回复，内存会顶上去，几百到几千条一批比较稳妥。
+  </div>
+  <p><b>面试落点：</b>「Redis 的单线程指命令执行串行，网络 IO 在 6.0 之后可以多线程。它快是因为纯内存、避免锁竞争、epoll 多路复用，不是因为『一个线程特别能干』。这套设计的代价是慢命令会阻塞全局，所以线上要禁 KEYS、控制大 key、用 UNLINK 代替 DEL、限制 Lua 脚本时长。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>数据结构与编码：你写的 list，底层可能换了三次</h2></div>
+  <p class="lead">「Redis 有五种数据类型」这句话本身没错，但只说这个，等于不知道 Redis 为什么会省内存。真正决定内存占用和操作延迟的，是每种类型在元素数量、元素大小时的<b>底层编码切换</b>。</p>
+  <p>先说 String。它是唯一被所有其他结构复用的基础类型，底层是 SDS（简单动态字符串），相比 C 字符串多存了长度和剩余空间：取长度 O(1)、二进制安全、追加时按需扩容。<b>编码分三档</b>：能转成整数就存成 int；短字符串（44 字节以内）用 embstr，对象头和内容一次分配；更长的用 raw，分开分配。</p>
+  <table>
+    <tr><th style="width:90px">类型</th><th>小数据编码</th><th>大数据编码</th><th>切换的大致条件</th></tr>
+    <tr><td><b>String</b></td><td>int / embstr</td><td>raw</td><td>能否解析为整数、长度是否超过 44 字节</td></tr>
+    <tr><td><b>List</b></td><td>listpack 组成的 quicklist</td><td>同样是 quicklist，只是节点更大</td><td>7.0 起 quicklist 的节点用 listpack，早期版本是 ziplist</td></tr>
+    <tr><td><b>Hash</b></td><td>listpack</td><td>hashtable</td><td>字段数或单个 value 长度超过阈值（默认 128 个 / 64 字节，以配置为准）</td></tr>
+    <tr><td><b>Set</b></td><td>intset（全整数）/ listpack</td><td>hashtable</td><td>出现非整数元素，或元素数超过阈值</td></tr>
+    <tr><td><b>ZSet</b></td><td>listpack</td><td>skiplist + dict</td><td>元素数或成员长度超过阈值；两个结构同时维护，一个管排序一个管查分</td></tr>
+  </table>
+  <p>为什么小数据要用 listpack 这类紧凑结构？因为它把元素连续存放在一块内存里，<b>省掉了每个元素一份指针和对象头的开销</b>。一个几万字段的 hash，用 hashtable 存可能要几十 MB，用 listpack 只要几 MB。代价是插入删除要移动内存、查找是线性扫描，所以元素一多就必须转成 hashtable。</p>
+  <p>ZSet 的 skiplist + dict 组合值得单独说：dict 提供 O(1) 的「按成员查分数」，skiplist 提供 O(log N) 的「按分数范围取」。<b>两个索引指向同一份数据</b>，所以内存是双份的，但换来两类操作都很快。为什么不用红黑树？范围查询时 skiplist 只要顺着底层链表走，红黑树要做中序遍历，实现和并发控制都更麻烦。</p>
+  <pre><span class="c"># 看一个 key 的真实编码和内存占用（编码比类型更有信息量）</span>
+OBJECT ENCODING shop:item:1001
+MEMORY USAGE shop:item:1001
+
+<span class="c"># 小 hash 用 listpack：字段少、value 短，内存极省</span>
+HSET user:1001 name "张三" age 28 city "杭州"
+OBJECT ENCODING user:1001        <span class="c"># 期望 listpack</span>
+
+<span class="c"># 塞入超过阈值的字段，编码会自动变成 hashtable，且不会自动变回来</span>
+<span class="c"># 阈值名字在 7.0 从 *-ziplist-* 改成了 *-listpack-*，以你的版本 CONFIG GET 为准</span>
+CONFIG GET hash-max-listpack-entries
+CONFIG GET hash-max-listpack-value
+
+<span class="c"># ZSet 的范围查询走 skiplist，按分数取前 10</span>
+ZADD rank:2026 980 "u1" 870 "u2" 760 "u3"
+ZREVRANGE rank:2026 0 9 WITHSCORES
+ZRANGEBYSCORE rank:2026 800 1000 WITHSCORES</pre>
+  <div class="callout">
+    <b>编码转换是单向的。</b>一个 hash 曾经涨到 200 个字段变成 hashtable，即使后来删到只剩 3 个字段，编码也不会退回 listpack。所以「先用大 key 试跑，再删数据」这种操作会把内存永久撑大。判断大 key 用 <span class="k">redis-cli --bigkeys</span> 或 <span class="k">MEMORY USAGE</span>，别靠猜。
+  </div>
+  <p><b>面试落点：</b>「Redis 的性能不只取决于类型，还取决于编码。小数据用 listpack/intset 这类紧凑结构省内存，超过阈值转成 hashtable 或 skiplist 保证操作复杂度。ZSet 大编码是 skiplist 加 dict 双结构，一个管范围、一个管点查。这个切换是单向的，所以设计 key 的时候就要预估字段规模。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>穿透：查一个不存在的东西，谁都救不了你</h2></div>
+  <p class="lead">攻击者用一个不存在的商品 ID 发起十万 QPS。缓存里没有，数据库里也没有，于是每个请求都完整地走了一遍「查缓存 → 查库 → 回写空」。<b>缓存对不存在的 key 是无效的</b>，这就是穿透的本质。</p>
+  <p>注意它和击穿的区别：击穿是「数据存在，但缓存刚过期」，穿透是「数据压根不存在」。前者有明确的恢复时点，后者只要请求还在，压力就一直在。所以穿透的危害更像 CC 攻击，而不是性能问题。</p>
+  <p>三种解法，强度依次递增：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>参数校验</b>：ID 必须是正整数、必须在合法区间、必须符合业务格式。这一层能挡掉大部分粗糙的扫描，成本几乎为零，但很多人跳过。</div></div>
+    <div class="step"><div class="txt"><b>空值缓存</b>：查库为空也写一个特殊值进缓存，TTL 设短（几十秒到几分钟）。实现简单，缺点是会占内存，且在海量随机 ID 攻击下会写入大量垃圾 key。</div></div>
+    <div class="step"><div class="txt"><b>布隆过滤器</b>：把所有存在的 key 预先灌进去，查询前先问一句「可能存在吗」。说不存在就一定不存在，可以直接返回；说存在则可能有误判，继续走正常流程。</div></div>
+  </div>
+  <p>布隆过滤器的两个硬限制必须知道：<b>有假阳性、没有假阴性</b>（可能误判存在，绝不会误判不存在），以及<b>标准实现不支持删除</b>——因为一个 bit 可能被多个元素共享，删一个会影响别人。要支持删除得用计数布隆（counting bloom）或换 Cuckoo Filter，代价是内存和复杂度上升。</p>
+  <pre><span class="c"># RedisBloom 模块提供的布隆命令（需要先加载模块，原生 Redis 没有）</span>
+BF.RESERVE sku:bloom 0.01 1000000
+<span class="c"># 参数：误判率 1%，预估元素数 100 万。误判率越低、元素越多，占用内存越大</span>
+
+BF.ADD sku:bloom SKU1001
+BF.EXISTS sku:bloom SKU1001      <span class="c"># 1，可能存在</span>
+BF.EXISTS sku:bloom SKU9999      <span class="c"># 0，一定不存在，直接返回空</span>
+
+<span class="c"># 没有模块时，用空值缓存兜底：值写一个特殊标记，TTL 要短</span>
+SET shop:item:9999 "__NULL__" EX 60
+<span class="c"># 回写时注意：正常数据的 TTL 要远长于空值，否则会把「不存在」的结论缓存太久</span>
+
+<span class="c"># 布隆过滤器的信息：看误判率和已用容量</span>
+BF.INFO sku:bloom</pre>
+  <div class="callout danger">
+    <b>空值缓存的坑在「数据后来被创建了」。</b>用户查一个还没上架的商品，缓存了空值 5 分钟；商品上架后，这 5 分钟内所有人看到的还是「不存在」。所以空值 TTL 要短，并且在写入路径上主动删掉这个空值 key。任何「缓存否定结论」的设计，都要同步考虑结论失效的那一刻。
+  </div>
+  <p><b>面试落点：</b>「穿透是查询不存在的数据，缓存永远不会命中。我会分三层处理：参数合法性校验挡掉明显非法的请求，空值缓存挡住偶发的重复查询，布隆过滤器挡随机 ID 扫描。布隆有假阳性、不支持删除，所以它只适合做前置拦截，不能当作唯一的数据源判断。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>击穿：一个热点 key 过期，一秒内数据库流量翻十倍</h2></div>
+  <p class="lead">大促零点，首页 banner 的缓存 key 恰好到期。这一毫秒开始，几千个并发同时发现「缓存没了」，然后一起去查同一条 SQL。<b>数据库没做错任何事，它只是被同一个问题问了几千遍。</b></p>
+  <p>这就是击穿。它的特征是「单点、瞬时、自愈」：只影响一个 key，持续几十毫秒到几秒，等第一个请求把缓存重建好就恢复。但如果这个 key 的查询很重（比如多表 JOIN 加聚合），重建要 2 秒，那这 2 秒里数据库可能已经被打死，之后就算缓存好了也恢复不了——<b>自愈是有前提的</b>。</p>
+  <p>两种主流解法，选择取决于你能不能接受「读旧数据」：</p>
+  <table>
+    <tr><th style="width:150px">方案</th><th>怎么做</th><th>代价</th></tr>
+    <tr><td><b>互斥重建</b></td><td>只让拿到锁的那个请求去查库并回写，其他请求短暂等待后重试或走兜底</td><td>读会被阻塞一小段；锁本身可能失效（见模块 9）</td></tr>
+    <tr><td><b>逻辑过期</b></td><td>value 里带一个 expireAt，Redis 层面不设 TTL；发现逻辑过期就返回旧值，同时异步重建</td><td>会读到过期数据；实现复杂，需要额外的重建触发机制</td></tr>
+  </table>
+  <pre><span class="c"># 互斥重建的骨架（伪代码，重点是顺序，不是语法）</span>
+value = GET shop:item:1001
+if value != nil:
+    return value
+
+ok = SET lock:item:1001 &lt;token&gt; NX PX 3000
+if ok:
+    try:
+        value = GET shop:item:1001          <span class="c"># 双重检查：可能别人刚重建完</span>
+        if value == nil:
+            value = db.query(1001)          <span class="c"># 只有这一个请求打到库</span>
+            SET shop:item:1001 value EX 300
+    finally:
+        <span class="c"># 必须校验 token 再删，防止误删别人的锁</span>
+        EVAL "if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end" 1 lock:item:1001 &lt;token&gt;
+else:
+    <span class="c"># 没抢到锁：短暂等待后重试，最多 2~3 次，仍失败就返回兜底值</span>
+    SLEEP 50ms
+    return 重试或兜底
+
+<span class="c"># 逻辑过期：value 是一个带时间戳的结构，Redis 里没有 TTL</span>
+SET shop:item:1001 '{"data":{...},"expireAt":1761000000}'
+<span class="c"># 读的时候先判断 expireAt，过期就返回 data 并投递一个异步重建任务</span></pre>
+  <div class="callout ok">
+    <b>选择标准很简单：</b>如果业务能接受「短暂读到旧数据」（商品详情、榜单、配置），用逻辑过期，因为它<b>不阻塞任何读请求</b>；如果不能接受（库存、价格），用互斥重建，并且给等待设上限，超时就走降级。真实系统里常常两者混用：核心字段互斥，展示字段逻辑过期。
+  </div>
+  <p><b>面试落点：</b>「击穿是单个热点 key 失效瞬间的并发穿透。互斥重建保证只有一个请求回源，代价是读要等；逻辑过期不设 Redis TTL，用业务时间戳判断，读到旧值但完全无阻塞。选哪个看业务能不能容忍旧数据。另外热点 key 本身应该永不过期、由后台定时刷新，从根上避免这个问题。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>雪崩：不是「很多个击穿」，是系统性失效</h2></div>
+  <p class="lead">凌晨批量导入商品，代码里统一写了 <span class="k">EX 3600</span>。一小时后的那一秒，二十万个 key 同时消失。这不是二十万个独立的击穿，这是<b>一次有组织的失效</b>——数据库面对的不是尖刺，而是一段持续的高压平台。</p>
+  <p>雪崩有两个来源，处理思路不同：</p>
+  <ul>
+    <li><b>同一时刻批量过期</b>：预热脚本、批量导入、统一 TTL 都会造成这个结果。解法是<b>给 TTL 加随机抖动</b>（比如 3600 秒加 0 到 300 秒的随机），把失效时间摊开。这个改动只有一行，收益极大。</li>
+    <li><b>Redis 整体不可用</b>：主节点挂了、网络分区、内存打满触发淘汰。这种情况下所有 key 一起「失效」，TTL 再怎么随机都没用，只能靠架构兜底。</li>
+  </ul>
+  <p>架构兜底四件事，按优先级排：<b>高可用</b>（主从 + 哨兵或 Cluster，让单点故障能自动切换）、<b>多级缓存</b>（本地缓存挡在最前面，Redis 挂了还有一层）、<b>熔断限流</b>（数据库连接池被打满前，先把入口流量掐掉）、<b>预热</b>（大促前把热点数据提前灌好，别让冷启动撞上高峰）。</p>
+  <table>
+    <tr><th style="width:170px">手段</th><th>解决什么</th><th>局限</th></tr>
+    <tr><td>TTL 随机抖动</td><td>批量过期造成的集中失效</td><td>对实例宕机无效</td></tr>
+    <tr><td>本地缓存（Caffeine 等）</td><td>Redis 抖动时的第一层缓冲</td><td>多实例间不一致，容量有限，要有短 TTL</td></tr>
+    <tr><td>熔断降级</td><td>数据库被打死前的最后一道闸</td><td>降级意味着功能受损，要产品认可</td></tr>
+    <tr><td>哨兵 / Cluster</td><td>单点故障自动切换</td><td>切换期间仍有秒级不可用，异步复制可能丢数据</td></tr>
+    <tr><td>提前预热</td><td>冷启动、大促开场</td><td>只能覆盖可预测的流量</td></tr>
+  </table>
+  <pre><span class="c"># 错误的写法：所有 key 同一个过期时间</span>
+SET shop:item:1001 "..." EX 3600
+SET shop:item:1002 "..." EX 3600
+
+<span class="c"># 正确的写法：基础 TTL + 随机抖动（示例：3000~3600 秒）</span>
+<span class="c"># 代码里用 random(3000, 3600) 作为 EX 的值</span>
+SET shop:item:1001 "..." EX 3187
+
+<span class="c"># 看当前实例的内存与淘汰情况：内存打满会触发 maxmemory-policy 淘汰，也可能直接拒绝写</span>
+INFO memory
+CONFIG GET maxmemory
+CONFIG GET maxmemory-policy
+
+<span class="c"># 看是否发生过主从切换、连接被拒这类事件</span>
+INFO stats
+INFO replication
+<span class="c"># rejected_connections 增长说明连接数打满了</span></pre>
+  <div class="callout warn">
+    <b>淘汰策略也是雪崩的一个来源。</b>如果 <span class="k">maxmemory-policy</span> 是 <span class="k">allkeys-lru</span>，内存打满时 Redis 会主动淘汰 key——包括你刚写进去的热点 key，于是命中率骤降、请求涌向数据库。表现为「Redis 没挂，但命中率从 98% 掉到 40%」。这种情况要去查内存增长曲线，而不是查网络。
+  </div>
+  <p><b>面试落点：</b>「雪崩分两种：批量过期和实例不可用。前者用 TTL 随机打散就能解决大半；后者要靠高可用、本地缓存、熔断降级这套组合。我会特别提一句淘汰策略——内存打满触发 LRU 淘汰时，Redis 是活着的，但命中率会崩，这种雪崩最容易被误判成网络问题。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>双写一致性：先删缓存还是先写库，答案取决于窗口</h2></div>
+  <p class="lead">「先更新数据库再删缓存，还是先删缓存再更新数据库？」这道题的标准答案是前者，但如果你只说「前者」，被追问「那为什么还有延迟双删」时就接不上。</p>
+  <p>把两种顺序的最坏情况各推一遍。设读请求 R 和写请求 W 并发：</p>
+  <table>
+    <tr><th style="width:190px">顺序</th><th>不一致是怎么发生的</th><th>脏数据能留多久</th></tr>
+    <tr><td><b>先删缓存，再写库</b></td><td>R 发现缓存空，去库读旧值；W 写完库；R 把旧值回填缓存。缓存里长期是旧值</td><td>直到下一次写操作或 TTL 到期，可能很久</td></tr>
+    <tr><td><b>先写库，再删缓存</b></td><td>R 在 W 写库前读到旧值，但回填动作晚于 W 的删除，仍可能写入旧值</td><td>概率极低（要求读比写慢且恰好错位），且有 TTL 兜底</td></tr>
+  </table>
+  <p>所以「先写库再删缓存」（Cache Aside）是主流，不是因为它绝对正确，而是因为<b>它把不一致的窗口压到了极小</b>。真要彻底消除，只能牺牲性能：读的时候加锁、或者干脆不用缓存。</p>
+  <p>延迟双删是补丁：写完库、删一次缓存、睡一小段（比如几百毫秒）、再删一次。第二次删除是为了清掉「在写库期间被读请求回填的旧值」。<b>它的致命弱点是睡眠时间靠猜</b>——睡短了没用，睡长了接口 RT 变差，而且它假设读请求的耗时是稳定的。</p>
+  <p>更彻底的方案是<b>订阅 binlog 异步删缓存</b>（canal 这类工具）：数据库变更落 binlog 后再删，天然按真实提交顺序执行，不依赖业务代码的自觉。代价是引入了一条新的链路，链路本身要能容忍延迟和重复消费。</p>
+  <pre><span class="c"># 删缓存失败怎么办：删两次 + 记消息队列重试，别只删一次就完事</span>
+<span class="c"># 伪代码：写库成功后删缓存，失败则投递一条延迟重试消息</span>
+UPDATE shop_item SET price = 99.00 WHERE id = 1001;
+DEL shop:item:1001
+<span class="c"># 如果 DEL 返回 0（key 本来就不存在）也算成功，不需要重试</span>
+
+<span class="c"># 延迟双删：注意 sleep 会占住请求，通常放到异步任务里做</span>
+DEL shop:item:1001
+<span class="c"># sleep 300~500ms（依读请求耗时而定，没有通用值）</span>
+DEL shop:item:1001
+
+<span class="c"># 强一致场景的折中：让读请求短暂走数据库，或对同一 key 加互斥</span>
+SET lock:item:1001 &lt;token&gt; NX PX 1000
+<span class="c"># 注意：这把锁会显著降低读吞吐，只适合极少数强一致字段</span></pre>
+  <div class="callout">
+    <b>先给结论再给条件，是这类题的正确答法。</b>「默认用 Cache Aside，先写库再删缓存，接受毫秒级的最终一致；如果业务要求读到自己刚写的数据，就在写后一小段时间内强制读主库；如果连这个都不接受，说明这个字段不该用缓存。」——三句话，把方案、兜底和边界都说完了。
+  </div>
+  <p><b>面试落点：</b>「缓存和数据库不可能强一致，只能缩小不一致窗口。主流是先更新库再删缓存，因为它的不一致窗口最小；延迟双删是在主从延迟场景下的补丁，睡眠时间靠经验；更可靠的是订阅 binlog 删缓存。如果业务要求强一致，正确的做法不是加锁，而是这个数据不要走缓存。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>持久化：fork 那一下，你的延迟会跳</h2></div>
+  <p class="lead">「Redis 持久化有 RDB 和 AOF，RDB 快、AOF 安全」——这句话背完，面试官问「bgsave 的时候主线程真的完全不阻塞吗」，就答不上来了。<b>fork 本身是要花时间的，而且和内存大小正相关。</b></p>
+  <p>RDB 的做法是 fork 一个子进程，由子进程把内存快照写进文件，主线程继续处理请求。父子进程共享内存页，靠 <b>copy-on-write</b> 隔离：只有主线程修改某一页时，才复制那一页。所以：写多的实例，COW 复制的页多，内存可能短时间涨到接近两倍；fork 时要复制页表，<b>页表越大，fork 越慢</b>，几十 GB 的实例 fork 卡住几百毫秒是可能的。</p>
+  <p>AOF 记的是写命令。三种刷盘策略：<span class="k">always</span> 每条都 fsync，最安全但性能最差；<span class="k">everysec</span> 每秒一次，最多丢 1 秒数据，是默认折中；<span class="k">no</span> 交给操作系统，性能和安全性都最差。AOF 会越写越大，需要 rewrite 压缩——<b>rewrite 也是 fork 子进程</b>，所以「RDB 的 fork 问题」在 AOF 上同样存在。</p>
+  <table>
+    <tr><th style="width:130px">对比项</th><th>RDB</th><th>AOF</th></tr>
+    <tr><td>记录什么</td><td>某一时刻的全量数据快照</td><td>每一条写命令（可 rewrite 压缩）</td></tr>
+    <tr><td>恢复速度</td><td>快，直接加载二进制</td><td>慢，要重放所有命令（混合持久化可缓解）</td></tr>
+    <tr><td>数据安全</td><td>两次快照之间的数据会丢</td><td>everysec 最多丢 1 秒</td></tr>
+    <tr><td>对性能的影响</td><td>fork + COW，写多时内存翻倍</td><td>持续追加，fsync 策略决定开销；rewrite 时有 fork</td></tr>
+    <tr><td>文件体积</td><td>小，二进制压缩</td><td>大，文本命令</td></tr>
+  </table>
+  <p>混合持久化（4.0 起，<span class="k">aof-use-rdb-preamble yes</span>）是把两者拼起来：rewrite 时先把当前数据以 RDB 格式写到 AOF 文件头部，后续增量仍用命令追加。这样恢复时先加载 RDB 部分（快），再重放少量增量（少），兼顾了速度和安全性。<b>这也是现在的推荐配置。</b></p>
+  <pre><span class="c"># 看持久化状态：重点盯三个"是否成功"和 fork 耗时</span>
+INFO persistence
+<span class="c"># rdb_last_bgsave_status:ok / aof_last_write_status:ok</span>
+<span class="c"># rdb_changes_since_last_save：距上次快照改了多少次，判断快照频率</span>
+<span class="c"># latest_fork_usec：最近一次 fork 花了多少微秒，这个数字最能说明问题</span>
+
+<span class="c"># 手动触发，注意 bgsave 是后台，save 会阻塞主线程（线上禁用 save）</span>
+BGSAVE
+BGREWRITEAOF
+
+<span class="c"># 混合持久化与刷盘策略</span>
+CONFIG GET appendonly
+CONFIG GET appendfsync
+CONFIG GET aof-use-rdb-preamble</pre>
+  <div class="callout danger">
+    <b>别在主从全量同步时做其他重活。</b>从库第一次连上主库要触发全量同步，主库会 fork 一次生成 RDB。如果这时候恰好也在 bgsave 或 AOF rewrite，两个 fork 叠加，延迟尖刺会非常明显。<b>新加从库、扩容、迁移，都应该避开业务高峰</b>，这不是谨慎，是容量常识。
+  </div>
+  <p><b>面试落点：</b>「RDB 靠 fork 加 COW，子进程写盘时主线程基本不受影响，但 fork 本身要复制页表，内存越大越慢，写多的时候 COW 还会让内存短时翻倍。AOF everysec 最多丢一秒，rewrite 同样要 fork。生产上一般开混合持久化，并且监控 latest_fork_usec，避免在高峰做全量同步。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>主从、哨兵、Cluster：三种方案解决三个不同的问题</h2></div>
+  <p class="lead">「Redis 怎么做高可用？」有人答哨兵，有人答 Cluster，两个人都对，但都没答完整——<b>哨兵解决的是「自动切换」，Cluster 解决的是「容量和写入扩展」</b>。如果你只有 8G 数据、但要求故障自动恢复，上 Cluster 是过度设计；如果你有 200G 数据，哨兵帮不了你，因为单机放不下。</p>
+  <p>先看复制本身。从库连上主库后先做<b>全量同步</b>（主库 fork 出 RDB 传过去，期间的写命令缓存在 repl buffer 里补发），之后走<b>增量同步</b>（靠 runid + offset 定位，断了重连时用 <span class="k">PSYNC</span> 续传，前提是 offset 还在 repl_backlog 里）。<b>repl_backlog 设小了，网络抖一下就会退化成全量同步</b>，这是很常见的隐患。</p>
+  <p>哨兵是一个独立进程集群，干三件事：监控、通知、故障转移。判断下线分两级：单个哨兵认为连不上是<b>主观下线</b>，达到 quorum 数量的哨兵都这么认为才是<b>客观下线</b>，然后选一个哨兵执行切换。切换后它会通知客户端新主库地址——<b>所以客户端必须支持哨兵协议</b>，直连 IP 的代码在切换后会全部失效。</p>
+  <p>Cluster 是分片方案：<b>16384 个槽</b>，每个 key 用 CRC16 算出一个值再对 16384 取模，决定落在哪个节点。客户端收到 <span class="k">MOVED</span> 重定向后会更新本地槽位表；如果槽正在迁移，会收到 <span class="k">ASK</span>，只对这一次请求做临时重定向。<b>MOVED 是永久的，ASK 是临时的</b>，这个区别考得很频繁。</p>
+  <pre><span class="c"># 复制状态：主库看 connected_slaves，从库看 master_link_status</span>
+INFO replication
+<span class="c"># master_repl_offset 与从库 slave_repl_offset 的差，就是真实落后量</span>
+
+<span class="c"># 哨兵：查主库地址、查所有被监控的主库</span>
+redis-cli -p 26379 SENTINEL get-master-addr-by-name mymaster
+redis-cli -p 26379 SENTINEL masters
+
+<span class="c"># Cluster：槽位分配、节点状态、key 落在哪个槽</span>
+CLUSTER INFO
+CLUSTER SLOTS
+CLUSTER KEYSLOT user:1001
+
+<span class="c"># 跨 slot 的多 key 操作会报 CROSSSLOT，用 hash tag 把 key 绑到同一个槽</span>
+<span class="c"># {user:1001}:profile 与 {user:1001}:order 的槽位相同</span>
+MGET "{user:1001}:profile" "{user:1001}:order"</pre>
+  <table>
+    <tr><th style="width:110px">方案</th><th>解决什么</th><th>不解决什么</th></tr>
+    <tr><td><b>主从</b></td><td>读扩展、数据冗余</td><td>不自动切换，主挂了要人工介入</td></tr>
+    <tr><td><b>哨兵</b></td><td>自动故障转移、客户端发现新主</td><td>单机容量上限，写仍然只有一个节点</td></tr>
+    <tr><td><b>Cluster</b></td><td>数据分片、容量与写扩展、部分节点故障仍可用</td><td>跨槽事务和批量操作受限；运维复杂度明显上升</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>异步复制一定会丢数据。</b>主库写完内存就返回成功，binlog 还没到从库时主库挂了，这部分数据就没了。Redis 提供 <span class="k">min-replicas-to-write</span> 加 <span class="k">min-replicas-max-lag</span>，要求至少 N 个从库延迟不超过 M 秒才允许写，能缓解但会降低可用性。<b>这不是「配置一下就安全」，而是「用可用性换一致性」的取舍。</b>
+  </div>
+  <p><b>面试落点：</b>「主从解决读扩展和冗余，哨兵解决自动切换，Cluster 解决容量和写扩展，三者不是替代关系而是叠加关系。Cluster 用 16384 个槽做分片，MOVED 是永久重定向、ASK 是迁移期间的临时重定向。所有方案底层都是异步复制，所以故障切换一定存在丢数据的窗口，要按业务接受度决定要不要开 min-replicas-to-write。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>分布式锁：加锁一行命令，正确性要靠三件事</h2></div>
+  <p class="lead"><span class="k">SET lock:order:1001 1 NX EX 30</span> —— 这行命令能跑，但它不是一个可靠的锁。缺了三样东西：<b>谁能删、删的时候删的是不是自己的、锁到期了业务还没跑完怎么办。</b></p>
+  <p>第一个问题：为什么 value 不能写死 1。如果 A 的锁过期了，B 拿到了锁，此时 A 执行完来删锁，删掉的是 B 的锁——互斥就破了。所以 value 必须是<b>每个请求唯一的 token</b>，删除前先比对。</p>
+  <p>第二个问题：比对和删除必须是原子的。GET 完再 DEL，中间可能过期并被别人拿走。所以要用 Lua 脚本，Redis 保证脚本执行期间不插入其他命令。</p>
+  <p>第三个问题：业务执行时间超过锁的 TTL。要么把 TTL 设得足够长（但那样故障恢复慢），要么做<b>续期</b>——起一个后台任务定期检查「锁还是我的吗」，是就延长 TTL。这就是常说的 watchdog。</p>
+  <pre><span class="c"># 加锁：NX 保证互斥，PX 给过期时间，value 是唯一 token</span>
+SET lock:order:1001 "8f4a1c9e-3b2d-4a71-9c55-2f0e6d1b7a33" NX PX 30000
+
+<span class="c"># 释放：先比对 token 再删，必须用 Lua 保证原子</span>
+EVAL "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end" 1 lock:order:1001 "8f4a1c9e-3b2d-4a71-9c55-2f0e6d1b7a33"
+
+<span class="c"># 续期同样要校验 token，不能无脑 EXPIRE</span>
+EVAL "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) else return 0 end" 1 lock:order:1001 "8f4a1c9e-3b2d-4a71-9c55-2f0e6d1b7a33" 30000
+
+<span class="c"># 看锁的剩余时间，排查"锁没释放"类问题</span>
+PTTL lock:order:1001
+GET lock:order:1001</pre>
+  <p>Redlock 是「多实例多数派」方案：向 N 个独立 Redis 实例依次加锁，超过半数成功且在有效期内才算拿到锁。它的目标是解决「主从切换丢锁」——单实例主库挂了，从库还没同步到这把锁，新主库上别人就能拿到同一把锁。</p>
+  <p>Redlock 在业界有公开争论：一方质疑它依赖各节点的时钟速率、且进程 GC 停顿可能让「我以为还在锁内」变成错觉；另一方认为在合理假设下它是安全的。<b>面试里不需要站队，需要说清「这个方案在防什么、代价是什么」</b>。真正对正确性要求极高的场景（比如扣款），更稳的做法是数据库唯一约束、乐观锁版本号，或者在锁之外再加一个单调递增的 fencing token，让下游能拒绝过期持有者的请求。</p>
+  <table>
+    <tr><th style="width:180px">问题</th><th>错误做法</th><th>正确做法</th></tr>
+    <tr><td>锁被别人删掉</td><td>value 写固定值，直接 DEL</td><td>唯一 token + Lua 比对删除</td></tr>
+    <tr><td>业务超时锁已失效</td><td>把 TTL 设成一天</td><td>合理 TTL + 后台续期，并保证业务可重入或幂等</td></tr>
+    <tr><td>主从切换丢锁</td><td>以为 SET NX 就万无一失</td><td>Redlock 或 fencing token，或改用数据库约束</td></tr>
+    <tr><td>锁不可重入导致自锁</td><td>同一线程再次加锁失败</td><td>用 Hash 记录 token 和重入次数，或换 Redisson 这类成熟实现</td></tr>
+  </table>
+  <p><b>面试落点：</b>「一个可用的 Redis 锁要满足三点：value 唯一、释放时用 Lua 比对后删除、有续期机制。但即使这三条都做到，主从异步复制仍可能在切换时丢锁，Redlock 就是想解决这个，代价是多实例部署和时钟假设。对正确性要求极高的业务，我会用数据库唯一约束或 fencing token 兜底，而不是把正确性全押在锁上。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：这些话一说出口，追问就来了</h2></div>
+  <p class="lead">下面每一条都曾经是「标准答案」，但它们只在特定前提下成立。面试官追问的，正是那个前提。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">说 Redis 是单线程</div><div class="pd">命令执行是单线程，网络 IO 在 6.0 起可多线程，另外一直有后台线程处理 fsync、close、UNLINK。直接说「单线程」会被追问 6.0 改了什么。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把穿透、击穿、雪崩混着说</div><div class="pd">穿透是数据不存在，击穿是单个热点失效，雪崩是批量失效或实例不可用。解法和监控指标都不一样，混答等于三个都没答。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">以为布隆过滤器能删除元素</div><div class="pd">标准布隆的 bit 是共享的，删一个会影响其他元素。要删除得用计数布隆或 Cuckoo Filter，或者定期重建。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">给所有 key 设同样的 TTL</div><div class="pd">批量导入、统一 3600 秒，等于给自己安排了一次定时雪崩。TTL 必须加随机抖动，这是一行代码的事。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 KEYS 做模糊查询</div><div class="pd">O(N) 且阻塞全局，百万 key 能卡住整个实例。用 SCAN 游标迭代，注意 SCAN 只保证遍历期间存在的元素都会被返回，可能重复。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">用 DEL 删大 key</div><div class="pd">释放几万元素是同步的，会造成延迟尖刺。用 UNLINK 把释放交给后台线程，同时从业务上拆开大 key。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">分布式锁 value 写死、直接 DEL 释放</div><div class="pd">锁过期后可能删掉别人的锁。必须用唯一 token，并用 Lua 保证「比对 + 删除」原子。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">以为主从切换不丢数据</div><div class="pd">复制是异步的，主库返回成功时数据可能还没到从库。要减少窗口就开 min-replicas-to-write，代价是可用性下降。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">Cluster 里随便用多 key 命令</div><div class="pd">跨槽的 MGET、事务、Lua 会直接报 CROSSSLOT。要么用 hash tag 把相关 key 绑到同槽，要么在客户端拆开。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">只看 Redis 有没有挂，不看命中率</div><div class="pd">淘汰策略在内存打满时会主动踢掉热点 key，实例活着但命中率崩了，压力照样打到数据库。命中率要和 QPS 一起看。</div></div></div>
+  <p><b>面试落点：</b>遇到「你踩过什么坑」，讲一个带因果的。比如「我们做过一次批量预热，脚本里 TTL 全写的 3600，一小时后数据库连接池直接打满。后来加了随机抖动，同一次失效的 key 从二十万降到几千，问题就没了」——一个具体的数字，比十条原则有说服力。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个热点商品 key 在流量高峰到期，数千并发同时回源数据库，持续约 2 秒后恢复。这属于哪一类问题？</div>
+      <button class="opt">缓存穿透，因为请求穿过了缓存</button>
+      <button class="opt">缓存雪崩，因为数据库压力很大</button>
+      <button class="opt">缓存击穿，单个热点 key 失效导致的瞬时并发穿透</button>
+      <button class="opt">缓存预热失败，属于发布流程问题</button>
+      <div class="ans">正确答案：<b>缓存击穿</b>。特征是「单个 key、瞬时、可自愈」。穿透指数据本身不存在，请求永远不命中；雪崩指大批 key 同时失效或实例不可用，表现为持续高压而非短尖刺。击穿的典型解法是互斥重建或逻辑过期。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 关于布隆过滤器，下列说法正确的是？</div>
+      <button class="opt">它可能把存在的元素误判为不存在，因此不能作为拦截依据</button>
+      <button class="opt">它可能把不存在的元素误判为存在，但说「不存在」时一定准确</button>
+      <button class="opt">它支持 O(1) 删除任意元素，适合频繁增删的场景</button>
+      <button class="opt">元素越多，误判率越低，内存占用不变</button>
+      <div class="ans">正确答案：<b>可能有假阳性，没有假阴性</b>。所以「说不存在」可以直接拒绝，「说存在」还要继续查缓存和数据库。标准布隆过滤器不支持删除（bit 被多个元素共享），且元素越多误判率越高、需要的内存也越大。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 采用「先更新数据库，再删除缓存」时，仍可能出现短暂不一致。最准确的原因是？</div>
+      <button class="opt">删除缓存一定会失败，所以必然脏读</button>
+      <button class="opt">数据库和缓存不在同一个事务里，所以永远不可能一致</button>
+      <button class="opt">只要先更新库就不会有任何不一致，这个说法是错的</button>
+      <button class="opt">读请求可能在写库前读到旧值，且回填缓存的时刻晚于删除动作</button>
+      <div class="ans">正确答案：<b>读回填晚于删除</b>。读请求读了旧值，随后写请求更新库并删缓存，读请求才把旧值写回缓存，于是缓存里留下旧值。这个窗口极小且被 TTL 兜底，所以该方案仍是主流；要更可靠可以用 binlog 订阅删缓存。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. RDB 的 bgsave 期间，主线程是否完全不受影响？</div>
+      <button class="opt">不完全。fork 需要复制页表，内存越大耗时越长；写多时 copy-on-write 还会让内存上涨</button>
+      <button class="opt">完全不受影响，因为子进程独立处理所有工作</button>
+      <button class="opt">主线程会被阻塞直到 RDB 文件写完</button>
+      <button class="opt">只有 AOF 重写会阻塞，RDB 不会</button>
+      <div class="ans">正确答案：<b>不完全不受影响</b>。子进程负责写盘，主线程继续服务，但 fork 本身要复制页表（耗时随内存增大），并且主线程写入会触发 copy-on-write 复制内存页。监控 <span class="k">latest_fork_usec</span> 能看到这个开销。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. Redis Cluster 返回 <span class="k">MOVED</span> 和 <span class="k">ASK</span> 的区别是？</div>
+      <button class="opt">MOVED 表示节点故障，ASK 表示槽正在迁移</button>
+      <button class="opt">两者完全等价，只是版本不同</button>
+      <button class="opt">MOVED 是槽已永久迁到新节点，客户端应更新槽位表；ASK 是迁移中的临时重定向，只对本次请求有效</button>
+      <button class="opt">ASK 表示权限不足，MOVED 表示地址变更</button>
+      <div class="ans">正确答案：<b>MOVED 永久、ASK 临时</b>。槽完成迁移后用 MOVED，客户端更新本地槽位缓存；迁移过程中，若 key 已迁到目标节点，源节点返回 ASK，客户端只需为这一次请求加 ASKING 转发，不更新缓存。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 用 <span class="k">SET lock:order:1001 1 NX EX 30</span> 实现分布式锁，最主要的缺陷是？</div>
+      <button class="opt">NX 参数不能和 EX 同时使用，命令会报错</button>
+      <button class="opt">value 固定，锁过期后原持有者可能删掉别人的锁；且没有续期机制</button>
+      <button class="opt">EX 的单位是毫秒，30 毫秒太短</button>
+      <button class="opt">SET 命令不是原子操作，需要配合 MULTI</button>
+      <div class="ans">正确答案：<b>value 固定 + 无续期</b>。SET 加 NX、EX 本身是原子的（EX 单位是秒，PX 才是毫秒）。真正的问题是释放时无法区分持有者，必须用唯一 token 配合 Lua 比对删除；同时业务超时后锁会提前释放，需要续期或幂等兜底。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>SDS</b></td><td>Redis 的字符串实现，带长度和剩余空间，取长度 O(1) 且二进制安全</td></tr>
+    <tr><td><b>listpack</b></td><td>紧凑的连续内存结构，小 hash / 小 zset 用它存，省掉每元素的指针开销</td></tr>
+    <tr><td><b>quicklist</b></td><td>list 的实现，由多个 listpack 节点串成双向链表，兼顾内存与插入效率</td></tr>
+    <tr><td><b>skiplist</b></td><td>跳表，ZSet 大编码里负责按分数排序和范围查询，与 dict 共享同一份数据</td></tr>
+    <tr><td><b>缓存穿透</b></td><td>查询不存在的数据，缓存永不命中，请求全部落到数据库</td></tr>
+    <tr><td><b>缓存击穿</b></td><td>单个热点 key 失效瞬间，大量并发同时回源</td></tr>
+    <tr><td><b>缓存雪崩</b></td><td>大批 key 同时失效或实例整体不可用，数据库承受持续高压</td></tr>
+    <tr><td><b>布隆过滤器</b></td><td>用位数组判断元素「可能存在 / 一定不存在」，有假阳性、标准实现不支持删除</td></tr>
+    <tr><td><b>逻辑过期</b></td><td>不设 Redis TTL，在 value 里存业务过期时间，过期后返回旧值并异步重建</td></tr>
+    <tr><td><b>Cache Aside</b></td><td>读时回填、写时先更新数据库再删缓存的通用模式，只保证最终一致</td></tr>
+    <tr><td><b>延迟双删</b></td><td>写完库删一次缓存，延迟一小段时间再删一次，用于清理期间被回填的旧值</td></tr>
+    <tr><td><b>COW</b></td><td>写时复制。fork 后父子共享内存页，任一方写入才复制该页</td></tr>
+    <tr><td><b>AOF rewrite</b></td><td>把冗余的写命令压缩成最小集合，本质是 fork 子进程重写文件</td></tr>
+    <tr><td><b>16384 槽</b></td><td>Cluster 的槽总数，key 经 CRC16 取模后决定归属节点</td></tr>
+    <tr><td><b>fencing token</b></td><td>单调递增的令牌，让下游能拒绝过期持有者的请求，弥补锁的时效问题</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 本机起一个 Redis，用 <span class="k">OBJECT ENCODING</span> 观察 hash 从 listpack 变 hashtable 的临界点，再把字段删回去，确认它不会变回来；② 写一个 20 行的脚本模拟「一千个并发抢同一个过期 key」，先在无锁版本下看数据库被打多少次，再加上 <span class="k">SET NX</span> 对比；③ 用 <span class="k">CLUSTER KEYSLOT</span> 验证带不带 hash tag 的 key 是否落在同一个槽，亲手撞一次 <span class="k">CROSSSLOT</span> 报错。<br><br>
+    <b>之后值得单独学：</b>第 17 期讲 MySQL，缓存失效之后所有压力最终都会落到它身上，那篇里的回表和慢查询正好接住这条线；第 30 期讲消息队列，双写一致性用 binlog 订阅方案时会用到；第 32 期讲稳定性，熔断、限流、降级是雪崩兜底的最后一环，Redis 只是其中一块。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 18 期 · 缓存问题的答案不在 Redis 里，在「谁失效、失效多久、失效时谁兜底」这三个问题里</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

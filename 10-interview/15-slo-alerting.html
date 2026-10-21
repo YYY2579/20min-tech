@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLO、错误预算与告警设计</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 15 期</span>
+    <h1>SLO、错误预算与告警设计</h1>
+    <p class="sub">「CPU 超 80% 就告警」是运维新手的标志——<b>告警要指向用户正在受影响</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>9</b> 大模块</span>
+      <span class="chip"><b>6</b> 个公式</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：99.9% 的 SLO，30 天里允许你挂多久？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：告警响了，但没人知道该干什么</h2></div>
+  <p class="lead">值班群里最典型的一天是这样的：上午九点开始，CPU 使用率超过 80% 的告警每五分钟响一次，响了四十次，没有一次需要人动手。下午两点，有人把群消息设成了免打扰。晚上八点，数据库连接池耗尽，全站 502，而那一刻群里是安静的——因为那条「连接池使用率」的告警，早就被归到「噪音」里删掉了。</p>
+  <p>问题不在告警工具，在<b>告警的对象选错了</b>。CPU 是原因，不是症状。用户不会因为 CPU 到 81% 而打不开页面，他们只会在请求超时的时候骂人。告警如果盯原因，就会同时出现「该响的时候不响」和「不该响的时候狂响」——这两件事其实是同一个错误的两面。</p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>CPU 80% 告警一天四十条，没人处理</td><td>阈值调高一点，或者加个 for</td><td>它监控的是资源，不是用户。阈值调到 90% 只会让告警更晚、更没用</td></tr>
+    <tr><td>可用性 99.89%，月底才发现</td><td>监控没覆盖到</td><td>监控覆盖到了，但用的是「当月累计」这种长窗口，等到跌破已经来不及做任何事</td></tr>
+    <tr><td>定了 99.99%，团队天天救火</td><td>团队执行力不行</td><td>单可用区、单实例数据库的架构撑不住四个九。SLO 不是愿望，是架构的承诺</td></tr>
+  </table>
+  <div class="callout">
+    <b>这一篇要解决的核心问题只有一个：</b>把「监控指标」翻译成「用户体验」，再把「用户体验」翻译成「一条人能做点什么的告警」。SLI、SLO、错误预算、燃率，全都是为这个翻译服务的中间工具，不是目的。
+  </div>
+  <p>顺序是：先分清 SLI / SLO / SLA 这三个词（面试第一问），再讲怎么选 SLI，然后把错误预算和燃率算清楚，接着是多窗口多燃率告警，最后落到分级、降噪、值班体验和 on-call 指标。中间会给出可以直接抄的 PromQL 和 YAML，但每一段都会说清「为什么是这个数」。</p>
+  <p><b>面试落点：</b>「我设计告警的顺序是先定 SLI，再定 SLO，最后才写规则。因为告警的表达式只是 SLO 的一种实现，SLO 没定清楚，写出来的规则一定是拍脑袋的阈值。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>SLI / SLO / SLA：三个词，三种责任</h2></div>
+  <p class="lead">面试官问「SLI 和 SLO 有什么区别」，很多人答成「一个是指标一个是目标」，然后就没了。这个答案对，但不足以说明你为什么会在生产里用错——用错的典型表现是把 SLA 当 SLO，于是所有决策都在赔钱的边缘做。</p>
+  <table>
+    <tr><th style="width:80px">名称</th><th>是什么</th><th>谁定</th><th>违反的后果</th><th>例子</th></tr>
+    <tr><td><b>SLI</b></td><td>一个可测量的比例，回答「现在有多好」</td><td>工程团队</td><td>没有后果，它只是测量</td><td>过去 5 分钟，成功请求占有效请求的 99.95%</td></tr>
+    <tr><td><b>SLO</b></td><td>SLI 的目标值加时间窗，回答「应该有多好」</td><td>工程 + 产品</td><td>触发内部动作：冻结发布、投入可靠性工作</td><td>30 天滚动窗口内，可用性不低于 99.9%</td></tr>
+    <tr><td><b>SLA</b></td><td>对客户的合同承诺，含违约条款</td><td>商务 + 法务</td><td>赔钱、信用抵扣、客户可解约</td><td>月度可用性低于 99.5%，按比例返还服务费</td></tr>
+  </table>
+  <p>三者的正确关系是：<b>SLO 必须比 SLA 更严</b>。SLA 承诺 99.5%，你的 SLO 就该定 99.9%——那 0.4% 是缓冲，是你在赔钱之前用来发现和纠正的空间。反过来，如果 SLO 和 SLA 一样，等于把内部预警线画在了悬崖边上，等你收到预算耗尽的信号时，已经在跟客户谈赔偿了。</p>
+  <p>为什么 SLO 不能定 100%？两个理由，都要能说出来。第一，<b>100% 意味着错误预算为零</b>，任何一次发布都是在花钱，团队会自然地停止变更，系统反而越来越僵化、越来越不可靠。第二，达到 100% 的成本是指数上升的：多一个九，往往要重建整个架构（多可用区、多活、去掉所有单点），而收益可能只是少挂四分钟。</p>
+  <div class="callout warn">
+    <b>SLO 必须带时间窗，而且窗口决定了它的性格。</b>「可用性 99.9%」这句话本身是不完整的。30 天滚动窗口意味着一次大故障会压你一个月；7 天窗口恢复快，但容易被「周末低峰」稀释；按自然月结算则会在月初清零，团队有动机在月末冲指标。选哪个窗口是产品决策，不是监控配置。
+  </div>
+  <p>还有一个容易漏的：<b>SLO 要有 owner 和明确的动作</b>。没有 owner 的 SLO 只是一行文档，违反之后没人需要做任何事，那它就退化成了一个好看的报表。这也是面试里区分「读过 SRE 书」和「真的落地过」的地方。</p>
+  <p><b>面试怎么答：</b>「SLI 是测量，SLO 是内部目标，SLA 是对外合同。SLO 一定要比 SLA 严，那中间的差值就是缓冲；SLO 还必须带时间窗和 owner，并且事先约定违反时做什么，否则它只是个报表。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>怎么选 SLI：从用户能感知的那一面量</h2></div>
+  <p class="lead">「你们的 SLI 是什么」——如果答案是「CPU 使用率」，这场面试基本结束了。资源指标可以帮你排障，但没法代表用户体验；用户感受不到你的 CPU，只感受到慢和错。</p>
+  <p>常见的 SLI 有四类，按重要性排：</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>可用性</div><div class="cd">成功请求 / 有效请求。最基础的一个，几乎所有服务都该有。关键在于「成功」和「有效」怎么定义。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>延迟</div><div class="cd">在阈值内完成的请求比例，比如「300ms 内完成的比例」。不要用平均延迟，也不要用 P99 单点。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>正确率</div><div class="cd">返回结果正确的比例。搜索结果为空但没报错、推荐返回了默认列表，都是「可用但不对」。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>新鲜度</div><div class="cd">数据有多新。对报表、数仓、缓存类系统，这是比可用性更真实的体验指标。</div></div>
+  </div>
+  <p>先说最容易被追问的一点：<b>分母里该不该有 4xx？</b>我的答案是默认不算失败，但要分类处理。用户输错密码返回 401、触发限流返回 429，这些不是「服务坏了」，把它们算进错误预算会让你的预算被无关流量吃掉。但要注意两个例外：如果 4xx 是你自己的 bug 造成的（比如参数校验写错，正常请求被判成 400），那它就该算；如果是被攻击刷出来的 429，通常也应该单独统计，而不是混进可用性。</p>
+  <p>第二个追问：<b>SLI 该在哪一层测？</b>越靠近用户越真实——在负载均衡或边缘网关上统计，能覆盖到「请求根本没到应用」的情况。但只在那里测，排障时就没有服务端视角。<b>正确做法是两层都测</b>：边缘的 SLI 用来对 SLO 负责，服务端的指标用来定位。两边数字对不上，本身就是一条线索（通常是中间层超时、重试或者连接复用导致）。</p>
+  <pre><span class="c"># 可用性 SLI：5 分钟内成功请求占比</span>
+sum(rate(http_requests_total{job="api",status!~"5.."}[5m]))
+/
+sum(rate(http_requests_total{job="api"}[5m]))
+
+<span class="c"># 延迟 SLI：300ms 内完成的比例，注意用的是 _bucket 不是分位数</span>
+sum(rate(http_request_duration_seconds_bucket{job="api",le="0.3"}[5m]))
+/
+sum(rate(http_request_duration_seconds_count{job="api"}[5m]))
+
+<span class="c"># 新鲜度 SLI：数据延迟在 60 秒内的比例（需要业务自己暴露处理时间戳）</span>
+count( (time() - data_last_processed_timestamp_seconds) &lt; 60 )
+/
+count(data_last_processed_timestamp_seconds)</pre>
+  <div class="callout ok">
+    <b>别用「1 减错误率」写 SLI。</b>看起来等价，实际有两个坑：流量为 0 时分母是 0，结果变成 NaN，面板和告警都会抽风；而且「好事件 / 有效事件」这个形式可以直接对应错误预算的定义，后面算燃率时不用再变形。养成这个习惯，公式会一路顺下来。
+  </div>
+  <p>一个服务最多三到五个 SLI。太多了没人看得过来，而且会互相矛盾——延迟达标但正确率崩了，你该冻结发布吗？选的时候问自己一句：<b>如果这个数变差，用户会不会骂人？</b>会，才是 SLI。</p>
+  <p><b>面试怎么答：</b>「我优先选能代表用户感受的比例型指标：可用性、延迟达标率、正确率、数据新鲜度。分母要排除掉不属于服务责任的流量，比如正常的 4xx 和限流；测量点尽量靠用户侧，但服务端也要有一份用于定位。资源指标不进 SLO，只用于排障和容量。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>错误预算：99.9% 的 30 天，是 43.2 分钟</h2></div>
+  <p class="lead">这个数字值得背下来，因为它是所有推导的起点。面试里能脱口而出「43 分钟」，再补一句「也就是 0.1% 乘 43200 分钟」，比说「大概几十分钟」可信得多。</p>
+  <p>错误预算的定义很朴素：<b>在时间窗内，允许你「不好」的总时长（或总请求数）</b>。公式是 <span class="k">(1 − SLO) × 窗口</span>。按时间算：30 天是 43200 分钟，0.1% 就是 43.2 分钟。按请求算更贴近实际：一百万次请求里允许一千次失败。</p>
+  <table>
+    <tr><th style="width:120px">SLO</th><th>30 天允许不可用</th><th>7 天允许不可用</th><th>直观感受</th></tr>
+    <tr><td>99%</td><td>7 小时 12 分</td><td>1 小时 41 分</td><td>可以停机维护</td></tr>
+    <tr><td>99.9%</td><td>43 分 12 秒</td><td>10 分 4 秒</td><td>一次大故障就能烧完</td></tr>
+    <tr><td>99.95%</td><td>21 分 36 秒</td><td>5 分 2 秒</td><td>需要多副本和快速切换</td></tr>
+    <tr><td>99.99%</td><td>4 分 19 秒</td><td>1 分钟</td><td>单次发布都可能超标</td></tr>
+  </table>
+  <p>接着是<b>燃率（burn rate）</b>，它是这一整套体系里最重要的一个概念：<span class="k">燃率 = 实际错误率 / (1 − SLO)</span>。燃率等于 1，意思是「按当前速度，刚好在窗口结束时把预算用完」；燃率等于 2，就是「半个月就烧完」；燃率等于 14.4，是「一小时烧掉月预算的 2%」。</p>
+  <p>为什么是 14.4？自己推一遍就再也不会忘。月预算是 <span class="k">0.001 × 720 小时 = 0.72 小时</span>。要用一小时烧掉其中的 2%，就是烧掉 <span class="k">0.0144 小时</span> 的错误时长；这一小时里的错误率就是 1.44%；再除以预算错误率 0.1%，得到 14.4。<b>能现场推这个数的人，比背下这张表的人可信得多。</b></p>
+  <pre><span class="c"># 燃率：错误率除以预算错误率。0.001 就是 1 - 99.9%</span>
+(
+  sum(rate(http_requests_total{job="api",status=~"5.."}[5m]))
+  /
+  sum(rate(http_requests_total{job="api"}[5m]))
+) / 0.001
+
+<span class="c"># 剩余预算比例（30 天窗口）。注意：直接查 30d 很贵，生产上要用 recording rule 预聚合</span>
+1 - (
+  sum(increase(slo_errors_total{job="api"}[30d]))
+  /
+  sum(increase(slo_requests_total{job="api"}[30d]))
+) / 0.001</pre>
+  <div class="callout warn">
+    <b>别在告警规则里直接写 <span class="k">[30d]</span> 的 increase。</b>它要扫三十天的原始样本，每次评估都是一次重查询，规则一多就会把 Prometheus 拖垮，还会经常超时返回空值。正确做法是用 recording rule 每隔几分钟把「累计错误数」和「累计总数」写成低基数指标，预算计算查这些预聚合结果。
+  </div>
+  <p>还有一笔账要提前想清楚：<b>预算是按请求算还是按时长算？</b>低峰期挂一小时，损失的请求数可能还不如高峰期挂一分钟。按请求算更贴近「多少用户受影响」，按时长算更贴近「合同怎么写的」。多数团队用请求比，但对外沟通时换算成时长更好理解——这两种口径在面试里都说得通，关键是你知道自己在用哪一种。</p>
+  <p><b>面试怎么答：</b>「错误预算是 (1−SLO) 乘时间窗，99.9% 的 30 天就是 43.2 分钟。燃率是实际错误率除以预算错误率，等于 1 表示刚好用完。它最大的价值是把『要不要停止发布』从吵架变成算术。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>多窗口多燃率：为什么单窗口一定误报</h2></div>
+  <p class="lead">「错误预算烧得快就告警」——这句话听起来无懈可击，落到实现上立刻分叉：窗口开多长？开短了天天误报，开长了等发现时已经烧完了。</p>
+  <p>先把两难说透。用 5 分钟窗口算燃率：一次持续 90 秒的抖动就能把它推到几十倍，告警响了，但五分钟后就恢复，用户可能根本没感觉——这是<b>误报</b>。用 6 小时窗口：一次刚发生的严重故障，要等它在六小时里占到足够比重才会越线，可能是四十分钟以后——这是<b>漏报和延迟</b>。单窗口无论怎么调，都只能在这两个坑之间选一个。</p>
+  <p>解法是<b>两个窗口同时满足才发告警</b>：长窗口负责确认「这是一次真实的、持续的燃烧」，短窗口负责确认「现在还在烧，不是几小时前的事故余波」。这就是常说的多窗口多燃率（multiwindow, multi-burn-rate）。它的精妙之处在于：长窗口压住噪声，短窗口提供及时性，两个条件与一下，误报和延迟同时下降。</p>
+  <table>
+    <tr><th style="width:100px">级别</th><th>长窗口</th><th>短窗口</th><th>燃率阈值</th><th>含义</th><th>通知方式</th></tr>
+    <tr><td><b>P1 快速</b></td><td>1 小时</td><td>5 分钟</td><td>14.4</td><td>一小时烧掉月预算的 2%</td><td>电话 / 短信</td></tr>
+    <tr><td><b>P2 中速</b></td><td>6 小时</td><td>30 分钟</td><td>6</td><td>六小时烧掉 5%</td><td>IM + 值班</td></tr>
+    <tr><td><b>P3 慢速</b></td><td>3 天</td><td>6 小时</td><td>1</td><td>三天烧掉 10%，按此速度月底耗尽</td><td>工单 / 次日处理</td></tr>
+  </table>
+  <p>这三个倍数不是拍出来的，都能用上一节的公式倒推：6 小时烧 5%，就是 <span class="k">0.05 × 0.72 / 6 = 0.006</span>，也就是 0.6% 的错误率，除以 0.1% 得 6；3 天烧 10%，就是 <span class="k">0.1 × 0.72 / 72 = 0.001</span>，正好是 1。<b>这套数字在公开的 SRE 实践里被广泛引用，但你要能推，而不是背。</b>如果你的 SLO 是 99.95%，预算错误率变成 0.05%，所有阈值都要按比例重算——直接抄表会错得离谱。</p>
+  <pre><span class="c"># 先做成 recording rule，避免告警每次扫长窗口原始数据</span>
+groups:
+  - name: slo.rules
+    interval: 30s
+    rules:
+      - record: slo:error_ratio:rate5m
+        expr: |
+          sum(rate(http_requests_total{job="api",status=~"5.."}[5m]))
+          / sum(rate(http_requests_total{job="api"}[5m]))
+      - record: slo:error_ratio:rate1h
+        expr: |
+          sum(rate(http_requests_total{job="api",status=~"5.."}[1h]))
+          / sum(rate(http_requests_total{job="api"}[1h]))
+
+  - name: slo.alerts
+    rules:
+      - alert: ErrorBudgetBurnFast
+        expr: |
+          slo:error_ratio:rate1h &gt; (14.4 * 0.001)
+          and
+          slo:error_ratio:rate5m &gt; (14.4 * 0.001)
+        for: 2m
+        labels: {severity: critical, slo: api-availability}
+        annotations:
+          summary: "API 可用性快速燃烧预算（1h 燃率约 {{ $value | humanize }} 倍）"
+          runbook: "https://wiki.example.com/runbook/slo-burn-api"</pre>
+  <div class="callout">
+    <b>为什么短窗口也要用同一个阈值？</b>因为短窗口的作用是「确认现在还在烧」，不是「再判一次严重程度」。如果短窗口用一个更低的阈值，等于放宽了条件，误报又会回来。两个窗口同阈值，是与关系，取交集。
+  </div>
+  <p>还有一个细节：短窗口不满足时，长窗口的告警会停在 pending 或者直接消失，这正是我们想要的——故障已经停了，不该再叫人起床。<span class="k">for</span> 只需要很短（一两分钟），因为双窗口本身已经把抖动过滤掉了，再叠一个长 for 只会延迟。</p>
+  <p><b>面试怎么答：</b>「单窗口必然二选一：短窗口误报，长窗口迟钝。所以用长短两个窗口同时越线才告警，长窗口确认是持续燃烧，短窗口确认现在还在烧。阈值由燃率倒推，比如一小时烧掉月预算 2% 对应的燃率是 14.4。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>错误预算政策：花完了到底谁说了算</h2></div>
+  <p class="lead">预算烧完了，然后呢？如果答案是「然后大家继续发布，只是群里多一条红色消息」，那这套体系就是装饰品。预算真正的价值，在于它把「要不要停」变成了一个事先约定好的流程。</p>
+  <p>错误预算政策（error budget policy）是一份很短的文档，至少要写清四件事：<b>什么条件下触发、触发后停什么、谁能批准例外、什么条件下恢复</b>。写下来的意义是：出事的时候不用开会吵，也不用等某个领导拍板。</p>
+  <table>
+    <tr><th style="width:190px">预算状态</th><th>默认动作</th><th>谁能豁免</th></tr>
+    <tr><td>剩余 &gt; 50%</td><td>正常发布节奏，可以做混沌实验、压测、架构改造</td><td>不需要</td></tr>
+    <tr><td>剩余 20%~50%</td><td>发布照常，但要求每次发布有回滚预案，可靠性改进项排进迭代</td><td>不需要</td></tr>
+    <tr><td>剩余 &lt; 20%</td><td>冻结非紧急变更，只允许修复类和安全类发布</td><td>技术负责人 + 产品负责人双签</td></tr>
+    <tr><td>已耗尽</td><td>全面冻结功能发布，直到预算恢复到阈值以上；故障复盘必须产出改进项并排期</td><td>CTO 级别，且需写明风险接受人</td></tr>
+  </table>
+  <p>这里有个反直觉但很重要的点：<b>预算有剩余是好事，应该被花掉</b>。剩余很多说明你的 SLO 定得太松，或者团队过于保守。健康的用法是拿剩余预算去做那些「可能出点小问题但收益很大」的事：灰度更激进一点、做一次故障演练、升级一个有风险但必须升的依赖。<b>预算不是存款，是燃料。</b></p>
+  <div class="callout danger">
+    <b>绝对不要把错误预算做成考核指标。</b>一旦和绩效挂钩，团队会有三种反应：把 SLO 从 99.9% 偷偷改成 99.5%；把分母做大（把健康检查、内部调用都算进「有效请求」）；或者干脆不报故障。这三种都比「预算超了」严重得多，因为它们让数据本身失去意义。
+  </div>
+  <p>还有一个实操问题：预算该由谁看？如果只有 SRE 看，产品会觉得「这是运维的事」；如果只有产品看，工程会觉得「又在压指标」。可行的做法是<b>每周一次十五分钟的联合 review</b>：看剩余预算、看本周燃烧的原因、决定下周是加速还是收敛。会议短，但必须固定，因为它决定了发布节奏。</p>
+  <p><b>面试怎么答：</b>「错误预算政策的核心是事先约定：剩余多少可以正常发，低于多少冻结，谁能批例外。它的作用是让『停不停发布』不用临场吵架。另外预算不是考核指标，有剩余反而应该主动花在演练和架构改造上，否则 SLO 就定得太松了。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>告警分级与路由：电话只留给用户正在疼的事</h2></div>
+  <p class="lead">分级的依据不是「哪个指标超了」，而是「<b>多少用户受影响、能不能自愈、有没有降级</b>」。这三件事决定了它是该半夜打电话，还是第二天进工单。</p>
+  <table>
+    <tr><th style="width:70px">级别</th><th>判据</th><th>响应要求</th><th>通道</th></tr>
+    <tr><td><b>P1</b></td><td>核心链路大面积不可用，且不会自愈；SLO 快速燃烧</td><td>5 分钟内响应，全员投入</td><td>电话 + 短信 + 群</td></tr>
+    <tr><td><b>P2</b></td><td>部分用户受影响，或核心功能降级；有临时绕行方案</td><td>30 分钟内响应</td><td>IM + 值班</td></tr>
+    <tr><td><b>P3</b></td><td>趋势性问题：磁盘 80%、证书 20 天后过期、容量按当前增速一个月后不足</td><td>工作时间处理</td><td>工单 / 看板</td></tr>
+    <tr><td><b>P4</b></td><td>纯信息：发布完成、扩缩容事件</td><td>不需要响应</td><td>归档，不进群</td></tr>
+  </table>
+  <p>把这张表和「症状 / 原因」这条线交叉一下，就会得到一条很好用的规则：<b>症状类告警可以上电话，原因类告警最高到 P3</b>。SLO 燃烧、错误率高、延迟超标是症状；CPU 高、磁盘 80%、连接数多、GC 时间长是原因。原因类不是不重要，而是「它需要人看，但不需要把人叫起来」——因为它可能根本不影响用户，也可能已经被自动扩容消化掉了。</p>
+  <p>升级策略（escalation）要写死在路由里，不能靠人自觉。典型配置是：P1 发出后 5 分钟无人确认，升级到备班；15 分钟无人确认，升级到团队负责人；30 分钟升级到技术总监。<b>「无人确认」这个状态必须能被系统感知</b>，所以告警通道要支持 ack，光发到群里不算。</p>
+  <pre>route:
+  receiver: default
+  group_by: [slo, cluster]
+  routes:
+    - matchers: [severity="critical"]
+      receiver: pager
+      group_wait: 10s
+      repeat_interval: 1h
+    - matchers: [severity="warning"]
+      receiver: im
+      group_wait: 1m
+      repeat_interval: 4h
+    - matchers: [severity="info"]
+      receiver: ticket
+
+<span class="c"># 抑制：SLO 燃烧告警存在时，压掉同一服务下的所有原因类告警</span>
+inhibit_rules:
+  - source_matchers: [alertname="ErrorBudgetBurnFast"]
+    target_matchers: [severity=~"warning|info"]
+    equal: [slo]</pre>
+  <p>还有一个容易被忽略的点：<b>告警里必须带「下一步做什么」</b>。一条只有标题的告警，收到的人第一件事是去翻群记录、找文档、问同事，这段时间全是浪费。runbook 链接不是加分项，是准入条件——没有 runbook 的告警，不该进电话通道。</p>
+  <p><b>面试怎么答：</b>「分级看影响面和自愈能力，不看指标类型。症状类告警可以进电话，原因类最高到工单。升级策略要写进路由，并且依赖 ack 状态而不是人的自觉；每条进电话的告警都必须带 runbook，否则半夜被叫起来的人只能干瞪眼。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>降噪：分组、抑制、静默，再加两件很少有人做的</h2></div>
+  <p class="lead">降噪不是「把告警调少」，是「让每一条发出去的消息都值得看一眼」。前三个手段是工具层面的，后两个是设计层面的，缺了后两个，前三个只是在给噪音化妆。</p>
+  <p><b>分组</b>解决「一次故障刷一百条」。同一次数据库抖动，可能同时触发二十个服务的延迟告警。按服务加集群分组，能把它们合成一条通知；按实例分组等于没分。<b>抑制</b>解决「根因被衍生告警淹没」：目标宕机的告警存在时，压掉这台机器上的所有其它告警。<b>静默</b>解决「我知道，别吵」：变更窗口、演练期间使用，必须带过期时间和工单号。</p>
+  <p>第四个手段是<b>在规则层做聚合</b>。很多人给每个接口、每个实例都配一条 P99 告警，于是一个依赖挂了，能同时响五十条。正确做法是：<b>一个 SLO 对应一到两条告警</b>，表达式里用 <span class="k">sum by (slo)</span> 聚合，需要细节的时候去面板看。<span class="k">count(...) by (service)</span> 还能让告警直接说出「10 台里有 3 台异常」，比五十条各自为战的告警有用得多。</p>
+  <p>第五个手段是<b>把「同源告警」在规则里合并</b>。比如「磁盘使用率」和「inode 使用率」经常同时触发，合成一条「磁盘资源告警」并带上是哪个维度，能直接减半。这不是偷懒，是让收到的人一眼看到全貌。</p>
+  <pre><span class="c"># 一个 SLO 一条告警：按 slo 聚合，而不是按 instance 展开</span>
+- alert: ErrorBudgetBurnFast
+  expr: |
+    slo:error_ratio:rate1h &gt; (14.4 * 0.001)
+    and
+    slo:error_ratio:rate5m &gt; (14.4 * 0.001)
+  for: 2m
+  labels: {severity: critical}
+
+<span class="c"># 需要「影响几台」时，让告警自己算出来</span>
+- alert: InstanceDownPartial
+  expr: |
+    count by (service) (up{job="api"} == 0) &gt;= 3
+  for: 5m
+  annotations:
+    summary: "{{ $labels.service }} 有 {{ $value }} 台实例抓取失败"</pre>
+  <div class="callout warn">
+    <b>静默最危险的形态是「忘了撤」。</b>上线前静默两小时，三个月后还在静默——这期间真出事是没人知道的，而且因为「监控配置里看不出异常」，复盘时极难发现。规矩很简单：静默必须关联变更单，到期自动失效，每次交接班把生效中的静默列表过一遍。
+  </div>
+  <p>最后一句关于抑制的边界：抑制规则的范围宁小勿大。少写一个 <span class="k">equal</span>，就可能出现「A 机房一台机器宕机，把 B 机房所有告警都压掉」的事故。写完抑制规则，一定要反向验证一次：<b>构造一个「被抑制的告警其实是真故障」的场景，看它会不会被误压。</b></p>
+  <p><b>面试怎么答：</b>「降噪分两层：工具层是分组、抑制、静默；设计层是一个 SLO 只配一到两条告警、在规则里聚合而不是按实例展开。抑制最容易出错的地方是范围过大，所以我写完会专门验证一次『真故障会不会被压掉』。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>告警疲劳：它不是感受问题，是可以用数字管的</h2></div>
+  <p class="lead">「值班太累了」这句话在评审会上没有说服力。换成「上个班收到 87 条告警，其中 71 条没有任何人做动作，占 82%」，讨论立刻就不一样了。</p>
+  <p>核心指标叫<b>无动作告警率</b>：收到的告警里，最终没有导致任何操作（没有回滚、没有扩容、没有改配置、没有人工介入）的比例。它衡量的是「这条告警有没有用」，而不是「系统健不健康」。行业里常见的经验线是把它压到两三成以下，具体数字按你团队历史数据定，但方向是明确的：<b>大部分告警应该导致动作，否则它就该变成看板。</b></p>
+  <table>
+    <tr><th style="width:180px">指标</th><th>怎么算</th><th>说明了什么</th></tr>
+    <tr><td>无动作告警率</td><td>无动作告警数 / 总告警数</td><td>告警质量。高，说明规则在自娱自乐</td></tr>
+    <tr><td>每班 P1 数</td><td>一个班次内 P1 告警条数</td><td>稳定性，也反映分级是否过严</td></tr>
+    <tr><td>告警准确率</td><td>真故障告警 / 总告警</td><td>信噪比。低，团队会开始忽略一切</td></tr>
+    <tr><td>通知到确认时长</td><td>ack 时间 − 触发时间</td><td>通道是否有效、值班是否在看</td></tr>
+  </table>
+  <p>「告警疲劳」真正的危害不是累，是<b>习得性忽略</b>。当一个人连续三十次被无效告警叫醒，第三十一次他会先看手机、判断「大概又是那个」，然后再决定起不起床——这三十秒到几分钟的延迟，在 P1 场景里就是钱。更糟的是，团队会开始关通知，这时候你的监控等于不存在。</p>
+  <div class="callout ok">
+    <b>四个能立刻做的动作：</b>① 所有进电话的告警必须有 runbook，没有就降级到 IM；② 每周花十五分钟看「上周触发次数 top 10」，能删的删、能调 for 的调 for、能改成趋势的改成趋势；③ 给每个服务设一个「每班告警预算」，超了就强制评审；④ 静默、抑制的变更走 code review，别在 UI 上随手点。
+  </div>
+  <p>还有值班体验本身：轮班周期不要太长（一周到两周比较常见，具体看团队规模）、交接要有书面记录、夜班要有补偿、出事后不做人身问责。<b>心理安全直接影响故障上报的及时性</b>——一个怕被骂的团队，会本能地先自己扛，扛不住了才说，那时代价已经翻了几倍。</p>
+  <p><b>面试怎么答：</b>「告警疲劳可以用无动作告警率来量化，我们的目标是让它降到两三成以下。做法是每周评审噪声 top 10，没 runbook 的不许进电话，每个服务设每班告警预算。因为疲劳的最终后果不是累，是团队开始忽略所有告警。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>on-call 指标：MTTD、MTTR 和那个没人算的逃逸率</h2></div>
+  <p class="lead">「你们的 MTTR 是多少」是道陷阱题。答一个数字很容易，但如果不区分「止血」和「修复」，这个数字既不能比较，也不能指导改进。</p>
+  <table>
+    <tr><th style="width:110px">指标</th><th>定义</th><th>它能暴露什么</th></tr>
+    <tr><td><b>MTTD</b></td><td>故障发生到被发现的时间</td><td>监控覆盖率。它长，说明告警没覆盖到，或者全靠用户投诉</td></tr>
+    <tr><td><b>MTTA</b></td><td>被发现到有人开始处理</td><td>通知链路和值班响应。它长，说明通道无效或分级过滥</td></tr>
+    <tr><td><b>MTTR</b></td><td>开始处理到恢复服务</td><td>止血能力：回滚快不快、有没有降级开关、排查路径清不清楚</td></tr>
+    <tr><td><b>MTBF</b></td><td>两次故障之间的平均间隔</td><td>系统稳定性趋势，也是变更质量的间接反映</td></tr>
+    <tr><td><b>逃逸率</b></td><td>用户先发现、监控后知道的故障占比</td><td>监控的真实有效性。这是最扎心的一个数</td></tr>
+  </table>
+  <p>为什么要拆开「止血」和「修复」？因为这两件事的目标完全不同。止血是「让用户先用上」，手段通常是回滚、切流、降级、扩容；修复是「让根因消失」，可能要改代码、改架构，花几天。<b>把它们混成一个 MTTR，会导致团队为了数字好看而选择「重启了事」，根因永远不修。</b>更合理的做法是记两个数：服务恢复时间、根因关闭时间。</p>
+  <p>逃逸率值得单独说，因为它是最难作假、也最容易被忽略的指标。所有由用户投诉、客服工单、客户成功团队转进来的故障，都算逃逸。它高，说明你的告警只覆盖了「你想到的失败模式」，而真实世界的失败模式永远比你想到的多——这也是为什么症状类告警比原因类告警更重要。</p>
+  <div class="callout">
+    <b>指标怎么采，别靠人填表。</b>告警的触发时间、ack 时间、恢复时间都能从 Alertmanager 和工单系统里取；故障的开始时间要从 SLO 曲线回推（错误率第一次越线的时刻），而不是从「有人发现」开始算。否则 MTTD 永远是零，因为你把发现时刻当成了开始时刻。
+  </div>
+  <p>还有一个方向性的判断：<b>MTTR 不是越低越好。</b>压到极低往往意味着「快速重启掩盖问题」，短期指标好看，长期故障频率上升。健康的组合是 MTTR 稳定、MTBF 上升、逃逸率下降——说明你在变稳，而不是在变快。</p>
+  <p><b>面试怎么答：</b>「我会把 MTTD、MTTA、MTTR 分开看，因为它们分别对应监控覆盖、通知链路和止血能力。MTTR 还要拆成服务恢复和根因关闭两个数，否则团队会为了指标好看只做重启。另外我会盯逃逸率，也就是用户先发现的故障占比，它最能反映监控是不是真的有用。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">坑</span><h2>9 个坑：每一条都在真实的值班群里发生过</h2></div>
+  <p class="lead">这些坑的共同点是：<b>配置上没有错，逻辑上是错的</b>。而且它们不会立刻爆炸，会慢慢把团队的信任消耗掉。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 CPU / 内存使用率当 P1 告警</div><div class="pd">资源高不等于用户受影响。它最多是 P3 趋势告警。真正的 P1 应该是 SLO 燃烧、错误率飙升、核心接口不可用。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">SLO 不带时间窗，或者定成 100%</div><div class="pd">「可用性 99.9%」不是完整的 SLO，必须说清是 30 天滚动还是自然月。100% 意味着零错误预算，等于禁止一切变更。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只看月累计，月底才发现超标</div><div class="pd">月度累计是滞后指标，等它跌破，损失已经发生完了。要用燃率看「正在以多快的速度烧」，而不是看「已经烧了多少」。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">把 4xx 算进错误预算</div><div class="pd">用户输错密码、被限流，不是你的服务坏了。混进来会让预算被无关流量吃掉，真正的故障反而被稀释。要按状态码分类，并单独处理「自己 bug 导致的 4xx」。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">分母里塞满健康检查和内部调用</div><div class="pd">探针每秒一次、内部 RPC 占九成流量，算出来的可用性永远好看，因为它衡量的根本不是用户体验。分母只该包含真实用户请求。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">把错误预算当 KPI 考核</div><div class="pd">一旦和绩效挂钩，团队会改 SLO、改分母、瞒报故障。数据失真比预算超标严重得多。预算的用途是决策，不是考核。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">静默不设过期、不关联工单</div><div class="pd">三个月后还静着的告警，等于没有这条告警，而且从配置里完全看不出来。静默必须有到期时间，交接班要检查生效列表。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">抑制规则范围过大</div><div class="pd">少写 equal，一条根因告警会压掉整个集群的告警。写完必须反向验证：构造一个真故障，看它会不会被误压。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">告警没有 runbook，也没有 ack</div><div class="pd">半夜被叫起来的人只能自己摸索，这十几分钟全是纯损失；没有 ack 就无法自动升级，人没看到就永远没人接手。</div></div></div>
+  <p><b>面试落点：</b>第 1 条和第 6 条最适合展开讲。前者能引出「症状告警 vs 原因告警」的完整论述，后者能引出「度量一旦变成目标就会失真」的判断——这两句都能让面试官觉得你想过制度层面，而不只是会写规则。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. SLO 是 99.9%、窗口 30 天，错误预算大约是多少？</div>
+      <button class="opt">4.3 分钟</button>
+      <button class="opt">43.2 分钟</button>
+      <button class="opt">7 小时 12 分</button>
+      <button class="opt">21.6 分钟</button>
+      <div class="ans">正确答案：<b>43.2 分钟</b>。30 天是 43200 分钟，乘以 0.1% 得 43.2 分钟。4.3 分钟对应 99.99%，7 小时 12 分对应 99%，21.6 分钟对应 99.95%。这几个数最好一起记住，面试常拿来对比。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 燃率（burn rate）等于 1 意味着什么？</div>
+      <button class="opt">当前错误率等于 1%</button>
+      <button class="opt">预算已经用完</button>
+      <button class="opt">按当前速度，刚好在窗口结束时把预算用完</button>
+      <button class="opt">当前有一半的请求失败</button>
+      <div class="ans">正确答案：<b>刚好用完</b>。燃率是「实际错误率 / 预算错误率」，等于 1 表示消耗速度与预算允许的速度一致。等于 2 就是半个窗口烧完，等于 14.4 表示一小时烧掉月预算的 2%。它和错误率的绝对值不是一回事。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 为什么告警要用「长窗口 + 短窗口」同时越线，而不是只用一个大窗口？</div>
+      <button class="opt">长窗口压住偶发抖动导致的误报，短窗口保证故障恢复后告警能立刻停止、发现也不迟钝</button>
+      <button class="opt">因为 Prometheus 不支持单窗口的长时间范围查询</button>
+      <button class="opt">两个窗口可以互相校验数据是否准确</button>
+      <button class="opt">这样可以把告警数量减少一半</button>
+      <div class="ans">正确答案：<b>第一项</b>。只有短窗口时，一次持续一两分钟的抖动就能触发误报；只有长窗口时，故障已经烧了半小时才越线。两个同阈值的条件取交集，既能过滤噪声，又能保证「现在还在烧」才叫人。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 关于 SLI、SLO、SLA 的关系，哪个说法正确？</div>
+      <button class="opt">SLA 应该比 SLO 更严，这样才有缓冲</button>
+      <button class="opt">三者可以互相替换，只是叫法不同</button>
+      <button class="opt">SLI 是目标值，SLO 是实测值</button>
+      <button class="opt">SLO 应比 SLA 更严，两者的差值就是违约之前的缓冲空间</button>
+      <div class="ans">正确答案：<b>最后一项</b>。SLI 是实测比例，SLO 是内部目标，SLA 是对外合同。如果 SLO 和 SLA 一样严，等于把预警线画在悬崖边——等你收到信号时已经在谈赔偿了。反过来把 SLA 定得比 SLO 严，则是主动承诺一个自己都不打算达到的目标。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 下面哪种告警最应该走电话通道（P1）？</div>
+      <button class="opt">某台机器 CPU 使用率持续 10 分钟超过 80%</button>
+      <button class="opt">核心接口的可用性 SLI 快速燃烧，一小时已消耗月预算的 2%</button>
+      <button class="opt">磁盘使用率达到 80%，按当前增速一个月后写满</button>
+      <button class="opt">某个 Pod 重启了一次，已自动恢复</button>
+      <div class="ans">正确答案：<b>预算快速燃烧</b>。它直接对应「用户正在受影响」，是典型的症状告警。CPU 高是原因，可能完全不影响用户；磁盘 80% 是趋势，属于工单；单次重启已自愈，最多记一条信息。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 团队想把「错误预算剩余比例」纳入绩效，按月考核。最应该反对的理由是什么？</div>
+      <button class="opt">这个指标太难计算，口径容易吵架</button>
+      <button class="opt">预算应该按季度而不是按月考核</button>
+      <button class="opt">一旦成为考核项，团队会通过改 SLO、放大分母、瞒报故障来「达标」，指标本身失去意义</button>
+      <button class="opt">错误预算只适合 SRE 团队，不适合业务团队</button>
+      <div class="ans">正确答案：<b>指标会失真</b>。古德哈特定律：度量一旦成为目标，就不再是好度量。预算的正当用途是决策——决定要不要冻结发布、要不要投入可靠性工作；把它变成考核，只会得到一份好看的假数据。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>SLI</b></td><td>服务等级指标，一个可测量的比例，比如成功请求占比</td></tr>
+    <tr><td><b>SLO</b></td><td>服务等级目标，SLI 加时间窗加目标值</td></tr>
+    <tr><td><b>SLA</b></td><td>服务等级协议，对外合同，违反有商业后果</td></tr>
+    <tr><td><b>错误预算</b></td><td>(1−SLO) 乘时间窗，允许「不好」的额度</td></tr>
+    <tr><td><b>燃率</b></td><td>实际错误率除以预算错误率，衡量预算消耗速度</td></tr>
+    <tr><td><b>多窗口多燃率</b></td><td>长短两个窗口同时越线才告警，兼顾灵敏与抗噪</td></tr>
+    <tr><td><b>错误预算政策</b></td><td>预算消耗到不同水位时该做什么的书面约定</td></tr>
+    <tr><td><b>症状告警</b></td><td>直接反映用户受影响程度的告警，适合进电话通道</td></tr>
+    <tr><td><b>原因告警</b></td><td>反映资源或组件状态的告警，适合看板和工单</td></tr>
+    <tr><td><b>抑制</b></td><td>满足条件时压住另一批告警，常用于根因压衍生</td></tr>
+    <tr><td><b>静默</b></td><td>人工设置的临时闭麦，必须带过期时间和工单号</td></tr>
+    <tr><td><b>无动作告警率</b></td><td>收到后没有导致任何操作的告警占比，衡量告警质量</td></tr>
+    <tr><td><b>逃逸率</b></td><td>用户先发现、监控后知道的故障占比，衡量监控真实有效性</td></tr>
+    <tr><td><b>MTTD / MTTR</b></td><td>平均发现时间 / 平均恢复时间，前者看监控覆盖，后者看止血能力</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 拿你现在负责（或者练手）的一个服务，写下它的 SLI 定义和分母口径，然后手工算一遍过去 30 天的可用性，看和你以为的差多少；② 把 99.9% 对应的 43.2 分钟、99.95% 的 21.6 分钟、99.99% 的 4.3 分钟背下来，并练习从「燃率 14.4」倒推「一小时烧 2%」；③ 翻一遍你手上的告警规则，把纯资源类的全部降级到工单，只留症状类的电话通道，数一数还剩几条。<br><br>
+    <b>之后值得单独学：</b>第 14 期讲这些 PromQL 怎么写对（本篇只讲该算什么）；第 16 期把指标、日志、链路串起来，回答「SLO 烧了之后怎么定位」；第 21 期讲事故处理与复盘，那一篇的模板可以直接接到本篇的错误预算政策上。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 15 期 · 好的告警不是「系统有事」，是「你有事要做」</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

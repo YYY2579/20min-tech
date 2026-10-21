@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网络排障 12 个经典现象：从「ping 得通」到「就是打不开」</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 6 期</span>
+    <h1>网络排障 12 个经典现象：从「ping 得通」到「就是打不开」</h1>
+    <p class="sub">同一句「网络不通」，可能是 DNS、防火墙、MTU、回程路由、TLS 里的任意一层。先分层，再动手。</p>
+    <div class="density">
+      <span class="chip"><b>12</b> 个现象</span>
+      <span class="chip"><b>20</b> 条命令</span>
+      <span class="chip"><b>5</b> 层模型</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先想一个你遇到过的「打不开」：当时你下的第一个命令是什么，它证明了什么？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>「打不开」这三个字，能拆出十二种病</h2></div>
+  <p class="lead">用户说「网站打不开」，你 <span class="k">ping</span> 一下域名，通了，于是回一句「网络没问题，你清下缓存」。这句话在运维岗上是很危险的——<b>ping 通只证明 ICMP 能来回，别的什么都不能证明</b>。</p>
+  <p>同一个「打不开」，往下拆至少有十二种可能：DNS 解析到了错的 IP、端口没监听、防火墙 DROP 了包、安全组只放行了一半、MTU 太大被中间设备吞掉、回程路由走了另一条路、TLS 证书过期、代理环境变量指向一个早就下线的 squid、上游服务 502、网关等上游超时、客户端自己先超时断开，以及最容易被忽略的——十分钟前有人改了一个配置。</p>
+  <table>
+    <tr><th style="width:200px">你看到的</th><th style="width:170px">最容易得出的错误结论</th><th>实际上它只证明了</th></tr>
+    <tr><td>ping 域名通</td><td>网络没问题</td><td>ICMP 到那个 IP 能往返。DNS 可能解析到了旧 IP，端口可能没开，TLS 可能失败</td></tr>
+    <tr><td>telnet 端口通</td><td>服务正常</td><td>三次握手成功，有人在这个端口 listen。应用可能返回 500，也可能 accept 了不处理</td></tr>
+    <tr><td>curl 返回 200</td><td>用户那边也没问题</td><td>你这台机器、这个时刻、这条路径是通的。用户可能在另一个省、走另一个出口、带着另一个 Cookie</td></tr>
+  </table>
+  <div class="callout">
+    <b>这篇的组织方式：</b>先给一套五层排查法，把「打不开」压成一道选择题；然后把 12 个现象按层分组，每个现象给「长什么样、先敲什么、看到什么就定性」；接着是抓包三步和一张现象对照表；最后讲变更类故障该先回滚还是先查。每一节都落一句面试话术。
+  </div>
+  <p><b>面试落点：</b>「用户说打不开，我不会先 ping。我会先问三件事：只有他一个人还是所有人都这样、换网络（4G）是否复现、什么时候开始的。这三问能把范围从『整个系统』缩小到『某条路径』或者『某个客户端』，然后再分层验证。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>五层排查法：每层都要拿到一个能证伪的证据</h2></div>
+  <p class="lead">分层不是为了画得好看，是为了<b>让每一层都有一个明确的「通过/不通过」判据</b>。没有判据的检查等于没检查——比如「我看了一下防火墙，好像没问题」，这句话在故障复盘里毫无价值。</p>
+  <table>
+    <tr><th style="width:80px">层</th><th>要回答的问题</th><th>证据（命令）</th><th>通过的标准</th></tr>
+    <tr><td><b>链路</b></td><td>网卡通不通、有没有物理错误</td><td><span class="k">ip -s link</span>、<span class="k">ethtool eth0</span></td><td>UP 状态、RX/TX errors 不增长</td></tr>
+    <tr><td><b>IP</b></td><td>地址对不对、路由走到哪、能不能到对端</td><td><span class="k">ip addr</span>、<span class="k">ip route get</span>、<span class="k">ping</span>、<span class="k">mtr</span></td><td>路由命中预期下一跳，ICMP 往返</td></tr>
+    <tr><td><b>端口</b></td><td>对端有没有监听、包有没有被拦</td><td><span class="k">ss -lntp</span>、<span class="k">nc -zv</span>、<span class="k">nft list ruleset</span></td><td>握手能完成，或被明确拒绝（RST）</td></tr>
+    <tr><td><b>协议</b></td><td>MTU 合不合适、有没有重传、TLS 能不能协商</td><td><span class="k">ping -M do</span>、<span class="k">nstat</span>、<span class="k">openssl s_client</span></td><td>大包能过、重传率正常、握手成功</td></tr>
+    <tr><td><b>应用</b></td><td>服务返回什么、慢在哪一段</td><td><span class="k">curl -w</span>、应用日志、链路追踪</td><td>状态码正确、各阶段耗时在预算内</td></tr>
+  </table>
+  <p>顺序上还有一个更实用的技巧：<b>先近后远</b>。先看发起方本地——DNS 解析对不对、hosts 有没有写死、代理变量有没有设、本机路由表正不正常；再看服务端——进程在不在、端口监听在哪个地址、负载高不高；最后才看中间——负载均衡、安全组、NAT、专线。理由是前两类你能自己改，中间那类要拉人。</p>
+  <p>另一条经验是<b>双向验证</b>。任何「不通」都要问一句：是去程不通，还是回程不通？只在一端抓包，看到包发出去了就断定「对端没回」，这个结论是不成立的——包可能到了对端，只是回程被丢了。</p>
+  <pre><span class="c"># 一条命令看清「我这张网卡、这个目标、走哪条路、源地址是谁」</span>
+ip route get 10.0.0.12
+
+<span class="c"># 逐跳看：哪一跳开始丢包、哪一跳延迟突然抬高</span>
+mtr -n -c 20 10.0.0.12
+
+<span class="c"># 端口探测：-z 只探测不发送数据，-v 打印结果，-w 超时</span>
+nc -zv -w 3 10.0.0.12 8080
+
+<span class="c"># 本地监听情况：看清绑的是 0.0.0.0 还是 127.0.0.1</span>
+ss -lntp | grep 8080</pre>
+  <div class="callout warn">
+    <b>别把「能 ping 通」当成「网络正常」的同义词。</b>很多云环境对 ICMP 单独限速甚至不放行，ping 不通但业务正常的情况非常普遍；反过来 ping 通而业务全挂也每天都在发生。ICMP 只是一条独立的小路，它通不通和 TCP 那条路的关系很弱。
+  </div>
+  <p><b>面试落点：</b>「我按链路、IP、端口、协议、应用五层走，每一层都要给出一个可证伪的结论。顺序上先看发起方本地，再看服务端，最后看中间设备，因为前两段我自己能改。任何不通我都会确认是去程还是回程，只在一端抓包得出的结论不算数。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>现象 1-3：通与不通之间的三种灰度</h2></div>
+  <p class="lead">这三个现象在值班群里的描述几乎一模一样——「连不上」。但它们的成因、命令、修复动作完全不同，混在一起就只能靠猜。</p>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>ping 通、端口不通</div><div class="cd">先看服务绑的是哪个地址。127.0.0.1 和 0.0.0.0 是两个世界，前者只有本机能连。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>被拒 vs 超时</div><div class="cd">拒绝说明包到了、对端不认；超时说明包没了。一个查服务，一个查网络。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>同机通、跨机不通</div><div class="cd">绑定地址、协议族、本机防火墙、网络策略、路由，五选一，顺序别乱。</div></div>
+  </div>
+  <h3>现象 1：ping 通，端口不通</h3>
+  <p>最常见的原因是<b>绑错地址</b>：服务监听在 <span class="k">127.0.0.1:8080</span>，本机 curl 通，外部连不上。这不是防火墙问题，是应用配置问题。第二种是防火墙 DROP，表现为<b>超时</b>而不是拒绝。第三种是上游安全组只放行了 ICMP 没放行 TCP——很多云主机的默认规则就是这样。</p>
+  <pre><span class="c"># 在服务端确认绑在哪个地址（0.0.0.0 和 :: 才是对外）</span>
+ss -lntp | grep 8080
+<span class="c"># LISTEN 0 128 127.0.0.1:8080   &lt;-- 只有本机能连</span>
+<span class="c"># LISTEN 0 128 0.0.0.0:8080     &lt;-- 所有 IPv4 地址</span>
+<span class="c"># LISTEN 0 128 [::]:8080        &lt;-- IPv6，是否兼 IPv4 取决于 net.ipv6.bindv6only</span>
+
+<span class="c"># 从客户端探测，区分「拒绝」和「超时」</span>
+nc -zv -w 3 10.0.0.12 8080
+<span class="c"># 立刻返回 refused        → 包到了，没人监听或防火墙 REJECT</span>
+<span class="c"># 卡满 3 秒 timeout        → 包被丢了，路由/安全组/DROP 规则</span>
+
+<span class="c"># 服务端看规则（nft 与 iptables 在前端可能是同一套）</span>
+nft list ruleset 2&gt;/dev/null | head -40
+iptables -S 2&gt;/dev/null | head -40</pre>
+  <h3>现象 2：连接被拒（RST）和连接超时，是两个世界</h3>
+  <p>这条区分极其重要，因为它直接决定你下一步去哪。<b>RST 意味着包到达了对端协议栈</b>——路径是通的，是对端主动说「我不认这个连接」。原因通常是端口没监听、连接已被回收（服务重启过）、或者防火墙配了 reject-with tcp-reset。<b>超时意味着包消失了</b>——中间有设备 DROP、路由不可达、安全组没放行、或者回程不通。</p>
+  <table>
+    <tr><th style="width:120px">客户端看到</th><th>包到没到对端</th><th>优先怀疑</th><th>下一步</th></tr>
+    <tr><td>Connection refused</td><td>到了</td><td>端口没监听、进程挂了、绑了 127.0.0.1</td><td>服务端 <span class="k">ss -lntp</span>，看进程和绑定地址</td></tr>
+    <tr><td>Connection timed out</td><td>没到（或被静默丢）</td><td>安全组、iptables DROP、路由黑洞、回程不通</td><td>两端抓包，确认包在哪一跳消失</td></tr>
+    <tr><td>Connection reset by peer</td><td>到了，且连接曾建立</td><td>对端进程崩溃、连接被中间设备清表、复用了已关闭的长连接</td><td>看对端有没有重启、LB 的空闲超时</td></tr>
+    <tr><td>No route to host</td><td>没到</td><td>本机没有匹配路由，或收到 ICMP 主机不可达</td><td><span class="k">ip route get</span> 确认下一跳</td></tr>
+  </table>
+  <h3>现象 3：同机通，跨机不通</h3>
+  <p>同一台机器上 <span class="k">curl localhost:8080</span> 正常，从另一台机器连就失败。这条的排查路径非常固定：<b>绑定地址 → 监听协议族 → 本机防火墙 → 网络策略 → 路由</b>。容器环境还要多一层：端口有没有映射出来、映射到了哪个地址、宿主机上的 DNAT 规则在不在。</p>
+  <p>一个容易漏的点：<span class="k">[::]:8080</span> 看起来是 IPv6，但在多数 Linux 默认配置下同时接受 IPv4 映射地址。反过来，如果应用只绑了 IPv4 的 <span class="k">0.0.0.0</span>，客户端用 IPv6 地址连就会失败——而 DNS 可能同时返回 A 和 AAAA 记录，客户端优先选哪个由系统决定，这就是「有的人能打开、有的人打不开」的一种来源。</p>
+  <pre><span class="c"># 容器场景：端口映射和宿主机规则</span>
+docker port myapp
+iptables -t nat -S | grep 8080
+
+<span class="c"># 看某个端口上到底有没有包进来（先抓再连，别反过来）</span>
+tcpdump -i any -nn -c 5 'tcp port 8080 and host 10.0.0.5'</pre>
+  <p><b>面试落点：</b>「连接被拒和连接超时我一定分开说。拒绝说明包到了、对端不认，去查监听和绑定地址；超时说明包被丢了，去查安全组、防火墙和路由。这两个现象混着说，等于承认自己没看抓包。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>现象 4-6：慢、丢、卡在大包上</h2></div>
+  <p class="lead">「能打开但很慢」比「完全打不开」更难查，因为它没有明确的失败点。这时候需要的不是更多工具，而是<b>把一个请求切成几段分别计时</b>。</p>
+  <h3>现象 4：curl 很慢，慢在哪一段</h3>
+  <p>一个 HTTPS 请求至少要经历 DNS 解析、TCP 握手、TLS 握手、服务端处理（TTFB）、内容传输五段。<span class="k">curl -w</span> 能把每一段的累计时间打出来，两两相减就是这一段的耗时。这是整篇里最值得背下来的一条命令。</p>
+  <pre>curl -o /dev/null -s -w '
+  dns   %{time_namelookup}
+  tcp   %{time_connect}
+  tls   %{time_appconnect}
+  ttfb  %{time_starttransfer}
+  total %{time_total}
+  code  %{http_code}
+' https://example.com/api/health
+
+<span class="c"># 各段耗时 = 后一个减前一个：</span>
+<span class="c"># DNS   = time_namelookup</span>
+<span class="c"># TCP   = time_connect - time_namelookup</span>
+<span class="c"># TLS   = time_appconnect - time_connect</span>
+<span class="c"># TTFB  = time_starttransfer - time_appconnect</span>
+<span class="c"># 传输  = time_total - time_starttransfer</span></pre>
+  <table>
+    <tr><th style="width:130px">哪一段大</th><th>说明什么</th><th>往下查</th></tr>
+    <tr><td><b>DNS 段</b></td><td>解析慢，或者解析失败后在重试</td><td><span class="k">dig +stats</span> 看查询耗时；换 <span class="k">@8.8.8.8</span> 对比；查 resolv.conf 的 timeout/attempts</td></tr>
+    <tr><td><b>TCP 段</b></td><td>握手 RTT 大，或者 SYN 在重传</td><td>同地域应该在毫秒级；跨地域按物理距离算；异常大就查丢包和路由</td></tr>
+    <tr><td><b>TLS 段</b></td><td>证书链太长、要多次往返、或者 OCSP 拉取超时</td><td><span class="k">openssl s_client</span> 看握手轮次和证书链</td></tr>
+    <tr><td><b>TTFB 段</b></td><td>服务端在算，或者上游慢</td><td>应用日志、慢查询、下游依赖耗时</td></tr>
+    <tr><td><b>传输段</b></td><td>响应体大，或者带宽受限</td><td>看压缩有没有开、是不是在下大文件</td></tr>
+  </table>
+  <p>一个特别常见的误判：DNS 段看起来只有 20ms，觉得很正常——但如果每次请求都花 20ms 解析，而连接池本来可以省掉这 20ms，那在 QPS 高的服务里就是实打实的浪费。所以「慢不慢」要跟<b>这条链路的理论下限</b>比，不是跟「感觉」比。</p>
+  <h3>现象 5：丢包，但要先分清丢在哪</h3>
+  <p>丢包至少有三个层次：<b>物理/链路层</b>（网卡、光模块、线路误码）、<b>队列层</b>（网卡 ring buffer 满、qdisc 丢弃、conntrack 表满）、<b>策略层</b>（安全组、限速、清洗设备）。它们都表现为「丢」，但修法完全不同。</p>
+  <pre><span class="c"># 1. 链路层有没有错</span>
+ip -s link show eth0
+ethtool -S eth0 | grep -iE 'drop|err|miss|fifo|discard'
+
+<span class="c"># 2. 内核协议栈的丢弃计数（这些比 ping 的丢包率精确得多）</span>
+nstat -az | grep -iE 'InDrops|InCsumErrors|TCPBacklogDrop|ListenOverflows|TCPTimeouts|RetransSegs'
+
+<span class="c"># 3. 队列和限速</span>
+tc -s qdisc show dev eth0
+cat /proc/sys/net/netfilter/nf_conntrack_count
+cat /proc/sys/net/netfilter/nf_conntrack_max
+
+<span class="c"># 4. 路径上哪一跳开始丢</span>
+mtr -n -c 50 10.0.0.12</pre>
+  <p>判断方法：<b>看计数器的增量，不看绝对值</b>。机器跑了半年，丢包计数是几千，和「每分钟涨几百」完全是两回事。另外，间歇性失败要区分「固定比例」（更像丢包或限速）和「特定时间点」（更像定时任务、连接池轮换、证书检查）。</p>
+  <h3>现象 6：MTU 黑洞，小包通大包不通</h3>
+  <p>这是最像「玄学」的一类：TCP 三次握手成功（包很小），登录成功，执行一个返回大量数据的命令就卡住；小接口正常，返回大 JSON 的接口超时。<b>典型的 MTU 黑洞。</b></p>
+  <p>机制是这样的：路径上某一段的 MTU 比两端小（隧道封装、PPPoE、VPN 都会吃掉几十字节）。发送方发了大包，且设置了「不允许分片」（DF 位）。中间设备本该回一个 ICMP「需要分片」，但如果这个 ICMP 被防火墙拦了，发送方永远收不到通知，就会一直重传那个大包，直到超时。</p>
+  <pre><span class="c"># 以太网 MTU 1500 时，1472 + 8(ICMP) + 20(IP) = 1500</span>
+<span class="c"># -M do 表示设置 DF 位，不允许分片</span>
+ping -M do -s 1472 -c 3 10.0.0.12
+
+<span class="c"># 逐步缩小包长，找到能通过的最大值</span>
+ping -M do -s 1400 -c 3 10.0.0.12
+ping -M do -s 1200 -c 3 10.0.0.12
+
+<span class="c"># tracepath 会顺带做路径 MTU 探测</span>
+tracepath -n 10.0.0.12
+
+<span class="c"># 看本机各接口的 MTU</span>
+ip link show | grep -E 'mtu|state'</pre>
+  <p>修复方式有三条路：调小两端的 MTU（治本但不一定两边都能改）、在隧道网关上做 MSS clamping（把握手里通告的 MSS 改小，让发送方一开始就不发大包）、或者放行 ICMP 类型 3 代码 4（让 PMTU 发现能正常工作）。<b>第三条最容易被忽略，也最容易在「安全加固」之后突然出现。</b></p>
+  <p><b>面试落点：</b>「『慢』我一定先用 curl -w 分段，DNS、TCP、TLS、TTFB 四段分别看，不猜。『小包通大包不通』我第一反应是 MTU 黑洞，用 ping -M do 逐步缩小包长验证，根因往往是隧道封装加上 ICMP 被拦。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>现象 7-9：502 / 504 / 499 的分水岭</h2></div>
+  <p class="lead">这三个码在监控面板上长得像一家人，处理方向却完全不同。答错归属，你会去查一个根本没问题的组件。</p>
+  <table>
+    <tr><th style="width:80px">状态码</th><th style="width:150px">谁产生的</th><th>字面含义</th><th>实际在说</th></tr>
+    <tr><td><b>502</b></td><td>网关（Nginx / LB）</td><td>Bad Gateway</td><td>我连上了上游，但收到的响应无法解析，或者连接直接被上游重置/拒绝</td></tr>
+    <tr><td><b>503</b></td><td>网关或应用</td><td>Service Unavailable</td><td>我没有可用的上游（全被摘了）、或者我主动限流/维护</td></tr>
+    <tr><td><b>504</b></td><td>网关</td><td>Gateway Timeout</td><td>我连上了上游，发了请求，但在超时时间内没等到响应</td></tr>
+    <tr><td><b>499</b></td><td>Nginx（自定义）</td><td>没有标准含义</td><td>客户端在 Nginx 返回响应之前，自己把连接关了</td></tr>
+  </table>
+  <p>看清这张表的关键是<b>「谁写的这个码」</b>。502 和 504 是网关替上游「代言」，所以日志在网关侧，但根因可能在上游；499 是网关记录「客户端跑了」，所以它<b>几乎总是客户端的超时时间比服务端短</b>的结果，而不是服务端的错。</p>
+  <h3>现象 7：502 集中在发布之后</h3>
+  <p>如果 502 只在发布窗口出现，八成是<b>连接复用 + 上游重启</b>：网关和后端之间是长连接，后端进程重启，旧连接在网关的连接池里还被认为是可用的，请求发过去吃到 RST，网关就记一个 502。解决办法是在上游优雅退出时先摘流量、等在途请求结束，或者让网关对幂等请求做一次重试。</p>
+  <p>如果 502 是常态，按这个顺序查：上游进程活着吗（<span class="k">ss -lntp</span>）→ 网关到上游的地址和端口对不对（很多事故是 upstream 里写了旧 IP）→ 协议对不对（上游是 HTTPS 但配了 http，或者反过来）→ 请求头是不是太大（超了上游的缓冲限制）→ 上游有没有主动 reset（比如 body 太大、超时后直接关连接）。</p>
+  <h3>现象 8：504 说明上游「慢」而不是「死」</h3>
+  <p>504 的价值在于它把范围缩到了「上游处理时间 &gt; 网关超时」。接下来要回答的是：上游真的慢，还是网关的超时设得太短？<b>先直连上游绕过网关测一次</b>，这一步能把责任分清楚。</p>
+  <pre><span class="c"># 绕过网关，直接打上游，看它到底多慢</span>
+curl -o /dev/null -s -w 'code=%{http_code} ttfb=%{time_starttransfer}\n' \
+  http://10.0.0.21:8080/api/slow
+
+<span class="c"># Nginx 侧：哪些超时参数在起作用（名字以你的版本为准）</span>
+<span class="c"># proxy_connect_timeout  连上游的超时</span>
+<span class="c"># proxy_send_timeout     发请求给上游的超时</span>
+<span class="c"># proxy_read_timeout     等上游响应的超时（504 多半是它）</span>
+nginx -T 2&gt;/dev/null | grep -E 'proxy_(connect|send|read)_timeout'
+
+<span class="c"># 看 upstream 的响应时间分布（需要在 log_format 里加 $upstream_response_time）</span>
+awk '{print $NF}' /var/log/nginx/access.log | sort -n | tail -20</pre>
+  <h3>现象 9：499 是客户端先跑了</h3>
+  <p>499 不是 HTTP 标准状态码，是 Nginx 自己的约定。它出现说明：请求已经到达 Nginx，Nginx 转发给了上游，但在上游返回之前，客户端断开了。<b>最常见的成因是客户端的超时时间小于服务端的处理时间。</b></p>
+  <p>所以看到 499 不要急着说「客户端有问题」。要问的是：为什么这个接口要处理这么久？是慢查询、是下游依赖、还是重试放大？499 常常是 504 的前兆——客户端等不及先断了，网关还在等上游，最后自己记一个 504。</p>
+  <div class="callout danger">
+    <b>别把 499 当成「客户端网络差」。</b>如果 499 集中在某一个接口，那基本可以断定是这个接口慢；如果分散在所有接口，才去看客户端侧的超时配置、移动网络切换、或者中间设备的空闲超时。这两种情况的处理方向完全相反。
+  </div>
+  <p><b>面试落点：</b>「502 是网关收到了无效响应或连接被上游重置，504 是网关等上游超时，499 是客户端提前断开。前两个日志在网关、根因可能在上游，499 则要看是不是接口本身太慢。判断归属看是谁写的这个码，不看谁在报错。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>现象 10-12：单向、TLS、代理变量</h2></div>
+  <p class="lead">这三个现象共同的特点是「配置看起来都对」。它们不是漏配，而是配了但语义不对，或者环境变量在某个看不见的地方生效了。</p>
+  <h3>现象 10：单向不通，去得回不来</h3>
+  <p>判断方法很直接：<b>两端同时抓包</b>。A 端看到 SYN 发出、B 端没收到，问题在去程；B 端收到了、回了 SYN-ACK、A 端没收到，问题在回程。一句话就能把范围砍一半。</p>
+  <p>回程不通的常见原因：策略路由（源地址选路选错了出口）、非对称路由（去走专线回走公网，状态防火墙把回包当非法）、云环境的网络 ACL（无状态，需要双向放行，而安全组是有状态的，只需放入方向）。<b>「安全组是有状态的」这一点经常被忘记</b>，导致有人明明放行了入方向却还在查出方向。</p>
+  <pre><span class="c"># A 端抓（假设客户端 10.0.0.5，服务端 10.0.0.12）</span>
+tcpdump -i any -nn -c 20 'host 10.0.0.12 and tcp port 8080'
+
+<span class="c"># B 端同时抓，然后对比两边的第一行时间戳</span>
+tcpdump -i any -nn -c 20 'host 10.0.0.5 and tcp port 8080'
+
+<span class="c"># 看本机选的是哪个源地址、走哪个出口</span>
+ip route get 10.0.0.12 from 10.0.0.5
+
+<span class="c"># 策略路由规则</span>
+ip rule show
+ip route show table all | head -30</pre>
+  <h3>现象 11：TLS 握手失败</h3>
+  <p>TLS 失败的信息量其实很大，只是很多人被一长串报错吓住了。按报错归类，基本就五种：证书过期、域名不匹配、证书链不完整、协议/套件不匹配、客户端时间不对（是的，时间不对会导致证书「还没生效」）。</p>
+  <pre><span class="c"># -servername 一定要带，否则 SNI 缺失，拿到的可能是默认站点的证书</span>
+openssl s_client -connect example.com:443 -servername example.com -showcerts &lt; /dev/null
+
+<span class="c"># 只看关键信息</span>
+openssl s_client -connect example.com:443 -servername example.com &lt; /dev/null 2&gt;&amp;1 \
+  | openssl x509 -noout -subject -issuer -dates
+
+<span class="c"># 用 curl 看协商结果和证书链</span>
+curl -vI https://example.com 2&gt;&amp;1 | grep -E 'SSL|TLS|subject|issuer|expire'</pre>
+  <table>
+    <tr><th style="width:170px">报错关键词</th><th>含义</th><th>处理</th></tr>
+    <tr><td>certificate has expired</td><td>证书过期</td><td>换证书，同时把到期告警提前到 30 天</td></tr>
+    <tr><td>unable to get local issuer certificate</td><td>链不完整，服务端没发中间证书</td><td>在服务端配置里补上中间证书，顺序是叶证书在前</td></tr>
+    <tr><td>certificate verify failed</td><td>根证书不在客户端信任库，或者被中间人替换</td><td>先确认是不是自签/内部 CA，再确认信任库</td></tr>
+    <tr><td>wrong version number</td><td>用 HTTPS 打了 HTTP 端口，或者反过来</td><td>确认端口和协议，这个错和证书无关</td></tr>
+    <tr><td>handshake failure</td><td>协议版本或加密套件没有交集</td><td>看两端的 min version 和 cipher 配置</td></tr>
+  </table>
+  <p>「链不完整」这一条值得单独说：浏览器往往能靠证书里的 AIA 地址自动补齐中间证书，所以「浏览器能打开」不代表链是完整的；而 Java、curl、某些移动端 SDK 不会去补，就会直接失败。<b>「浏览器正常、App 报证书错误」是链不完整的经典信号。</b></p>
+  <h3>现象 12：代理环境变量，看不见的手</h3>
+  <p>同一个脚本，在你的终端跑得通，在 CI 里超时；<span class="k">curl</span> 报连不上，<span class="k">ping</span> 却通。查半天网络，最后发现是 <span class="k">https_proxy</span> 指向了一个早就下线的代理。</p>
+  <pre><span class="c"># 大小写都要看：不同工具读的变量名不一样</span>
+env | grep -iE 'proxy|no_proxy'
+
+<span class="c"># curl 会告诉你它有没有走代理</span>
+curl -v https://example.com 2&gt;&amp;1 | grep -iE 'proxy|connect to'
+
+<span class="c"># 强制不走代理，用来对比</span>
+curl --noproxy '*' -v https://example.com
+
+<span class="c"># systemd 服务不继承 shell 的 export，要单独配</span>
+systemctl show myapp -p Environment</pre>
+  <p>几个坑：<b>Java 默认不读 http_proxy</b>，它读的是 <span class="k">-Dhttp.proxyHost</span> 这类系统属性；<b>systemd 启动的服务不继承你在 shell 里 export 的变量</b>，要写进 unit 的 Environment 或者 EnvironmentFile；<b>容器会继承构建时的环境变量</b>，镜像里带了一个代理配置，跑到生产就全走代理了；<b>no_proxy 的语法各家不同</b>，有的支持 CIDR 有的不支持，写 <span class="k">*.internal</span> 还是 <span class="k">.internal</span> 要看具体工具。</p>
+  <p><b>面试落点：</b>「单向不通我会两端同时抓包，看第一行包在哪边消失，这样能立刻分清去程还是回程。TLS 失败我先跑 openssl s_client 带 SNI，看是证书、链、还是协议版本的问题。代理的问题先 env | grep -i proxy，再确认这个进程到底有没有继承到这些变量。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>抓包定位三步：在哪抓、抓什么、看什么</h2></div>
+  <p class="lead">抓包这件事，90% 的失败发生在「抓之前」——抓错了网卡、过滤条件写宽了、只抓了一端。真正打开分析的时候，面对几千行，人是会放弃的。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>定抓点。</b>请求路径上有几个可能的观察点：客户端网卡、负载均衡、服务端网卡、容器内的 veth。至少选两个，才能判断「包在哪一段消失」。只有一个抓点，你只能得到「我这边看到了什么」，得不到结论。</div></div>
+    <div class="step"><div class="txt"><b>定过滤。</b>host + port 精确到一条流，别用 <span class="k">tcp</span> 这种宽条件。同时限包数（<span class="k">-c</span>）和时长（<span class="k">timeout</span>），把结果落文件（<span class="k">-w</span>）而不是刷屏。</div></div>
+    <div class="step"><div class="txt"><b>定判读顺序。</b>握手是否成对（S / S. / .）→ 谁先发 RST 或 FIN → seq 有没有重复（重传）→ 窗口有没有变 0 → len 是否和预期一致。这五问走完，大部分问题已经有答案。</div></div>
+  </div>
+  <pre><span class="c"># 一条流、限 500 包、完整包长、落文件</span>
+timeout 30 tcpdump -i eth0 -nn -s 0 -c 500 \
+  'host 10.0.0.12 and tcp port 8080' -w /tmp/flow.pcap
+
+<span class="c"># 容器里抓：先找到容器在宿主机上的 veth</span>
+ip link | grep -A1 veth
+nsenter -t $(docker inspect -f '{{.State.Pid}}' myapp) -n tcpdump -i eth0 -nn -c 50
+
+<span class="c"># 回看时先统计，再看明细</span>
+tcpdump -r /tmp/flow.pcap -nn -q | awk '{print $1}' | sort | uniq -c | sort -rn | head
+
+<span class="c"># 只看 RST 和重传</span>
+tcpdump -r /tmp/flow.pcap -nn 'tcp[tcpflags] &amp; tcp-rst != 0'</pre>
+  <table>
+    <tr><th style="width:180px">抓到的样子</th><th>结论</th></tr>
+    <tr><td>只有 [S]，没有 [S.]</td><td>对端没收到，或者收到了但没回。去对端抓，看有没有收到</td></tr>
+    <tr><td>有 [S.] 但没有第三次 [.]</td><td>回程丢了，或者客户端不认这个 SYN-ACK</td></tr>
+    <tr><td>握完成后立刻 [R]</td><td>服务端进程没监听、或者 accept 队列满后连接被回收</td></tr>
+    <tr><td>同一个 seq 反复出现</td><td>重传。看间隔是 RTO 退避（1s、2s、4s）还是快速重传</td></tr>
+    <tr><td>窗口一直是 0</td><td>接收方应用读得慢，不是网络问题</td></tr>
+    <tr><td>len 远小于 MSS 且频繁</td><td>应用写得碎，Nagle 和延迟 ACK 在互相等</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>抓包本身的三个副作用：</b>高 PPS 下 tcpdump 会丢包（结尾会打 "packets dropped by kernel"），此时结论不可信；<span class="k">-s 0</span> 抓全包会显著增加磁盘和内存占用，几十秒就能写出几个 G；容器/云环境里抓到的地址可能是 NAT 之后的，别拿它去和业务日志里的客户端 IP 对。
+  </div>
+  <p><b>面试落点：</b>「我抓包一定抓两个点，不然没法判断包在哪一段消失。过滤条件精确到一条流，限时长限包数。判读按握手、RST、重传、窗口、长度五个问题走，不逐行读。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>一张对照表：十二个现象，第一条命令</h2></div>
+  <p class="lead">这张表建议直接背下来。它的用法是：<b>先认现象，再敲第一条命令</b>，不要从头读。</p>
+  <table>
+    <tr><th style="width:180px">现象</th><th style="width:200px">第一条命令</th><th>看到什么就定性</th></tr>
+    <tr><td>ping 通、端口不通</td><td><span class="k">ss -lntp</span>（服务端）</td><td>绑的是 127.0.0.1 就是绑定问题，绑的是 0.0.0.0 就去查防火墙</td></tr>
+    <tr><td>连接被拒</td><td><span class="k">nc -zv</span></td><td>refused 说明包到了，查监听；timeout 说明包没了，查策略</td></tr>
+    <tr><td>同机通、跨机不通</td><td><span class="k">ss -lntp</span> + <span class="k">iptables -S</span></td><td>绑定地址、协议族、本机规则，三选一</td></tr>
+    <tr><td>curl 慢</td><td><span class="k">curl -w</span> 五段计时</td><td>哪一段占比最大，就往那一层走</td></tr>
+    <tr><td>间歇性丢包</td><td><span class="k">nstat -az</span> 看增量</td><td>RetransSegs 涨说明在重传；InDrops 涨说明队列满</td></tr>
+    <tr><td>小包通、大包卡</td><td><span class="k">ping -M do -s 1472</span></td><td>1472 不通、1400 通，基本就是 MTU 黑洞</td></tr>
+    <tr><td>502</td><td>网关 error log + <span class="k">curl</span> 直连上游</td><td>直连正常说明是网关到上游这一段；直连也错就是上游本身</td></tr>
+    <tr><td>504</td><td>直连上游测 TTFB</td><td>上游确实慢，还是网关超时配得太短，一比就知道</td></tr>
+    <tr><td>499</td><td>按接口聚合 access log</td><td>集中在某个接口就是它慢；分散就是客户端侧超时</td></tr>
+    <tr><td>单向不通</td><td>两端同时 <span class="k">tcpdump</span></td><td>第一行包在哪边消失，就定去程还是回程</td></tr>
+    <tr><td>TLS 失败</td><td><span class="k">openssl s_client -servername</span></td><td>看是过期、链不全、还是协议不匹配</td></tr>
+    <tr><td>只有某些机器失败</td><td><span class="k">env | grep -i proxy</span></td><td>代理变量、hosts、DNS 服务器，三选一</td></tr>
+  </table>
+  <div class="cmds">
+    <div class="crow"><code>curl -o /dev/null -s -w '%{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total}\n' URL</code><span class="desc">一个请求切成五段，慢在哪一段一目了然</span><button class="copy">复制</button></div>
+    <div class="crow"><code>mtr -n -c 50 10.0.0.12</code><span class="desc">逐跳丢包与延迟，比 traceroute 更适合判断间歇性故障</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ping -M do -s 1472 -c 3 host</code><span class="desc">带 DF 位的大包测试，MTU 黑洞的第一条命令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>nc -zv -w 3 host 8080</code><span class="desc">区分「拒绝」和「超时」，两个方向完全不同</span><button class="copy">复制</button></div>
+    <div class="crow"><code>openssl s_client -connect host:443 -servername host -showcerts</code><span class="desc">看证书链、有效期、协商出的协议版本</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tcpdump -i any -nn -s 0 -c 200 'host H and tcp port P' -w /tmp/f.pcap</code><span class="desc">精确到一条流，落文件回看，别刷屏</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试落点：</b>「我脑子里有一张现象到命令的对照表，但它更重要的是帮我判断『这个现象能推出什么、不能推出什么』。比如 refused 能推出包到了，timeout 只能推出包没到，这两个结论的强度是不一样的。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>变更类故障：先回滚还是先查</h2></div>
+  <p class="lead">这类故障最好判断，也最容易吵起来。「刚发完版就挂了，先回滚还是先查根因？」——这不是价值观问题，是一道有明确判据的选择题。</p>
+  <p>判据有三条，按顺序问：<b>影响面在不在扩大？回滚成本有多高？回滚能不能真的撤销这次变更？</b></p>
+  <table>
+    <tr><th style="width:230px">情况</th><th>动作</th><th>理由</th></tr>
+    <tr><td>影响面在扩大（错误率还在涨）</td><td>先止损，回滚或摘流量</td><td>根因可以事后查，用户流失不可逆</td></tr>
+    <tr><td>变更是明确的、可回滚的（镜像、配置）</td><td>先回滚，保留现场</td><td>回滚只要两分钟，查根因可能要两小时</td></tr>
+    <tr><td>变更不可逆（数据迁移、证书替换、DDL）</td><td>先查，同时准备降级方案</td><td>回滚可能造成数据不一致，比故障更麻烦</td></tr>
+    <tr><td>不确定是不是变更引起的</td><td>先对比，再决定</td><td>用 diff 和指标对比代替猜，五分钟能定性</td></tr>
+  </table>
+  <p>「保留现场」这四个字经常被说成空话，具体是四件事：<b>存一份当前配置</b>（<span class="k">nginx -T</span>、<span class="k">kubectl get -o yaml</span>）、<b>抓一次包或存一次线程栈</b>、<b>记下时间点</b>（后面要跟监控对齐）、<b>记下回滚前的版本号</b>。这四件事加起来不超过三分钟，但能让复盘从「凭记忆」变成「看证据」。</p>
+  <pre><span class="c"># 配置有没有被改过（对比备份或版本库）</span>
+diff -u /etc/nginx/nginx.conf.bak /etc/nginx/nginx.conf
+
+<span class="c"># K8s：看这次发布改了什么、能不能退回去</span>
+kubectl rollout history deployment/myapp
+kubectl rollout undo deployment/myapp
+
+<span class="c"># 证书什么时候到期（变更类故障的高频原因）</span>
+openssl x509 -in /etc/ssl/cert.pem -noout -enddate
+
+<span class="c"># DNS 改过没有：对比两个解析器的结果</span>
+dig +short @10.0.0.2 example.com
+dig +short @8.8.8.8 example.com</pre>
+  <p>还有一个反直觉的经验：<b>变更类故障里，真正「改错了」的比例没有想象中高，更多是「改对了但没改全」</b>——只改了一台机器、只改了一个集群、只改了应用没改网关、灰度只放了 1% 就以为全量生效。所以第一个动作往往不是回滚，而是<b>确认变更的实际覆盖范围</b>：哪些实例拿到了新配置，哪些还是旧的。这种「新旧混跑」的状态，比一个纯粹的错误配置更难查。</p>
+  <div class="callout">
+    <b>一个实用习惯：</b>任何变更前，把「怎么验证成功」和「怎么回滚」写成两行贴在工单里。写不出来，说明这次变更不该发。这比任何流程规范都有效，因为它逼你在动手前想清楚退路。
+  </div>
+  <p><b>面试落点：</b>「先回滚还是先查，我看三件事：影响面在不在扩大、回滚成本高不高、这次变更可不可逆。可逆且在扩大的，先回滚再查；不可逆的，先查同时准备降级。回滚前我会花三分钟存配置、抓一次现场、记下版本号，不然复盘的时候全靠回忆。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>9 个坑：每一条都会让你多查两小时</h2></div>
+  <p class="lead">网络排障的坑有个共同特征：<b>它们不会让你得出错误答案，而是让你在一个错误的方向上非常努力</b>。两小时后你精疲力尽，问题还在。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">ping 通就宣布网络没问题</div><div class="pd">ICMP 和 TCP 走的是同一张路由表，但策略、限速、防火墙规则可以是分开的。ping 通只能证明「有去有回」，端口、TLS、应用层全都没被验证。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把「连接超时」和「连接被拒」当成一回事</div><div class="pd">拒绝说明包到了对端（路径通、策略放行），超时说明包没了（被丢或被拦）。一个查服务，一个查网络，方向完全相反。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只看 ping 的丢包率判断链路质量</div><div class="pd">ICMP 常被单独限速，ping 的丢包率和 TCP 的实际重传率可以差一个数量级。要看 nstat 的 RetransSegs 和 InDrops。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">curl 慢就直接怀疑服务端</div><div class="pd">不分局段就没法定位。DNS 慢、TCP 握手慢、TLS 慢、TTFB 慢，四种情况的负责人完全不同。先用 -w 把时间切开。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">遇到大包卡住就去调应用缓冲区</div><div class="pd">「小包通、大包不通」几乎就是 MTU 黑洞的签名。用 ping -M do 逐步缩小包长，两分钟能验证，比翻代码快得多。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到 502 就去重启上游</div><div class="pd">502 可能是协议配错（http 打 https）、upstream 里写了旧 IP、请求头超限、或者连接池复用了已经关闭的长连接。重启只是把症状推迟。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">只在一端抓包就下结论</div><div class="pd">「我这边发出去了，对端没回」——这个结论需要两端都抓才能成立。回程可能走了另一条链路，也可能在容器环境里根本没经过你抓的网卡。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">忘记代理和 hosts 这两个隐形配置</div><div class="pd">「只有我这台机器不行」时，先看 env 里的 proxy 和 /etc/hosts。这两个东西的优先级比你想的高，而且经常是半年前某次临时排查留下的。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">故障还在扩大就开始查根因</div><div class="pd">根因可以事后查，用户流失不可逆。先止损（回滚、摘流量、限流），把现场留下来，再坐下来分析。这两件事不冲突，只是有先后。</div></div></div>
+  <p><b>面试落点：</b>这 9 条里挑一条讲，结构固定：当时的判断、造成的后果、后来改成了什么。第三段决定面试官认为你是「踩过坑」还是「长了记性」。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 本机 <span class="k">curl 127.0.0.1:8080</span> 正常，从另一台机器连 10.0.0.12:8080 报 Connection refused。最可能的原因是？</div>
+      <button class="opt">两台机器之间的防火墙把包 DROP 了</button>
+      <button class="opt">服务只监听了 127.0.0.1，没有监听对外地址</button>
+      <button class="opt">MTU 不匹配导致大包被丢</button>
+      <button class="opt">DNS 解析到了错误的 IP</button>
+      <div class="ans">正确答案：<b>只监听 127.0.0.1</b>。refused 说明包已经到达对端协议栈，只是那个地址端口上没有监听者。防火墙 DROP 会表现为超时；MTU 问题通常发生在数据阶段而不是建连阶段；DNS 错误则连 IP 都不对，不会是这个报错。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 客户端连一个端口，卡了 30 秒后报 timeout，而不是立刻 refused。这说明？</div>
+      <button class="opt">对端端口没监听，内核直接回了 RST</button>
+      <button class="opt">对端进程崩溃了，但端口还在</button>
+      <button class="opt">SYN 包在路径上被静默丢弃，或者回程不通</button>
+      <button class="opt">对端的 accept 队列满了，内核回 RST</button>
+      <div class="ans">正确答案：<b>包被丢了</b>。refused 需要对方回 RST，前提是包到达了对方协议栈。超时意味着 SYN 没得到任何回应——中间设备 DROP、安全组未放行、路由黑洞、回程被拦，都会这样。这也是为什么这两个现象必须分开说。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. <span class="k">curl -w</span> 显示 <span class="k">time_connect=0.05</span>、<span class="k">time_appconnect=0.60</span>、<span class="k">time_starttransfer=0.65</span>。慢在哪一段？</div>
+      <button class="opt">DNS 解析，占了大部分时间</button>
+      <button class="opt">服务端处理，TTFB 有 0.6 秒</button>
+      <button class="opt">TLS 握手，从 TCP 建立到 TLS 完成花了 0.55 秒</button>
+      <button class="opt">响应传输，内容太大</button>
+      <div class="ans">正确答案：<b>TLS 握手</b>。time_appconnect 减去 time_connect 是 0.55 秒，说明 TLS 阶段很慢，常见原因是证书链过长、需要多次往返、或者 OCSP 拉取超时。TTFB 段只有 0.05 秒，说明服务端处理很快。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 一个接口返回大 JSON 时超时，返回小 JSON 正常；TCP 握手成功。最应该先验证什么？</div>
+      <button class="opt">用 ping -M do 逐步减小包长，确认是不是 MTU 黑洞</button>
+      <button class="opt">重启服务，排除内存泄漏</button>
+      <button class="opt">检查数据库慢查询</button>
+      <button class="opt">把网关的超时时间调大</button>
+      <div class="ans">正确答案：<b>验 MTU</b>。「小包通、大包不通」是 MTU 黑洞的典型签名：路径上某段 MTU 更小，大包带 DF 位被丢弃，而本该回来的 ICMP「需要分片」又被防火墙拦了，发送方只能一直重传。用 ping -M do 缩小包长两分钟就能验证。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 网关日志里 502 和 504 同时出现，下面哪个判断是对的？</div>
+      <button class="opt">502 说明上游没监听，504 说明上游崩了</button>
+      <button class="opt">两个都是客户端的问题，应该让客户端重试</button>
+      <button class="opt">502 是网关从上游拿到了无效响应或连接被重置，504 是网关等上游响应超时，根因都可能在上游</button>
+      <button class="opt">504 是网关自己过载，和上游无关</button>
+      <div class="ans">正确答案：<b>都指向网关与上游之间</b>。502 表示连接建立了但响应不可用（拒绝、重置、无法解析）；504 表示请求发出去了但等不到响应。两者的日志都在网关，根因可能在上游，所以下一步是绕过网关直连上游测一次，把责任分清楚。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. Nginx 日志里出现大量 499，最合理的解读是？</div>
+      <button class="opt">上游返回了非法的 HTTP 响应</button>
+      <button class="opt">客户端在 Nginx 返回响应之前主动断开了连接，常见于客户端超时短于服务端处理时间</button>
+      <button class="opt">Nginx 自身的 worker 进程不够用</button>
+      <button class="opt">证书校验失败，TLS 握手被中断</button>
+      <div class="ans">正确答案：<b>客户端先断开</b>。499 是 Nginx 的自定义状态码，没有标准含义，记录的是「客户端关闭了连接，而我还没把响应发出去」。它通常意味着接口处理时间超过了客户端的超时阈值，所以要去查这个接口为什么慢，而不是查客户端网络。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:170px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>RST</b></td><td>复位包。收到它说明包到了对方，只是对方不认这个连接</td></tr>
+    <tr><td><b>DF 位</b></td><td>IP 头里的「不允许分片」标志，MTU 探测靠它触发 ICMP 通告</td></tr>
+    <tr><td><b>PMTU</b></td><td>路径最大传输单元，是整条路径上最小的那个 MTU，不是两端接口的 MTU</td></tr>
+    <tr><td><b>MTU 黑洞</b></td><td>大包被丢弃且 ICMP 通告也被拦，发送方永远不知道要减小包长</td></tr>
+    <tr><td><b>MSS clamping</b></td><td>在网关上改写握手报文里的 MSS，让发送方一开始就不发超过路径 MTU 的包</td></tr>
+    <tr><td><b>TTFB</b></td><td>Time To First Byte，从发出请求到收到第一个字节，主要反映服务端处理时间</td></tr>
+    <tr><td><b>非对称路由</b></td><td>去程和回程走不同的路径，状态防火墙可能把回包判为非法</td></tr>
+    <tr><td><b>SNI</b></td><td>TLS 握手中的服务器名称指示，一个 IP 挂多张证书时靠它选证书</td></tr>
+    <tr><td><b>证书链</b></td><td>叶证书 → 中间 CA → 根 CA。服务端要发中间证书，否则部分客户端验证失败</td></tr>
+    <tr><td><b>499</b></td><td>Nginx 自定义状态码，表示客户端在响应发出前主动断开</td></tr>
+    <tr><td><b>conntrack</b></td><td>连接跟踪表，表满后新连接被静默丢弃，dmesg 里有明确提示</td></tr>
+    <tr><td><b>no_proxy</b></td><td>指定哪些目标不走代理，语法各家工具不一致，写之前要确认</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在测试机上起一个只绑 127.0.0.1 的服务，从另一台机器连，把 refused 和 timeout 两种报错都制造一遍并记住区别；② 用 <span class="k">curl -w</span> 分别打一个静态文件、一个慢接口、一个 HTTPS 站点，把五段耗时的形状记住；③ 把某台机器的 MTU 调小，制造一次「小包通大包不通」，用 <span class="k">ping -M do</span> 找临界值，再体会一下 ICMP 被拦之后有多难查。<br><br>
+    <b>之后值得单独学：</b>第 5 期讲 TCP 状态机和握手细节，这一篇里的很多现象在那边有机制层面的解释；第 7 期讲 DNS 解析链路和 HTTP/HTTPS，包括缓存、状态码归属和 TLS 握手轮次；第 12 期讲 K8s 网络，那里会多出 Service、Ingress、CoreDNS 三层，排查顺序要重新排。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 6 期 · 排障的功夫不在命令多，在于你能不能用一句话把范围砍掉一半</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

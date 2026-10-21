@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>调度、QoS、扩缩容与优雅发布</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 13 期</span>
+    <h1>调度、QoS、扩缩容与优雅发布</h1>
+    <p class="sub"><span class="k">preStop</span> 不 sleep 那几秒，就是你「每次发布都有 502」的根因。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>12</b> 个参数</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>1</b> 条退出时序</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：Pod 被删的时候，是先从 Endpoints 摘掉，还是先收到 SIGTERM？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都不是 bug，都是配置的默认值</h2></div>
+  <p class="lead">「每次发布都有几十个 502，发布完就好。」「扩容了，Pod 全 Pending。」「HPA 配了 70%，CPU 到 90% 也不扩。」这三件事在同一个团队里往往同时存在，而且都有一个共同点：<b>系统的默认行为恰好不是你想要的，而你从没改过它。</b></p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>发布期间稳定出现 502，持续十几秒</td><td>新版本有 bug，或者负载均衡抖动</td><td>Pod 被删时，摘 Endpoints 和发 SIGTERM 是<b>并行</b>的，而规则同步有延迟。进程已经退出，流量还在往它身上打</td></tr>
+    <tr><td>HPA 扩到 20 个副本，一半 Pending</td><td>HPA 有 bug，副本数算错了</td><td>HPA 只管改 replicas，不管节点放不放得下。节点扩容要靠 Cluster Autoscaler，而它需要几分钟</td></tr>
+    <tr><td>CPU 打满但 HPA 不扩</td><td>metrics 采集坏了</td><td>HPA 的利用率是「用量 ÷ requests」。没设 requests，这个百分比根本算不出来，HPA 只会报 unable to get metric</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>调度是一次性的</div><div class="cd">scheduler 只在 Pod 创建时选一次节点，绑定后就不再管。节点变忙、标签变了，它都不会重新调度。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>QoS 决定谁先死</div><div class="cd">节点资源不够时，kubelet 按 QoS 排序驱逐。这不是惩罚，是让你用配置声明「谁更不重要」。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>发布是一个时序问题</div><div class="cd">502 几乎都出在「摘流量」和「停进程」之间的窗口里。把这个窗口抹平，比调任何超时都有效。</div></div>
+  </div>
+  <p>这一篇按「一个 Pod 怎么被安排 → 怎么被保护 → 怎么被扩缩 → 怎么被替换」的顺序走。前半段讲调度和约束，中间讲 QoS 与三种扩缩容，后半段讲滚动更新、优雅退出和探针设计——最后这三节是同一件事的三个面，<b>目标都是让「替换一个 Pod」对用户不可见</b>。</p>
+  <div class="callout">
+    <b>先把一句话记住：</b>发布的本质不是「启动新版本」，是「把流量从旧版本挪到新版本，且中间不留空窗」。启动新版本 Kubernetes 已经帮你做了，不留空窗需要你配三个东西——readiness 探针、preStop 钩子、足够大的 grace period。缺一个就有 502。
+  </div>
+  <p><b>面试怎么答：</b>「K8s 的调度、驱逐、发布其实是一条链：调度决定 Pod 落在哪，QoS 决定资源紧张时谁先被赶走，滚动更新决定新旧怎么交替，优雅退出决定交替时流量会不会打空。我排 502 的时候不会先看应用日志，先看 preStop、grace period 和 readiness 这三处配置。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>调度两步：先筛掉不能放的，再给能放的打分</h2></div>
+  <p class="lead">调度的全部逻辑可以压成两句话：<b>过滤（Filter）留下「放得下」的节点，打分（Score）在这些节点里挑「最合适」的一个</b>。前者是硬条件，一票否决；后者是偏好，分出高下。理解这个分层，你才知道哪些配置会导致 Pending，哪些只是「尽量」。</p>
+  <table>
+    <tr><th style="width:180px">阶段</th><th>在做什么</th><th>典型插件</th><th>失败/结果</th></tr>
+    <tr><td><b>Filter（预选）</b></td><td>逐个节点检查硬约束，不满足就排除</td><td>NodeResourcesFit、TaintToleration、NodeAffinity、InterPodAffinity、VolumeBinding、NodePorts、NodeUnschedulable</td><td>全被排除 → Pending，Events 里逐项列出原因</td></tr>
+    <tr><td><b>Score（优选）</b></td><td>给通过的节点打 0-100 分，加权求和</td><td>NodeResourcesFit（LeastAllocated / BalancedAllocation）、ImageLocality、InterPodAffinity、PodTopologySpread</td><td>取最高分；同分随机</td></tr>
+    <tr><td><b>Bind</b></td><td>把 Pod 的 nodeName 写上去</td><td>—</td><td>写失败会重试，绑定后不再变</td></tr>
+  </table>
+  <p>NodeResourcesFit 的打分策略值得单独说一句，因为它解释了「为什么 Pod 总是堆到某一台机器上」。<b>LeastAllocated</b> 倾向选「已分配比例最低」的节点，也就是打散；<b>BalancedAllocation</b> 倾向选「CPU 和内存用量比例最接近」的节点，目的是避免一台机器 CPU 满了内存空着。不同发行版和版本的默认值不一样，以你集群的 scheduler 配置为准，但这两个策略的取舍是可以直接讲的。</p>
+  <pre><span class="c"># 1. 调度失败的原因：看 Events 里那句话，按节点分项统计</span>
+kubectl describe pod web-0 | sed -n '/Events/,$p'
+kubectl get events --field-selector reason=FailedScheduling
+
+<span class="c"># 2. 节点上「已经被 requests 占掉多少」——这才是调度依据</span>
+kubectl describe node node-1 | sed -n '/Allocated resources/,/Events/p'
+
+<span class="c"># 3. 这个 Pod 到底要多少资源、有没有亲和约束</span>
+kubectl get pod web-0 -o jsonpath='{.spec.containers[*].resources}{"\n"}{.spec.nodeSelector}{"\n"}{.spec.affinity}{"\n"}'
+
+<span class="c"># 4. 看 scheduler 自己的判断过程（需要开日志级别，生产慎用）</span>
+kubectl -n kube-system logs kube-scheduler-xxx --tail=50
+
+<span class="c"># 5. 已经绑定的 Pod 不会被重新调度，这是设计不是 bug</span>
+kubectl get pod web-0 -o jsonpath='{.spec.nodeName}{" "}{.status.conditions}{"\n"}'</pre>
+  <p>最容易答错的一个点：<b>调度只发生一次</b>。Pod 一旦绑定到节点，除非被删除重建，否则永远不会换节点，即使那台节点后来变得很忙、或者标签变了。<span class="k">IgnoredDuringExecution</span> 这个名字就是在说这件事——「调度时看，运行中忽略」。想让 Pod 重新分布，只能靠重建（删掉让它被新调度），或者额外部署 descheduler 这类组件。</p>
+  <p>另一条链路是<b>抢占（preemption）</b>：高优先级 Pod 调度不上时，scheduler 会尝试驱逐某个节点上的低优先级 Pod 来腾位置。<span class="k">PriorityClass</span> 就是给这件事用的。它的副作用很直接——你以为只是「让核心服务优先启动」，实际上它可能把别人的 Pod 杀掉。所以优先级要少用、分级要清楚，不要给一堆服务都配上高优先级。</p>
+  <div class="callout warn">
+    <b>「节点很空但 Pod Pending」的两种典型解释。</b>一是 requests 虚高：所有 Pod 都写了 2 核 4G，节点账面早满了，实际用量只有 20%。二是硬约束：节点标签不匹配、污点不容忍、PVC 的可用区对不上。前者是容量规划问题，后者是配置问题，但现象完全一样，只能靠 Events 里那句话区分。
+  </div>
+  <p><b>面试怎么答：</b>「调度分过滤和打分两步。过滤是硬条件：资源、污点、亲和、卷、端口，任何一条不满足就排除；打分是偏好：资源均衡、镜像本地性、拓扑分散。所有过滤都失败才 Pending，Events 里会按节点列出原因。还有一点很重要：调度只发生一次，绑定后不会因为节点变忙而重新调度。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>亲和与反亲和：required 是承诺，preferred 是愿望</h2></div>
+  <p class="lead">「我想让这几个服务跑在一起」和「我想让它们别跑在一起」，在 Kubernetes 里是同一套语法的两个方向。而写错一个词——把 preferred 写成 required——就会把「尽量」变成「必须」，让 Pod 永久 Pending。</p>
+  <table>
+    <tr><th style="width:170px">字段</th><th>管的是</th><th>硬/软</th><th>写错的后果</th></tr>
+    <tr><td><b>nodeSelector</b></td><td>节点标签，等值匹配</td><td>硬</td><td>没有匹配节点 → 永久 Pending</td></tr>
+    <tr><td><b>nodeAffinity.required...</b></td><td>节点标签，支持表达式和集合</td><td>硬</td><td>同上，且表达式写错更难发现</td></tr>
+    <tr><td><b>nodeAffinity.preferred...</b></td><td>节点标签，带 weight（1-100）</td><td>软</td><td>不满足也能调度，只是没享受到偏好</td></tr>
+    <tr><td><b>podAffinity</b></td><td>和某些 Pod 靠近（同拓扑域）</td><td>硬/软都有</td><td>目标 Pod 不存在时，硬亲和会一直 Pending</td></tr>
+    <tr><td><b>podAntiAffinity</b></td><td>和某些 Pod 分开（同拓扑域）</td><td>硬/软都有</td><td>副本数大于拓扑域数量 → 多余的永久 Pending</td></tr>
+  </table>
+  <p>反亲和是发布事故的高发区，因为它的约束是<b>「副本之间互斥」</b>。你写「同一个 hostname 上不能有两个 web」，节点有 4 台，副本数从 3 扩到 6——多出来的 3 个副本没有任何节点可去。而 HPA 还在继续扩，于是你看到一半 Pod 在跑、一半 Pending，业务容量只有预期的一半。这类问题不会报错，只会安静地少一半容量。</p>
+  <pre><span class="c"># 硬反亲和：每个节点最多一个（副本数不能超过节点数）</span>
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels: {app: web}
+        topologyKey: kubernetes.io/hostname
+
+<span class="c"># 软反亲和：尽量打散，放不下也不阻塞（weight 越高越优先）</span>
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels: {app: web}
+          topologyKey: kubernetes.io/hostname
+
+<span class="c"># 节点亲和：用表达式而不是 nodeSelector，能表达集合和取反</span>
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-pool
+              operator: In
+              values: [general, memory-optimized]</pre>
+  <p>为什么硬亲和也危险？因为它的语义是「必须先有目标 Pod 存在」。两个服务互相硬亲和，谁先起来？都起不来。这类循环依赖在微服务里很常见，而且表现是「两个 Deployment 一直 Pending，删掉任何一个另一个就能起来」，非常反直觉。要打破它，只能至少有一边改成 preferred，或者去掉亲和用别的机制（比如同一个 Pod 里放 sidecar）。</p>
+  <p>还有一个语义细节值得说清：<b>topologyKey 决定「多近算近」</b>。用 <span class="k">kubernetes.io/hostname</span> 就是同一台机器，用 <span class="k">topology.kubernetes.io/zone</span> 就是同一个可用区。写错这一层，「打散」会变成「全部集中在同一台机器上」——因为约束的粒度变了，而你从 YAML 上看不出来。</p>
+  <div class="callout danger">
+    <b>硬反亲和不是「高可用配置」，它是「容量上限配置」。</b>它给你的是「绝不同机」，代价是「副本数被节点数封顶」。真正想要「尽量打散、又不浪费容量」的，应该用拓扑分布约束（下一节），它允许倾斜，而不是一刀切。
+  </div>
+  <p><b>面试怎么答：</b>「亲和分节点和 Pod 两类，各有硬软两种。required 是一票否决，preferred 只影响打分。反亲和的坑最典型：用 hostname 做拓扑键、副本数超过节点数，多出来的副本永远 Pending，而且不报错。想打散又要保留弹性，应该用 topologySpreadConstraints 而不是硬反亲和。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>污点与容忍：节点有脾气，Pod 有通行证</h2></div>
+  <p class="lead">亲和是「Pod 挑节点」，污点是<b>「节点拒绝 Pod」</b>。这两个方向要分清：写亲和是你在表达偏好，写污点是节点在立规矩。而规矩有三种力度，其中一种会把你正在跑的 Pod 赶走。</p>
+  <table>
+    <tr><th style="width:150px">Effect</th><th>对新 Pod</th><th>对已运行的 Pod</th><th>典型用途</th></tr>
+    <tr><td><b>NoSchedule</b></td><td>不容忍就不调度</td><td>不动</td><td>专用节点、GPU 节点、维护中的节点</td></tr>
+    <tr><td><b>PreferNoSchedule</b></td><td>尽量不调度，没别的地方还是放</td><td>不动</td><td>软性的「别往这放」</td></tr>
+    <tr><td><b>NoExecute</b></td><td>不容忍就不调度</td><td><b>驱逐</b>（可按 tolerationSeconds 延迟）</td><td>节点异常、抢占、节点下线</td></tr>
+  </table>
+  <p>这三个 effect 里，只有 NoExecute 会动已经在跑的 Pod，这也是「节点 NotReady 之后 Pod 被赶到别处」的机制——节点失联时，控制面给它打上 <span class="k">node.kubernetes.io/unreachable:NoExecute</span>，Pod 等过 tolerationSeconds 就被驱逐重建。系统还维护另外几个：<span class="k">not-ready</span>、<span class="k">memory-pressure</span>、<span class="k">disk-pressure</span>、<span class="k">pid-pressure</span>、<span class="k">network-unavailable</span>，以及 cordon 产生的 <span class="k">unschedulable</span>。</p>
+  <p>容忍的写法有两种 operator，这个细节经常被问：<b>Equal</b> 要求 key、value、effect 都对上；<b>Exists</b> 只要求 key 存在，value 可以随便，甚至不写。所以「容忍这个 key 的所有污点」用 Exists 更省事，而「只容忍 value 是 gpu 的那种」必须用 Equal。effect 不写表示匹配该 key 的所有 effect。</p>
+  <pre><span class="c"># 给节点打污点（专用节点）</span>
+kubectl taint node node-1 dedicated=infra:NoSchedule
+
+<span class="c"># 容忍的两种写法</span>
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: infra
+    effect: NoSchedule
+  - key: node.kubernetes.io/unreachable
+    operator: Exists
+    effect: NoExecute
+    tolerationSeconds: 300     <span class="c"># 5 分钟后才赶我走</span>
+
+<span class="c"># 看节点上的污点与 Pod 上的容忍是否配对</span>
+kubectl describe node node-1 | grep -A3 Taints
+kubectl get pod web-0 -o jsonpath='{.spec.tolerations}{"\n"}'
+
+<span class="c"># cordon 本质是打 unschedulable 污点，drain 会逐出 Pod</span>
+kubectl cordon node-1
+kubectl drain node-1 --ignore-daemonsets --delete-emptydir-data
+
+<span class="c"># 去掉污点（注意末尾的减号）</span>
+kubectl taint node node-1 dedicated=infra:NoSchedule-</pre>
+  <p>实践里最常见的误用，是<b>给节点打污点做「专用池」，然后忘了 DaemonSet 和系统组件</b>。日志采集、监控 agent 通常是 DaemonSet，它们的控制器会自动加一批容忍，所以还能跑；但你自己部署的 sidecar 式 agent、或者集群的 CNI、kube-proxy 如果是 Deployment 形态，就会全部 Pending。结果是节点起来了、Pod 也调度上去了，但网络不通——因为 CNI 的 Pod 没在这个节点上跑起来。</p>
+  <p>另一个细节：<b>污点和容忍只是「准入」，不是「绑定」</b>。容忍了某个污点，不代表 Pod 一定会调度到那台节点，它只是「不被这项拒绝」。要真的把 Pod 固定到专用节点，还得配 nodeAffinity 或者 nodeSelector——这是「专用节点池」的标准写法，两个都要写。</p>
+  <div class="callout ok">
+    <b>一个能立刻用的判断顺序：</b>Pod Pending 且 Events 里出现 untolerated taint，先问三个问题——这个污点是谁加的？为什么加？不加会怎样？因为污点往往是别人（平台团队、升级流程、故障处理）临时加的，你贸然加容忍，等于绕过了别人设的保护。
+  </div>
+  <p><b>面试怎么答：</b>「污点是节点拒绝 Pod，容忍是 Pod 的通行证，方向跟亲和相反。三个 effect 里只有 NoExecute 会驱逐已运行的 Pod，节点 NotReady 时就是靠 unreachable:NoExecute 把 Pod 赶走重建的。容忍只保证不被拒绝，不保证一定调度上去，专用节点要同时配 nodeAffinity。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>拓扑分布：允许一点倾斜，但别倒</h2></div>
+  <p class="lead">反亲和是二元判断——同域里「有」或「没有」。但真实需求往往是「尽量平均，允许差一点」。这个需求用反亲和表达不了，用拓扑分布约束可以，而且它不会因为副本数超过域数量就卡死。</p>
+  <p>四个字段要一起理解：<b>maxSkew</b> 是允许的最大倾斜（某个域比最少的域最多多几个）；<b>topologyKey</b> 是域的粒度（可用区、节点）；<b>whenUnsatisfiable</b> 决定不满足时是拒绝调度（DoNotSchedule）还是只降分（ScheduleAnyway）；<b>labelSelector</b> 决定统计哪些 Pod。</p>
+  <table>
+    <tr><th style="width:150px">字段</th><th>含义</th><th>写错会怎样</th></tr>
+    <tr><td><b>maxSkew</b></td><td>域之间允许的最大数量差</td><td>写 1 最严格，容易出现「为了凑平均反而调度不上」</td></tr>
+    <tr><td><b>topologyKey</b></td><td>按什么维度分域</td><td>写成 hostname 就变成「每节点一个」，和反亲和等价但不会卡死</td></tr>
+    <tr><td><b>whenUnsatisfiable</b></td><td>DoNotSchedule 硬约束 / ScheduleAnyway 只影响打分</td><td>业务对可用区有强要求时用软约束，等于没保障</td></tr>
+    <tr><td><b>labelSelector</b></td><td>统计哪些 Pod 参与平衡</td><td>选错会把别的服务的 Pod 算进来，导致分布莫名其妙</td></tr>
+  </table>
+  <pre>topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels: {app: web}
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway     <span class="c"># 节点级别只做偏好</span>
+    labelSelector:
+      matchLabels: {app: web}</pre>
+  <p>为什么这个约束比反亲和更适合生产？举个例子：3 个可用区、6 个副本。用硬反亲和 + zone 粒度，每个区最多 2 个，刚好；但如果某个可用区挂了，只剩 4 个副本能跑，而新副本因为硬约束无法调度到那两个健康的区（每区已经 2 个，互斥），容量就永久降一半。用拓扑分布 + maxSkew 2，健康区可以各长到 3 个，容量恢复到 6。</p>
+  <p>还有一个容易被忽略的参数是 <span class="k">minDomains</span>（较新版本支持，以你集群为准）。它解决的问题是：可用区只有 1 个能调度时，maxSkew 的计算会「退化」，所有副本堆在这一个区也算满足约束。设了 minDomains 之后，域数量不足时会认为不满足，从而拒绝调度——这是「宁可 Pending 也不要全堆在一个区」的选择。</p>
+  <div class="callout warn">
+    <b>拓扑分布和反亲和可以叠，但别指望它们互相兜底。</b>硬反亲和会让 Pod 卡在 Pending，拓扑分布的软约束不会；反过来，软约束不提供任何可用性保证。想清楚你要的是「绝对不共存」还是「尽量均匀」，这两个诉求对应两套机制，混着写最容易出现「看起来配了高可用，实际全在一个区」。
+  </div>
+  <p><b>面试怎么答：</b>「拓扑分布约束解决的是『尽量均匀』，四个关键字段是 maxSkew、topologyKey、whenUnsatisfiable 和 labelSelector。它比硬反亲和更适合生产，因为反亲和会把副本数封顶在域数量上，一个区挂了容量就永久损失；拓扑分布允许健康区多承担一些。要强保证就用 DoNotSchedule，要弹性就用 ScheduleAnyway。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>QoS 与驱逐：节点撑不住时，先杀谁</h2></div>
+  <p class="lead">QoS 不是标签，是<b>从 requests 与 limits 的关系里算出来的结果</b>。它直接决定两件事：节点资源紧张时谁先被赶走，以及内核 OOM 时谁的「被杀分数」更高。</p>
+  <table>
+    <tr><th style="width:140px">QoS</th><th>条件</th><th>oom_score_adj</th><th>驱逐顺序</th></tr>
+    <tr><td><b>Guaranteed</b></td><td>每个容器都设了 CPU 和内存，且 requests 等于 limits</td><td>约 -997</td><td>最后（几乎是最后）</td></tr>
+    <tr><td><b>Burstable</b></td><td>设了 requests 或 limits，但不满足 Guaranteed</td><td>2 到 999 之间，按内存 requests 占比算</td><td>中间，按「超出 requests 的程度」排序</td></tr>
+    <tr><td><b>BestEffort</b></td><td>所有容器都没设 requests 和 limits</td><td>1000</td><td>最先</td></tr>
+  </table>
+  <p>这里有个值得说透的机制：Burstable 的驱逐排序不是按「谁用得多」，而是按 <b>「用量相对 requests 超了多少」</b>。一个 requests 100Mi、实际用 500Mi 的 Pod，比一个 requests 2Gi、实际用 2.1Gi 的 Pod 更先被赶走。这个设计的意思是：你声明了多少，就保护多少；超出的部分没有保护。</p>
+  <p>触发驱逐的是 kubelet 的资源水位，比如内存可用量低于硬阈值、本地磁盘使用率高于阈值。<b>这些阈值是 kubelet 配置，不同发行版不一样</b>（常见默认里内存硬阈值是 100Mi 量级、nodefs 和 imagefs 是百分比），所以不要背数字，去看你集群的 kubelet 配置或 <span class="k">describe node</span> 里的 Conditions。软驱逐会带一个宽限期，硬驱逐立即动手。</p>
+  <pre><span class="c"># 1. 这个 Pod 实际是什么 QoS（系统算的，不能手写）</span>
+kubectl get pod web-0 -o jsonpath='{.status.qosClass}{"\n"}'
+
+<span class="c"># 2. 驱逐的证据：Message 里写的是哪种资源</span>
+kubectl get pod -A -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,PHASE:.status.phase,REASON:.status.reason,MSG:.status.message' | grep -i evict
+
+<span class="c"># 3. 节点压力状态（kubelet 打的 Condition）</span>
+kubectl describe node node-1 | sed -n '/Conditions/,/Addresses/p'
+
+<span class="c"># 4. 容器的 oom_score_adj，能看出内核更倾向杀谁</span>
+kubectl exec web-0 -- cat /proc/1/oom_score_adj
+
+<span class="c"># 5. 硬驱逐阈值（在节点上，路径和字段随版本变化，以你环境为准）</span>
+cat /var/lib/kubelet/config.yaml | sed -n '/evictionHard/,/^[a-z]/p'</pre>
+  <p>有一个必须知道的事实：<b>PDB 不保护节点压力驱逐</b>。PodDisruptionBudget 约束的是通过 eviction API 发起的自愿中断（比如 drain、descheduler），而 kubelet 因为资源不足赶 Pod 走的是本地决策，不经过那个接口。所以「我配了 PDB，不会一次挂光」这个假设在节点 OOM 的场景里是不成立的。真正能减少这种情况的，是留出资源余量、把关键服务配成 Guaranteed、以及别让 requests 严重失真。</p>
+  <p>反过来说，BestEffort 也不是一无是处：批处理、可中断任务、压测工具用 BestEffort 是合理的——它们本来就该在资源紧张时先让路。问题出在<b>把核心服务写成 BestEffort</b>：没有任何 requests，调度器认为它不占资源，可以无限往上堆，节点一忙它第一个被杀，而且杀了之后重建还落在同一台节点上，继续被杀。</p>
+  <div class="callout danger">
+    <b>把 requests 写得很小来「提高调度成功率」，是一种自伤。</b>requests 小意味着：调度时占位少（容易放上去）、驱逐时「超出 requests 的程度」大（更容易被赶走）、HPA 算 CPU 利用率时分母小（百分比虚高，可能触发无意义的扩容）。三个后果都指向同一个方向：你以为占了便宜，实际把稳定性押上了。
+  </div>
+  <p><b>面试怎么答：</b>「QoS 是 requests 和 limits 的关系算出来的，Guaranteed 是两者相等、BestEffort 是都不设、其余是 Burstable。驱逐顺序是 BestEffort 先走，Burstable 按超出 requests 的比例排序，Guaranteed 最后。要注意 PDB 不保护节点压力驱逐，它只约束 drain 这类走 eviction API 的自愿中断。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>三种扩缩容：HPA 改副本，VPA 改规格，CA 加节点</h2></div>
+  <p class="lead">这三个东西经常被混着说，其实它们改的是三个不同的东西：<b>HPA 改 replicas，VPA 改 requests/limits，Cluster Autoscaler 改节点数量</b>。搞混了就会问出「HPA 为什么没加机器」这种问题。</p>
+  <table>
+    <tr><th style="width:130px">组件</th><th>改什么</th><th>指标从哪来</th><th>生效速度</th></tr>
+    <tr><td><b>HPA</b></td><td>Deployment/StatefulSet 的 replicas</td><td>metrics-server（资源指标）、custom/external metrics（如 QPS、队列长度）</td><td>十几秒到几分钟（采集间隔 + 稳定窗口）</td></tr>
+    <tr><td><b>VPA</b></td><td>Pod 的 requests/limits</td><td>历史用量推荐值</td><td>慢，通常需要重建 Pod 才生效</td></tr>
+    <tr><td><b>Cluster Autoscaler</b></td><td>节点池的节点数</td><td>是否有 Pending 的 Pod、节点是否长期低利用</td><td>几分钟（创建节点 + 加入集群 + 拉镜像）</td></tr>
+  </table>
+  <p>HPA 的算法值得写出来，因为它解释了很多「为什么不扩」：<b>期望副本数 = 当前副本数 × 当前指标值 ÷ 目标指标值</b>，向上取整。CPU 利用率的口径是「实际用量 ÷ requests 之和」，不是除以 limit，也不是除以节点容量。所以：没设 requests，这个百分比算不出来；requests 设得比实际低很多，百分比会虚高，一有流量就扩到天花板。</p>
+  <pre><span class="c"># HPA 配置：资源指标 + 行为控制</span>
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+spec:
+  scaleTargetRef: {kind: Deployment, name: web}
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 60}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300    <span class="c"># 5 分钟内容忍更高的副本数</span>
+    scaleUp:
+      stabilizationWindowSeconds: 0
+
+<span class="c"># 排障：HPA 的 Conditions 会直接写「算不出来」的原因</span>
+kubectl get hpa web -o yaml | sed -n '/status:/,$p'
+kubectl describe hpa web
+
+<span class="c"># 指标链是否通：metrics-server → apiserver → HPA</span>
+kubectl top pod web-0
+kubectl get apiservice v1beta1.metrics.k8s.io
+
+<span class="c"># VPA 的推荐值（updateMode 为 Off 时只看不动）</span>
+kubectl describe vpa web-vpa | sed -n '/Recommendation/,$p'
+
+<span class="c"># CA 的判断依据：有没有 Pending 且不可调度的 Pod</span>
+kubectl get pod -A --field-selector status.phase=Pending</pre>
+  <p>「CPU 70% 却不扩」的排查顺序很固定：<b>先看 HPA 的 Conditions</b>。如果是 <span class="k">failed to get cpu utilization: missing request for cpu</span>，就是没设 requests；如果是 <span class="k">unable to fetch metrics</span>，就是 metrics-server 或 apiservice 不通；如果 Conditions 正常但 Replicas 不动，就看是不是已经到 maxReplicas，或者 scaleDown 的稳定窗口把扩容也压住了（少见，但行为配置写错时会发生）。</p>
+  <p>VPA 有两个使用上的硬约束：<b>它会重建 Pod</b>（除了 Off 和 Initial 之外的模式），所以不适合对可用性敏感、启动又慢的服务；<b>它不要和 HPA 同时对同一个资源做决策</b>，否则一个想加副本、一个想改 requests，指标口径互相打架，结果是来回震荡。常见的组合是 HPA 管副本（用 CPU 或 QPS），VPA 只出推荐值由人改，或者 VPA 管内存、HPA 管 CPU——后者的前提是你清楚这两个指标不会互相影响。</p>
+  <div class="callout warn">
+    <b>扩容是有延迟的，而延迟要靠余量兜。</b>HPA 的链路是「采集指标 → 计算 → 改 replicas → 调度 → 拉镜像 → 启动 → Ready」，节点不够还要再加一段 CA 建节点的时间。整条链路走完可能是几分钟，而流量峰值往往只有几十秒。所以关键服务不能只靠 HPA，得有最低副本数保证余量，或者用低优先级的占位 Pod 做资源预留。
+  </div>
+  <p><b>面试怎么答：</b>「HPA 只改副本数，指标默认来自 metrics-server，CPU 利用率是相对 requests 算的，所以没设 requests 它就算不出来。VPA 改 requests 但通常要重建 Pod，不要和 HPA 对同一资源同时开。Cluster Autoscaler 是看到 Pending 才加节点，链路很长，所以关键服务的容量要靠 minReplicas 留余量，不能指望它秒级响应。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>滚动更新：maxSurge 与 maxUnavailable 在算什么</h2></div>
+  <p class="lead">这两个参数不是「速度调节旋钮」，它们在算<b>容量边界</b>：发布过程中最多能多出几个 Pod、最多能少几个可用 Pod。算错的方向只有两个——要么发布太慢，要么发布期间容量不够。</p>
+  <table>
+    <tr><th style="width:190px">参数</th><th>含义</th><th>默认</th><th>取 0 的后果</th></tr>
+    <tr><td><b>maxSurge</b></td><td>允许超出期望副本数的 Pod 数（可以是数字或百分比）</td><td>25%</td><td>必须先删后建，发布期间容量下降</td></tr>
+    <tr><td><b>maxUnavailable</b></td><td>允许不可用的 Pod 数</td><td>25%</td><td>必须先建后删，需要额外的节点资源</td></tr>
+    <tr><td><b>minReadySeconds</b></td><td>Pod Ready 之后还要稳定多久才算可用</td><td>0</td><td>刚 Ready 就继续推进，错误暴露得更快</td></tr>
+    <tr><td><b>progressDeadlineSeconds</b></td><td>多久没进展就标记为失败</td><td>600</td><td>卡住时不报警，rollout status 一直等</td></tr>
+    <tr><td><b>revisionHistoryLimit</b></td><td>保留多少个旧 ReplicaSet 供回滚</td><td>10</td><td>回滚不了太远的版本</td></tr>
+  </table>
+  <p>算一笔账：副本 10，maxSurge 25% 就是 3（向上取整），maxUnavailable 25% 就是 2（向下取整）。发布时的峰值是 13 个 Pod，谷值是 8 个可用。这两个数字要提前和容量对齐：如果峰值 13 个放不下（节点资源不够），发布就会卡在「新 Pod Pending」；如果谷值 8 个撑不住流量，发布期间就会超时。<b>把它们同时设为 0 是不允许的</b>，apiserver 会直接拒绝。</p>
+  <pre><span class="c"># 看发布进度和卡住的原因</span>
+kubectl rollout status deploy/web --timeout=180s
+kubectl rollout history deploy/web
+kubectl describe deploy/web | sed -n '/Conditions/,$p'
+
+<span class="c"># 暂停/恢复：可以做一次「只起新版本、不切完」的观察</span>
+kubectl rollout pause deploy/web
+kubectl rollout resume deploy/web
+
+<span class="c"># 回滚到上一个版本（ReplicaSet 还在，不需要重新构建）</span>
+kubectl rollout undo deploy/web
+
+<span class="c"># PDB：约束自愿中断，不约束节点压力驱逐</span>
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+spec:
+  minAvailable: 2          <span class="c"># 或 maxUnavailable: 1</span>
+  selector:
+    matchLabels: {app: web}</pre>
+  <p>PDB 有一个经典的自锁：<b>minAvailable 写成 100% 或者等于副本数，drain 就永远等不到许可</b>。因为滚动更新或 drain 必须先摘掉至少一个，而 PDB 说「一个都不能少」。现象是 <span class="k">kubectl drain</span> 卡住、事件里反复出现 <span class="k">Cannot evict pod as it would violate the pod's disruption budget</span>。这类问题在节点维护时最容易撞上，而且因为是「保护」而不是「故障」，很容易被误判成集群卡了。</p>
+  <p>PDB 和滚动更新的关系也要说清：<b>它们不互相约束</b>。Deployment 的滚动更新直接删旧 Pod，不走 eviction API，所以 PDB 管不到它；PDB 只在 drain、节点维护、descheduler 这类自愿中断场景生效。指望 PDB 来保证「发布时至少有几个可用」，方向是错的——那个要靠 maxUnavailable 和 readiness。</p>
+  <div class="callout ok">
+    <b>一套能直接用的参数组合：</b>副本 ≥ 3，maxSurge 1 到 25%，maxUnavailable 0 到 1，minReadySeconds 10 到 30 秒，progressDeadlineSeconds 保持默认或按启动时间放大，再给关键服务配一个 minAvailable 为「副本数减一」的 PDB。这套组合的取舍是「发布慢一点，但不掉容量」，适合大多数在线服务。
+  </div>
+  <p><b>面试怎么答：</b>「maxSurge 和 maxUnavailable 算的是发布期间的容量上下界，两个都是百分比时一个向上取整一个向下取整，不能同时为 0。minReadySeconds 决定新 Pod 要稳定多久才算可用，它直接影响错误暴露的速度。PDB 只约束 drain 这类走 eviction API 的自愿中断，滚动更新不走那条路，所以 PDB 不能替代 maxUnavailable 的作用。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>优雅退出：摘流量和发信号是并行的</h2></div>
+  <p class="lead">这是本期最该记住的一节。绝大多数「发布时 502」的根因，是<b>一个时序假设错了</b>：很多人以为系统会「先把流量摘干净，再通知进程退出」。实际不是——这两件事同时开始，而摘流量要经过好几个组件才生效。</p>
+  <pre>kubectl delete pod / Deployment 滚动更新
+│
+├─ t=0    Pod 标记 deletionTimestamp，状态变 Terminating
+│         ├─ EndpointSlice 控制器开始把它从后端移除（异步，要传播）
+│         └─ kubelet 开始执行 preStop hook（如果有）
+│
+├─ t=0~  kube-proxy 同步规则、Ingress controller 更新 upstream
+│         这两个都有延迟：秒级到几十秒，取决于规模和实现
+│         这段时间里，新连接还在往这个 Pod 打
+│
+├─ t=preStop 结束 → kubelet 发 SIGTERM
+│         应用应该：停止接受新请求、等在途请求完成、关闭连接池
+│
+├─ t=preStop + 应用退出时间 → 容器退出
+│
+└─ t=terminationGracePeriodSeconds（默认 30s）到期 → SIGKILL，退出码 137
+          preStop 的耗时是算在这 30 秒里的</pre>
+  <p>看这张时序就明白 preStop 里 sleep 几秒的作用了：<b>它不是「让应用多活一会儿」，是「给规则传播留时间」</b>。在这几秒里，应用还在正常处理请求，但新的连接已经不再被路由过来。等传播完成，再让它退出，就不会有人打到已经关闭的端口。</p>
+  <table>
+    <tr><th style="width:150px">现象</th><th>原因</th><th>改哪里</th></tr>
+    <tr><td>发布时稳定 502，持续十几秒</td><td>没有 preStop，SIGTERM 后进程立即关闭监听，规则还没同步完</td><td>加 preStop sleep 5-15 秒，同时应用要优雅关闭</td></tr>
+    <tr><td>偶发 connection reset</td><td>应用收到 SIGTERM 直接 exit，在途请求被切断</td><td>应用侧等 in-flight 请求结束，再退出</td></tr>
+    <tr><td>Pod 总是等满 30 秒才消失</td><td>应用忽略了 SIGTERM，只能等 grace 到期被 SIGKILL</td><td>修信号处理；顺便确认 PID 1 是应用本体</td></tr>
+    <tr><td>退出码 137，日志没有 shutdown 记录</td><td>grace 不够，preStop + 退出耗时超了</td><td>调大 terminationGracePeriodSeconds，别只调 preStop</td></tr>
+    <tr><td>SIGTERM 到不了应用</td><td>CMD 用了 shell 形式，PID 1 是 sh，信号不转发</td><td>改成 exec 形式，或用 tini/dumb-init</td></tr>
+  </table>
+  <pre><span class="c"># 正确的三段式：给规则传播留时间 + 应用自己优雅关闭</span>
+spec:
+  terminationGracePeriodSeconds: 60        <span class="c"># 要大于 preStop + 应用退出时间</span>
+  containers:
+    - name: web
+      lifecycle:
+        preStop:
+          exec:
+            command: ["sleep", "10"]       <span class="c"># 这 10 秒算在 60 秒里</span>
+      <span class="c"># exec 形式，保证 PID 1 是应用，能收到 SIGTERM</span>
+      command: ["/app/server"]
+      args: ["--port=8080"]
+
+<span class="c"># 验证：删一个 Pod，盯着它什么时候从 EndpointSlice 消失、什么时候退出</span>
+kubectl delete pod web-0 &amp;
+watch -n1 'kubectl get endpointslice -l kubernetes.io/service-name=web -o wide'
+
+<span class="c"># 确认进程收到的信号（应用日志里应该有 shutdown 记录）</span>
+kubectl logs web-0 --previous | tail -20</pre>
+  <p>「sleep 10 秒」这个做法看起来很土，但它解决的是一个真实的不确定性：<b>你无法知道规则传播需要多久</b>。kube-proxy 的同步周期、Ingress controller 的 reload 延迟、客户端的连接池、上游 LB 的健康检查间隔，每一层都是变量。用一个略大于最坏情况的等待，比精确计算可靠得多。</p>
+  <p>应用侧要配合的部分不能省。收到 SIGTERM 之后，正确的顺序是：<b>停止接受新连接 → 等在途请求完成（设一个上限）→ 关闭连接池和后台任务 → 退出</b>。只做「收到信号就 exit」等于把在途请求全扔掉，preStop 再长也救不回来，因为那些请求是在 sleep 期间进来的。</p>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get pod NAME -o jsonpath='{.spec.terminationGracePeriodSeconds}'</code><span class="desc">先确认预算有多大，未设置时是 30 秒</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pod NAME -o jsonpath='{.spec.containers[*].lifecycle}'</code><span class="desc">有没有 preStop，执行的是什么命令，sleep 几秒</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pod NAME -o jsonpath='{.spec.containers[*].command}'</code><span class="desc">确认是 exec 形式，不是 sh -c 包一层</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get endpointslice -l kubernetes.io/service-name=SVC -w</code><span class="desc">删 Pod 时盯着后端什么时候消失，量出传播延迟</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs NAME --previous | tail -20</code><span class="desc">有没有 shutdown 记录，决定了 SIGTERM 到底有没有到应用</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get pod NAME -o jsonpath='{.status.containerStatuses[0].lastState.terminated}'</code><span class="desc">137 是被 SIGKILL，说明预算不够；0 或 143 才是正常收尾</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout danger">
+    <b>两个时间要满足这个不等式：</b>preStop 时长 + 应用优雅退出时长 &lt; terminationGracePeriodSeconds。左边超了右边，kubelet 会直接 SIGKILL，应用来不及 flush，日志里什么都没有，退出码 137——看起来像被 OOM，其实是时间不够。改的时候两个一起看，只调 preStop 会把余量吃掉。
+  </div>
+  <p><b>面试怎么答：</b>「删 Pod 时，摘 Endpoints 和发 SIGTERM 是并行的，不是串行。规则传播有延迟，所以要在 preStop 里 sleep 几秒，让流量先停下来再退出。grace period 要大于 preStop 加应用退出时间，否则会被 SIGKILL。另外 CMD 必须是 exec 形式，shell 形式下 PID 1 是 sh，SIGTERM 到不了应用。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>探针设计：它是发布系统的一部分，不是装饰</h2></div>
+  <p class="lead">很多人把探针当成「加个 /healthz 就完事」。但在发布的语境里，探针决定了三件事：<b>什么时候开始接流量、什么时候被摘掉、什么时候被重启</b>。这三个动作直接对应发布的质量。</p>
+  <table>
+    <tr><th style="width:120px">探针</th><th>成功意味着</th><th>失败的动作</th><th>设计要点</th></tr>
+    <tr><td><b>startup</b></td><td>启动完成，可以开始做别的检查</td><td>重启容器</td><td>预算要覆盖最慢启动路径，成功后自动让位</td></tr>
+    <tr><td><b>readiness</b></td><td>能处理请求</td><td>从 Endpoints 摘除，不重启</td><td>反映「持续不可用」，不是「此刻有点忙」</td></tr>
+    <tr><td><b>liveness</b></td><td>进程还值得救</td><td>重启容器</td><td>只查自己，绝不查下游</td></tr>
+  </table>
+  <p>先说 liveness 的边界，因为它的错误代价最大。判断标准只有一句：<b>「这个检查失败，重启能修好吗？」</b>能——比如死锁、事件循环卡住、内存泄漏到无法服务，那就该重启。不能——比如数据库连不上、下游超时、配置中心不可用，重启只会让所有副本同时进入冷启动，把一次下游抖动放大成全站故障。</p>
+  <p>readiness 的边界相反：<b>它应该表达「我现在不该接流量」</b>，所以查依赖是合理的。但有两个前提：一是失败要能快速恢复（依赖回来就自动恢复，不需要人工干预），二是不要用它表达瞬时状态。查「连接池是否有空闲连接」这种指标，会让 Pod 在 Endpoints 里反复进出，客户端看到的是间歇性 502，比稳定地少一个副本更糟。</p>
+  <pre><span class="c"># 一套能直接用的三段式（注意预算和时间的关系）</span>
+startupProbe:
+  httpGet: {path: /healthz, port: 8080}
+  periodSeconds: 10
+  failureThreshold: 30          <span class="c"># 最多等 300 秒，要覆盖最慢启动</span>
+readinessProbe:
+  httpGet: {path: /ready, port: 8080}
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 2           <span class="c"># 10 秒内摘流量，够快但不敏感</span>
+livenessProbe:
+  httpGet: {path: /healthz, port: 8080}
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3           <span class="c"># 约 30 秒才重启，容忍一次长 GC</span>
+
+<span class="c"># 确认探针真的在被执行（失败会写进 Events，也会反映在 ready 状态）</span>
+kubectl describe pod web-0 | grep -i -E 'probe|unhealthy'
+kubectl get pod web-0 -o jsonpath='{.status.containerStatuses[0].ready}{"\n"}'
+
+<span class="c"># 探针端点要独立于业务路由：不要经过鉴权中间件</span>
+kubectl exec web-0 -- wget -qO- http://127.0.0.1:8080/healthz</pre>
+  <p>参数之间的关系要会算：<b>最大等待时间约等于 periodSeconds 乘 failureThreshold</b>。默认 period 是 10 秒、failureThreshold 是 3，所以默认配置下要连续失败三次、大约 30 秒才会动手。很多人以为「探针失败就立刻重启」，把 failureThreshold 调成 1、period 调成 1 秒，结果一次 GC 停顿就把自己重启了——这是自己制造的故障。</p>
+  <p>几个容易忽略的设计点：探针的 <span class="k">timeoutSeconds</span> 必须小于 <span class="k">periodSeconds</span>，否则上一次没超时下一次又开始了；探针端点要<b>独立于业务路由</b>，不要经过鉴权、限流、灰度中间件，否则中间件一抖，探针全挂；用 <span class="k">exec</span> 探针要注意它每次都会 fork 一个进程，高频率下开销不小，能用 httpGet 就别用 exec；探针失败会把日志刷满，注意别让它变成日志量的主要来源。</p>
+  <div class="callout warn">
+    <b>探针还有一个发布期的副作用：它会把发布卡住。</b>新 Pod 一直不 Ready，滚动更新就不会继续推进，超过 progressDeadlineSeconds 之后 Deployment 会被标记为失败（但不会自动回滚）。所以「发布卡住」时，第一件事是看新 Pod 的 readiness 为什么不过，而不是反复 <span class="k">rollout restart</span>。
+  </div>
+  <p><b>面试怎么答：</b>「探针不是三个独立的开关，它们分别对应启动预算、接流量、重启三个决策。liveness 的判断标准是『重启能不能修好』，所以不能查下游；readiness 可以查依赖，但要能自动恢复；startup 的预算约等于 failureThreshold 乘 periodSeconds。最大等待时间默认是 30 秒这个量级，把它调成 1 秒等于让 GC 来决定你的可用性。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：参数之间的乘法关系</h2></div>
+  <p class="lead">这一节的坑有个共同点：<b>单个参数看起来都合理，组合起来才出问题</b>。maxUnavailable 和 PDB 组合、preStop 和 grace 组合、HPA 和 requests 组合——每一对都有一个隐含的不等式。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">maxSurge 和 maxUnavailable 都设成 0</div><div class="pd">apiserver 会直接拒绝，因为这意味着「既不能多也不能少」，滚动更新无法推进。至少放开一个：要么多起 Pod 换容量，要么牺牲一点容量换速度。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">PDB 的 minAvailable 等于副本数</div><div class="pd">drain 永远拿不到许可，节点维护会卡死，事件里反复报 would violate the pod's disruption budget。正确写法是 maxUnavailable: 1 或 minAvailable 比副本数少一个。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">用硬反亲和做高可用，副本数又超过节点数</div><div class="pd">多出来的副本永久 Pending，而且不报错，只是容量少一半。想要「尽量打散」应该用拓扑分布约束，它允许倾斜但不会卡死。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">不设 requests，却指望 HPA 按 CPU 扩</div><div class="pd">CPU 利用率的分母是 requests 之和，没设就计算不出来，HPA 的 Conditions 会写 missing request for cpu。HPA 依赖 requests 才能工作。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">preStop 的 sleep 时长算在 grace 之外</div><div class="pd">它算在里面。grace 30 秒、preStop sleep 30 秒，应用就一点退出时间都没有，直接被 SIGKILL，退出码 137，日志里什么都没有。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">CMD 用 shell 形式，却指望能优雅退出</div><div class="pd">shell 形式下 PID 1 是 sh，它不会把 SIGTERM 转发给子进程。应用等不到信号，只能等 grace 到期被杀。要改 exec 形式，或者引入 tini 之类的 init。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">liveness 里查数据库</div><div class="pd">数据库一抖，所有副本同时重启，重启中的实例又加重数据库负担，形成级联。发布期间尤其致命：你分不清是「新版本有问题」还是「数据库在抖」。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">CPU 型 HPA 用在 IO 密集服务上</div><div class="pd">IO 密集服务的瓶颈在等待，CPU 一直很低，HPA 永远不扩，而请求已经在排队。这类服务应该用 QPS、并发数或队列长度这类自定义指标。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">VPA 和 HPA 同时对 CPU 做决策</div><div class="pd">VPA 改 requests，HPA 的利用率分母跟着变，两个控制器互相追着改，副本数和 requests 一起震荡。同一种资源只能有一个主导者。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">只靠 HPA，不留容量余量</div><div class="pd">HPA 到 Pod Ready 要几十秒，节点不够还要等 Cluster Autoscaler 建节点，可能几分钟。流量峰值往往只有几十秒，等扩出来已经过去了。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个能算数字的讲。比如「我们发布时 502，一开始以为是镜像有问题，后来发现是没配 preStop，SIGTERM 之后进程立刻关监听，而 Ingress 的 upstream 还要几秒才更新完。加了 preStop sleep 8 秒、grace 调到 45 秒，并且让应用在 SIGTERM 后等 10 秒再退出，502 就没了。」有数字、有时序、有验证，比背十条坑有说服力。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. kube-scheduler 的调度过程，正确的描述是？</div>
+      <button class="opt">先给所有节点打分，再在最高分的节点上检查资源是否足够</button>
+      <button class="opt">随机选一个节点，失败就换下一个，直到成功</button>
+      <button class="opt">先用一组过滤插件排除不满足硬约束的节点，再对剩下的节点打分选最高</button>
+      <button class="opt">由 kubelet 主动上报资源，apiserver 直接指定节点</button>
+      <div class="ans">正确答案：<b>先过滤再打分</b>。过滤阶段是硬条件（资源、污点、亲和、卷、端口），任何一条不满足该节点就被排除；打分阶段只在通过的节点里比较资源均衡度、镜像本地性、拓扑分散等偏好，取最高分。这也是为什么 Pending 只会由过滤失败引起，打分低不会导致 Pending。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">2. 一个 Deployment 配了硬反亲和（topologyKey 为 hostname，labelSelector 匹配自身），副本数 6，集群只有 4 个节点。会发生什么？</div>
+      <button class="opt">6 个副本轮流调度，总有 2 个在 Pending 和 Running 之间切换</button>
+      <button class="opt">调度器会自动放宽反亲和约束，把 6 个副本放到 4 个节点上</button>
+      <button class="opt">6 个副本全部 Pending，因为没有节点能满足「每个节点最多一个」</button>
+      <button class="opt">4 个 Running、2 个永久 Pending，且不会有报错</button>
+      <div class="ans">正确答案：<b>4 个 Running、2 个永久 Pending</b>。硬反亲和是逐 Pod 判定的：前 4 个分别落到 4 个节点，第 5、6 个在所有节点上都会与同标签的 Pod 冲突，于是永久 Pending 并在 Events 里报 didn't match pod anti-affinity rules。它不会自动放宽，也不会让已在跑的 Pod 让位，结果就是容量静默少三分之一。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">3. HPA 配了 CPU 目标 60%，但一直不扩容，<span class="k">describe hpa</span> 里出现 <span class="k">failed to get cpu utilization: missing request for cpu</span>。原因是？</div>
+      <button class="opt">metrics-server 没有安装，采集不到任何指标</button>
+      <button class="opt">容器的 requests 没设 CPU，利用率的分母不存在，百分比算不出来</button>
+      <button class="opt">maxReplicas 设得太小，已经到上限</button>
+      <button class="opt">HPA 的 API 版本过旧，需要升级到 v2</button>
+      <div class="ans">正确答案：<b>缺 requests</b>。HPA 的 CPU 利用率是「实际用量 ÷ requests 之和」，没有 requests 这个分母，百分比无从计算，HPA 只能报错并停止决策。如果只设了 limits，很多情况下 requests 会被默认成 limits，反而「碰巧能用」，但那等于按上限预留资源，调度会变紧。metrics-server 缺失报的是 unable to fetch metrics，文案不同。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 一个 Deployment 副本数是 3，PDB 配了 <span class="k">minAvailable: 3</span>。执行 <span class="k">kubectl drain</span> 维护节点时会发生什么？</div>
+      <button class="opt">drain 卡住，因为驱逐任何一个 Pod 都会违反 PDB，事件里反复报 disruption budget 相关错误</button>
+      <button class="opt">drain 正常进行，PDB 只影响滚动更新</button>
+      <button class="opt">PDB 会自动放宽到 2，drain 继续</button>
+      <button class="opt">drain 会把整个 Deployment 删掉再重建</button>
+      <div class="ans">正确答案：<b>drain 卡住</b>。PDB 的语义是「自愿中断时至少要保留这么多可用」，minAvailable 等于副本数意味着一个都不能少，而 drain 必须先驱逐至少一个，于是永远得不到许可。正确做法是 minAvailable 设为副本数减一，或改用 maxUnavailable: 1。注意 PDB 只约束 drain 这类走 eviction API 的操作，滚动更新不受它约束。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 每次滚动发布都会出现十几秒的 502，新 Pod 的 readiness 是正常的。最可能的原因？</div>
+      <button class="opt">新版本的镜像有问题，启动后立即崩溃</button>
+      <button class="opt">Service 的 targetPort 配错了</button>
+      <button class="opt">旧 Pod 收到 SIGTERM 后立即退出，而 Endpoints 摘除和规则同步有延迟，流量还在打到它</button>
+      <button class="opt">maxSurge 设得太小，导致发布太慢</button>
+      <div class="ans">正确答案：<b>摘流量与停进程的竞态</b>。删除 Pod 时，从 Endpoints 摘除和发送 SIGTERM 是并行的，kube-proxy 与 Ingress 更新 upstream 都有延迟。如果进程收到 SIGTERM 就关闭监听，这段窗口里到达的请求就会 502。修法是加 preStop sleep 几秒给规则传播留时间，同时应用侧要等在途请求处理完再退出。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 关于污点的三种 effect，下面哪个说法是对的？</div>
+      <button class="opt">NoSchedule 会把已经运行在该节点上的、不容忍该污点的 Pod 驱逐出去</button>
+      <button class="opt">只有 NoExecute 会驱逐已经运行在节点上的、不容忍该污点的 Pod，且可以用 tolerationSeconds 延迟</button>
+      <button class="opt">PreferNoSchedule 会让不容忍的 Pod 完全无法调度到该节点</button>
+      <button class="opt">三种 effect 都只影响新调度的 Pod，对已运行 Pod 都没有影响</button>
+      <div class="ans">正确答案：<b>NoExecute 才会驱逐</b>。NoSchedule 只影响新 Pod 的调度决策，已在运行的 Pod 不受影响；PreferNoSchedule 是软约束，没有别的地方可放时仍然会调度过去；NoExecute 既阻止新 Pod，也会驱逐不容忍的存量 Pod，tolerationSeconds 可以让它多留一会儿。节点 NotReady 时控制面加的就是 NoExecute 类污点。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:210px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>Filter / Score</b></td><td>调度的两个阶段：硬条件过滤，余下的节点打分选最高</td></tr>
+    <tr><td><b>requests</b></td><td>调度与 QoS 的依据，也是 HPA 计算利用率的基数；不等于实际用量</td></tr>
+    <tr><td><b>IgnoredDuringExecution</b></td><td>「调度时检查、运行中忽略」，所以 Pod 绑定后不会因标签变化被迁走</td></tr>
+    <tr><td><b>topologyKey</b></td><td>亲和与拓扑分布的粒度：hostname 是节点级，zone 是可用区级</td></tr>
+    <tr><td><b>taint / toleration</b></td><td>节点的拒绝规则与 Pod 的通行证；容忍只保证不被拒绝，不保证被选中</td></tr>
+    <tr><td><b>NoExecute</b></td><td>唯一会驱逐存量 Pod 的污点效果，可配 tolerationSeconds 延迟</td></tr>
+    <tr><td><b>maxSkew</b></td><td>拓扑分布里允许的域间数量差，配合 whenUnsatisfiable 决定硬软</td></tr>
+    <tr><td><b>QoS 三级</b></td><td>Guaranteed / Burstable / BestEffort，决定 oom_score_adj 和驱逐顺序</td></tr>
+    <tr><td><b>evictionHard</b></td><td>kubelet 的硬驱逐阈值，触到就立即驱逐，与 PDB 无关</td></tr>
+    <tr><td><b>HPA</b></td><td>按指标改 replicas；CPU 利用率相对 requests，需要 metrics 链路可用</td></tr>
+    <tr><td><b>VPA</b></td><td>按历史用量改 requests/limits，多数模式需要重建 Pod，别和 HPA 抢同一资源</td></tr>
+    <tr><td><b>Cluster Autoscaler</b></td><td>看到 Pending 才加节点，链路以分钟计，不能替代容量余量</td></tr>
+    <tr><td><b>maxSurge / maxUnavailable</b></td><td>滚动更新的容量上下界，百分比取整方向不同，不能同时为 0</td></tr>
+    <tr><td><b>minReadySeconds</b></td><td>Ready 之后还要稳定多久才算可用，直接影响错误暴露速度</td></tr>
+    <tr><td><b>PDB</b></td><td>约束自愿中断的可用下限，只管 drain 这类走 eviction API 的操作</td></tr>
+    <tr><td><b>preStop</b></td><td>终止前执行的钩子，用来给流量摘除留传播时间；耗时计入 grace period</td></tr>
+    <tr><td><b>terminationGracePeriodSeconds</b></td><td>从发 SIGTERM 到 SIGKILL 的预算，默认 30 秒，必须大于 preStop 加退出时间</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起一个 3 副本的 Deployment，配上 preStop sleep 和 readiness，然后用 <span class="k">kubectl rollout restart</span> 发布，同时用一个循环 curl 打 Service，把失败的请求数和时间点记下来；再把 preStop 去掉重跑一次，对比差异——这个对比会比你读十篇文章都记得牢。② 把副本数设成 6、节点只有 4 个，加一条硬反亲和，观察 2 个 Pod 永久 Pending 和 Events 里的原文，然后换成 topologySpreadConstraints 看恢复。③ 给一个 CPU 不高但 QPS 很高的服务配 HPA，观察它为什么不扩，再改成基于自定义指标。<br><br>
+    <b>之后值得单独学：</b>第 11 期讲这些配置出错后长什么样（Pending、Evicted、Terminating），是这一篇的故障视角；第 12 期讲发布时流量路径上的 Endpoints、kube-proxy、Ingress 各自怎么更新，能解释 preStop 为什么要等；第 19 期讲 CI/CD 与发布策略，把蓝绿、金丝雀和这里的滚动更新放在一起比较取舍。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 13 期 · 发布的功夫不在起新版本，在于让「替换一个 Pod」对用户完全不可见</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

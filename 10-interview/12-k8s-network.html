@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>K8s 网络全链路：Pod、Service、Ingress 与 DNS</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 12 期</span>
+    <h1>K8s 网络全链路：Pod、Service、Ingress 与 DNS</h1>
+    <p class="sub">一个请求从外到内要过五道关，<b>知道每关谁负责</b>，你才知道该看谁的日志。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>7</b> 大模块</span>
+      <span class="chip"><b>5</b> 层链路</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>18</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：客户端的包发到 ClusterIP，是谁把它改成 Pod IP 的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都叫「网络不通」，修的地方差三个组件</h2></div>
+  <p class="lead">「服务调不通」是 K8s 里最没有信息量的一句话。同一个现象，可能是 DNS 解析到了错的名字、可能是 iptables 规则没下发、可能是跨节点封装把大包丢了、也可能是 Ingress 的 host 没匹配上。这四个原因分布在四个组件里，<b>你在错的地方翻一天也不会有结果</b>。</p>
+  <table>
+    <tr><th style="width:220px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>curl 服务名超时，直接 curl Pod IP 秒通</td><td>网络插件坏了</td><td>DNS 或 Service 规则。名字解析出来是 ClusterIP，而 ClusterIP 只是一串内核规则，规则没下发或端口写错，包就凭空消失</td></tr>
+    <tr><td>ping 通、小请求通，一传大文件就卡死</td><td>带宽不够，或者对方处理慢</td><td>MTU。Overlay 封装要额外占几十字节，Pod 里还按 1500 发，包在隧道口被分片或丢弃，表现为「握手成功、传数据卡住」</td></tr>
+    <tr><td>同一个命名空间内互通，跨命名空间全挂</td><td>namespace 之间有隔离</td><td>命名空间本身<b>不隔离网络</b>。是某个 NetworkPolicy 选中了目标 Pod，让它那个方向变成默认拒绝</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>数据面在核里</div><div class="cd">Service 转发、NetworkPolicy 拦截，最终都由内核的 netfilter/IPVS 或 eBPF 完成。没有哪个进程在「转发请求」。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>控制面只写规则</div><div class="cd">kube-proxy、CNI 的 agent、CoreDNS 都是「把期望翻译成规则」的角色。规则写完就退出画面，剩下的事内核干。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>地址会变，名字不变</div><div class="cd">Pod IP 随重建变动，ClusterIP 在 Service 生命周期内不变，域名靠 DNS 维护。三层地址各有各的失效方式。</div></div>
+  </div>
+  <p>这一篇按「一个请求从外到内」的顺序走：先看 Pod 网络模型和 CNI 铺的路，再拆 Service 这层虚拟地址怎么变成规则，然后是 NodePort、负载均衡和 Headless 的差别，接着是 Ingress、DNS 和 NetworkPolicy 三道关，最后把跨节点访问的完整路径和排查顺序收在一起。</p>
+  <div class="callout">
+    <b>一个能贯穿全文的判断：</b>网络问题的排查顺序，永远是从「离你最近的确定性」往外推。你确定 Pod 在跑、确定端口在听、确定 IP 是多少，然后一层层往外验证。反过来从「外网打不开」往里查，你会同时怀疑五个组件。
+  </div>
+  <p><b>面试怎么答：</b>「K8s 网络我会分五层看：Pod 之间的三层连通（CNI 负责）、Service 的虚拟 IP（kube-proxy 写规则）、集群内名字解析（CoreDNS）、四层暴露（NodePort/LB）、七层入口（Ingress Controller）。每一层都有一个明确的负责人，出问题先定位是哪一层，再看那个组件的状态。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>Pod 网络模型：一个 Pod 一个 IP，且不用 NAT</h2></div>
+  <p class="lead">K8s 对 Pod 网络只提了三条要求：<b>每个 Pod 有自己的 IP；所有 Pod 之间可以直接通，不需要 NAT；同一台机器上的容器和 Pod 看到彼此的地址是一样的</b>。这三条听起来像废话，但它们决定了 CNI 必须实现什么。</p>
+  <p>实现方式在每台节点上是同一套：Pod 里有一块 eth0，它和宿主机上的一根 veth 配对；veth 这一头接到网桥（或者直接被路由规则处理），节点上的路由表知道「这个 Pod IP 应该从哪根 veth 出去」。跨节点的那一跳，才是 CNI 真正要解决的问题——<b>别的节点怎么知道这个 Pod IP 在哪台机器上</b>。</p>
+  <table>
+    <tr><th style="width:150px">方案</th><th>跨节点怎么走</th><th>代价</th><th>典型实现</th></tr>
+    <tr><td><b>Underlay / 路由</b></td><td>把 Pod 网段的路由发布到物理网络，或节点之间直接路由</td><td>性能最好，但要底层网络配合，IP 段规划要提前做</td><td>Calico 的 BGP 模式</td></tr>
+    <tr><td><b>IPIP</b></td><td>用 IP 协议套 IP，包头加 20 字节</td><td>开销小，只支持 IPv4 单播；部分网络会拦协议号 4</td><td>Calico 的 IPIP 模式</td></tr>
+    <tr><td><b>VXLAN</b></td><td>用 UDP 封装二层帧，包头加 50 字节</td><td>兼容性最好，能过大多数网络；封装/解封装有 CPU 开销</td><td>Flannel、Calico 的 VXLAN 模式</td></tr>
+    <tr><td><b>host-gw</b></td><td>纯路由，节点把对方 Pod 网段的下一跳指向对端节点</td><td>最快，但要求所有节点在同一二层网络</td><td>Flannel 的 host-gw</td></tr>
+  </table>
+  <p>这四种方案的差别，落到排障上只有一个关键数字：<b>MTU</b>。物理网卡是 1500 时，VXLAN 之后 Pod 里能用的只有 1450，IPIP 之后是 1480。如果 CNI 没把这个值配到 Pod 的网卡上（或者某个节点配错了），Pod 会以为自己是 1500，发出去的大包在隧道口塞不进去——<b>表现就是小请求正常，一传大数据就卡住</b>，而且 ping 是通的，因为 ping 的包很小。</p>
+  <pre><span class="c"># 1. Pod 的 IP、所在节点、走的哪块网卡</span>
+kubectl get pod -o wide
+kubectl exec web-0 -- ip -4 addr show eth0
+kubectl exec web-0 -- ip route
+
+<span class="c"># 2. Pod 网卡的 MTU：和节点物理网卡对比，差的就是封装开销</span>
+kubectl exec web-0 -- ip link show eth0 | grep -o 'mtu [0-9]*'
+ip link show eth0 | grep -o 'mtu [0-9]*'
+
+<span class="c"># 3. 节点上能看到 veth 配对和隧道路由</span>
+ip route | grep -E 'cali|flannel|cni'
+ip -d link show | grep -A1 vxlan
+
+<span class="c"># 4. CNI 的配置在哪：二进制、配置、日志三个位置</span>
+ls /etc/cni/net.d/
+ls /opt/cni/bin/ | head
+journalctl -u kubelet --since "10 min ago" | grep -i cni
+
+<span class="c"># 5. MTU 验证：带 DF 标志打不同大小的包，找到不通的那个尺寸</span>
+kubectl exec web-0 -- ping -M do -s 1400 -c 2 &lt;peer-pod-ip&gt;
+kubectl exec web-0 -- ping -M do -s 1450 -c 2 &lt;peer-pod-ip&gt;</pre>
+  <p>CNI 本身是一个很薄的规范：容器运行时在创建 Pod 沙箱时调用 CNI 插件，传入 <span class="k">ADD</span>、<span class="k">DEL</span>、<span class="k">CHECK</span> 三种命令，插件负责把网卡、IP、路由配好，然后返回结果。所以「Pod 卡在 ContainerCreating」时，一条很有效的路径是看 kubelet 日志里 CNI 那一段——IP 分配失败、插件二进制缺失、配置解析错，都会在这里留下一行。</p>
+  <p>还有一个常被问的细节：<b>Pod 里的 <span class="k">lo</span> 是一直有的，eth0 是 CNI 配的</b>。所以「同一个 Pod 里两个容器用 localhost 互访」跟 CNI 无关，它们共享的是同一个网络命名空间，走的是回环。这也解释了为什么 sidecar 模式的代理能拦到主容器的流量——它们在同一张网卡上。</p>
+  <div class="callout warn">
+    <b>MTU 问题的迷惑性在于「有时通有时不通」。</b>TCP 握手包很小，能过；一旦开始传数据，满载的 1500 字节包在隧道口超限，如果中间设备又不回 ICMP「需要分片」，发送方就一直重传。表现出来是：连接建立成功、小响应正常、下载大文件或调大接口卡死。看到这个组合，第一个怀疑对象应该是 MTU，而不是带宽。
+  </div>
+  <p><b>面试怎么答：</b>「K8s 的 Pod 网络模型是每个 Pod 一个 IP、Pod 之间直接通、不做 NAT。跨节点靠 CNI，路由型性能最好但要底层配合，隧道型兼容性好但有封装开销。这个开销在排障上就体现为 MTU：VXLAN 少 50 字节，IPIP 少 20 字节，配错就是小包通、大包卡。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>Service：ClusterIP 上没有进程，只有规则</h2></div>
+  <p class="lead">「kube-proxy 在 ClusterIP 上监听，把请求转给 Pod。」这句话是错的，而且是面试里区分「用过」和「背过」的分水岭。<b>没有任何进程监听 ClusterIP</b>，它甚至不在任何网卡上。包能被转走，是因为节点内核里有一条规则，把目的地址改写了。</p>
+  <p>完整的链条是这样：Service 对象创建后，控制器把匹配的 Pod 地址写进 EndpointSlice；每个节点上的 kube-proxy watch 到变化，把「ClusterIP:port → 一组 PodIP:port」翻译成 iptables 规则或 IPVS 虚拟服务；客户端发包时，包进入节点协议栈，在 PREROUTING/OUTPUT 阶段命中 DNAT 规则，目的地址被改成某个 Pod IP；回程靠 conntrack 把源地址改回去。</p>
+  <table>
+    <tr><th style="width:150px">模式</th><th>转发怎么做</th><th>负载均衡</th><th>规模上的问题</th></tr>
+    <tr><td><b>iptables</b></td><td>每个 Service 一组链：KUBE-SERVICES → KUBE-SVC-xxx → KUBE-SEP-xxx</td><td>用 statistic 模块按概率随机选一条</td><td>规则数随 Service 和 Endpoint 线性增长，全量同步变慢，匹配是线性遍历</td></tr>
+    <tr><td><b>IPVS</b></td><td>内核里的虚拟服务，真实服务器列表挂在上面</td><td>哈希表，支持 rr、lc、sh 等调度算法</td><td>规模好得多，但需要内核模块，且某些场景仍要配合 iptables</td></tr>
+    <tr><td><b>eBPF（CNI 自带）</b></td><td>在 socket 层或 tc 层直接改写，绕过 conntrack</td><td>由 CNI 实现决定</td><td>性能好，但排查工具和 iptables 那套不一样，得看 CNI 自己的命令</td></tr>
+  </table>
+  <pre><span class="c"># 1. 先确认这个 Service 有没有后端（一切都从这里分叉）</span>
+kubectl get endpointslice -l kubernetes.io/service-name=web -o wide
+
+<span class="c"># 2. iptables 模式：看三条链是否串起来</span>
+iptables -t nat -L KUBE-SERVICES -n | grep &lt;cluster-ip&gt;
+iptables -t nat -L KUBE-SVC-XXXXXXXX -n
+iptables -t nat -L KUBE-SEP-XXXXXXXX -n
+
+<span class="c"># 3. IPVS 模式：看虚拟服务和真实服务器</span>
+ipvsadm -Ln | grep -A3 &lt;cluster-ip&gt;
+
+<span class="c"># 4. conntrack：一条连接的 DNAT 记录长什么样</span>
+conntrack -L -d &lt;cluster-ip&gt; 2&gt;/dev/null | head
+
+<span class="c"># 5. kube-proxy 自己的日志和模式</span>
+kubectl -n kube-system logs ds/kube-proxy --tail=50
+kubectl -n kube-system get cm kube-proxy -o yaml | grep -E 'mode|scheduler'</pre>
+  <p>这里有两个必须说清的细节。第一，<b>ClusterIP 的 ping 不通是正常的</b>。它是个虚拟地址，只对特定协议和端口的规则生效，ICMP 根本没有对应规则，包会被丢掉。所以「ping 一下 Service IP」这个动作没有任何诊断价值，很多人在这里得出「网络不通」的错误结论。</p>
+  <p>第二，<b>DNAT 只在包第一次进入时发生，之后靠 conntrack 记住</b>。这意味着一条长连接一旦被转到某个 Pod，就会一直粘在那个 Pod 上，不会因为后端扩容而重新分配。这也是「扩容了但流量没上来」的原因之一——老连接还在老 Pod 上。要重新分配，只能让连接断开重建（这也是为什么发布时优雅退出比扩容更重要）。</p>
+  <p>还有一个语义差异值得记：<b>Service 的 port 和 targetPort 不是一回事</b>。port 是别人访问你的入口，targetPort 是容器真实监听的端口，两者可以不同。targetPort 写名字时，必须和容器 <span class="k">ports[].name</span> 完全一致；名字对不上，EndpointSlice 里的端口就是错的，连接直接被拒，而 Service 对象本身看起来完全正常。</p>
+  <div class="callout danger">
+    <b>「规则没下发」比「规则写错」更常见。</b>kube-proxy 是按节点同步的，同步有延迟，节点多的时候可能几秒到几十秒。新建 Service 后立刻访问失败，先等一轮同步再下结论。另外 kube-proxy 挂了不会影响已有连接（规则还在内核里），但新 Service 会彻底不通——这个现象很容易被误判成「网络插件挂了」。
+  </div>
+  <p><b>面试怎么答：</b>「ClusterIP 不是进程，是 kube-proxy 写进内核的 DNAT 规则，iptables 模式是一串链加概率选择，IPVS 模式是内核里的虚拟服务。所以 ping ClusterIP 不通是正常的，它只对配置的端口有规则。DNAT 只在首包发生，之后靠 conntrack，所以长连接会粘在后端，扩容不会重新分配。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>NodePort、LoadBalancer、Headless：三种暴露，三种失效方式</h2></div>
+  <p class="lead">这三种类型经常被当成「暴露级别的递进」，其实它们的<b>失效方式完全不同</b>。NodePort 死在端口和策略上，LoadBalancer 死在云控制器和健康检查上，Headless 死在客户端假设上。</p>
+  <table>
+    <tr><th style="width:150px">类型</th><th>怎么工作</th><th>源 IP</th><th>典型坑</th></tr>
+    <tr><td><b>ClusterIP</b></td><td>节点内 DNAT 到 Pod</td><td>变成节点 IP（SNAT）</td><td>集群外无法直接访问</td></tr>
+    <tr><td><b>NodePort</b></td><td>每个节点监听 30000-32767 的某个端口，转发到 Service</td><td>默认 SNAT 成节点 IP</td><td>端口范围固定；安全组要放行；节点 IP 变了入口就变</td></tr>
+    <tr><td><b>LoadBalancer</b></td><td>云控制器创建 LB，把流量导到 NodePort 或 Pod</td><td>取决于 externalTrafficPolicy</td><td>云控制器没跑就拿不到外部 IP；健康检查打错端口</td></tr>
+    <tr><td><b>Headless</b></td><td>clusterIP 为 None，DNS 直接返回 Pod IP 列表</td><td>客户端直连 Pod</td><td>客户端要自己做负载均衡和重试；DNS 缓存会拿到已死的 IP</td></tr>
+  </table>
+  <p>NodePort 有两个必须知道的约束。第一是端口范围由 apiserver 的 <span class="k">--service-node-port-range</span> 决定，默认 30000-32767，写个小端口会被拒。第二是<b>安全组和防火墙</b>：很多云环境只放行了 80/443，NodePort 的 3 万端口在外面根本连不上，但集群内部测试一切正常，所以这类问题经常被拖到上线才炸。</p>
+  <p><span class="k">externalTrafficPolicy</span> 是这节最值得记住的字段，因为它同时影响三件事：</p>
+  <table>
+    <tr><th style="width:130px">取值</th><th>流量路径</th><th>源 IP</th><th>副作用</th></tr>
+    <tr><td><b>Cluster</b>（默认）</td><td>可以转到任意节点的 Pod，可能要再跨一次节点</td><td>被 SNAT 成节点 IP，业务拿不到真实客户端 IP</td><td>多一跳，延迟略高</td></tr>
+    <tr><td><b>Local</b></td><td>只转到本节点上的 Pod</td><td>保留真实源 IP</td><td>本节点没有该服务的 Pod 时，流量被直接丢弃，不是转到别处</td></tr>
+  </table>
+  <p>「Local 会丢包」这一点非常反直觉：你以为「本节点没有就找别的节点」，实际是「没有就丢」。所以在节点数少、副本数少、或者有节点亲和性的场景里，用 Local 很容易出现「部分节点访问不通，其他节点正常」的诡异现象——而这恰恰是最难查的一类，因为你的探针可能正好落在健康的节点上。</p>
+  <pre><span class="c"># 1. 三种类型的关键字段</span>
+kubectl get svc web -o jsonpath='{.spec.type}{" "}{.spec.clusterIP}{" "}{.spec.externalTrafficPolicy}{" "}{.spec.ports}{"\n"}'
+
+<span class="c"># 2. LoadBalancer 拿不到外部 IP 时，先看云控制器和事件</span>
+kubectl -n kube-system get pod | grep -i cloud
+kubectl describe svc web | sed -n '/Events/,$p'
+
+<span class="c"># 3. NodePort 是否真的在每个节点上都监听（在节点上执行）</span>
+ss -lntp | grep &lt;node-port&gt;
+iptables -t nat -L KUBE-NODEPORTS -n | head
+
+<span class="c"># 4. Headless：DNS 返回的是一串 A 记录，不是一个 VIP</span>
+kubectl get svc web-headless -o jsonpath='{.spec.clusterIP}{"\n"}'
+kubectl exec tmp -- nslookup web-headless.prod.svc.cluster.local
+
+<span class="c"># 5. StatefulSet 的单 Pod 域名（需要 headless Service）</span>
+kubectl exec tmp -- nslookup web-0.web-headless.prod.svc.cluster.local</pre>
+  <p>Headless 的误区值得单独说：它经常被当成「省一个 ClusterIP」的优化，实际上它把负载均衡的责任<b>推给了客户端</b>。DNS 返回一组地址，客户端通常只用第一个（或者按自己的策略选），如果第一个 Pod 挂了，客户端要自己发现并重试。而 DNS 还有缓存和 TTL，Pod 重建换了 IP 之后，客户端可能还拿着一批旧地址在打。StatefulSet 用它是为了「每个成员有稳定名字」，不是为了性能。</p>
+  <div class="callout ok">
+    <b>选型的一句话：</b>集群内互调 → ClusterIP；临时对外、没有 LB → NodePort（记得放行安全组）；生产对外、需要固定入口和证书 → LoadBalancer 或 Ingress；需要每个成员单独寻址（数据库集群、Kafka） → Headless。
+  </div>
+  <p><b>面试怎么答：</b>「NodePort 是在每个节点开一个高端口转发，范围默认 30000 到 32767，问题通常出在安全组；LoadBalancer 靠云控制器创建真实 LB；Headless 没有 VIP，DNS 直接返回 Pod IP，客户端要自己做负载均衡。externalTrafficPolicy 设成 Local 能保留源 IP，但本节点没有后端时流量会被丢弃，这是它最容易踩的地方。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>Ingress：它只是一份配置，干活的是 Controller</h2></div>
+  <p class="lead">「我创建了 Ingress，为什么没生效？」因为 <b>Ingress 对象本身不做任何事</b>。它是一份声明「哪个域名、哪个路径应该转到哪个 Service」的配置，必须有一个 Ingress Controller 在跑，把它翻译成自己那套代理配置（nginx 的 server/location、traefik 的路由表、envoy 的 listener）。</p>
+  <p>这就解释了为什么「Ingress 创建成功但访问 404」是最高频的现象：对象合法，没人执行。判断只需要一条命令——集群里有没有 IngressClass、有没有对应的 controller Pod、这个 Ingress 有没有指定 class。</p>
+  <table>
+    <tr><th style="width:170px">现象</th><th>原因</th><th>验证</th></tr>
+    <tr><td>所有域名都 404</td><td>没有 controller，或者 Ingress 的 ingressClassName 没匹配上</td><td>看 IngressClass 和 controller Pod 是否存在</td></tr>
+    <tr><td>某个域名 404，其他正常</td><td>host 不匹配（含端口、大小写、通配符写法）</td><td>curl 时带 Host 头，逐条对照规则</td></tr>
+    <tr><td>路径 404，根路径正常</td><td>pathType 与 rewrite 配置不匹配</td><td>Prefix 会把前缀带下去，Exact 必须完全相等</td></tr>
+    <tr><td>502 Bad Gateway</td><td>Controller 连不上后端：Service 没后端、端口错、Pod 不 Ready</td><td>看 controller 日志里的 upstream 地址</td></tr>
+    <tr><td>504 Gateway Timeout</td><td>后端处理超过 proxy-read-timeout</td><td>对照后端实际耗时，调超时而不是盲目加重试</td></tr>
+    <tr><td>413 Request Entity Too Large</td><td>请求体超过 proxy-body-size</td><td>按业务上限调整，不要设成无限大</td></tr>
+  </table>
+  <pre><span class="c"># 1. 有没有 controller、有没有 class</span>
+kubectl get ingressclass
+kubectl get pod -A | grep -i -E 'ingress|traefik|envoy'
+kubectl get ingress web -o jsonpath='{.spec.ingressClassName}{" "}{.spec.rules}{"\n"}'
+
+<span class="c"># 2. 带 Host 头验证路由，别用 IP 直接打</span>
+curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: api.example.com' http://&lt;ingress-ip&gt;/v1/users
+
+<span class="c"># 3. controller 日志里能看到它选中的 upstream</span>
+kubectl -n ingress-nginx logs deploy/ingress-nginx-controller --tail=50
+
+<span class="c"># 4. 确认后端 Service 和端口，Ingress 只认 serviceName + port</span>
+kubectl get ingress web -o jsonpath='{.spec.rules[*].http.paths[*].backend}{"\n"}'
+kubectl get endpointslice -l kubernetes.io/service-name=web -o wide
+
+<span class="c"># 5. TLS：证书在 Secret 里，名字要和 tls 段一致</span>
+kubectl get ingress web -o jsonpath='{.spec.tls}{"\n"}'
+kubectl get secret web-tls -o jsonpath='{.type}{"\n"}'</pre>
+  <p>Ingress 与 Service 的分工，用一句话说清：<b>Service 解决「一组 Pod 的稳定四层地址」，Ingress 解决「HTTP 请求按域名和路径分给哪个 Service」</b>。所以 Ingress 的后端一定是 Service，不能直接写 Pod；Ingress 也不做 TCP/UDP 的一般转发（那要靠 controller 自己的扩展配置，各家写法不同）。</p>
+  <p>另一个必须知道的现实：<b>Ingress 的注解不跨 controller 通用</b>。<span class="k">nginx.ingress.kubernetes.io/rewrite-target</span> 只在 nginx 系 controller 上有效，换到 traefik 就是一堆没用的字符串，而且不会报错。所以从别的项目抄 Ingress YAML 时，先确认 controller 是不是同一家；不同家的话，规则能抄，注解不能抄。</p>
+  <div class="callout warn">
+    <b>pathType 是个安静的坑。</b>Prefix 表示按路径前缀匹配，Exact 表示完全相等，ImplementationSpecific 交给 controller 自己解释。同一个 <span class="k">/api</span>，写成 Prefix 时 <span class="k">/api/users</span> 能命中，写成 Exact 时只有 <span class="k">/api</span> 本身能命中。从 Exact 改成 Prefix 之后路径突然都能访问了，很多人以为是自己「修好了路由」，其实是把匹配范围放开了。
+  </div>
+  <p><b>面试怎么答：</b>「Ingress 是七层的路由声明，必须配 controller 才有用，对象创建成功不等于生效。排查先看 IngressClass 和 controller 是否存在，再看 host、path、pathType 是否匹配，最后看后端 Service 有没有 Endpoint。它还负责 TLS 终止，证书放在同命名空间的 Secret 里。注解是 controller 私有的，换一家就失效。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>CoreDNS 与 ndots:5：那 5 秒延迟是怎么来的</h2></div>
+  <p class="lead">「服务偶尔会慢 5 秒，重启就好了，过一阵又来。」这类现象有一个非常经典的成因，而且和业务代码一点关系都没有：<b>Pod 里的 resolv.conf 带了一个 ndots:5，访问外部域名时先撞了五次不存在的集群内域名</b>。</p>
+  <p>先看 Pod 里到底写了什么。Kubernetes 会给每个 Pod 生成一份 resolv.conf，search 域是一串后缀，ndots 是一个阈值：<b>如果查询的名字里「点的数量」小于 ndots，就先依次拼接 search 里的后缀去查，全部失败才查原名</b>。</p>
+  <pre><span class="c"># Pod 里的真实配置长这样（namespace 不同，第一行不同）</span>
+cat /etc/resolv.conf
+<span class="c"># search prod.svc.cluster.local svc.cluster.local cluster.local</span>
+<span class="c"># nameserver 10.96.0.10</span>
+<span class="c"># options ndots:5</span>
+
+<span class="c"># 查一个外部域名时，DNS 查询的实际顺序是：</span>
+<span class="c">#   api.example.com.prod.svc.cluster.local   -> NXDOMAIN</span>
+<span class="c">#   api.example.com.svc.cluster.local        -> NXDOMAIN</span>
+<span class="c">#   api.example.com.cluster.local            -> NXDOMAIN</span>
+<span class="c">#   api.example.com.（原名）                  -> 成功</span></pre>
+  <p><span class="k">api.example.com</span> 只有两个点，小于 5，所以前面那几次拼接查询都会真实发生。每次 NXDOMAIN 都要走一趟 CoreDNS，如果 CoreDNS 负载高、或者上游 DNS 慢，这几次查询累计起来就是几百毫秒到几秒。而 <b>NXDOMAIN 还会被负缓存</b>，某些客户端库在解析失败后会重试，把延迟放大成「偶尔 5 秒」。</p>
+  <p>解法有三个，按推荐程度排：<b>写 FQDN（末尾加点）</b>，让客户端跳过 search 列表，这是最便宜的；<b>在 Pod 的 dnsConfig 里把 ndots 调小</b>（比如 2），但要确认集群内的短名访问是否还依赖它；<b>部署 NodeLocal DNSCache</b>，把 DNS 查询放到节点本地，减少往返和 CoreDNS 压力。三个可以叠加。</p>
+  <table>
+    <tr><th style="width:230px">现象</th><th>可能原因</th><th>验证</th></tr>
+    <tr><td>所有名字都解析不了</td><td>CoreDNS 全挂，或 kube-dns Service 没有 Endpoint</td><td>nslookup kubernetes.default，看有没有响应</td></tr>
+    <tr><td>集群内短名能解析，全名不能</td><td>search 域不对（比如跨 ns 用了短名）</td><td>对比 /etc/resolv.conf 的 search 与目标 ns</td></tr>
+    <tr><td>外部域名慢、内部快</td><td>ndots:5 导致的 search 放大</td><td>dig 时加 +search 观察查询次数</td></tr>
+    <tr><td>解析结果指向已删除的 Pod</td><td>DNS 缓存 / 负缓存，或 headless 地址未及时更新</td><td>看 TTL，直接查 CoreDNS 的 kubernetes 插件结果</td></tr>
+    <tr><td>间歇性 SERVFAIL</td><td>CoreDNS 上游转发超时、并发不够</td><td>看 CoreDNS 日志和 metrics 的请求延迟</td></tr>
+  </table>
+  <pre><span class="c"># 1. 从 Pod 里查，别在节点上查——节点用的是另一份 resolv.conf</span>
+kubectl exec -it tmp -- cat /etc/resolv.conf
+kubectl exec -it tmp -- nslookup web.prod.svc.cluster.local
+kubectl exec -it tmp -- nslookup api.example.com
+
+<span class="c"># 2. 看 search 列表参与了几次查询（dig 的输出会列出实际查询名）</span>
+kubectl exec -it tmp -- nslookup -debug api.example.com 2&gt;&amp;1 | grep -i 'query\|name'
+
+<span class="c"># 3. 末尾加点 = 绝对域名，跳过 search 列表</span>
+kubectl exec -it tmp -- nslookup api.example.com.
+
+<span class="c"># 4. CoreDNS 自己是否健康：副本数、日志、Corefile</span>
+kubectl -n kube-system get pod -l k8s-app=kube-dns -o wide
+kubectl -n kube-system logs -l k8s-app=kube-dns --tail=50
+kubectl -n kube-system get cm coredns -o yaml | sed -n '/Corefile/,/^  [a-z]/p'
+
+<span class="c"># 5. 按 Pod 覆盖 DNS 参数（ndots 调小 + 指定 nameserver）</span>
+<span class="c"># spec.dnsConfig:</span>
+<span class="c">#   options: [{name: ndots, value: "2"}]</span>
+<span class="c">#   nameservers: ["10.96.0.10"]</span></pre>
+  <p>CoreDNS 的工作方式值得记一句：它读一个叫 Corefile 的配置，里面最关键的插件是 <span class="k">kubernetes</span>（负责 <span class="k">.cluster.local</span> 这类集群内域名，直接查 apiserver 的 Service/Endpoint）和 <span class="k">forward</span>（负责把外部域名转给上游）。所以「集群内域名解析不了」和「外部域名解析不了」是两条完全不同的链路，前者看 kubernetes 插件和 apiserver 连通性，后者看 forward 和节点上的上游 DNS。</p>
+  <div class="callout">
+    <b>一个容易忽略的细节：<span class="k">hostNetwork: true</span> 的 Pod 用的是节点自己的 resolv.conf，不是集群那份。</b>所以同一段代码，在普通 Pod 里能用短名访问 Service，在 hostNetwork 的 DaemonSet 里就解析不了。这类差异在部署日志采集、监控 agent 时经常遇到。
+  </div>
+  <p><b>面试怎么答：</b>「Pod 的 resolv.conf 里 search 有三个后缀、ndots 是 5，所以查询一个只有两个点的外部域名时，会先拼三次 search 后缀得到 NXDOMAIN，才查原名，延迟就是这么来的。解法是写 FQDN 末尾加点、把 ndots 调小、或者上 NodeLocal DNSCache。集群内域名和外部域名走的是 CoreDNS 的两个不同插件，排查要分开。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>NetworkPolicy：写它的是 K8s，执行它的是 CNI</h2></div>
+  <p class="lead">NetworkPolicy 有一个让所有人第一次遇到都会懵的语义：<b>它不是「拒绝列表」，是「一旦选中就默认拒绝」</b>。你写了一条「允许 frontend 访问 api」，结果 api 连 DNS 都查不了了——因为 egress 方向也被默认拒绝了，而你没写放行 53 端口的规则。</p>
+  <p>准确地说：一个 Pod 如果在某个方向上被<b>任意一条</b>策略选中，那个方向就变成默认拒绝，只允许策略里显式列出的流量。方向分 ingress 和 egress，由 <span class="k">policyTypes</span> 决定；不写 policyTypes 时，有 ingress 规则就认为管 ingress，有 egress 规则就认为管 egress。</p>
+  <table>
+    <tr><th style="width:190px">选择器</th><th>选的是什么</th><th>常见误用</th></tr>
+    <tr><td><b>podSelector</b></td><td>同命名空间内的 Pod（按标签）</td><td>以为能选到别的 ns 的 Pod，实际必须配 namespaceSelector</td></tr>
+    <tr><td><b>namespaceSelector</b></td><td>整个命名空间里的 Pod（按 ns 标签）</td><td>用 ns 的名字当标签——ns 必须有对应的 label 才匹配得上</td></tr>
+    <tr><td><b>ipBlock</b></td><td>CIDR 段，可带 except</td><td>用它写 Pod 网段，Pod 重建换 IP 后就失效了</td></tr>
+    <tr><td><b>ports</b></td><td>端口和协议</td><td>只写 port 不写 protocol，UDP 的 DNS 请求被拦</td></tr>
+  </table>
+  <pre><span class="c"># 1. 策略存在不等于生效：先确认 CNI 是否实现了 NetworkPolicy</span>
+kubectl get netpol -A
+kubectl -n kube-system get pod | grep -i -E 'calico|cilium|weave|canal'
+
+<span class="c"># 2. 看这条策略选中了哪些 Pod（policy 的 podSelector 与 Pod 标签）</span>
+kubectl describe netpol allow-frontend -n prod
+kubectl get pod -n prod --show-labels | grep api
+
+<span class="c"># 3. egress 放行 DNS 是最容易漏的一条</span>
+<span class="c">#    ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]</span>
+<span class="c">#    to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}}]</span>
+
+<span class="c"># 4. 实测：从 A Pod 打 B Pod，再用一个不该通的组合做对照</span>
+kubectl exec -it frontend-0 -n prod -- wget -qO- --timeout=3 http://api:8080/healthz
+kubectl exec -it other-0 -n prod -- wget -qO- --timeout=3 http://api:8080/healthz
+
+<span class="c"># 5. eBPF 型 CNI 有自己的策略视图（以你集群的 CNI 为准）</span>
+calicoctl get networkpolicy -A 2&gt;/dev/null
+cilium policy get 2&gt;/dev/null | head</pre>
+  <p>「CNI 不支持就是一张废纸」这句话要说得准确一点：<b>对象会被 apiserver 接受，但没有任何组件去执行它</b>，不会报错、不会告警、不会有事件。Flannel 单独使用时就是这样，它只做连通，不做策略；Canal 是 Flannel 加 Calico 的策略引擎，才有拦截能力。所以「我们上了 NetworkPolicy 做零信任」这句话，在面试里最好补一句「前提是 CNI 支持」，否则很容易被追问到哑口。</p>
+  <p>另一个实践中的取舍：<b>默认拒绝 + 白名单</b>是安全上正确的做法，但它的运维成本很高——每加一个依赖就要加一条规则，漏了就是线上故障，而且症状往往是「超时」而不是「拒绝」，因为策略通常是静默丢包。折中的做法是先用「监控模式」观察一段时间（部分 CNI 支持只记录不拦截），把真实流量摸清楚再收紧。</p>
+  <div class="callout danger">
+    <b>策略生效后现象是超时，不是 connection refused。</b>因为它丢包而不是回 RST。这意味着你在应用日志里看到的是「请求超时」，在两端抓包看到的是「请求发出去了，没有回应」。如果不知道有策略这层，很容易一路查到网卡和交换机上去。
+  </div>
+  <p><b>面试怎么答：</b>「NetworkPolicy 是 Pod 级的三层/四层策略，由 CNI 执行，kube-proxy 不参与。它的语义是：Pod 一旦在某个方向上被策略选中，那个方向就默认拒绝，只放行显式允许的。最常见的坑是 egress 忘了放行 DNS，导致服务看起来「网络不通」其实是解析不了。CNI 不支持时策略会被静默忽略，配置成功但没效果。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>一次跨节点访问的完整路径，和四个抓包点</h2></div>
+  <p class="lead">把一个包从客户端 Pod 到服务端 Pod 的每一跳写出来，你才能在「不通」的时候说出「它死在第几跳」。这条路径上有四次地址变化，每一次都对应一个可以抓包的位置。</p>
+  <pre>客户端 Pod（10.244.1.7）访问 web.prod.svc.cluster.local:8080
+│
+├─ ① Pod 内 eth0：目的地址 = ClusterIP 10.96.23.11
+│     查 DNS 得到 ClusterIP；包从 eth0 发出
+│
+├─ ② 节点 A 的 veth 端：包进入主机协议栈
+│     PREROUTING 命中 KUBE-SERVICES → DNAT 成 Pod IP 10.244.2.9
+│     conntrack 记下这条映射
+│
+├─ ③ 节点 A 的路由：10.244.2.0/24 在节点 B 上
+│     VXLAN 模式：包进 vxlan0，加 50 字节封装，从物理网卡发出
+│     BGP/host-gw 模式：直接改写下一跳为节点 B，不封装
+│
+├─ ④ 节点 B 的隧道口：解封装，得到原始包（目的 10.244.2.9）
+│     路由到目标 Pod 的 veth，送进网络命名空间
+│
+└─ ⑤ 服务端 Pod eth0：收到目的 10.244.2.9:8080
+      回程按 conntrack 反向改写，源地址变回 ClusterIP</pre>
+  <table>
+    <tr><th style="width:120px">抓包点</th><th>看到什么地址</th><th>能证明什么</th></tr>
+    <tr><td><b>Pod 内 eth0</b></td><td>源 Pod IP → ClusterIP</td><td>应用有没有真的发出请求；DNS 解析结果对不对</td></tr>
+    <tr><td><b>节点上的 veth</b></td><td>同上，但已经是主机视角</td><td>包有没有离开 Pod（排除应用层问题）</td></tr>
+    <tr><td><b>隧道设备 / 物理网卡</b></td><td>外层 IP → 外层 IP（封装后）</td><td>跨节点这一段通不通；有没有被 MTU 卡住</td></tr>
+    <tr><td><b>服务端 Pod eth0</b></td><td>源 Pod IP → 服务端 Pod IP</td><td>DNAT 有没有发生；请求到没到目标进程</td></tr>
+  </table>
+  <pre><span class="c"># 1. 在 Pod 内抓（需要镜像里有 tcpdump，或用临时调试容器）</span>
+kubectl exec -it client-0 -- tcpdump -i eth0 -nn -c 20 'tcp port 8080'
+
+<span class="c"># 2. 在节点上抓 veth 和隧道口，两边对照看封装前后</span>
+tcpdump -i any -nn -c 20 'host 10.244.1.7 and host 10.244.2.9'
+tcpdump -i vxlan0 -nn -c 10
+tcpdump -i eth0 -nn -c 10 'udp port 8472'   <span class="c"># Flannel VXLAN 默认端口，以你集群为准</span>
+
+<span class="c"># 3. 看内核怎么改的地址，以及有没有被丢</span>
+conntrack -L | grep 10.96.23.11
+nstat -az | grep -E 'IpInDiscards|IpOutDiscards|TcpRetransSegs'
+ip -s link show vxlan0
+
+<span class="c"># 4. 按 MTU 逐步试，找到能通的最大尺寸</span>
+kubectl exec -it client-0 -- ping -M do -s 1400 -c 1 10.244.2.9
+kubectl exec -it client-0 -- ping -M do -s 1450 -c 1 10.244.2.9
+kubectl exec -it client-0 -- ping -M do -s 1472 -c 1 10.244.2.9</pre>
+  <p>这张路径图最有用的地方，是它告诉你<b>「ping 通」到底证明了什么</b>。Pod 之间的 ping 通只证明三层可达，它不经过 ClusterIP 的 DNAT（ping 的是 Pod IP），也不证明端口在监听、不证明策略放行、不证明 MTU 够。所以「ping 得通但服务不通」不是矛盾，是必然——它们走的是不同的路径。</p>
+  <p>还有一个隐蔽的细节：<b>在节点上抓包，看到的可能不是应用真正发出的包</b>。GRO/GSO 会把多个小段在网卡层合并成大包，你在物理网卡上看到的是合并后的形态；容器里抓包看到的是 Pod 命名空间里的原始形态。算 MTU 的时候要分清你在哪一层看，否则会得出「应用在发 64K 的包」这种结论。</p>
+  <div class="callout ok">
+    <b>一个判断口诀：</b>源 Pod 有出、目标 Pod 没进 → 问题在中间（路由、封装、策略）；目标 Pod 有进但没回应 → 问题在应用（没监听、处理慢）；两边都有但客户端报错 → 看回程和被谁改了地址。这三句话能覆盖大部分跨节点问题。
+  </div>
+  <p><b>面试怎么答：</b>「跨节点访问的路径是：Pod 发出到 ClusterIP → 节点上 DNAT 成 Pod IP → 按路由走隧道或直接路由 → 对端解封装 → 送到目标 Pod。抓包点有四个：Pod 内、节点 veth、隧道口、目标 Pod。判断方法是看出和进：只有出没有进就是中间层的问题，有进没回就是应用的问题。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>排查顺序：从 Pod 里往外走，七步</h2></div>
+  <p class="lead">网络排障最怕的是<b>同时怀疑五个组件</b>。固定一个从内往外的顺序，每一步只回答一个问题，答完再走下一步。这个顺序的好处是：任何一步失败，后面的全都不用查。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>DNS 解析对了吗</b>：从客户端 Pod 里 <span class="k">nslookup 服务名</span>。解析不出来，后面全免谈；解析出来但地址不对，说明 Service 或 search 域的问题。</div></div>
+    <div class="step"><div class="txt"><b>ClusterIP 通不通</b>：<span class="k">wget -qO- --timeout=3 http://svc:port/</span>。注意用 TCP 而不是 ping——ping ClusterIP 永远不通，这是设计。</div></div>
+    <div class="step"><div class="txt"><b>Pod IP 通不通</b>：把服务名换成某个后端 Pod IP 直接打。通了说明问题在 Service 层（规则、端口映射），不通说明在 CNI 或应用监听。</div></div>
+    <div class="step"><div class="txt"><b>跨节点还通吗</b>：找一个在别的节点的 Pod 做对照。只有跨节点不通，就往 MTU、隧道、路由和策略上查。</div></div>
+    <div class="step"><div class="txt"><b>四层暴露对不对</b>：NodePort 就从集群外打节点 IP，LoadBalancer 就看有没有外部地址、健康检查过没过。</div></div>
+    <div class="step"><div class="txt"><b>七层路由对不对</b>：带上 Host 头打 Ingress，看是 404（规则没匹配）、502（后端连不上）还是 504（后端太慢）。三个码指向三个地方。</div></div>
+    <div class="step"><div class="txt"><b>出集群这一段</b>：最后才查 NAT 网关、出网策略、对端白名单。这一段已经不属于 K8s 了，但很多「集群内好好的、调外部就超时」的问题出在这里。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:200px">卡在第几步</th><th>大概率的问题</th><th>第一条命令</th></tr>
+    <tr><td>第 1 步：解析不出</td><td>CoreDNS、search 域、跨 ns 用了短名</td><td>cat /etc/resolv.conf + nslookup 全名</td></tr>
+    <tr><td>第 2 步：ClusterIP 不通</td><td>Endpoints 为空、targetPort 错、kube-proxy 规则没下发</td><td>kubectl get endpointslice</td></tr>
+    <tr><td>第 3 步：Pod IP 不通</td><td>应用没监听在那个端口、监听在 127.0.0.1、NetworkPolicy</td><td>kubectl exec -- ss -lntp</td></tr>
+    <tr><td>第 4 步：只有跨节点不通</td><td>MTU、隧道、节点路由、安全组</td><td>ping -M do 逐步试尺寸</td></tr>
+    <tr><td>第 5 步：NodePort 从外面不通</td><td>安全组、externalTrafficPolicy Local、防火墙</td><td>ss -lntp 在节点上看端口</td></tr>
+    <tr><td>第 6 步：Ingress 报错</td><td>404 规则、502 后端、504 超时</td><td>controller 日志里的 upstream</td></tr>
+  </table>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get endpointslice -l kubernetes.io/service-name=SVC</code><span class="desc">有没有后端，一步切开「服务发现」和「网络转发」</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec -it POD -- cat /etc/resolv.conf</code><span class="desc">search 域和 ndots，解释绝大多数「偶尔慢几秒」</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec -it POD -- nslookup SVC.NS.svc.cluster.local</code><span class="desc">用全名验证，排除短名和 search 域的干扰</span><button class="copy">复制</button></div>
+    <div class="crow"><code>iptables -t nat -L KUBE-SERVICES -n | grep VIP</code><span class="desc">iptables 模式下确认规则真的存在</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ipvsadm -Ln | grep -A3 VIP</code><span class="desc">IPVS 模式下看虚拟服务和真实服务器列表</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec -it POD -- ping -M do -s 1450 PEER_IP</code><span class="desc">带 DF 测 MTU，小包通大包不通就是它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get netpol -A</code><span class="desc">确认有没有策略选中了目标 Pod（CNI 不支持则等于没有）</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>不要跳过第 1 步。</b>「DNS 肯定没问题」是排障里最贵的假设。它便宜（一条 nslookup）、快（几百毫秒），而且能一次性排除 search 域、跨命名空间短名、CoreDNS 挂掉三种情况。跳过它，你可能会花四十分钟在 iptables 里找一个根本不存在的规则。
+  </div>
+  <p><b>面试怎么答：</b>「我从 Pod 里往外走：先 nslookup 确认解析，再打 ClusterIP，再打 Pod IP，再区分是不是只有跨节点不通，然后才是 NodePort、Ingress、出集群。每一步只回答一个问题，前一步不通就不看后面。这样做的好处是任何一次排查都能给出一个明确的结论，而不是『试了几个办法好像好了』。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>10 个坑：每一个都能让你查错组件</h2></div>
+  <p class="lead">网络这一块的坑有个共同特征：<b>它们不报错</b>。规则写错了、策略没生效、MTU 差了 50 字节，系统都安静地按错误的方式运行，只有业务在超时。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 ping 测 ClusterIP</div><div class="pd">ClusterIP 是虚拟地址，只有配置了端口的规则，没有 ICMP 规则。ping 不通是正常的，通不通都不说明服务可用。要用 TCP 打端口。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">以为有进程监听 ClusterIP</div><div class="pd">没有任何进程监听它，ss 里也看不到。真正干活的是内核里的 DNAT 规则，出问题要查规则和 conntrack，不是查进程。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">把 kube-proxy 当负载均衡器</div><div class="pd">它只负责把 Service 翻译成规则，不转发任何数据。它挂了已有连接照常（规则还在内核），但新 Service 会完全不通，这个组合很容易误判。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">跨节点不通就换 CNI</div><div class="pd">先测 MTU。小包通、大包不通，或者 TLS 握手卡住，十个里有八个是封装后 MTU 没配对，换插件是成本最高且无效的做法。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">把 ndots:5 的延迟当成 CoreDNS 故障</div><div class="pd">访问外部域名时先拼三次 search 后缀，这是配置行为不是故障。写 FQDN 末尾加点就能验证：加了点变快，就说明是 search 放大。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">写了 NetworkPolicy 就以为隔离生效</div><div class="pd">执行者是 CNI。Flannel 单独用不实现策略，YAML 会被接受但没有任何效果，也不报错。必须实测一次「本该被拒绝」的流量。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">策略只写 ingress，忘了 egress 的 DNS</div><div class="pd">一旦 Pod 在 egress 方向被选中，默认拒绝一切出站，包括 53 端口。表现是「服务突然解析不了域名」，而网络、CoreDNS 都是好的。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用 externalTrafficPolicy: Local 却没考虑节点分布</div><div class="pd">本节点没有这个服务的 Pod 时，流量被丢弃而不是转到别处。副本少或有节点亲和时，会出现「部分节点通、部分节点不通」。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把 Headless 当负载均衡用</div><div class="pd">DNS 返回一组 Pod IP，选哪个是客户端的事，重试也是客户端的事。第一个地址挂了就报错，这种「随机失败」在 Service 上是不会出现的。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">在节点上抓包就以为抓到了真相</div><div class="pd">容器有自己的命名空间，节点上看到的是 NAT 之后的地址；GRO/GSO 还会把包合并成你从没发过的大包。算 MTU 时在错误的层看，结论一定是错的。</div></div></div>
+  <p><b>面试怎么答：</b>挑一条讲成因果链：现象、误判、验证方式、改法。比如「有次跨节点调接口，小请求正常，传文件就卡住。我一开始怀疑带宽，加监控发现带宽很低。后来带 DF 打 1450 的包不通，才发现是节点上新装的 CNI 没把 MTU 配成 1450。这个坑让我以后看到『握手成功但传数据卡住』先测 MTU。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 关于 Service 的 ClusterIP，下面哪个说法是对的？</div>
+      <button class="opt">kube-proxy 在 ClusterIP 上监听，收到请求后转发给后端 Pod</button>
+      <button class="opt">它是一个虚拟地址，实际生效的是节点内核里的 DNAT 规则，没有进程监听它</button>
+      <button class="opt">它是 CoreDNS 返回的一条 CNAME 记录，指向某个 Pod IP</button>
+      <button class="opt">它是云负载均衡器分配的内网地址，由云控制器维护</button>
+      <div class="ans">正确答案：<b>内核 DNAT 规则</b>。kube-proxy 只负责把 Service 和 EndpointSlice 翻译成 iptables 或 IPVS 规则，真正改写地址的是内核。所以 ClusterIP 不在任何网卡上、ss 看不到监听、ping 也不通（没有对应的 ICMP 规则），只有配置过的协议和端口才有转发规则。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 一个 Pod 访问外部域名 <span class="k">api.example.com</span> 经常慢几百毫秒到几秒，访问集群内 Service 很快。最可能的原因？</div>
+      <button class="opt">CoreDNS 副本太少，所有查询都在排队</button>
+      <button class="opt">Pod 到外部网络的带宽不足</button>
+      <button class="opt">resolv.conf 里 ndots:5 加 search 域，导致先拼多次集群内后缀查询，全部 NXDOMAIN 后才查原名</button>
+      <button class="opt">Service 的 targetPort 配置错误，导致重试</button>
+      <div class="ans">正确答案：<b>ndots:5 的 search 放大</b>。api.example.com 只有两个点，小于 ndots 的阈值，解析器会依次拼接 search 里的三个后缀去查，全部失败后才查原名，每次 NXDOMAIN 都是一次真实查询。集群内 Service 名本来就匹配 search 域，所以不受影响。验证方法是查 api.example.com.（末尾加点）对比耗时。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 一个 headless Service（clusterIP: None）后有三个 Ready 的 Pod，客户端查它的域名会得到什么？</div>
+      <button class="opt">一个固定的虚拟 IP，由 kube-proxy 负责负载均衡</button>
+      <button class="opt">一条 CNAME，指向第一个可用 Pod 的域名</button>
+      <button class="opt">什么都不返回，headless 只能用于 StatefulSet 的内部通信</button>
+      <button class="opt">多个 Pod IP 的 A 记录，客户端要自己做选择和重试</button>
+      <div class="ans">正确答案：<b>多个 A 记录</b>。headless Service 不分配虚拟 IP，DNS 直接返回后端 Pod 的地址列表（就绪的才会返回）。所以负载均衡和失败重试的责任转移给了客户端，这是它和普通 Service 最大的区别。StatefulSet 用它主要是为了给每个成员一个稳定域名，而不是为了性能。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 你写了一条 NetworkPolicy，只允许 frontend 访问 api 的 8080，apply 成功。之后 api 报「解析不了数据库域名」。最可能的原因？</div>
+      <button class="opt">该 Pod 在 egress 方向被策略选中，默认拒绝出站，而策略里没有放行 DNS 的 53 端口</button>
+      <button class="opt">NetworkPolicy 会顺带禁用 CoreDNS，需要重启 CoreDNS</button>
+      <button class="opt">策略只对 ingress 生效，egress 一定是放开的，问题在别处</button>
+      <button class="opt">NetworkPolicy 会修改 Pod 的 resolv.conf，需要重建 Pod</button>
+      <div class="ans">正确答案：<b>egress 默认拒绝，没放行 DNS</b>。NetworkPolicy 的语义是「被选中即默认拒绝该方向」，必须显式列出允许的流量。只写 ingress 规则时，如果 policyTypes 里包含 Egress（或写了 egress 段），出站就被限制，UDP/TCP 53 必须单独放行，通常指向 kube-system 的 DNS Pod。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">5. Pod 之间 ping 通，但调用一个返回大 JSON 的接口时稳定卡住；换成小响应就正常。最可能的原因？</div>
+      <button class="opt">Service 的 sessionAffinity 把请求粘到了坏的 Pod</button>
+      <button class="opt">CoreDNS 返回了过期的地址</button>
+      <button class="opt">NetworkPolicy 只允许了小包通过</button>
+      <button class="opt">Overlay 封装让可用 MTU 变小（VXLAN 少 50 字节），Pod 网卡仍按 1500 发，大包在隧道口被丢</button>
+      <div class="ans">正确答案：<b>MTU</b>。ping 的包很小，能过；TCP 握手也小，能过；一开始传数据，满载的 1500 字节包超过隧道能承载的大小，如果中间又不回「需要分片」的 ICMP，发送方只能一直重传。验证方法是带 DF 标志逐步加大包长，找到恰好不通的尺寸，再和 `ip link` 里的 mtu 值对照。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. Ingress 对象创建成功，但访问域名一直返回 404（响应来自 controller 的默认后端）。最先该确认什么？</div>
+      <button class="opt">后端 Pod 的 readiness 探针是否通过</button>
+      <button class="opt">集群里有没有 Ingress Controller 在跑、这个 Ingress 的 ingressClassName 是否匹配、host 与 path 是否正确</button>
+      <button class="opt">CoreDNS 是否正常工作</button>
+      <button class="opt">Service 的 externalTrafficPolicy 是否是 Local</button>
+      <div class="ans">正确答案：<b>controller 与路由规则</b>。404 来自 controller 的默认后端，说明请求到达了 controller 但没有任何规则匹配——可能是没有 controller、ingressClassName 不匹配、host 写错（含端口和大小写）、或者 pathType 与实际路径不符。后端不通会表现为 502，不是 404；DNS 有问题则根本到不了 controller。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>CNI</b></td><td>容器网络接口规范，运行时通过 ADD/DEL/CHECK 调用插件，负责给 Pod 配网卡、IP 和路由</td></tr>
+    <tr><td><b>Overlay</b></td><td>在物理网络之上再封一层（VXLAN/IPIP），让 Pod 网段跨节点互通，代价是包头开销和 MTU 变小</td></tr>
+    <tr><td><b>VXLAN</b></td><td>用 UDP 封装二层帧，包头约 50 字节，MTU 1500 时 Pod 侧通常只能用 1450</td></tr>
+    <tr><td><b>BGP 模式</b></td><td>把 Pod 网段路由发布给物理网络，不封装、性能最好，但要求底层网络配合</td></tr>
+    <tr><td><b>ClusterIP</b></td><td>Service 的虚拟地址，只存在于转发规则里，没有进程监听，ping 不通是正常的</td></tr>
+    <tr><td><b>DNAT</b></td><td>把包的目的地址改写，Service 转发就是靠它；只在首包发生，之后由 conntrack 记住</td></tr>
+    <tr><td><b>conntrack</b></td><td>连接跟踪表，记录五元组和地址改写结果，回程靠它还原；表满会静默丢包</td></tr>
+    <tr><td><b>EndpointSlice</b></td><td>Service 的后端地址列表，由控制器按 selector 和 Ready 状态维护</td></tr>
+    <tr><td><b>NodePort</b></td><td>在每个节点开一个高端口（默认 30000-32767）转发到 Service，对外暴露的最简单方式</td></tr>
+    <tr><td><b>externalTrafficPolicy</b></td><td>Cluster 会 SNAT、可跨节点转发；Local 保留源 IP，但本节点无后端时直接丢包</td></tr>
+    <tr><td><b>Headless Service</b></td><td>clusterIP 为 None，DNS 直接返回 Pod IP 列表，负载均衡由客户端负责</td></tr>
+    <tr><td><b>Ingress / IngressClass</b></td><td>七层路由声明与它的「由谁来执行」标记，必须配套 controller 才有意义</td></tr>
+    <tr><td><b>ndots</b></td><td>resolv.conf 里的阈值：名字里的点数小于它就先用 search 后缀试，默认 5 会放大外部域名查询</td></tr>
+    <tr><td><b>NetworkPolicy</b></td><td>Pod 级三层/四层策略，由 CNI 执行；被选中即该方向默认拒绝，需要显式放行</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起两个不同命名空间的 Pod，用短名、全名、带末尾点的 FQDN 各查一次，把 <span class="k">nslookup -debug</span> 的输出对照 search 域看一遍；② 在节点上 <span class="k">iptables -t nat -L KUBE-SERVICES -n</span> 找一个 ClusterIP，顺着 KUBE-SVC 和 KUBE-SEP 走完三级链，再 <span class="k">conntrack -L</span> 找到对应的那条记录；③ 用 <span class="k">ping -M do</span> 从 1400 加到 1472，找出你的集群里跨节点能通的最大包长，再和 <span class="k">ip link show</span> 的 mtu 对照，亲手确认封装开销。<br><br>
+    <b>之后值得单独学：</b>第 13 期讲调度和优雅发布——为什么「发布时 502」的根因一半在网络（Endpoint 摘除与 SIGTERM 的竞态）、一半在参数；第 10 期讲 Service 与 Endpoints 的对象关系，是这一篇的控制面视角；第 6 期讲通用的网络排障（DNS、MTU、TLS、代理），把集群里的这套方法放回单机环境同样成立。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 12 期 · 网络排障的难点不是命令，是你能不能说清这个包在哪一跳被改写了地址</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>
