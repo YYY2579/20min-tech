@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ansible 与自动化运维：怎么讲才像做过</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 37 期</span>
+    <h1>Ansible 与自动化运维：怎么讲才像做过</h1>
+    <p class="sub">会写 playbook 不值钱，值钱的是<b>你知道幂等和收敛在哪个环节被破坏</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个考点</span>
+      <span class="chip"><b>9</b> 个坑</span>
+      <span class="chip"><b>22</b> 级变量优先级</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你的 playbook 跑第二遍，凭什么结果和第一遍一样？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：playbook 都跑绿了，机器却没变成你想要的样子</h2></div>
+  <p class="lead">「我明明改了默认值，怎么还是老端口？」「第二次跑，全部 <span class="k">changed</span>，可我什么都没改。」「改了 nginx 配置，重启没生效，我问了半天才发现 handler 压根没被通知。」这三句话的共同点是——<b>Ansible 没有报错，它只是诚实执行了你写的东西</b>。而写的人以为自己在声明「期望状态」，实际上写的是一串动作。</p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>改了 <span class="k">defaults/main.yml</span>，端口没变</td><td>Ansible 缓存了变量</td><td>同一个变量在 <span class="k">group_vars/</span> 或 <span class="k">-e</span> 里被赋过值，defaults 是<b>优先级最低</b>的一档，从来没机会生效</td></tr>
+    <tr><td>第二次跑还是 <span class="k">changed</span></td><td>机器有问题，配置没落下去</td><td>任务用的是 <span class="k">command</span>/<span class="k">shell</span>，模块不知道什么叫「已经是这个状态」，所以永远报 changed；至于配置落没落，取决于命令本身</td></tr>
+    <tr><td>改配置没重启</td><td>handler 写错了</td><td>handler 只在<b>通知它的任务报告 changed</b> 时才排入队列。如果那个任务第二次跑没变化（比如用了 <span class="k">command</span> 但状态其实没变、或者文件本来就一样），handler 不会被触发</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>无 agent</div><div class="cd">靠 SSH（或 WinRM、本地、容器连接插件）执行，被管机器上不需要常驻进程。这既是它的最大优点，也决定了它<b>没有「持续收敛」能力</b>：跑完就结束，下一次之前机器可以随便被改。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>模块负责幂等</div><div class="cd">幂等不是 Ansible 这个框架给你的，是<b>模块</b>给你的。<span class="k">copy</span> 会先算校验和，<span class="k">command</span> 什么都不会算。用错模块，幂等就没了。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>变量决定不确定性</div><div class="cd">同样的代码在不同 inventory、不同 <span class="k">-e</span> 下行为完全不同。22 级优先级不是要你背，是要你知道<b>「改了没生效」该往哪查</b>。</div></div>
+  </div>
+  <p>这一篇的组织方式是：先说面试官为什么爱问（他要量化你的自动化能力），再把核心概念和幂等语义讲准，然后是变量优先级、目录结构、三个真实运维任务、Vault，最后是和 Shell、Terraform 的分工，以及排障命令。每一节都落一句能直接说出口的话。</p>
+  <div class="callout danger">
+    <b>先把一个最常见的错误说法纠正掉：</b>「Ansible 是声明式的，所以它是幂等的」——这句话不成立。Ansible 的执行模型是<b>按序执行 task 列表</b>，每个 task 调一个模块；幂等性来自模块自己实现的「先检查、再动手」逻辑。所以「幂等」是一个<b>逐模块成立、逐模块失效</b>的属性，不是全局保证。
+  </div>
+  <p><b>面试怎么答：</b>「我用 Ansible 主要做三件事——批量配置下发、滚动重启这类有顺序的变更、以及新机器的初始化。我判断一个 playbook 是不是靠谱，看两点：跑第二遍是不是全 ok 零 changed；以及 --check --diff 能不能提前看出它要动哪些文件。这两点做不到，说明里面有模块用错了或者变量没收敛。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>为什么面试官爱问：他要的是「量化你的自动化能力」</h2></div>
+  <p class="lead">「你会 Ansible 吗」这个问题几乎没有区分度，因为答「会」的人里，有写过三个 task 的，也有一千台机器的配置全在里面的。面试官真正想问的是三件事：<b>你管过多大范围、你的改动怎么被验证、出问题你怎么回滚</b>。这三个答案里只要有一个是具体的数字和流程，你就和「写过 playbook」的人分开了。</p>
+  <table>
+    <tr><th style="width:150px">他其实在问</th><th>答不上来的样子</th><th>能得分的样子</th></tr>
+    <tr><td>规模</td><td>「几百台吧」</td><td>「三个环境共 N 台，按 role 分组，inventory 按业务线和环境两层组织，日常变更一次影响 20~50 台」</td></tr>
+    <tr><td>验证</td><td>「跑完看结果」</td><td>「先 <span class="k">--syntax-check</span> 和 <span class="k">ansible-lint</span>，再 <span class="k">--check --diff</span> 看要改哪些文件，灰度一组，确认后全量」</td></tr>
+    <tr><td>回滚</td><td>「改回去再跑一次」</td><td>「配置是模板渲染的，回滚就是改变量或回退 Git 提交再跑一遍；涉及版本升级的用 <span class="k">serial</span> 分批，出问题用 <span class="k">--limit</span> 只修那几台」</td></tr>
+    <tr><td>幂等</td><td>「Ansible 是幂等的」</td><td>「模块层面幂等。<span class="k">command</span> 必须配 <span class="k">creates</span>/<span class="k">changed_when</span>，否则每次都报 changed，handler 也会被误触发」</td></tr>
+  </table>
+  <p>有一个很好用的自我检查：<b>你能不能在三十秒内说出「上一次线上用 Ansible 做的变更是什么、影响了多少台、怎么验证的」</b>。说不出来，面试官基本会判定你是「照着文档写过 demo」。所以这一篇里所有的技术点，最好都挂到一个你自己的例子上——哪怕例子很小（比如「我用它把 60 台机器的 logrotate 配置统一了」），也比空谈体系可信。</p>
+  <p>另一个常被追问的角度是<b>「为什么不用 Shell 脚本」</b>。这个问题后面有一节专门讲，这里先给结论：脚本解决「做一次」，Ansible 解决「随时可以再做一次，并且结果一样」。真正的差别不在语法，在<b>状态检查和报告</b>——Ansible 会告诉你每台机器是 changed 还是 ok、失败在哪一步，脚本要靠你自己 echo。</p>
+  <div class="callout ok">
+    <b>一个可以立刻补上的短板：</b>准备好一句话讲清你的目录结构。「我们的 playbook 按角色拆，每个角色一个 Git 仓库或者一个目录，公共变量放 group_vars，环境差异用 inventory 区分，密钥用 ansible-vault 加密，CI 里跑 lint 和 check，apply 需要审批」——这句话里每一个逗号后面都可能被追问，但都答得上来，你就稳了。
+  </div>
+  <p><b>面试怎么答：</b>「我理解面试官问 Ansible，其实是在问自动化的成熟度。我会先说规模和结构，再说验证和回滚流程，最后说我认为最容易出问题的地方——幂等被 command 模块破坏、变量优先级导致的环境差异、以及 handler 没被触发导致改了配置没重启。这三件事我都在实际变更里遇到过。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>核心概念：六个词，每个都对应一类问题</h2></div>
+  <p class="lead">Ansible 的概念不算多，但每个概念都对应一类具体的故障。<b>inventory 决定你改了谁，play 决定你做什么，role 决定怎么复用，module 决定幂不幂等，fact 决定分支判断的可靠性，handler 决定收尾动作什么时候执行。</b>把它们和故障对上号，比背定义有用。</p>
+  <table>
+    <tr><th style="width:120px">概念</th><th>它是什么</th><th>它对应的典型故障</th></tr>
+    <tr><td><b>inventory</b></td><td>主机清单，可以是 INI/YAML 静态文件，也可以是动态脚本或插件（从云 API 拉）</td><td>改错环境：以为在改 staging，其实 limit 没加，改了生产；动态 inventory 拉回来的机器比预期多</td></tr>
+    <tr><td><b>play</b></td><td>一次「对哪批主机、执行哪组任务」的绑定，一个 playbook 里可以有多个 play</td><td>变量作用域混乱：在 A play 里定义的 vars 在 B play 里不存在</td></tr>
+    <tr><td><b>role</b></td><td>可复用的任务集合，带固定的目录结构</td><td>变量被覆盖（defaults vs vars）、handler 名冲突、角色之间互相依赖没在 meta 里声明</td></tr>
+    <tr><td><b>module</b></td><td>真正干活的最小单元，在远端执行并返回 JSON</td><td>用了不幂等的模块（command/shell/raw）导致每次 changed；模块参数写错导致「跑绿了但没生效」</td></tr>
+    <tr><td><b>fact</b></td><td>Ansible 自动采集的主机信息（OS、IP、内存、磁盘、网卡…），也能自定义</td><td>关掉 <span class="k">gather_facts</span> 之后还在用 <span class="k">ansible_distribution</span>，条件判断永远为假</td></tr>
+    <tr><td><b>handler</b></td><td>被 notify 触发的收尾任务（典型是重启服务），默认在 play 末尾执行一次</td><td>改了配置没重启；或者反过来，每次都重启（因为通知它的任务永远报 changed）</td></tr>
+  </table>
+  <p><b>fact 的采集方式要说清楚</b>，因为它经常被误解：Ansible 在目标机上执行一段采集脚本（不是靠读本地缓存），把结果作为变量注入。所以采集是有成本的——几百台机器、每台几十个 fact，光采集就要一段时间；可以用 <span class="k">gather_subset</span> 只采需要的部分，或者开 fact cache（<span class="k">fact_caching</span>，可选 jsonfile、redis、memcached 等后端，具体配置以你版本的文档为准）。</p>
+  <p><b>自定义 fact</b> 有两条路：把静态文件放到 <span class="k">/etc/ansible/facts.d/*.fact</span>（INI 或 JSON），或者用 <span class="k">set_fact</span> 在运行时算出来。区别很重要——<span class="k">set_fact</span> 的结果<b>只在本次运行有效</b>（除非开了 fact cache），而 facts.d 里的文件是持久的、每次都会被采集。</p>
+  <pre><span class="c"># 看某个主机到底有哪些 fact（排障利器，别猜）</span>
+ansible web-01 -m setup -a 'filter=ansible_distribution*'
+ansible web-01 -m setup -a 'gather_subset=network'
+
+<span class="c"># 只采一部分，能明显缩短大批量执行的时间</span>
+- hosts: all
+  gather_facts: true
+  gather_subset: ["network", "virtual"]
+
+<span class="c"># 关掉采集但要用 fact 时，必须自己补上</span>
+- hosts: all
+  gather_facts: false
+  tasks:
+    - ansible.builtin.setup:
+        gather_subset: ["distribution"]
+      when: needed | default(true)</pre>
+  <p><b>handler 的语义值得单独记三条</b>：第一，只有<b>报告 changed</b> 的任务才会触发 notify，ok 和 skipped 都不触发；第二，handler 在 play 的<b>末尾</b>统一执行，同一个 handler 被 notify 多次也只跑一次；第三，如果 play 在 handler 执行前失败，handler 不会执行——除非你用 <span class="k">meta: flush_handlers</span> 提前冲刷，或者配置了在失败时也执行的选项（具体开关名以你版本为准）。「改了配置但服务没重启」这类事故，八成是第一条。</p>
+  <div class="callout warn">
+    <b>「handler 没跑」和「handler 不该跑的时候跑了」同样危险。</b>后者更隐蔽：如果通知它的是一个 <span class="k">shell</span> 任务（永远 changed），那每次执行 playbook 都会重启一次服务——在几百台上跑一遍，等于自己制造了一次全站抖动。所以给 <span class="k">command</span>/<span class="k">shell</span> 配 <span class="k">changed_when</span> 不只是为了报告好看，是为了<b>不误触发下游动作</b>。
+  </div>
+  <p><b>面试怎么答：</b>「六个概念我按故障来记：inventory 决定影响面，所以要习惯性加 --limit 和 --list-hosts 确认；module 决定幂等，command 类模块必须自己声明 changed_when；fact 是采集出来的，关掉 gather_facts 再用 fact 就会静默失效；handler 只在通知它的任务 changed 时才执行，且在 play 末尾跑一次。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>幂等性：它不是框架给的，是模块给的</h2></div>
+  <p class="lead">幂等的定义很朴素：<b>同一个操作执行一次和执行多次，系统的最终状态相同</b>。对应到 Ansible 的报告里，就是「第二次跑，全是 <span class="k">ok</span>，没有 <span class="k">changed</span>」。这一节要回答的问题是：这个属性到底由谁保证，以及在哪些环节会悄悄失效。</p>
+  <p>答案是<b>模块</b>。以 <span class="k">copy</span> 为例，它并不是无脑把文件传过去：它先在目标机上算出现有文件的校验和（checksum），和源文件的校验和比较，一样就返回 <span class="k">changed=false</span> 直接结束，不一样才传。<span class="k">template</span> 同理，而且它还会先把 Jinja 渲染完再比。<span class="k">service</span> 会先查服务的当前状态，已经 <span class="k">started</span> 就不动。<span class="k">yum</span>/<span class="k">apt</span>/<span class="k">dnf</span> 会先查包是否已安装及版本。</p>
+  <p>所以「幂等」的本质是<b>模块内部有一段「读当前状态 → 比较 → 决定是否写」的逻辑</b>。而 <span class="k">command</span>、<span class="k">shell</span>、<span class="k">raw</span> 这三个模块没有这段逻辑——它们只是把命令交给远端执行，返回码为 0 就报 changed。你让它跑 <span class="k">echo</span>，它也报 changed。</p>
+  <table>
+    <tr><th style="width:170px">模块</th><th>幂等吗</th><th>怎么用才不出事</th></tr>
+    <tr><td><b>copy / template</b></td><td>天然幂等（比 checksum）</td><td>配置里<b>不要</b>塞时间戳、随机数、UUID，否则每次渲染结果都不同，永远 changed</td></tr>
+    <tr><td><b>file</b></td><td>幂等（比 state、mode、owner）</td><td>mode 要写字符串 <span class="k">"0644"</span>；写成 <span class="k">0644</span> 会被当八进制字面量处理，得到意外权限</td></tr>
+    <tr><td><b>lineinfile / blockinfile</b></td><td>条件幂等</td><td>必须给 <span class="k">regexp</span> 才能可靠判断「已经改过了」；多行块用 <span class="k">blockinfile</span>，它靠 marker 注释界定</td></tr>
+    <tr><td><b>yum / apt / pip</b></td><td>幂等，但 <span class="k">state=latest</span> 会每次升级</td><td>生产环境锁版本：<span class="k">name=nginx-1.24.0</span> 或 <span class="k">state=present</span> + 显式版本号，否则每次跑都可能升到新版本</td></tr>
+    <tr><td><b>service</b></td><td>幂等（比当前状态）</td><td><span class="k">state=restarted</span> 一定会重启；只有 <span class="k">started</span>/<span class="k">stopped</span> 才是幂等的。要「只在配置变了才重启」，用 handler</td></tr>
+    <tr><td><b>command / shell / raw</b></td><td><b>不幂等</b></td><td>三选一：加 <span class="k">creates</span>/<span class="k">removes</span>；加 <span class="k">changed_when</span>；换成有对应功能的专用模块</td></tr>
+    <tr><td><b>uri / wait_for</b></td><td>不产生变更，用于探测</td><td>配 <span class="k">until</span> + <span class="k">retries</span> + <span class="k">delay</span> 做轮询，比 <span class="k">sleep</span> 可靠</td></tr>
+  </table>
+  <pre><span class="c"># 反例：每次都是 changed，还会误触发 handler</span>
+- name: 安装 agent
+  ansible.builtin.shell: curl -s http://pkg/apt/install.sh | bash
+
+<span class="c"># 正例 1：用 creates 表达「已经做过了就不做」</span>
+- name: 初始化数据目录
+  ansible.builtin.command: /opt/app/bin/init --datadir /data/app
+  args:
+    creates: /data/app/initialized.flag
+
+<span class="c"># 正例 2：自己判断状态，自己声明 changed</span>
+- name: 检查是否已是目标版本
+  ansible.builtin.command: /opt/app/bin/version
+  register: ver
+  changed_when: false        <span class="c"># 这是个只读检查，永远不算改变</span>
+
+- name: 升级到目标版本
+  ansible.builtin.command: /opt/app/bin/upgrade --to 2.4.1
+  when: ver.stdout is version('2.4.1', '&lt;')   <span class="c"># 注意 &lt; 要转义</span>
+
+<span class="c"># 正例 3：模块已经把状态判断做完了，不要自己去 shell</span>
+- name: 确保 nginx 配置是最新的
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    validate: /usr/sbin/nginx -t -c %s    <span class="c"># 落盘前先校验语法，错了不写入</span>
+    mode: "0644"
+  notify: reload nginx</pre>
+  <p><span class="k">validate</span> 这个参数值得单独强调，它是「改配置类变更」最实用的一道保险：模块会先把渲染好的内容写到一个临时文件，用你给的命令去校验它，<b>校验通过才覆盖目标文件</b>。这样即使模板里的变量算错了、渲染出一个语法错误的配置，也不会把线上服务搞挂——任务直接失败，原文件不动。nginx 用 <span class="k">nginx -t -c %s</span>，sshd 用 <span class="k">sshd -t -f %s</span>，<span class="k">%s</span> 是临时文件路径的占位符。</p>
+  <p>还有一个破坏幂等的隐蔽来源：<b>模板里的内容不稳定</b>。比如模板里写了 <span class="k">{{ ansible_date_time.iso8601 }}</span>，或者引用了一个每次都重新生成的随机 token，或者 <span class="k">lookup('pipe', ...)</span> 去调一个返回时间相关结果的命令。这类模板每次渲染结果都不同，copy/template 永远报 changed，然后 notify 的 handler 每次都重启——表现就是「我什么都没改，跑一遍全站重启了」。所以模板里<b>只放确定的配置</b>，动态值要么放变量、要么放环境变量/配置文件由应用自己生成。</p>
+  <div class="callout danger">
+    <b>「幂等」还有一个常被忽略的边界：它只保证终态一致，不保证过程无害。</b>比如一个任务把文件内容从 A 改成 B，第二次跑时文件已经是 B，它不会动——这是幂等。但如果中途有人手工把文件改成了 C，第二次跑会把 C 覆盖成 B，这个「覆盖」是正确的、也是你意料之外的。所以幂等不等于「不会覆盖别人的改动」，<b>它恰恰意味着「任何偏离都会被拉回来」</b>，这也是为什么「Ansible 管的文件不要手工改」要写成团队规则。
+  </div>
+  <p>批量执行时还有两个保护参数值得记住：<span class="k">serial</span> 控制分批（可以写数字、百分比或列表），<span class="k">max_failure_percentage</span> 控制「失败多少就中止」。没有这两个，一个写错的模板会在几秒内推到全部机器。</p>
+  <p><b>面试怎么答：</b>「幂等是模块属性不是框架属性。copy、template、file、service 这类模块内部会先读当前状态再比较，所以天然幂等；command、shell、raw 没有这个逻辑，返回码 0 就报 changed，必须配 creates/removes 或 changed_when。我判断一个 playbook 是否真的幂等，就看它跑第二遍是不是零 changed。另外 state=latest 和 state=restarted 这两个写法会破坏收敛，生产要锁版本、要用 handler 而不是无条件重启。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>变量优先级：22 级不是让你背，是让你知道往哪查</h2></div>
+  <p class="lead">「我改了变量，为什么没生效？」这是 Ansible 最高频的问题，没有之一。答案永远是<b>优先级</b>：同一个名字在别的地方被赋了值，而且那个地方优先级更高。官方文档给出的顺序有 22 级，从低到高如下（具体条目以你使用的 ansible-core 版本文档为准，历次版本间这个顺序基本稳定）。</p>
+  <table>
+    <tr><th style="width:60px">级</th><th style="width:220px">来源</th><th>什么时候会撞车</th></tr>
+    <tr><td>1</td><td>命令行值（如 <span class="k">-u</span>，严格说不是变量）</td><td>最低。基本不会成为「改了没生效」的原因</td></tr>
+    <tr><td>2</td><td><b>role defaults</b>（<span class="k">defaults/main.yml</span>）</td><td><b>最容易被覆盖的一档</b>。你在这里改端口，group_vars 里有个同名的就白改</td></tr>
+    <tr><td>3~7</td><td>inventory 的 group vars → inventory <span class="k">group_vars/all</span> → playbook <span class="k">group_vars/all</span> → inventory <span class="k">group_vars/*</span> → playbook <span class="k">group_vars/*</span></td><td><b>playbook 的 group_vars 高于 inventory 的</b>。同名变量放两处，生效的是 playbook 那份</td></tr>
+    <tr><td>8~10</td><td>inventory 的 host vars → inventory <span class="k">host_vars/*</span> → playbook <span class="k">host_vars/*</span></td><td><b>host 级永远压过 group 级</b>。想给某一台特殊配置，写 host_vars 就对了</td></tr>
+    <tr><td>11</td><td>主机 fact / 缓存的 set_fact</td><td><b>容易踩坑的一级</b>：你的自定义变量如果和某个 fact 同名（比如 <span class="k">ansible_hostname</span>），会被 fact 压掉</td></tr>
+    <tr><td>12~14</td><td>play <span class="k">vars</span> → <span class="k">vars_prompt</span> → <span class="k">vars_files</span></td><td>play 里 <span class="k">vars:</span> 写的比所有 group_vars 都高，很多人以为它最低</td></tr>
+    <tr><td>15</td><td><b>role vars</b>（<span class="k">vars/main.yml</span>）</td><td><b>角色内部的第二坑</b>：defaults 最低、vars 很高。想让使用者能覆盖，放 defaults；想锁死，放 vars</td></tr>
+    <tr><td>16~17</td><td>block vars → task vars</td><td>只在该 task 内生效，用于临时覆盖</td></tr>
+    <tr><td>18</td><td><span class="k">include_vars</span></td><td>运行时动态加载，压过前面所有静态定义</td></tr>
+    <tr><td>19</td><td><span class="k">set_fact</span> / register</td><td>运行时算出来的值优先级很高，且在本次运行内持续有效</td></tr>
+    <tr><td>20~21</td><td>role（含 include_role）参数 → include 参数</td><td>调用角色时传的参数，能压过角色内部的 vars</td></tr>
+    <tr><td>22</td><td><b>extra vars（<span class="k">-e</span>）</b></td><td><b>永远赢</b>。不管你在哪写了什么，<span class="k">-e</span> 最大</td></tr>
+  </table>
+  <p>22 级记不住没关系，<b>记住四条就够用</b>：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>defaults 最低，vars 很高，<span class="k">-e</span> 最高。</b>角色里想给默认值就放 <span class="k">defaults/</span>，放 <span class="k">vars/</span> 等于告诉别人「别改」。</div></div>
+    <div class="step"><div class="txt"><b>host 压过 group。</b>「某一台不一样」就写 <span class="k">host_vars/主机名</span>，不要靠 <span class="k">when</span> 在任务里判断主机名——那种写法会让任务列表越来越脏。</div></div>
+    <div class="step"><div class="txt"><b>runtime 压过 static。</b><span class="k">set_fact</span> 和 <span class="k">include_vars</span> 优先级远高于文件里的定义，所以「怎么改都不生效」时，先搜有没有同名的 <span class="k">set_fact</span>。</div></div>
+    <div class="step"><div class="txt"><b>playbook 的 group_vars 压过 inventory 的。</b>同一个变量在两处都写了，生效的是 playbook 目录下那份。</div></div>
+  </div>
+  <pre><span class="c"># 排障第一步：不要猜，直接问 Ansible 这个值到底是多少</span>
+ansible web-01 -m debug -a 'var=nginx_port' --extra-vars '@prod.yml'
+
+<span class="c"># 在 playbook 里把整个变量空间打出来看（信息量大，排障时才用）</span>
+- name: 打印当前主机的所有变量
+  ansible.builtin.debug:
+    var: hostvars[inventory_hostname]
+  when: debug_vars | default(false)
+
+<span class="c"># 看某个变量到底是从哪来的（-vvvv 的输出里会有 "variable ... from ..."）</span>
+ansible-playbook site.yml --limit web-01 -vvvv | grep -i 'nginx_port'</pre>
+  <div class="callout warn">
+    <b>「用 <span class="k">-e</span> 传环境差异」是个坏习惯，虽然它排在最顶级。</b>因为 <span class="k">-e</span> 赢过一切，它会<b>掩盖</b>你在 group_vars 里写的正确配置，而且这个值不在代码里、不进评审、不进 Git。三个月后有人问「生产为什么是这个端口」，答案可能在某个人的 shell 历史里。环境差异应该落在 inventory 的 group_vars 或者独立的 <span class="k">--extra-vars @env/prod.yml</span> 文件里，并且这个文件要进版本控制。
+  </div>
+  <p>还有两个和变量相关的坑。<b>第一，变量名覆盖 fact。</b>如果你定义了一个叫 <span class="k">ansible_user</span> 或者 <span class="k">ansible_port</span> 的变量，它和连接用的内置变量同名，行为会非常诡异。自定义变量尽量加前缀，比如 <span class="k">app_nginx_port</span>。<b>第二，<span class="k">hash_behaviour</span>。</b>默认情况下同名哈希变量在不同层级是<b>替换</b>而不是合并（该配置项可以改成合并，但官方不推荐，很多角色依赖替换语义）。所以「我在 defaults 里写了 5 个键，在 group_vars 里只想覆盖 1 个」——默认行为会把另外 4 个也丢掉。要么整体重写，要么把键拆成独立的扁平变量。</p>
+  <p><b>面试怎么答：</b>「变量优先级官方是 22 级，我记四条实用的：defaults 最低、role vars 很高、-e 最高；host 压过 group；运行时（set_fact、include_vars）压过静态定义；playbook 的 group_vars 压过 inventory 的。排障时我不猜，直接用 debug 打印变量值，或者 -vvvv 看它 from 哪里。另外同名哈希默认是替换不是合并，这点很容易踩。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>角色目录结构：每个目录对应一种意图</h2></div>
+  <p class="lead">角色的目录不是随便分的，它其实在表达「什么东西应该被使用者改，什么东西不该」。<b>看懂目录结构，就看懂了这个角色的契约。</b>很多人写角色只写 <span class="k">tasks/</span>，把文件、模板、变量全塞在一个目录里，结果就是无法复用、无法覆盖、无法看懂。</p>
+  <table>
+    <tr><th style="width:150px">目录</th><th>放什么</th><th>关键性质</th></tr>
+    <tr><td><b>defaults/main.yml</b></td><td>角色的默认变量</td><td><b>优先级最低</b>（第 2 级），任何人都能覆盖。所有「可以被改的默认值」都放这里</td></tr>
+    <tr><td><b>vars/main.yml</b></td><td>角色内部固定变量</td><td><b>优先级很高</b>（第 15 级），压过 group_vars 和 play vars。放「不该被随便改」的常量</td></tr>
+    <tr><td><b>tasks/main.yml</b></td><td>任务列表，可以 include 子文件</td><td>执行顺序是<b>从上到下</b>，不要写一个依赖「某天会被重排」的列表</td></tr>
+    <tr><td><b>handlers/main.yml</b></td><td>重启、reload 这类收尾动作</td><td>按<b>名字</b>被 notify，同名只跑一次。名字要带角色前缀，避免冲突</td></tr>
+    <tr><td><b>templates/*.j2</b></td><td>Jinja2 模板</td><td>会被渲染。放配置模板，变量从 defaults 来</td></tr>
+    <tr><td><b>files/*</b></td><td>静态文件</td><td><b>不渲染</b>，原样拷贝。放二进制、证书、脚本</td></tr>
+    <tr><td><b>meta/main.yml</b></td><td>角色依赖（<span class="k">dependencies</span>）、支持的平台</td><td>依赖在这里声明才会被自动先执行；漏了就会「跑不起来但说不清为什么」</td></tr>
+    <tr><td><b>README.md</b></td><td>角色用法与变量说明</td><td>不是可选件。没有 README 的角色，三个月后没人敢改</td></tr>
+  </table>
+  <p>为什么 <span class="k">defaults</span> 和 <span class="k">vars</span> 的区分这么重要？因为它直接决定<b>这个角色好不好用</b>。全部写进 <span class="k">vars/</span>，使用者想改端口就只能 fork 一份代码；全部写进 <span class="k">defaults/</span>，又会把一些不该被碰的内部常量暴露出去。一个实用的分法：<b>凡是有可能在不同环境、不同业务线取值不同的，放 defaults；凡是由角色逻辑推导出来的、或者改了就会出错的，放 vars。</b></p>
+  <pre><span class="c"># 一个标准角色的目录树</span>
+roles/nginx/
+├── defaults/main.yml      <span class="c"># nginx_port: 80, nginx_worker_processes: auto （可覆盖）</span>
+├── vars/main.yml          <span class="c"># nginx_pkg_name: nginx （平台推导出来的常量）</span>
+├── tasks/main.yml
+├── tasks/install.yml
+├── tasks/configure.yml
+├── handlers/main.yml      <span class="c"># name: "nginx reload"</span>
+├── templates/nginx.conf.j2
+├── files/50x.html
+├── meta/main.yml          <span class="c"># dependencies: [common]</span>
+└── README.md
+
+<span class="c"># meta/main.yml：依赖显式声明，否则顺序不可控</span>
+dependencies:
+  - role: common
+    vars:
+      ntp_servers: ["10.0.0.1", "10.0.0.2"]
+
+<span class="c"># handlers/main.yml：名字带前缀，避免和其他角色的 reload 冲突</span>
+- name: nginx reload
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded</pre>
+  <p><b>handler 名冲突</b>是个真实的坑：如果两个角色都定义了一个叫 <span class="k">restart service</span> 的 handler，Ansible 里只有<b>一个</b>会生效（同名覆盖），你的 notify 可能触发的是另一个角色的动作。所以 handler 一律加前缀，比如 <span class="k">nginx reload</span>、<span class="k">php-fpm restart</span>。或者用 <span class="k">listen</span> 指定一个主题名，多个任务订阅同一个主题。</p>
+  <p>还有一个实践细节：<b>tasks/main.yml 不要写太长</b>。常见拆法是按阶段拆文件（<span class="k">install.yml</span>、<span class="k">configure.yml</span>、<span class="k">service.yml</span>），main.yml 里只做 include。好处不只是整洁——你可以用 <span class="k">--start-at-task</span> 从某个阶段继续，也可以在某个阶段加 tag 单独执行。tag 的用法是 <span class="k">ansible-playbook site.yml --tags nginx_config</span>，调试时非常省时间。</p>
+  <div class="callout ok">
+    <b>判断一个角色写得好不好，看三件事：</b>① <span class="k">defaults/main.yml</span> 里有没有把所有可调项列全，并且每项有注释；② 跑两遍是不是零 changed；③ handler 名有没有前缀、有没有只在真正需要时才触发。<b>这三条满足，这个角色就可以进团队共享库了。</b>不满足的话，它会成为下一个「没人敢碰的目录」。
+  </div>
+  <p><b>面试怎么答：</b>「角色目录我按『可变/不可变』理解：defaults 优先级最低，放所有允许被覆盖的默认值；vars 优先级很高，放角色内部的常量，写进去基本等于不让人改。templates 会渲染、files 原样拷贝，两者别混。meta 里声明依赖，否则执行顺序不可控。handler 名字要带角色前缀，因为同名 handler 会互相覆盖。tasks 我习惯按阶段拆文件并用 tag 标记，方便 --tags 单独跑某一部分。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>三个典型运维任务：配置下发、滚动重启、密钥分发</h2></div>
+  <p class="lead">面试官让你「说一个你做过的 Ansible 场景」，这三个是最能展开的。它们的共同要求是：<b>能说清楚顺序、能说清楚失败会怎样、能说清楚怎么验证。</b></p>
+  <h3>任务一：批量改配置</h3>
+  <p>关键不是「把文件传过去」，是三条保险：<b>渲染前校验（validate）、改了才重启（handler）、失败不扩散（serial / max_failure_percentage）</b>。缺任何一条，这个变更都有把全站搞挂的可能。</p>
+  <pre>- name: 下发 nginx 配置
+  hosts: web
+  serial: "20%"                     <span class="c"># 一次只动 20%，别一次推全量</span>
+  max_failure_percentage: 10        <span class="c"># 失败超 10% 就停</span>
+  tasks:
+    - name: 渲染配置（落盘前先跑 nginx -t）
+      ansible.builtin.template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/nginx.conf
+        owner: root
+        group: root
+        mode: "0644"
+        validate: /usr/sbin/nginx -t -c %s
+      notify: nginx reload
+
+    - name: 等端口就绪（防止 reload 期间连接被拒）
+      ansible.builtin.wait_for:
+        port: 80
+        timeout: 20
+
+    - name: 抽查一个业务 URL
+      ansible.builtin.uri:
+        url: "http://{{ ansible_default_ipv4.address }}/health"
+        status_code: 200
+      retries: 5
+      delay: 2
+      delegate_to: localhost         <span class="c"># 从控制节点发起，模拟真实访问路径</span>
+
+  handlers:
+    - name: nginx reload
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded</pre>
+  <h3>任务二：滚动重启</h3>
+  <p>滚动重启的难点不是重启，是<b>「什么时候可以动下一批」</b>。顺序是：从负载均衡摘掉 → 等现有请求处理完 → 重启 → 等健康检查通过 → 放回。Ansible 里对应 <span class="k">serial</span> 分批、<span class="k">wait_for</span> 等端口、<span class="k">uri</span> 探活。如果你的摘流量动作是调 API 或者改某个注册中心状态，那一步要用 <span class="k">uri</span> 模块并且自己定义成功条件。</p>
+  <pre>- name: 滚动重启应用
+  hosts: app
+  serial: 2                        <span class="c"># 或者写 ["10%", "30%", "100%"] 分三轮加大</span>
+  any_errors_fatal: true           <span class="c"># 第一批挂了就不再继续</span>
+  tasks:
+    - name: 摘流量
+      ansible.builtin.uri:
+        url: "http://lb.internal/api/downstream/remove"
+        method: POST
+        body_format: json
+        body: {host: "{{ inventory_hostname }}"}
+        status_code: 200
+
+    - name: 等存量请求排空
+      ansible.builtin.wait_for:
+        path: /var/log/app/access.log
+        search_regex: 'idle'       <span class="c"># 更稳的是查应用的连接数指标，这里仅为示例</span>
+        timeout: 30
+      ignore_errors: true          <span class="c"># 探不到不应该中断整个变更</span>
+
+    - name: 重启
+      ansible.builtin.service:
+        name: app
+        state: restarted
+
+    - name: 等健康检查通过
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:8080/health"
+        status_code: 200
+      register: health
+      until: health.status == 200
+      retries: 20
+      delay: 3</pre>
+  <h3>任务三：密钥与证书分发</h3>
+  <p>这一类的核心要求是<b>「文件权限正确、过程不泄露、可轮换」</b>。三个必须做的动作：目标文件 <span class="k">mode: "0600"</span>（私钥 0400 或 0600，证书可以 0644）；任务加 <span class="k">no_log: true</span> 防止值被打进输出；内容本身用 Vault 加密（下一节讲）。</p>
+  <pre>- name: 分发 TLS 证书与私钥
+  hosts: web
+  tasks:
+    - name: 写私钥
+      ansible.builtin.copy:
+        content: "{{ tls_private_key }}"
+        dest: /etc/nginx/tls/server.key
+        owner: root
+        mode: "0600"
+      no_log: true                 <span class="c"># 关键：不要把内容打进日志</span>
+      notify: nginx reload
+
+    - name: 写证书
+      ansible.builtin.copy:
+        content: "{{ tls_certificate }}"
+        dest: /etc/nginx/tls/server.crt
+        mode: "0644"
+
+    - name: 分发 SSH 公钥（给运维账号）
+      ansible.posix.authorized_key:
+        user: ops
+        key: "{{ lookup('file', 'keys/ops.pub') }}"
+        state: present
+      <span class="c"># 慎用 exclusive: true —— 它会删掉该用户下所有不在列表里的 key</span></pre>
+  <div class="callout warn">
+    <b><span class="k">authorized_key</span> 的 <span class="k">exclusive: true</span> 是双向的。</b>它保证「只有我列出的 key 存在」，也就意味着会删掉机器上其他所有 key——包括你自己手动加的、包括别人应急时加的。用它能做到「密钥治理」，用错它会把所有人锁在门外。用的前提是：这份 key 列表是唯一权威来源，且你有带外方式（控制台 VNC、ILO/IPMI）能救回来。
+  </div>
+  <p><b>面试怎么答：</b>「我做过的典型变更有三类。批量改配置用 template 加 validate，配置落盘前先跑 nginx -t，语法错了就不写入，然后靠 handler 只在内容变化时才 reload，分批用 serial 加 max_failure_percentage。滚动重启的关键是摘流量、等排空、重启、探活这个顺序，探活用 uri 配 until 轮询，不用 sleep。密钥分发必须设 0600 权限、任务加 no_log，内容用 Vault 加密。这三类的共同点是：每一步失败都知道会怎样，而且失败不会扩散到全部机器。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>Vault 与密钥管理：加密的是静态存储，不是运行时</h2></div>
+  <p class="lead">「我们把密码放在 ansible-vault 里，所以是安全的」——这句话只对了一半。Vault 解决的是<b>静态存储</b>：Git 里的文件是密文，clone 下来也看不懂。但<b>它不解决运行时</b>：执行 playbook 时，Ansible 必须用密码解密，解密后的明文就在内存里、在网络传输的模块参数里、在可能输出的内容里。</p>
+  <table>
+    <tr><th style="width:170px">它防住什么</th><th>它防不住什么</th></tr>
+    <tr><td>Git 仓库泄露时，密钥不会明文暴露</td><td>有 vault 密码的人能看到所有密钥（所以密码本身的分发才是关键）</td></tr>
+    <tr><td>代码评审时敏感值不出现在 diff 里</td><td>运行时内存里的明文、模块参数传输过程中的明文</td></tr>
+    <tr><td>满足「配置不落明文」的合规要求</td><td><span class="k">-vvvv</span> 输出、任务回显、失败信息里打出来的明文</td></tr>
+    <tr><td>可以用不同 vault-id 分环境、分权限</td><td>目标机上落盘的文件权限没设对（Vault 管不了 chmod）</td></tr>
+  </table>
+  <pre><span class="c"># 1. 加密整个变量文件（最常用，适合一组相关密钥）</span>
+ansible-vault create group_vars/prod/vault.yml
+ansible-vault edit   group_vars/prod/vault.yml
+ansible-vault view   group_vars/prod/vault.yml
+ansible-vault rekey  group_vars/prod/vault.yml      <span class="c"># 换密码，轮换时必做</span>
+
+<span class="c"># 2. 只加密一个字符串（适合往已有 yml 里插一个密钥）</span>
+ansible-vault encrypt_string --vault-id prod@prompt 'sup3r-secret' --name 'db_password'
+
+<span class="c"># 3. 运行时提供密码：交互、文件、脚本三种</span>
+ansible-playbook site.yml --ask-vault-pass
+ansible-playbook site.yml --vault-password-file ~/.vault_pass
+ansible-playbook site.yml --vault-id prod@~/.vault_pass_prod
+
+<span class="c"># 4. 加密后的文件长这样（可以直接提交到 Git）</span>
+<span class="c"># $ANSIBLE_VAULT;1.1;AES256</span>
+<span class="c"># 363834393362313036396536...</span></pre>
+  <p><b>vault-id 是个被低估的用法。</b>它让你可以用不同的密码加密不同环境的密钥：<span class="k">--vault-id prod@/path/prod.key --vault-id staging@/path/staging.key</span>。好处是「管 staging 的人拿不到生产的密钥」，而且密文里带着 id，出错时报错信息会告诉你是哪个 id 的密码不对，而不是笼统地失败。</p>
+  <p><b>最重要的实践问题：vault 密码放哪？</b>三个选项，安全性递增：① 放在 CI 的密钥管理里（如 CI 变量的 masked/protected 类型），由流水线注入环境变量或临时文件——这是最常用也够用的方案；② 放在专门的密钥管理系统里，运行时通过脚本拉取（<span class="k">--vault-id prod@./get-vault-pass.sh</span>，脚本执行后输出密码到 stdout）；③ 本地开发用 <span class="k">--ask-vault-pass</span> 手动输入。<b>绝对不要做的</b>是把密码文件提交到 Git，或者明文写进 <span class="k">ansible.cfg</span> 的 <span class="k">vault_password_file</span> 并跟着代码走。</p>
+  <div class="callout danger">
+    <b>两个必须做的配套动作：</b>第一，所有处理密钥的任务加 <span class="k">no_log: true</span>。Vault 只加密存储，一旦任务把变量值作为结果返回，<span class="k">-v</span> 以上的输出里就是明文——包括任务失败时的报错信息。第二，别忘了目标机上的文件权限。<span class="k">copy</span> 一份私钥过去，Vault 不会帮你设 0600，权限得自己写 <span class="k">mode</span>。这两件事没做，Vault 等于只做了一半。
+  </div>
+  <p>最后一个务实的判断：<b>如果密钥量很大或者需要审计和自动轮换，Vault 不是最优解，应该上专门的密钥管理系统</b>（HashiCorp Vault、云厂商的 KMS/Secrets Manager 等），Ansible 在运行时通过 lookup 插件或者 API 去取，取到的值只在内存里，不落 Git。Ansible Vault 的定位是「中小规模、静态配置、团队内部」够用的方案，它的优势是不引入新依赖。</p>
+  <p><b>面试怎么答：</b>「Vault 解决的是静态存储加密——Git 里是密文、评审看不到明文，但它不解决运行时：执行时明文在内存里、在模块参数里、可能在输出里。所以配套必须做两件事：处理密钥的任务加 no_log，以及目标文件的 mode 要显式设成 0600。密码本身的分发才是关键，我放 CI 的密钥管理里由流水线注入，绝不能提交到 Git。多环境用 vault-id 分开，轮换用 rekey。如果密钥量大或者要审计和自动轮换，就上专门的密钥管理系统，Ansible 运行时去取。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>和 Shell 脚本、Terraform 的分工：谁管什么</h2></div>
+  <p class="lead">这类问题一定会被问，因为它考的是<b>你对工具边界的判断</b>，而不是会不会用。回答的核心是一句话：<b>按「资源的生命周期归谁管」来划分，而不是按「哪个工具更熟」划分。</b></p>
+  <table>
+    <tr><th style="width:150px">工具</th><th>它擅长</th><th>它不擅长</th><th>判断依据</th></tr>
+    <tr><td><b>Shell 脚本</b></td><td>一次性动作、胶水逻辑、本地工具链、在 Ansible 里被 module 调用</td><td>批量状态管理。它没有「当前状态」的概念，也没有结构化报告</td><td>只跑一次、不需要报告 → 脚本</td></tr>
+    <tr><td><b>Ansible</b></td><td>已有机器上的配置管理：装包、下发配置、起服务、初始化、有顺序的批量变更</td><td>资源编排。它不知道「这台机器是哪次创建的」，也没有依赖图和 plan 预览</td><td>机器已经有了，要让它变成某个样子 → Ansible</td></tr>
+    <tr><td><b>Terraform</b></td><td>基础设施的创建与销毁：VPC、子网、云主机、数据库实例、IAM、DNS 记录</td><td>机器内部的配置。它有 state，但把 OS 层配置写进去会让 state 和现实迅速脱节</td><td>东西还不存在，要把它造出来并可复现地销毁 → Terraform</td></tr>
+  </table>
+  <p>和 Shell 的区别，最直观的是<b>报告能力</b>。脚本跑完，你只知道退出码；哪台成功哪台失败、哪台其实没变化，得自己 grep 输出。Ansible 每台机器都返回结构化的结果：<span class="k">ok</span> / <span class="k">changed</span> / <span class="k">failed</span> / <span class="k">skipped</span> / <span class="k">unreachable</span>，还能用 <span class="k">--check</span> 先看一遍要动什么。这个差别在 5 台机器上不明显，在 500 台上就是「能不能安全做事」的差别。</p>
+  <p>和 Terraform 的区别，关键在<b>state 和收敛方式</b>。Terraform 维护一份 state 记录「我创建了哪些资源、它们的 ID 是什么」，因此它能算出「现实和声明之间的差」，并且敢销毁。Ansible 没有这份跨运行的状态记录（fact cache 只是缓存，不是资源清单），它每次都重新读目标机的当前状态来判断要不要动——所以<b>Ansible 不会帮你删东西，Terraform 会</b>。这就是为什么「删除一台机器」是 Terraform 的事，而「把一台机器的配置改掉」是 Ansible 的事。</p>
+  <div class="callout">
+    <b>一个很常见的误用：用 Ansible 去创建云资源。</b>技术上能做到（云厂商都提供 Ansible 模块），但问题是：创建出来的资源没有 state 记录，第二次跑靠什么判断「已经存在」？通常只能靠名字匹配，于是要么重复创建、要么因为找不到而失败。这类「资源生命周期」的问题，就该交给有 state 的工具。反过来，用 Terraform 的 <span class="k">remote-exec</span> 去跑一堆 shell 配置机器，同样是把状态写进了不该写的地方——改一行配置就要跑一次 apply，而且 apply 失败时 state 可能已经半新半旧。
+  </div>
+  <p>合理的组合方式是这样的：<b>Terraform 建资源 → 输出机器的 IP/分组信息 → 生成或更新 Ansible inventory → Ansible 做配置和初始化 → 应用发布交给 CI/Helm。</b>每一层只管自己有权威状态的部分，层与层之间用明确的产物交接（inventory 文件、镜像 tag、制品版本号）。</p>
+  <p>还有一条边界值得说清：<b>Kubernetes 里的东西，尽量不用 Ansible 管。</b>Pod、Deployment、ConfigMap 有自己的控制器在持续收敛，你用 Ansible apply 一份 manifest，下次有人 <span class="k">kubectl edit</span>，两边就开始打架。K8s 资源的正确入口是 GitOps（Argo CD / Flux）或者 CI 里的 helm/kubectl，Ansible 应该只管集群之外的部分（节点初始化、containerd 配置、仓库证书）。</p>
+  <p><b>面试怎么答：</b>「我按资源生命周期划分：资源还不存在、需要可复现地创建和销毁，用 Terraform，因为它有 state 能算差异；机器已经存在、要让它变成某个配置状态，用 Ansible，因为它每次读当前状态、不会帮你删东西；一次性动作和胶水逻辑用 Shell。三者串起来是：Terraform 建资源并产出 inventory，Ansible 做配置和应用初始化，容器内的发布交给 CI 和 GitOps。K8s 里的资源我不让 Ansible 管，因为控制器会持续收敛，两边同时写同一个对象一定会打架。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>排障与调试：从「跑绿了但没生效」到定位</h2></div>
+  <p class="lead">Ansible 的失败分三类：<b>连接类</b>（SSH 不通、权限不够、Python 找不到）、<b>语义类</b>（跑绿了但没生效，通常是变量或模块参数问题）、<b>顺序类</b>（handler 没跑、依赖没先执行）。每一类有不同的第一条命令，用错了就是在绕圈子。</p>
+  <table>
+    <tr><th style="width:170px">现象</th><th>第一反应</th><th>用哪个命令</th></tr>
+    <tr><td>UNREACHABLE / SSH 超时</td><td>先确认控制节点能不能连上，别急着看 playbook</td><td><span class="k">ansible -m ping</span>，-vvvv 看 SSH 细节</td></tr>
+    <tr><td>权限不足（Permission denied）</td><td>确认 <span class="k">become</span> 是否开启、<span class="k">become_user</span> 对不对</td><td><span class="k">ansible -m command -a 'id' -b</span></td></tr>
+    <tr><td>Python 相关报错（interpreter discovery）</td><td>目标机有没有 Python、版本是什么</td><td><span class="k">ansible -m setup</span>；必要时设 <span class="k">ansible_python_interpreter</span></td></tr>
+    <tr><td>跑绿了但配置没变</td><td>变量值不对，或者模板没渲染</td><td><span class="k">-m debug -a 'var=xxx'</span>，或者 <span class="k">--check --diff</span></td></tr>
+    <tr><td>改了配置没重启</td><td>handler 有没有被 notify 到</td><td>看该任务是不是 changed；<span class="k">--check</span> 看有没有 diff</td></tr>
+    <tr><td>每次都重启</td><td>通知者永远 changed</td><td>找那个 <span class="k">command</span>/<span class="k">shell</span>，看有没有 <span class="k">changed_when</span></td></tr>
+  </table>
+  <pre><span class="c"># 1. 语法与静态检查（CI 里必跑，成本几乎为零）</span>
+ansible-playbook site.yml --syntax-check
+ansible-lint site.yml
+
+<span class="c"># 2. 干跑：看它会改什么、改之前和之后差在哪（最重要的一条）</span>
+ansible-playbook site.yml --check --diff --limit web-01
+
+<span class="c"># 3. 确认影响面：先列主机，再决定要不要 limit</span>
+ansible-playbook site.yml --list-hosts
+ansible-playbook site.yml --list-tasks
+ansible-playbook site.yml --list-tags
+
+<span class="c"># 4. 连接类问题：-vvvv 会把 SSH 的每一步打出来</span>
+ansible web-01 -m ping -vvvv
+ansible web-01 -m command -a 'id' -b -K -vvvv      <span class="c"># -K 提示输入 sudo 密码</span>
+
+<span class="c"># 5. 逐步执行 / 从某个任务继续（调试长 playbook 很省时间）</span>
+ansible-playbook site.yml --step
+ansible-playbook site.yml --start-at-task "下发 nginx 配置"
+
+<span class="c"># 6. 并发与超时：大批量时按机器数调</span>
+ansible-playbook site.yml --forks 20
+ansible-playbook site.yml --timeout 30</pre>
+  <p><span class="k">--check --diff</span> 是本节的头号命令，但要清醒地知道它的边界：<b>它只对支持 check mode 的模块有效</b>。<span class="k">copy</span>、<span class="k">template</span>、<span class="k">file</span> 这类会正常报告「要不要改」以及 diff；而 <span class="k">command</span>、<span class="k">shell</span>、<span class="k">raw</span> 在 check mode 下<b>默认被跳过</b>（因为它们不支持），你看到的是「skipped」，不是「它会做什么」。所以如果你的 playbook 主体是 shell 命令，<span class="k">--check</span> 基本不提供信息——这本身就是个信号：说明这段逻辑应该换成专用模块。</p>
+  <p>如果确实需要在 check mode 下也执行某个只读命令，可以在任务上写 <span class="k">check_mode: false</span> 强制它运行（这个开关的含义是「即使处于 check mode，本任务也真正执行」，用的时候要确认它确实无害）。</p>
+  <div class="callout warn">
+    <b>「跑绿了但没生效」的排查顺序，建议固定成三步：</b>第一步，<span class="k">--check --diff --limit 一台</span>，看它认为要不要改——如果它说「不用改」，说明<b>它以为目标已经是对的</b>，问题在判断逻辑（变量、when 条件）；第二步，如果它说要改但改完没效果，看是不是改错了路径或者文件被别的东西覆盖（比如另一个角色、或者配置管理工具在打架）；第三步，<span class="k">-m debug -a 'var=xxx'</span> 把变量实际值打出来，不要靠读代码推断。
+  </div>
+  <p>连接类问题里，最常被忽略的是 <b>Python 解释器</b>。Ansible 的模块大多数要在目标机上用 Python 执行，现代版本会自动发现解释器，但在最小化镜像、容器、或者只有 Python3 且路径不标准的系统上会失败。现象通常是「<span class="k">/usr/bin/python: not found</span>」或者一段看不懂的 discovery 警告。解决办法是在 inventory 里给这批主机设 <span class="k">ansible_python_interpreter=/usr/bin/python3</span>，或者对完全不能用 Python 的场景改用 <span class="k">raw</span> 模块先装一个。</p>
+  <div class="cmds">
+    <div class="crow"><code>ansible-playbook site.yml --syntax-check</code><span class="desc">只查语法与结构，不连机器，CI 第一步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ansible-playbook site.yml --check --diff --limit web-01</code><span class="desc">干跑并看文件差异，先在一台上确认它要动什么</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ansible-playbook site.yml --list-hosts</code><span class="desc">执行前确认影响面，避免改错环境</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ansible web-01 -m debug -a 'var=nginx_port'</code><span class="desc">打印变量的实际生效值，变量优先级问题的终结者</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ansible web-01 -m ping -vvvv</code><span class="desc">连接类故障的第一条命令，SSH/become/解释器都能看出来</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ansible-playbook site.yml --start-at-task "下发 nginx 配置"</code><span class="desc">从指定任务继续，调试长 playbook 省时间</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试怎么答：</b>「排查我分三类。连接类用 ansible -m ping 加 -vvvv，看 SSH、become、Python 解释器；语义类（跑绿了没生效）先 --check --diff 看它认为要不要改，再用 debug 打变量实际值，不靠读代码推断；顺序类主要查 handler——它只在通知者 changed 时才跑，而且 check mode 下 command/shell 会被跳过，所以 --check 对这些模块不提供信息。CI 里固定跑 syntax-check 和 ansible-lint，成本几乎为零。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>9 个坑：都是「看起来没问题」的那类</h2></div>
+  <p class="lead">这一节的坑有个共同形状：<b>Ansible 不会报错，它只是按你写的做了另一件事。</b>所以它们不会在执行时暴露，而是在某次变更里变成一次事故。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">用 shell 模块下发配置</div><div class="pd">shell 每次都报 changed，于是 handler 每次都触发、每次都重启。而且它不比 checksum，你无法知道文件到底改没改。能用 copy/template/file/lineinfile 就别用 shell。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">默认值写进了 vars/main.yml</div><div class="pd">vars 优先级很高，会压过 group_vars 和 play vars，使用者改不动、只能 fork。允许覆盖的默认值必须放 defaults/main.yml。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">state=latest 或 state=restarted 当默认写法</div><div class="pd">latest 会每次把包升到最新版，restarted 会每次重启，两者都破坏收敛。生产锁版本，重启交给 handler。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">handler 名字和其他角色冲突</div><div class="pd">同名 handler 会互相覆盖，你 notify 的可能是另一个角色的动作。名字带角色前缀，或者用 listen 订阅主题。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">模板里放了时间戳或随机数</div><div class="pd">每次渲染结果都不同，copy/template 永远 changed，然后每次都触发重启。模板只放确定的配置，动态值用变量或让应用自己生成。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">以为 --check 能验证一切</div><div class="pd">command/shell/raw 在 check mode 下默认被跳过，你看到的「skipped」不代表安全。而且依赖前序任务结果的逻辑在 check 下根本不成立。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">密钥放进 Vault 就不管了</div><div class="pd">Vault 只加密静态存储，运行时明文在内存和输出里。处理密钥的任务必须加 no_log，目标文件必须显式设置 mode 0600。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">全量跑变更不加 serial 和 max_failure_percentage</div><div class="pd">一个写错的模板会在几秒内推到全部机器，没有中止点。分批 + 失败比例阈值是批量变更的底线配置。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">用 -e 传递环境差异</div><div class="pd">-e 赢过一切，会掩盖代码里的正确配置，而且这个值不进 Git、不进评审。环境差异放 inventory 的 group_vars 或独立的 vars 文件，并且版本化。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个你真的踩过的讲完整。「我踩过最典型的一次是 handler 没触发：我改了 nginx 配置模板，跑完是 ok 不是 changed，因为那台机器之前被人手工改过、内容和模板渲染结果刚好一样，于是 reload 没执行，我以为配置下发了其实没有。后来我把规则改成——配置类变更必须 --check --diff 先确认有 diff，并且不允许手工改 Ansible 管的文件。这个经历让我意识到『ok』不一定是好消息，它也可能意味着『它以为不用动』。」</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个 playbook 跑第二遍仍然全部报 <span class="k">changed</span>，最可能的原因是？</div>
+      <button class="opt">Ansible 的缓存没生效，重新执行了所有任务</button>
+      <button class="opt">目标机器的文件系统有问题，写入后立即被还原</button>
+      <button class="opt">任务使用了 command / shell 这类不带状态检查的模块，返回码为 0 就报 changed</button>
+      <button class="opt">inventory 里主机被重复定义了</button>
+      <div class="ans">正确答案：<b>command / shell 没有幂等逻辑</b>。幂等是模块属性，copy、template、file、service 会先读当前状态再比较；command、shell、raw 只是把命令交给远端执行，退出码 0 即报 changed。修法是加 creates/removes、加 changed_when，或换成专用模块。这个坑的连带后果是 handler 会被误触发，导致每次执行都重启服务。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">2. 关于 handler，下面哪个说法是对的？</div>
+      <button class="opt">只有通知它的任务报告 changed 时才会被触发，且默认在 play 末尾执行，多次 notify 同一个 handler 只跑一次</button>
+      <button class="opt">只要写了 notify，handler 就一定会在任务结束后立即执行</button>
+      <button class="opt">handler 被 notify 几次就执行几次</button>
+      <button class="opt">handler 在 check mode 下也会真正执行重启</button>
+      <div class="ans">正确答案：<b>changed 才触发、末尾统一跑、同名只跑一次</b>。ok 和 skipped 都不会触发 notify，所以「改了配置没重启」通常是通知者没有报告 changed。handler 默认排到 play 末尾统一执行，同一个 handler 被多次 notify 也只执行一次；想提前执行用 meta: flush_handlers。另外 handler 名字要保持唯一，同名会互相覆盖。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 你在角色的 <span class="k">defaults/main.yml</span> 里改了一个变量，执行后没生效。最应该怀疑什么？</div>
+      <button class="opt">Ansible 有变量缓存，需要清缓存</button>
+      <button class="opt">defaults 目录名写错了</button>
+      <button class="opt">目标机上的 fact 没有刷新</button>
+      <button class="opt">该变量在 group_vars、play vars、role vars 或 -e 中被赋过值，而 defaults 是优先级最低的一档</button>
+      <div class="ans">正确答案：<b>被更高优先级覆盖了</b>。role defaults 在官方 22 级顺序里排第 2，几乎是最低的一档；group_vars、host_vars、play vars、role vars、set_fact、include_vars、role 参数、-e 全部高于它。排障不要猜，用 ansible -m debug -a 'var=名字' 打印实际值，或 -vvvv 看它 from 哪里。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 角色的 <span class="k">defaults/main.yml</span> 和 <span class="k">vars/main.yml</span> 应该怎么区分使用？</div>
+      <button class="opt">两者完全等价，只是目录不同</button>
+      <button class="opt">defaults 优先级最低、用于可被覆盖的默认值；vars 优先级很高、用于角色内部不该被随便改的常量</button>
+      <button class="opt">vars 优先级更低，因为它是角色内部的</button>
+      <button class="opt">defaults 只能在 Ansible 2.x 之前用，新版统一用 vars</button>
+      <div class="ans">正确答案：<b>可变/不可变的分界</b>。defaults 是最低优先级（第 2 级），任何 group_vars、host_vars、play vars、-e 都能覆盖它，所以所有「允许使用者改的默认值」都应该放这里；vars 排在第 15 级，压过 group_vars 和 play vars，写进去基本等于「不许改」。把可调项写进 vars 会让角色无法复用。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 关于 <span class="k">ansible-vault</span>，下面哪个说法是准确的？</div>
+      <button class="opt">用了 Vault 之后，密钥在整个执行过程中都是加密的</button>
+      <button class="opt">Vault 会自动把写到目标机上的文件权限设成 0600</button>
+      <button class="opt">Vault 只加密静态存储（Git 里的文件），运行时明文在内存和输出中，所以处理密钥的任务要加 no_log、文件权限要显式设置</button>
+      <button class="opt">Vault 的密码可以和密文一起提交到 Git，因为密码本身也被加密了</button>
+      <div class="ans">正确答案：<b>只管静态，不管运行时</b>。执行时 Ansible 必须解密，明文存在于内存、模块参数、以及可能的输出里——所以处理密钥的任务必须加 no_log: true（否则 -v 以上输出和失败信息里就是明文），并且 copy 到目标机的私钥要显式写 mode: "0600"。vault 密码本身的分发才是关键，应放在 CI 的密钥管理里，绝不能提交到 Git。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 为什么「用 Ansible 创建云主机、用 Terraform 配置机器内部」通常被认为是反过来的分工？</div>
+      <button class="opt">因为 Ansible 不支持云厂商，Terraform 不支持装软件</button>
+      <button class="opt">因为 Terraform 有 state 能记录资源并计算差异、可安全销毁，适合资源生命周期；Ansible 每次读目标机当前状态、不会帮你删东西，适合已有机器的配置收敛</button>
+      <button class="opt">因为 Ansible 只能管 Linux，Terraform 能管 Windows</button>
+      <button class="opt">两者其实完全等价，用哪个只是习惯问题</button>
+      <div class="ans">正确答案：<b>按资源生命周期划分</b>。Terraform 维护 state，知道「我创建了什么、ID 是什么」，因此能算出声明与现实的差、也敢做 destroy；Ansible 没有跨运行的资源清单，每次重新读目标机状态来判断要不要改，所以它不会帮你删除资源。把 OS 内部配置写进 Terraform，会让 state 与机器实际状态迅速脱节；用 Ansible 创建云资源，则缺少「已存在」的判断依据，容易重复创建。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>幂等（idempotent）</b></td><td>执行一次和执行多次终态相同；在 Ansible 里表现为第二次跑零 changed，由模块而非框架保证</td></tr>
+    <tr><td><b>changed / ok</b></td><td>模块报告的状态：changed 表示它真的改了东西，ok 表示已经符合预期、没动</td></tr>
+    <tr><td><b>inventory</b></td><td>主机清单，静态文件或动态脚本/插件；group_vars 与 host_vars 决定变量作用域</td></tr>
+    <tr><td><b>play / playbook</b></td><td>play 是「哪批主机执行哪组任务」的绑定，playbook 是 play 的列表</td></tr>
+    <tr><td><b>role</b></td><td>可复用的任务集合，defaults 放可覆盖默认值、vars 放内部常量</td></tr>
+    <tr><td><b>module</b></td><td>最小的执行单元；copy/template/file/service 带状态检查，command/shell/raw 不带</td></tr>
+    <tr><td><b>fact</b></td><td>Ansible 采集的主机信息（OS、网络、内存等），可用 setup 模块查看；set_fact 只在本次运行有效</td></tr>
+    <tr><td><b>handler</b></td><td>被 notify 触发的收尾动作，只在通知者 changed 时排队，默认 play 末尾执行一次</td></tr>
+    <tr><td><b>validate</b></td><td>copy/template 的参数，落盘前用命令校验临时文件（如 nginx -t -c %s），失败则不覆盖</td></tr>
+    <tr><td><b>serial</b></td><td>分批执行，可写数字、百分比或列表；配合 max_failure_percentage 作中止阈值</td></tr>
+    <tr><td><b>changed_when</b></td><td>手动声明任务是否算「改变了」；给 command/shell 用时可避免误报和误触发 handler</td></tr>
+    <tr><td><b>no_log</b></td><td>任务级开关，禁止把参数与结果打进输出，处理密钥时必须加</td></tr>
+    <tr><td><b>ansible-vault</b></td><td>加密静态存储的工具（文件级或 encrypt_string），用 vault-id 分环境，rekey 轮换</td></tr>
+    <tr><td><b>check mode</b></td><td>--check 干跑预览；command/shell/raw 在其中默认被跳过</td></tr>
+    <tr><td><b>forks</b></td><td>并发度，即同时操作多少台主机；大批量时要结合控制机资源和 SSH 限制调</td></tr>
+    <tr><td><b>delegate_to</b></td><td>让任务在别的主机上执行（如 localhost），常用于探活、调外部 API</td></tr>
+    <tr><td><b>register / until</b></td><td>register 保存任务结果，配合 until/retries/delay 做轮询，替代 sleep</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 写一个小角色（比如统一 ntp 或 logrotate 配置），跑两遍，确认第二遍零 changed；然后故意把 <span class="k">copy</span> 换成 <span class="k">shell</span>，观察 changed 报告和 handler 行为的变化——这个对比会让「幂等由模块决定」变得具体。② 在 defaults 和 group_vars 里放同名变量，用 <span class="k">-m debug -a 'var=名字'</span> 看谁生效，亲手验证一次优先级。③ 给一个配置任务加 <span class="k">validate: nginx -t -c %s</span>，故意把模板写错，看它是不是真的没覆盖原文件。<br><br>
+    <b>之后值得单独学：</b>第 38 期讲 Terraform 的 state/lock/import/drift，正好和这一篇的分工一节对上，两篇一起看能建立「资源编排 vs 配置管理」的完整图景；第 19 期讲 CI/CD 与发布，能解释 Ansible 在流水线里应该处于哪个环节；第 25 期讲 Shell 脚本，是判断「这件事到底该不该写脚本」的基础；第 34 期讲容器安全的密钥管理部分，可以和这一篇的 Vault 一节对照着看。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 37 期 · Ansible 的分水岭不在会不会写 playbook，在你能不能解释「为什么第二次跑没有 changed」</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

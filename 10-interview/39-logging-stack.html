@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日志系统面试：ELK、Loki 与成本这道必答题</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 39 期</span>
+    <h1>日志系统面试：ELK、Loki 与成本这道必答题</h1>
+    <p class="sub">日志平台的难题不是收集，是<b>存多久、怎么检索、谁为成本负责</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>15</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>3</b> 套查询语法</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：一次报错，你要多久才能在日志里定位到那一条？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：日志这件事，出问题的时候才知道它没做好</h2></div>
+  <p class="lead">「用户投诉下单失败，我查了半小时日志，一条都没查到。」「磁盘被日志打满，业务写不进去了。」「月底账单出来，日志存储比所有机器加起来还贵。」这三件事的共同点是：<b>平时没人管日志，出事的时候它要么查不到、要么拖垮业务、要么拖垮预算</b>。</p>
+  <table>
+    <tr><th style="width:190px">现场</th><th style="width:160px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>查不到那条报错</td><td>日志丢了</td><td>大概率不是丢了，是<b>查不动</b>：关键字被分词切碎、时间范围选错、日志在多集群里、或者字段在采集时被压成了字符串没解析出来</td></tr>
+    <tr><td>磁盘被日志打满</td><td>日志量突然变大了</td><td>通常是<b>一条异常被反复打印</b>（循环里的 error、重试风暴），或者日志没做轮转、或者采集 agent 挂了导致本地堆积。量变大只是表象</td></tr>
+    <tr><td>账单上存储最贵</td><td>日志本来就多</td><td><b>索引比原文贵</b>。全文索引会额外存倒排结构和列存结构，加上副本，实际占用可能是原始日志的很多倍——倍数取决于你的字段结构和 mapping，必须实测</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>采集只解决「有没有」</div><div class="cd">把日志收上来是最简单的一步。真正决定这个平台好不好用的是后三步：<b>能不能查到、查得快不快、存得起多久</b>。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>索引模型决定成本曲线</div><div class="cd">ELK 对内容建全文索引，检索强、代价高；Loki 只对标签建索引、内容压缩存储，写入和存储的开销低得多，代价是全文检索慢。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>日志的价值随时间衰减</div><div class="cd">出错那一刻的日志价值最高，一周后基本只剩合规价值。<b>保留策略本质是在给「价值衰减」定价</b>，而不是简单地「存久一点更安全」。</div></div>
+  </div>
+  <p>这一篇按数据的流向组织：先分清四类日志（它们的保留期和检索需求完全不同），然后是采集、传输缓冲、存储与索引（这一节是全文的重点，会把 ES 和 Loki 的差异讲透），接着是三套查询语法、结构化规范、保留期与降采样、日志告警，最后是那道必答的成本题——「1TB/天 是怎么算出来的」。</p>
+  <div class="callout danger">
+    <b>先把一个普遍的错误认知纠正掉：</b>「日志系统就是把日志存起来，需要的时候 grep」——这句话在小规模时成立，在每天几百 GB 以上就不成立了。规模上去之后，你需要回答三个问题：<b>存多久</b>（合规 vs 成本）、<b>怎么检索</b>（全文索引还是标签索引）、<b>谁为成本负责</b>（集中平台还是业务团队分摊）。这三个问题答不上来，平台一定会先变成成本问题，然后变成稳定性问题。
+  </div>
+  <p><b>面试怎么答：</b>「我理解日志系统的难点不在收集，在三个权衡：保留期（合规要求 vs 存储成本）、检索方式（全文索引强但贵，标签索引省但全文查不动）、以及成本归属（集中平台容易变成无底洞，最好能按业务线分摊）。所以我一般会先按日志类型分级——审计日志长期留存、业务日志中等、调试日志短期甚至采样——再决定用什么存储。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>日志的四层：它们的保留期和检索需求完全不一样</h2></div>
+  <p class="lead">把「日志」当成一类东西，是后面所有决策出错的根源。真实环境里至少有四层，它们的<b>保留期要求、检索频率、丢失后果</b>差别极大。混在一起存，结果就是：最贵的地方存了最没用的数据，最该留的反而被一起删了。</p>
+  <table>
+    <tr><th style="width:130px">层次</th><th>内容</th><th>检索频率</th><th>丢失后果</th><th>保留倾向</th></tr>
+    <tr><td><b>业务日志</b></td><td>订单创建、支付结果、风控决策这类有业务语义的记录</td><td>中（对账、客诉、运营查询）</td><td>可能引发资损争议、无法对账</td><td>较长，且常需要独立归档</td></tr>
+    <tr><td><b>应用日志</b></td><td>程序运行信息：INFO/WARN/ERROR、慢查询、依赖调用结果</td><td>高（排障时）</td><td>排障失去依据，但通常不直接造成损失</td><td>短期热存（天级）+ 中期冷存</td></tr>
+    <tr><td><b>系统日志</b></td><td>syslog、journald、内核日志、容器运行时、节点 agent</td><td>低（出硬件/内核问题时才看）</td><td>排查底层故障变困难</td><td>中期，量通常不大</td></tr>
+    <tr><td><b>审计日志</b></td><td>谁在什么时候对什么做了什么操作（登录、权限变更、删除动作）</td><td>极低（事故事后追溯）</td><td><b>合规风险</b>，可能直接影响审计结论</td><td>最长，通常要求不可篡改、独立存储</td></tr>
+  </table>
+  <p>这个分层的实际用途是<b>分流</b>：不同层走不同的管道、不同的存储、不同的保留期。具体来说——审计日志单独一路，写入后基本不删，且要防止被业务应用篡改（写权限分离、落到独立账号下的存储）；业务日志可以结构化后单独建索引，因为它经常要按订单号精确查；应用日志量最大、价值衰减最快，是降采样和缩短保留期的主要对象；系统日志量小，跟随即可。</p>
+  <div class="callout warn">
+    <b>一个常见的错配：把 DEBUG 日志和业务日志混在一个索引里，然后给它们同样的保留期。</b>DEBUG 日志的量通常是业务日志的几十倍，但它的价值窗口只有几小时——出问题的时候看，看完就没用了。给它们一样的保留策略，等于用最贵的存储去存一堆再也不会被看的数据。<b>分流的最小改动：按级别拆索引或拆流，DEBUG 单独一条、保留两三天，ERROR 和业务日志保留三十天以上。</b>
+  </div>
+  <p>还有一个判断方法值得记住：<b>问「这条日志一年后还有人查吗」</b>。答「会」的，通常是业务日志和审计日志，需要冷存归档、需要能被检索（哪怕慢）；答「不会」的，是应用和调试日志，它们的保留期应该由「排障需要回溯多久」决定——一般覆盖一个发布周期加一点余量就够了，不需要按年算。</p>
+  <p><b>面试怎么答：</b>「我先把日志分四层：业务、应用、系统、审计。它们的需求完全不同——审计日志留存最长且要防篡改，业务日志要能按业务主键查、常需要中长期留存，应用日志量最大但价值衰减最快，是降采样的主要对象。做平台时我会按层分流：不同管道、不同存储、不同保留期，而不是统一收进来统一存。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>采集：agent 选型、多行合并与字段规范</h2></div>
+  <p class="lead">采集这一层的技术难点只有两个：<b>多行怎么合并</b>（一条 Java 异常栈被切成几百条，日志系统就废了一半），以及<b>元数据怎么补</b>（一条日志如果不知道来自哪个服务、哪个 Pod、哪个环境，它几乎没有检索价值）。</p>
+  <table>
+    <tr><th style="width:130px">agent</th><th>特点</th><th>典型场景</th></tr>
+    <tr><td><b>Filebeat</b></td><td>Go 写的轻量采集器，资源占用小，输出到 Elasticsearch / Logstash / Kafka 都方便</td><td>以 ES 为存储的主机日志采集</td></tr>
+    <tr><td><b>Fluent Bit</b></td><td>C 实现，内存占用很低，插件覆盖广，容器场景使用普遍</td><td>K8s 集群内的日志采集（常以 DaemonSet 部署）</td></tr>
+    <tr><td><b>Fluentd</b></td><td>Ruby 实现，插件生态最丰富，可用作聚合层做清洗和路由</td><td>需要复杂解析与多路分发的中间层</td></tr>
+    <tr><td><b>Promtail</b></td><td>面向 Loki 的采集器，负责读文件、打标签、推给 Loki</td><td>Loki 方案下的标准采集组件</td></tr>
+    <tr><td><b>Vector</b></td><td>Rust 实现，定位是可编程的数据管道，采集 + 转换一体</td><td>希望减少组件层数、把清洗前移的场景</td></tr>
+  </table>
+  <p><b>多行合并</b>的规则说起来很简单：<b>以「新日志开始的行」为界，把后续不属于新日志的行并到上一条</b>。实践中通常用「行首是否是时间戳」来判断——行首匹配 <span class="k">^\d{4}-\d{2}-\d{2}</span> 或 <span class="k">^\[</span> 的是新日志，其余（栈帧、<span class="k">Caused by:</span>）合并进去。也可以反过来配「以什么结尾算结束」，但可靠性不如前者。</p>
+  <pre><span class="c"># Filebeat 风格的多行配置（思路示例，参数名以你版本为准）</span>
+multiline.type: pattern
+multiline.pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}'   <span class="c"># 行首是日期 = 新日志</span>
+multiline.negate: true                             <span class="c"># 不匹配 pattern 的行...</span>
+multiline.match: after                             <span class="c"># ...合并到上一条之后</span>
+
+<span class="c"># Fluent Bit 风格：用 parser 定义首行规则</span>
+[MULTILINE_PARSER]
+    name          java_stacktrace
+    key_content   log
+    rule          "start_state"   "/^\d{4}-\d{2}-\d{2}/"  "cont"
+    rule          "cont"          "/^(?!\d{4}-\d{2}-\d{2})/" "cont"</pre>
+  <p><b>容器场景的采集位置</b>要清楚：容器把日志写到 stdout/stderr，容器运行时把它落到节点上的文件，kubelet 再在 <span class="k">/var/log/containers/</span> 下建符号链接指向真实文件（文件名里带 namespace、pod、container 信息）。所以采集器读的是<b>节点上的文件</b>，不是进容器里去读——这一点决定了它必须以 DaemonSet 形式每节点一个，也决定了它<b>天然能看到同节点上所有 Pod 的日志</b>（这是一个安全边界问题，多租户场景要注意）。</p>
+  <p><b>元数据补充</b>是容器日志的价值所在。光有一行文本没用，必须补上 <span class="k">namespace</span>、<span class="k">pod</span>、<span class="k">container</span>、<span class="k">node</span>，以及 Pod 上的业务标签（<span class="k">app</span>、<span class="k">env</span>、<span class="k">version</span>）。这些靠采集器调 Kubernetes API 做 enrich 得到。<b>这里有个成本控制点：不要把 Pod 的所有 label 都当索引字段</b>，只挑检索真正需要的几个——因为每多一个索引字段，写入成本就多一份。</p>
+  <pre><span class="c"># K8s 采集时补充元数据（Fluent Bit 风格，参数以版本为准）</span>
+[FILTER]
+    Name                kubernetes
+    Match               kube.*
+    Merge_Log           On            <span class="c"># 把 JSON 日志解析后合并进顶层字段</span>
+    Keep_Log            Off
+    Labels              On            <span class="c"># 只保留需要的 label，别全开</span>
+    Annotations         Off
+
+<span class="c"># 采集状态自查：有没有读不动、有没有堆积</span>
+<span class="c"># Filebeat 自身指标里有 harvester 数量、发送队列长度、ack 延迟</span>
+curl -s localhost:5066/stats | head -40</pre>
+  <div class="callout ok">
+    <b>一个几乎必踩的坑，值得单独记：日志轮转与采集位点冲突。</b>采集器靠「文件 + 偏移量」记录读到哪了，靠 inode 或路径识别文件。如果日志轮转把文件改名/压缩/删除，或者容器重建导致文件消失，位点就对不上了——表现是「日志看起来丢了」或者「重复采集了一遍」。缓解办法：让采集按路径通配符识别、轮转策略用 copytruncate 或直接让应用写到 stdout 由运行时管理、以及给采集器配置「关闭太久的文件句柄要释放」这类参数（具体项以你使用的 agent 文档为准）。
+  </div>
+  <p><b>面试怎么答：</b>「采集层的两个难点是多行合并和元数据补充。多行用『行首是时间戳即为新日志』的规则把异常栈合并成一条，否则一条栈变几百条，后面怎么查都查不动。容器场景下采集器以 DaemonSet 部署、读节点上 /var/log/containers 下的文件，再用 Kubernetes API 补上 namespace、pod、container 和业务标签——但只补检索真正需要的字段，因为每多一个索引字段写入成本就多一份。另外要注意日志轮转和采集位点冲突会造成丢日志或重复采集。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>传输与缓冲：削峰、背压，以及「丢哪种日志」的取舍</h2></div>
+  <p class="lead">采集器直连存储是很多小规模方案的默认做法，它的致命问题是：<b>下游一挂，上游就积压</b>。积压要么撑爆采集器的内存和磁盘缓冲，要么触发丢弃——而丢弃是无差别的，审计日志和调试日志一起丢。所以传输层的核心不是「传得快」，是<b>「有地方堆、并且知道该丢谁」</b>。</p>
+  <table>
+    <tr><th style="width:150px">机制</th><th>作用</th><th>代价</th></tr>
+    <tr><td><b>消息队列缓冲</b>（Kafka 等）</td><td>削峰：下游慢时堆在队列里，下游恢复后追平；同时天然支持多消费者（一路进 ES、一路进归档）</td><td>多一个组件要运维；分区和消费者的并行度要设计</td></tr>
+    <tr><td><b>本地磁盘缓冲</b></td><td>网络断时不丢，恢复后补传</td><td>占本地磁盘；缓冲满了仍然要决策</td></tr>
+    <tr><td><b>背压</b></td><td>下游慢时向上游施加压力，让采集降速</td><td>降速意味着应用侧写日志可能变慢（如果应用同步写且管道打通了的话）</td></tr>
+    <tr><td><b>限流 / 丢弃</b></td><td>保护下游不被打垮</td><td><b>丢什么必须有明确策略</b>，不能随机丢</td></tr>
+  </table>
+  <p>为什么强调「丢什么」要预先定义？因为在真正的故障里，日志量往往是爆炸的——一个依赖超时会让所有实例在几秒内打出成千上万条 ERROR，这正好是下游最脆弱的时候。如果没有策略，结果是：<b>最关键的故障期日志，恰恰是最可能丢的那些</b>。所以按级别分流在这里第二次发挥作用：把 ERROR、审计、业务日志放进「不丢」的队列（容量给足、消费者优先），把 DEBUG/INFO 放进「可丢」的队列（容量小、超了就丢）。</p>
+  <pre><span class="c"># 分流的两条管道（思路示意，具体配置以你使用的组件为准）</span>
+<span class="c"># 管道 A：关键日志 —— 容量大、副本多、不允许丢</span>
+app_error / audit / business  →  topic.logs-critical   →  写入 ES（或 Loki）+ 长期保留
+
+<span class="c"># 管道 B：调试日志 —— 容量小、可丢弃、保留期短</span>
+app_debug / app_info         →  topic.logs-bulk       →  采样后写入，保留 3 天
+
+<span class="c"># 采集端的关键开关（概念示意）</span>
+queue.mem.events: 4096           <span class="c"># 内存队列</span>
+queue.disk.max_size: 1GB         <span class="c"># 磁盘缓冲上限，撑不住就要决策</span>
+output.kafka.required_acks: 1    <span class="c"># 可靠性与吞吐的取舍</span></pre>
+  <div class="callout warn">
+    <b>别把「不丢日志」当成一个绝对目标。</b>这是一个成本极高的承诺：意味着你要为峰值（而不是均值）准备容量，还要为下游长时间不可用准备堆积空间。更务实的做法是<b>分层承诺</b>——审计和业务日志承诺不丢（所以给足容量、单独管道），调试日志明确承诺「可能丢」（并且让所有人知道）。面试里能说出「我们对不同级别的日志有不同的可靠性承诺」，比说「我们的日志一条都不丢」可信得多，也专业得多。
+  </div>
+  <p>还有一个经常被忽略的传输层问题：<b>时间戳该用谁的</b>。日志在应用侧生成、在采集侧被读、在存储侧被索引，中间可能有几秒到几分钟的延迟。如果索引时间用的是<b>到达时间</b>，那么一次下游积压会让所有日志的时间戳挤在一起，排障时的时间线完全错乱。正确做法是<b>用日志自身的时间戳</b>（采集器解析出 timestamp 字段并作为索引时间），到达时间只作为辅助字段记录延迟。配置里要注意时区：所有组件统一用 UTC 存储、展示层再转本地时区。</p>
+  <p><b>面试怎么答：</b>「传输层我一定会加缓冲，通常是消息队列，作用是削峰和隔离下游故障。关键是丢日志的策略要预先定义——故障期日志量会爆炸，而随机丢弃恰恰会丢掉最关键的那批。所以我按级别分流：ERROR、审计、业务日志进『不丢』的管道，DEBUG/INFO 进『可丢』的管道并明确告知团队。另外一个细节是索引时间戳必须用日志自身的时间，用到达时间的话，一次积压会让整个时间线错乱。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>存储与索引：全文索引和标签索引，是两条完全不同的成本曲线</h2></div>
+  <p class="lead">这是整篇技术含量最高的一节，也是 ELK 和 Loki 全部差异的源头。<b>差别不在「谁更快」，在「写一条日志的时候，各自往磁盘上多写了什么东西」。</b>理解了这个，选型、成本估算、坑位全都能顺着推出来。</p>
+  <h3>Elasticsearch：给内容建索引</h3>
+  <p>一条日志进 ES，大致发生三件事：<b>① 分词并建立倒排索引</b>——把文本切成一个个词（term），记录「哪个词出现在哪些文档里」，这样搜一个词能立刻定位到文档；<b>② 为聚合和排序建列存结构</b>（<span class="k">doc_values</span>），没有它就没法按字段做统计；<b>③ 保存原始文档</b>（<span class="k">_source</span>），用于返回结果和重建索引。再加上<b>副本分片</b>（高可用和查询吞吐需要），实际磁盘占用是原始日志的若干倍——<b>这个倍数取决于你的字段数、分词方式、是否关闭 _source 和副本数，必须用自己的真实样本实测，不要套用任何现成数字</b>。</p>
+  <p>代价换来的能力是：<b>任意字段的全文检索、复杂聚合、低延迟</b>。你可以搜「消息里包含 connection refused 且 service 是 api 且时间在昨晚两点到三点」，几秒内出结果，还能直接按错误类型做分布图。</p>
+  <h3>Loki：只给标签建索引</h3>
+  <p>Loki 的做法完全不同：它<b>不解析、不索引日志内容</b>。它只给每条日志流（stream）打一组<b>标签</b>（label），比如 <span class="k">{namespace="prod", app="api", env="prod"}</span>，然后为这组标签建一个很小的索引；日志内容本身被压缩成 chunk，直接扔进对象存储。</p>
+  <p>查询时发生的是：<b>先用标签把范围缩到少数几个 stream，再把对应的 chunk 拉出来解压，在里面做类似 grep 的扫描</b>。所以它的成本结构反过来了——写入几乎不做功（只压缩），存储便宜（对象存储 + 高压缩率），但<b>全文检索一个罕见字符串会很慢</b>，因为要扫大量数据。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>Elasticsearch（全文索引）</th><th>Loki（标签索引）</th></tr>
+    <tr><td><b>写入做功</b></td><td>重：分词、建倒排、建列存、写副本</td><td>轻：只压缩成 chunk，写对象存储</td></tr>
+    <tr><td><b>存储开销</b></td><td>高：倒排 + 列存 + 原文 + 副本（倍数需实测）</td><td>低：压缩后的原文 + 很小的标签索引</td></tr>
+    <tr><td><b>检索能力</b></td><td>强：任意字段全文检索、复杂聚合、低延迟</td><td>弱一些：必须先靠标签缩小范围，然后在 chunk 里扫描过滤</td></tr>
+    <tr><td><b>致命弱点</b></td><td>成本高、资源（内存）需求大、mapping 爆炸</td><td><b>高基数标签</b>：标签组合太多会导致 stream 爆炸、chunk 碎片化</td></tr>
+    <tr><td><b>适合</b></td><td>需要全文检索和复杂聚合、量中等、能承受成本</td><td>量大、查询模式固定（按服务/环境过滤再筛关键字）、成本敏感</td></tr>
+    <tr><td><b>查询语法</b></td><td>Lucene / KQL / ES DSL</td><td>LogQL</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>Loki 的第一号禁忌：不要把高基数的值当标签。</b>标签的作用是「把数据切成有限的几块」，所以它的取值集合必须小且稳定。典型的错误是把 <span class="k">trace_id</span>、<span class="k">user_id</span>、<span class="k">request_id</span>、<span class="k">pod_name</span>（如果 Pod 频繁重建）放进标签——每来一个请求就产生一个新 stream，索引会膨胀到无法维护，chunk 也会碎成一地。<b>正确做法：这些值留在日志行的内容里，用过滤算子（<span class="k">|= "abc123"</span>）去匹配。</b>判断标准很简单：这个字段的取值会不会随时间无限增长？会，就不能做标签。
+  </div>
+  <p>反过来，ES 也有对应的第一号禁忌：<b>字段爆炸（mapping explosion）</b>。如果日志是 JSON 且字段不固定（比如每个请求带不同的自定义字段），ES 默认会为每个新字段建索引，字段数涨到几千上万之后，集群元数据和内存会出问题。解决办法是：固定 schema、用模板限定字段、对不需要检索的字段关掉索引（<span class="k">index: false</span>）或者干脆存成一个字符串不解析。</p>
+  <pre><span class="c"># ES 侧：通过模板控制字段行为（思路示例）</span>
+{
+  "mappings": {
+    "dynamic_templates": [
+      { "strings_as_keyword": {
+          "match_mapping_type": "string",
+          "mapping": { "type": "keyword", "ignore_above": 1024 }   <span class="c"># 长文本不建 keyword</span>
+      }}
+    ],
+    "properties": {
+      "message": { "type": "text" },                    <span class="c"># 需要全文检索</span>
+      "trace_id": { "type": "keyword" },                <span class="c"># 只精确匹配</span>
+      "raw_payload": { "type": "object", "enabled": false }  <span class="c"># 不解析、不索引</span>
+    }
+  }
+}
+
+<span class="c"># Loki 侧：标签设计示例（好 vs 坏）</span>
+<span class="c"># 好：取值有限且稳定</span>
+{namespace="prod", app="api", env="prod", level="error"}
+<span class="c"># 坏：取值无限增长 —— 直接毁掉 Loki</span>
+{namespace="prod", app="api", trace_id="8f3a...", user_id="10293"}</pre>
+  <p><b>面试怎么答：</b>「两者的根本差别在写入时多写了什么。ES 会分词建倒排索引、建列存结构、保存原文，再加上副本，磁盘占用是原始日志的若干倍——倍数取决于字段结构和副本数，必须实测，我不套用现成数字。换来的是任意字段的全文检索和复杂聚合。Loki 只对标签建索引，内容压缩成 chunk 存对象存储，写入和存储的开销低得多，代价是全文检索要先靠标签缩小范围再扫描 chunk，所以查罕见字符串慢。各自的致命弱点也不同：Loki 怕高基数标签（trace_id、user_id 绝不能做标签，要留在内容里用过滤算子匹配），ES 怕字段爆炸（要固定 schema、用模板限制、不需要检索的字段关掉索引）。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>查询语法：同一个意图，三种写法</h2></div>
+  <p class="lead">面试让你「写一条查询」，考的不是背语法，是<b>你能不能把「我要找什么」翻译成「先缩小范围、再过滤」</b>。这个思路在三种语法里是通用的：<b>先用索引字段把数据量砍下来，再对内容做匹配</b>。顺序反了，查询就会慢到不可接受。</p>
+  <p>统一用这个场景举例：<b>找生产环境 api 服务里、状态码大于等于 500、且消息里含 "connection refused"、但排除健康检查路径的日志。</b></p>
+  <pre><span class="c"># 1) Lucene（Elasticsearch 的 query_string 语法，Kibana 老式搜索框、很多工具都支持）</span>
+service:api AND env:prod AND status:&gt;=500 AND message:"connection refused" NOT path:/health
+
+<span class="c"># 2) KQL（Kibana Query Language，Kibana 现在的默认语法，更接近自然语言）</span>
+service: "api" and env: "prod" and status &gt;= 500
+  and message: "connection refused" and not path: "health"
+
+<span class="c"># 3) LogQL（Loki）：先选择器，再过滤管线，最后格式化</span>
+{namespace="prod", app="api"}
+  |= "connection refused"          <span class="c"># 行过滤：包含</span>
+  != "health"                      <span class="c"># 行过滤：排除</span>
+  | json                           <span class="c"># 解析 JSON 行，把字段提出来</span>
+  | status &gt;= 500                  <span class="c"># 字段过滤</span>
+  | line_format "{{.message}}"     <span class="c"># 只输出消息</span>
+
+<span class="c"># LogQL 的指标查询（把日志变成时间序列，用于告警）</span>
+sum by (app) (rate({namespace="prod"} |= "ERROR" [5m]))</pre>
+  <table>
+    <tr><th style="width:130px">语法</th><th>结构</th><th>容易写错的地方</th></tr>
+    <tr><td><b>Lucene</b></td><td><span class="k">字段:值</span> + <span class="k">AND/OR/NOT</span> + 引号短语 + 范围 <span class="k">[a TO b]</span> 或 <span class="k">&gt;=</span></td><td>不加引号的短语会被分词拆开，<span class="k">connection refused</span> 变成「包含 connection 或 refused」</td></tr>
+    <tr><td><b>KQL</b></td><td>同上，但用小写 <span class="k">and/or/not</span>，字段和值之间可以有空格</td><td>它对类型更敏感：对 text 字段做等值匹配可能查不到，要匹配 keyword 子字段</td></tr>
+    <tr><td><b>LogQL</b></td><td><b>标签选择器</b> <span class="k">{...}</span> → 行过滤 <span class="k">|= != |~ !~</span> → 解析器 <span class="k">| json | logfmt</span> → 字段过滤 → 格式化/聚合</td><td>顺序不能乱：必须先有选择器；<span class="k">| json</span> 之后才能用字段过滤；正则过滤（<span class="k">|~</span>）比字符串过滤贵得多</td></tr>
+  </table>
+  <p><b>LogQL 的管线顺序值得单独记一下</b>，因为它是 Loki 性能的命门：选择器用索引（便宜）→ 字符串过滤在解压后扫描（中等）→ 正则过滤（贵）→ 解析和字段过滤（贵）。所以写查询的习惯是：<b>把最能缩小范围的条件放在最前面</b>。比如先 <span class="k">|= "order_id=12345"</span> 再 <span class="k">| json</span>，比先 <span class="k">| json</span> 再过滤快得多——因为前者在解压阶段就扔掉了绝大部分 chunk。</p>
+  <div class="callout">
+    <b>一个通用的慢查询诊断思路：</b>先看你的查询有没有用到索引。ES 里就是「条件里有没有命中索引字段、有没有用 wildcard 前缀通配（<span class="k">*abc</span> 这种前导通配符无法有效利用倒排索引，非常慢）」；Loki 里就是「选择器里的标签够不够具体」。<b>如果选择器是 <span class="k">{namespace="prod"}</span> 然后靠内容过滤，那本质上是在扫全量。</b>加一个 <span class="k">app="api"</span> 的标签，可能就把扫描量砍掉一个数量级。
+  </div>
+  <p><b>面试怎么答：</b>「思路是共通的：先用索引字段缩小范围，再对内容做匹配，顺序反了一定慢。ES 侧我会写 Lucene 或 KQL，注意短语要加引号否则会被分词拆开，还有前导通配符没法有效用索引。Loki 侧写 LogQL，结构是标签选择器 → 行过滤 → 解析 → 字段过滤 → 格式化，顺序不能乱，而且要把最能缩小范围的条件放最前面，先字符串过滤再 json 解析比反过来快得多。另外 LogQL 支持指标查询，可以把日志转成时间序列直接用于告警。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>结构化日志规范：让日志能被机器读，而不是被人读</h2></div>
+  <p class="lead">「我们的日志是 JSON 的」——这句话十次里有五次是错的：外层是 JSON，<span class="k">message</span> 里面还是一长串手拼的字符串。<b>真正的结构化是「每个需要被检索和聚合的值都是独立字段」</b>，而不是「日志被包在 JSON 里」。</p>
+  <table>
+    <tr><th style="width:150px">字段</th><th>要求</th><th>为什么</th></tr>
+    <tr><td><b>timestamp</b></td><td>ISO 8601，带时区，统一 UTC 存储；精确到毫秒以上</td><td>跨服务串联的基础。没有时区的时间戳在跨时区机器上是灾难</td></tr>
+    <tr><td><b>level</b></td><td>固定几个值（ERROR/WARN/INFO/DEBUG），全公司统一</td><td>分流、降采样、告警全靠它。一会儿 <span class="k">level</span> 一会儿 <span class="k">severity</span>，规则就写不下去</td></tr>
+    <tr><td><b>service / app</b></td><td>服务名，来自部署配置而不是硬编码</td><td>检索的第一维度。它必须是标签/索引字段</td></tr>
+    <tr><td><b>trace_id</b></td><td>贯穿一次请求的唯一 ID，从网关生成并透传</td><td>跨服务定位的唯一钥匙。<b>它应该是内容字段而不是标签</b>（高基数）</td></tr>
+    <tr><td><b>env / namespace</b></td><td>环境标识</td><td>把生产和预发彻底分开，避免查错环境</td></tr>
+    <tr><td><b>message</b></td><td>人读的一句话，<b>不要</b>把变量拼进去</td><td>拼进去的变量无法聚合。变量应该作为独立字段</td></tr>
+  </table>
+  <pre><span class="c"># 反例：外层 JSON，内容全靠手拼 —— 无法聚合、无法精确过滤</span>
+{"level":"error","message":"user 10293 order 88123 failed: connection refused, retry 3"}
+
+<span class="c"># 正例：可检索、可聚合、可按字段告警</span>
+{
+  "timestamp": "2026-10-21T02:13:47.512Z",
+  "level": "ERROR",
+  "service": "order-api",
+  "env": "prod",
+  "trace_id": "8f3a1c2e9b7d",
+  "event": "order_create_failed",
+  "user_id": 10293,
+  "order_id": 88123,
+  "error_type": "ConnectionRefused",
+  "upstream": "payment-svc",
+  "retry_count": 3,
+  "message": "创建订单失败，上游连接被拒"
+}</pre>
+  <p>为什么强调「不要把变量拼进 message」？因为一旦拼进去，<span class="k">message</span> 的取值就变成了无限集合——你没法按 <span class="k">error_type</span> 做分布统计，也没法写「只告警 ConnectionRefused」这种规则，只能靠正则去扒字符串，而正则既慢又脆（上游改一下措辞就失效）。<b>判断标准：这个值会不会被用于过滤或聚合？会，就必须是独立字段。</b></p>
+  <div class="callout danger">
+    <b>敏感信息是这一节最硬的红线。</b>日志里出现密码、token、身份证号、手机号、银行卡号、完整请求体，是最常见也最严重的一类泄露渠道——因为日志的存储权限通常比数据库宽得多，而且会被复制到多个系统、被下载到本地、被贴进工单和聊天群。三条必须做的：<b>① 框架层统一脱敏</b>（在日志输出前对已知敏感字段做掩码，不能靠每个开发记得）；<b>② 禁止打印完整请求/响应体</b>，要打就打脱敏后的摘要；<b>③ 把「日志里有敏感信息」当安全事件处理</b>——发现后要清理历史日志，而不只是改代码。
+  </div>
+  <p>还有两个规范细节值得写进团队的约定：<b>第一，错误日志要带上下文而不是只带一句话</b>。「connection refused」这种日志毫无价值，有价值的是「连谁失败、重试第几次、trace_id 是什么」。<b>第二，同一个错误不要在多层重复打印</b>——调用链上每一层都打一遍 ERROR，会让错误计数翻好几倍，告警阈值全部失真。约定是：<b>抛出异常的地方打 ERROR 并带完整上下文，中间层不打或者打 WARN，最外层统一记录并返回</b>。</p>
+  <p><b>面试怎么答：</b>「结构化的标准是『每个需要被检索和聚合的值都是独立字段』，而不是『日志包在 JSON 里』。必须有 timestamp（ISO 8601 带时区、统一 UTC）、level（全公司统一枚举）、service、env、trace_id、以及业务字段。关键是不要把变量拼进 message——拼进去之后就没法聚合也没法精确告警，只能靠正则扒字符串。另外 trace_id 是高基数的，在 Loki 里不能当标签，只能放内容里用过滤算子匹配。最后是脱敏，敏感信息进日志是最常见的泄露渠道，要在框架层统一掩码，不能靠人记得。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>保留期、冷热分层与降采样：给「价值衰减」定价</h2></div>
+  <p class="lead">日志的价值随时间急剧衰减：刚发生的一小时里它是排障的关键证据，一周后基本只剩合规价值，一年后几乎没人会查。<b>保留策略的本质，就是给这条衰减曲线定价</b>——而不管不顾地「多存几天更安全」，最终一定会变成账单问题。</p>
+  <table>
+    <tr><th style="width:130px">层次</th><th>介质与特点</th><th>适合放什么</th></tr>
+    <tr><td><b>热</b></td><td>本地 SSD / 高性能块存储，查询秒级</td><td>最近几个小时到几天，排障真正会查的窗口</td></tr>
+    <tr><td><b>温</b></td><td>性能较低的存储，查询变慢但仍可用</td><td>几天到几周，偶尔回溯</td></tr>
+    <tr><td><b>冷</b></td><td>对象存储，成本低、查询慢（可能需要先「解冻」）</td><td>几周到几个月，合规要求或低频审计</td></tr>
+    <tr><td><b>归档 / 删除</b></td><td>只留压缩原始文件（不能被检索，需要时再导入），或直接删除</td><td>超过保留期的数据</td></tr>
+  </table>
+  <p>ES 侧通常用索引生命周期管理（ILM）来驱动这套流转：按索引年龄或大小，自动把索引从热节点迁到温/冷节点、收缩分片、做快照，最后删除。<b>具体阶段名称和可用动作以你使用的版本文档为准</b>，不要凭记忆写死。Loki 侧的保留则由压缩器（compactor）和保留配置驱动，同样以版本文档为准。</p>
+  <pre><span class="c"># ES 侧：生命周期策略的形状（参数名与阶段以版本文档为准）</span>
+{
+  "policy": {
+    "phases": {
+      "hot":  { "actions": { "rollover": { "max_age": "1d", "max_primary_shard_size": "50gb" } } },
+      "warm": { "min_age": "3d",  "actions": { "forcemerge": {}, "shrink": {} } },
+      "cold": { "min_age": "30d", "actions": { "searchable_snapshot": {} } },
+      "delete":{ "min_age": "90d", "actions": { "delete": {} } }
+    }
+  }
+}
+
+<span class="c"># 降采样的两种做法</span>
+<span class="c"># ① 采集端采样：DEBUG 保留 10%，ERROR 全量</span>
+<span class="c"># ② 存储端降采样：热存保留原始日志，冷存只保留「按小时聚合的错误计数 + 少量样本」</span></pre>
+  <p><b>降采样是被低估的一招。</b>它的依据是：冷数据几乎不会被「逐条查看」，只会被「统计和抽样」。所以热存保留全量原文，冷存保留聚合结果 + 每类错误的少量样本，就能在保留可追溯能力的同时把存储砍掉一个量级。具体能砍多少取决于你的聚合粒度和样本比例，<b>这个比例要用真实数据实测，不要套用任何现成数字</b>。</p>
+  <div class="callout ok">
+    <b>一个能立刻做的成本动作：按级别拆保留期。</b>把 DEBUG/INFO 的保留期设成 2~3 天，WARN/ERROR 设成 30 天，审计日志单独走长期归档。这是改动最小、收益最明显的一步——因为在大多数系统里，DEBUG/INFO 占了日志量的绝大部分，而它们的价值窗口只有几小时。<b>做之前先统计一下各级别的占比，用数据说服团队，比讲道理有效。</b>
+  </div>
+  <p>还有两个成本管理动作值得提：<b>① 按业务线分摊</b>——给每条日志打上业务标签，按月出各业务线的日志量和存储成本。这一步的意义不在「收费」，在<b>让成本有归属</b>：当一个团队看到自己的日志占了全公司三分之一，优化就会自然发生。<b>② 设置写入限流和配额</b>——单个服务 unlimited 地写日志，会挤占整个平台。给每个服务设一个合理的写入上限，超了就采样或拒绝，并通知该团队。</p>
+  <p><b>面试怎么答：</b>「保留策略的本质是给日志的价值衰减定价。我的做法是按级别和类型拆保留期：DEBUG/INFO 两三天，WARN/ERROR 三十天，审计日志单独长期归档；存储上用冷热分层，热存放排障窗口，冷存放对象存储供低频审计。另外降采样很有效——冷数据几乎不会被逐条查看，所以冷存只保留按小时聚合的错误计数加少量样本。管理上我会按业务线出成本报表，让成本有归属，再配合单服务的写入配额防止一个服务挤占整个平台。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>日志告警：从「出现关键字就告警」到「错误率超过阈值」</h2></div>
+  <p class="lead">日志告警最常见的失败模式是噪声：<b>「message 里含 error 就告警」</b>——结果一天几百条，一周之后所有人都在心里把它过滤掉了。真正可用的告警，是把日志<b>先变成指标，再对指标告警</b>。</p>
+  <table>
+    <tr><th style="width:190px">做法</th><th>问题</th></tr>
+    <tr><td>关键字出现即告警（<span class="k">message: error</span>）</td><td>噪声极大。很多 error 是预期内的（参数校验失败、用户输入错误），单条出现完全不代表故障</td></tr>
+    <tr><td>按条数告警（5 分钟内 &gt; 10 条）</td><td>流量翻倍时条数自然翻倍，误报；流量低谷时又不报。<b>条数不是归一化指标</b></td></tr>
+    <tr><td><b>按错误率告警</b>（错误数 / 请求数 &gt; 阈值）</td><td>推荐。它不受流量波动影响，且和业务影响直接对应</td></tr>
+    <tr><td>按「新增错误类型」告警</td><td>有价值但实现复杂：需要维护「已知错误」基线，适合作为补充</td></tr>
+  </table>
+  <pre><span class="c"># LogQL：把日志变成比率，再做告警（推荐写法）</span>
+<span class="c"># 错误率 = 含 ERROR 的速率 / 全部日志速率</span>
+sum(rate({namespace="prod", app="order-api"} |= "ERROR" [5m]))
+  /
+sum(rate({namespace="prod", app="order-api"} [5m]))
+  &gt; 0.01          <span class="c"># 超过 1% 触发（阈值要按你的基线定）</span>
+
+<span class="c"># ES 侧：用 DSL 做聚合后由告警引擎判定（Watcher / 外部告警器，思路示例）</span>
+<span class="c"># 查询：按 5 分钟分桶，统计 level=ERROR 的 doc_count 与总 doc_count，算比率</span>
+<span class="c"># 判定：连续 2 个桶超过阈值才告警（避免单次抖动）</span>
+
+<span class="c"># 关键细节：分母不能为 0，低流量时段要加最小样本量条件</span>
+<span class="c">#   错误率 &gt; 1% AND 5 分钟内总请求数 &gt; 100</span></pre>
+  <p>三个让告警真正可用的细节：<b>① 连续窗口判定</b>——单一个 5 分钟窗口超阈值可能是抖动，要求「连续两个窗口」或「10 分钟内有 3 个窗口超阈值」能砍掉大量误报。<b>② 最小样本量</b>——低流量时段（凌晨）分母很小，1 条错误就是 100%，必须加「总请求数 &gt; N」的前提条件。<b>③ 告警要带上下文</b>——一条「错误率 3.2%」的告警没有用，有用的是「order-api 在 prod 环境错误率 3.2%，主要错误类型 ConnectionRefused，上游 payment-svc，示例 trace_id: 8f3a1c2e9b7d，runbook 链接：...」。<b>告警的目标是让人能在三十秒内开始行动，而不是让人先花十分钟去查日志。</b></p>
+  <div class="callout warn">
+    <b>别指望日志告警覆盖「没日志」的情况。</b>如果服务整个挂掉、或者采集链路断了，错误数会变成 0——按「错误率 &gt; 阈值」的规则，此时一切正常。<b>所以必须配一条「日志量骤降」的告警</b>（比如某服务 5 分钟内的日志条数低于历史同期的很小比例，或者干脆为 0）。这类「没有数据」的告警，是所有基于日志的告警体系里最容易被漏掉、也最致命的一条。
+  </div>
+  <p>还有一条边界要说清：<b>能用指标做的告警，不要基于日志做。</b>请求成功率、延迟、QPS 这些应该来自 metrics（Prometheus 一类），因为它们更稳、更便宜、聚合是在采集侧就完成的。日志告警适合的场景是「指标里没有的信息」——比如某个特定错误类型首次出现、某个业务的对账异常、审计类的违规操作。<b>把两者混为一谈，会得到一套又贵又不准的告警。</b></p>
+  <div class="cmds">
+    <div class="crow"><code>{namespace="prod", app="api"} |= "ERROR" | json | status &gt;= 500</code><span class="desc">LogQL：先标签缩小范围，再行过滤，再解析字段过滤</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sum(rate({namespace="prod", app="api"} |= "ERROR" [5m]))</code><span class="desc">把日志转成时间序列，是指标化告警的基础</span><button class="copy">复制</button></div>
+    <div class="crow"><code>service: "api" and env: "prod" and status &gt;= 500</code><span class="desc">KQL：Kibana 默认语法，短语要加引号否则被分词拆开</span><button class="copy">复制</button></div>
+    <div class="crow"><code>service:api AND env:prod AND message:"connection refused" NOT path:/health</code><span class="desc">Lucene：ES 的 query_string 语法，短语必须加引号</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ls /var/log/containers/ | head</code><span class="desc">容器日志在节点上的落盘位置，采集器读的就是这些文件</span><button class="copy">复制</button></div>
+    <div class="crow"><code>journalctl -u kubelet --since "10 min ago" -p warning</code><span class="desc">节点侧兜底：采集链路本身出问题时从这看</span><button class="copy">复制</button></div>
+  </div>
+  <p><b>面试怎么答：</b>「我不用『出现关键字就告警』，噪声太大。做法是把日志先变成指标再告警——用 LogQL 的 rate 或者 ES 的聚合算出错误率（错误数除以总请求数），因为错误率不受流量波动影响，比按条数告警稳得多。三个细节：连续多个窗口超阈值才触发、低流量时段加最小样本量条件、告警内容要带错误类型、上游、示例 trace_id 和 runbook 链接。另外必须配『日志量骤降』的告警，否则服务整个挂掉时错误率是 0，看起来一切正常。能用指标做的告警就不基于日志做。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：1TB/天 是怎么算出来的</h2></div>
+  <p class="lead">「你们日志一天多少？存储怎么估？」这题的正确答法不是报一个数字，是<b>把估算过程讲出来</b>。因为面试官知道你不可能记住准确的量，他想看的是：你有没有一套可复现的估算方法，以及你知不知道误差在哪。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一步：测单位产出。</b>选一个有代表性的实例（或一个 Pod），统计它在<b>峰值时段</b>每分钟写多少字节日志。注意是峰值不是均值——容量必须按峰值配。做法可以是直接看日志文件的增长，也可以看采集器上报的字节数。</div></div>
+    <div class="step"><div class="txt"><b>第二步：乘规模和时长。</b>单实例每分钟字节数 × 实例数 × 1440 = 每天的原始字节数。这一步要说明「实例数按峰值副本数算」，并且别忘了<b>非应用日志</b>（系统日志、审计、网关、中间件）通常也要单列。</div></div>
+    <div class="step"><div class="txt"><b>第三步：乘存储放大系数。</b>原始日志进存储后不是 1:1。ES 要算倒排索引、列存结构、原文和副本；Loki 要算压缩后的 chunk 加标签索引。<b>这个系数必须用你自己的真实样本实测</b>——拿一段有代表性的日志，写进去，看实际占用了多少字节，再反推系数。<b>不同字段结构、不同压缩率，结果可以差很多，绝不能套用别人给的数字。</b></div></div>
+    <div class="step"><div class="txt"><b>第四步：乘保留期并分层。</b>热存天数 × 热存单价 + 冷存天数 × 冷存单价，再加上副本和快照的份数。如果是多集群、多环境，分别算再加总。</div></div>
+    <div class="step"><div class="txt"><b>第五步：说出误差来源。</b>这一步是加分项：峰值估低了、日志量随业务增长、异常期会翻好几倍、压缩率取决于日志重复度、以及「你算的是今天，下个季度会变」。<b>敢说误差在哪，比报一个精确数字可信得多。</b></div></div>
+  </div>
+  <pre><span class="c"># 估算的骨架（系数必须实测，这里只给结构）</span>
+per_instance_bytes_per_min = 实测（峰值时段）
+instances                  = 峰值副本数
+raw_bytes_per_day          = per_instance_bytes_per_min * instances * 1440 * 日志种类数
+
+<span class="c"># ES 侧</span>
+stored_bytes = raw_bytes_per_day * 索引放大系数(实测) * (1 + 副本份数)
+cost_hot     = stored_bytes * 热存天数 * 热存单价
+cost_cold    = stored_bytes * 冷存天数 * 冷存单价        <span class="c"># 冷存通常还要 + 检索时的解冻成本</span>
+
+<span class="c"># Loki 侧</span>
+stored_bytes = raw_bytes_per_day * (1 / 压缩比(实测)) + 标签索引大小
+
+<span class="c"># 别忘了：快照/备份份数、跨区域复制、以及查询本身对资源的消耗</span></pre>
+  <div class="callout">
+    <b>一个完整示范（把方法讲清楚，不编数字）：</b>「我先测单位产出——挑一个有代表性的 Pod，在峰值时段统计它一分钟写多少字节，然后乘以峰值副本数和 1440，得到每天的原始量。接着乘存储放大系数，这个系数我一定是实测的：拿一段真实日志写进去，看实际占了多少，反推出来，因为字段结构和压缩率对它的影响非常大，我不套用现成数字。然后按冷热两档分别乘保留天数和单价，再加上副本和快照的份数。最后我会说明误差在哪：峰值可能估低、日志量会随业务增长、异常期可能翻好几倍、压缩率取决于日志的重复度。所以这个数是一个量级和一套方法，不是承诺。」
+  </div>
+  <p>如果面试官追问「那怎么降成本」，按优先级给四招：<b>① 按级别拆保留期</b>（改动最小、收益最大）；<b>② 减少无用日志</b>（重复打印、循环里的日志、DEBUG 上线没关）——这一招常常能砍掉一半量；<b>③ 降采样与冷热分层</b>；<b>④ 换存储模型</b>（量大且查询模式固定的场景，从全文索引换成标签索引）。<b>顺序很重要：先砍量，再谈换架构。</b>因为量没砍下来就换架构，只是把成本从一种形式换成另一种形式。</p>
+  <p><b>面试怎么答：</b>「我不背数字，我讲方法：测单位产出（峰值时段）→ 乘规模和时长 → 乘实测出来的存储放大系数 → 按冷热分档乘保留期和单价 → 最后说清误差来源。系数必须实测，因为字段结构和压缩率影响很大。降成本我按优先级：先按级别拆保留期，再砍无用日志（重复打印、线上开 DEBUG 常常能砍掉一半），然后降采样和冷热分层，最后才考虑换存储模型——量没砍下来就换架构只是换一种花钱方式。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：每一个都会让日志平台变成负担</h2></div>
+  <p class="lead">这一节的坑有个共同形状：<b>每一条在规模小的时候都不明显，量上去之后才爆发</b>——而那时改造成本已经很高了。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把 trace_id、user_id 这类高基数字段当 Loki 标签</div><div class="pd">标签的作用是「把数据切成有限几块」。取值会无限增长的字段做标签，会让 stream 爆炸、chunk 碎片化，索引膨胀到无法维护。高基数值必须留在日志内容里，用 |= 过滤算子匹配。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">「message 含 error 就告警」</div><div class="pd">噪声极大，一周后所有人都在心里屏蔽它。正确做法是把日志转成指标再告警：算错误率（错误数/请求数），加连续窗口判定和最小样本量条件。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只配了「错误率过高」，没配「日志量骤降」</div><div class="pd">服务整个挂掉或采集中断时，错误数变成 0，看起来一切正常。基于日志的告警体系必须有一条「没有数据」的告警。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">异常栈没做多行合并</div><div class="pd">一条 Java 栈被切成几百条，日志量虚高、检索结果被单条栈刷屏、按条数告警彻底失真。用「行首是时间戳即为新日志」的规则合并。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">采集直连存储，没有缓冲也没有丢弃策略</div><div class="pd">下游一挂就积压，撑爆内存后随机丢弃——而随机丢弃恰恰会丢掉故障期最关键的日志。加消息队列缓冲，并按级别定义「谁可以丢」。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">日志里打印敏感信息和完整请求体</div><div class="pd">日志的存储权限通常比数据库宽得多，还会被复制到多个系统、贴进工单。必须在框架层统一脱敏，不能靠每个开发记得；发现泄露要清理历史日志而不只是改代码。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">所有日志同一个保留期，冷数据全在热存储</div><div class="pd">DEBUG 的量通常是业务日志的几十倍，但价值窗口只有几小时。按级别拆保留期是改动最小、收益最大的一步。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">字段命名不统一，level / log_level / severity 三种写法</div><div class="pd">分流规则、降采样规则、告警规则全都写不下去——每一条都要写三个变体。字段规范要在平台侧强制，而不是靠约定。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把变量拼进 message</div><div class="pd">拼进去之后无法聚合也无法精确过滤，只能靠正则扒字符串，而正则既慢又脆。凡是需要被过滤或聚合的值，都必须是独立字段。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">索引时间用到达时间而不是日志自身时间</div><div class="pd">一次下游积压会让所有日志的时间戳挤在一起，排障时时间线完全错乱。必须用日志自身的 timestamp 做索引时间，到达时间只作为辅助字段，并且全链路统一 UTC。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个你真的处理过的讲完整。「我印象最深的是多行合并。之前 Java 服务的异常栈没配合并，一条栈变成三百多条日志，结果有两个后果：一是按条数告警的阈值彻底失真，一次异常就打爆；二是检索的时候结果页全是栈帧，真正的错误原因被淹没了。我们后来统一在采集端配了『行首是时间戳即为新日志』的规则，日志量当天就降了一大截——具体降多少取决于你们的栈有多长，这个要自己测。这件事让我意识到，日志平台的很多『性能问题』其实是『数据质量问题』，先治理数据再谈扩容。」</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. Elasticsearch 和 Loki 在索引模型上的根本差异是什么？</div>
+      <button class="opt">ES 用 B 树索引，Loki 用哈希索引</button>
+      <button class="opt">两者都建全文索引，只是压缩算法不同</button>
+      <button class="opt">ES 对日志内容做分词并建立倒排索引（另存列存结构与原文），检索强但存储开销高；Loki 只对标签建索引，内容压缩成 chunk 存对象存储，写入与存储便宜但全文检索要先按标签缩小范围再扫描</button>
+      <button class="opt">Loki 不支持任何形式的索引，只能顺序扫描全部日志</button>
+      <div class="ans">正确答案：<b>建不建内容索引</b>。ES 写入时要分词、建倒排索引、建 doc_values 供聚合、保存 _source，再加上副本，实际占用是原始日志的若干倍（倍数取决于字段结构和副本数，必须实测）。换来任意字段全文检索和复杂聚合。Loki 只对标签建很小的索引，内容压缩成 chunk 进对象存储，查询时先用标签选出 stream 再解压扫描，所以全文查罕见字符串慢。<b>各自的第一禁忌也不同：Loki 怕高基数标签，ES 怕字段爆炸。</b></div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 在 Loki 里，下面哪个字段<b>不适合</b>作为标签（label）？</div>
+      <button class="opt">namespace（取值有限且稳定）</button>
+      <button class="opt">trace_id（每次请求都不同，取值无限增长）</button>
+      <button class="opt">app（服务名，取值有限）</button>
+      <button class="opt">env（环境标识，取值有限）</button>
+      <div class="ans">正确答案：<b>trace_id</b>。标签的作用是「把数据切成有限的几块」，所以取值集合必须小且稳定。trace_id、user_id、request_id 这类每请求都不同的高基数值，会让每个请求产生一个新 stream，导致索引膨胀、chunk 碎片化，直接毁掉 Loki。正确做法是让它们留在日志行的内容里，用 |= "xxx" 这样的行过滤算子去匹配。<b>判断标准：这个字段的取值会不会随时间无限增长？会，就不能做标签。</b></div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 关于日志告警，下面哪种做法最可靠？</div>
+      <button class="opt">日志中出现关键字 error 就告警</button>
+      <button class="opt">5 分钟内错误日志超过 10 条就告警</button>
+      <button class="opt">只配「错误率过高」，不需要考虑没有日志的情况</button>
+      <button class="opt">把日志转成指标再告警：用错误率（错误数/请求数）并加连续窗口判定与最小样本量条件；同时必须配一条「日志量骤降」的告警</button>
+      <div class="ans">正确答案：<b>先转指标，再告警</b>。关键字告警噪声太大；按条数告警会随流量波动误报（流量翻倍条数自然翻倍），因为条数不是归一化指标。错误率（错误数除以请求数）不受流量影响，配合连续多个窗口才触发、低流量时段加最小样本量条件，稳定性高得多。<b>另外必须配「日志量骤降」告警——服务整个挂掉或采集中断时错误数是 0，看起来一切正常。</b></div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 采集端没配多行合并，最直接的后果是什么？</div>
+      <button class="opt">一条异常栈被切成几百条日志，日志量虚高、检索结果被栈帧刷屏、按条数告警的阈值失真</button>
+      <button class="opt">日志会丢失，因为采集器读不完</button>
+      <button class="opt">日志时间戳会错乱</button>
+      <button class="opt">采集器会崩溃退出</button>
+      <div class="ans">正确答案：<b>一条栈变几百条</b>。异常栈的每一行（包括 Caused by 和每个栈帧）都会被当成独立日志。后果有三个：日志量虚高、检索结果被单条栈刷屏导致真正的错误原因被淹没、以及按条数配置的告警阈值彻底失真。解决办法是在采集端配多行规则，通常用「行首是否匹配时间戳」来判断新日志的开始。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 索引时间应该用哪个时间戳？</div>
+      <button class="opt">到达存储的时间，因为它最准确反映写入顺序</button>
+      <button class="opt">采集器读取文件的时间</button>
+      <button class="opt">日志自身的时间戳（由应用生成、带时区、统一 UTC），到达时间只作为辅助字段记录延迟</button>
+      <button class="opt">两者都可以，差别不大</button>
+      <div class="ans">正确答案：<b>日志自身的时间戳</b>。如果用到达时间，那么一次下游积压或采集中断恢复后，所有补传的日志时间戳会挤在同一时刻，排障时的时间线完全错乱——你看到的「凌晨三点错误暴涨」可能只是「那时积压清完了」。同时全链路要统一用 UTC 存储、展示层再转本地时区，避免跨时区机器对不上。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 面试官问「你们日志一天 1TB，存储成本怎么估」，最好的回答方式是？</div>
+      <button class="opt">直接给出一个总成本数字</button>
+      <button class="opt">讲估算方法：测单位产出（峰值时段）→ 乘规模与时长 → 乘实测的存储放大系数 → 按冷热分档乘保留期与单价 → 并说明误差来源</button>
+      <button class="opt">说这个由云厂商账单决定，不需要估算</button>
+      <button class="opt">引用行业平均的单位存储成本来推算</button>
+      <div class="ans">正确答案：<b>讲方法，不背数字</b>。面试官知道你记不住准确量，他想看的是可复现的估算方法和对误差的认知。关键点是：单位产出要按峰值而不是均值测；存储放大系数（ES 的倒排+列存+原文+副本 / Loki 的压缩率）<b>必须用自己的真实样本实测</b>，因为字段结构和压缩率影响极大，不能套用现成数字；最后主动说明误差来源（峰值估低、业务增长、异常期翻几倍、压缩率随重复度变化）。敢说误差在哪，比报一个精确数字可信。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>倒排索引</b></td><td>记录「哪个词出现在哪些文档里」的结构，是全文检索快的原因，也是 ES 存储开销的主要来源</td></tr>
+    <tr><td><b>doc_values</b></td><td>ES 的列存结构，供聚合和排序使用，没有它就没法按字段统计</td></tr>
+    <tr><td><b>_source</b></td><td>ES 保存的原始文档，用于返回结果和重建索引</td></tr>
+    <tr><td><b>stream</b></td><td>Loki 中「一组标签相同的日志流」，是标签索引的基本单位</td></tr>
+    <tr><td><b>chunk</b></td><td>Loki 把日志压缩后的存储块，写入对象存储；查询时解压后扫描</td></tr>
+    <tr><td><b>高基数（high cardinality）</b></td><td>取值几乎无限增长的字段（trace_id、user_id），不能用作标签</td></tr>
+    <tr><td><b>多行合并</b></td><td>把异常栈合并成一条日志的规则，通常按「行首是否为时间戳」判断</td></tr>
+    <tr><td><b>背压</b></td><td>下游慢时向上游施加压力使其降速，防止积压撑爆缓冲</td></tr>
+    <tr><td><b>降采样</b></td><td>冷数据只保留聚合结果与少量样本，而非全部原文</td></tr>
+    <tr><td><b>ILM</b></td><td>索引生命周期管理，按年龄或大小把索引在冷热层之间流转并最终删除</td></tr>
+    <tr><td><b>LogQL</b></td><td>Loki 的查询语言：标签选择器 → 行过滤 → 解析 → 字段过滤 → 聚合</td></tr>
+    <tr><td><b>KQL / Lucene</b></td><td>Kibana 的查询语法 / ES 的 query_string 语法；短语要加引号否则被分词拆开</td></tr>
+    <tr><td><b>trace_id</b></td><td>贯穿一次请求的唯一 ID，跨服务定位的钥匙；它是高基数的，不能当标签</td></tr>
+    <tr><td><b>错误率告警</b></td><td>错误数除以请求数，不受流量波动影响，优于按条数告警</td></tr>
+    <tr><td><b>脱敏</b></td><td>在框架层对敏感字段统一掩码；日志是最常见的泄露渠道之一</td></tr>
+    <tr><td><b>保留期分层</b></td><td>按日志级别和类型设不同的保留时长，是性价比最高的成本手段</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 拿一个你自己的服务，统计各级别日志的占比（按字节数而不只是条数）——这个数字通常会让所有人吃一惊，也是推动治理最有力的证据。② 故意制造一条多行的 Java/Python 异常，先在没配多行合并时看它被切成多少条，配好之后再看一次，亲手确认这个差距。③ 写一条 LogQL 和一条 KQL，实现同一个查询意图（比如「找 prod 环境某服务状态码 ≥500 且排除健康检查的日志」），体会两者「先缩小范围再匹配」的共同思路。<br><br>
+    <b>之后值得单独学：</b>第 14 期讲 Prometheus，能帮你分清「什么该走指标、什么该走日志」——这一篇提到的「能用指标做的告警不要基于日志做」在那里有完整展开；第 16 期讲可观测性三大支柱，能把日志放在 traces 和 metrics 的上下文里看；第 02 期讲 Linux 排查，其中的命令行工具是日志分析的兜底手段；第 35 期讲云成本，对象存储的冷热分层定价和这一篇的保留期策略是同一套思路。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 39 期 · 日志系统的分水岭不在收得上来，在于你知道哪些该留、哪些该扔、以及这份钱谁出</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

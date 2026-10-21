@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据库运维面试：备份恢复、主从切换与容量治理</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 41 期</span>
+    <h1>数据库运维面试：备份恢复、主从切换与容量治理</h1>
+    <p class="sub">问「你们多久备份一次」之后必问的是<b>「恢复演练做过吗，RTO 多少」</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>22</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：主库突然不可达，你要在多长时间内恢复写入——这个时间是老板定的、还是你算出来的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都不是没备份，是备份没用上</h2></div>
+  <p class="lead">「备份每天都有，定时任务从没失败过。」这句话听起来很安心，直到真正需要恢复的那一刻。数据库运维里最贵的一课几乎都长这样：<b>备份在，恢复不出来。</b></p>
+  <p>下面三个现场覆盖了面试里绝大多数追问。它们的共同点不是运气不好，而是<b>把「备份成功」当成了「可以恢复」</b>，这两件事之间隔着演练、校验和一条没断的 binlog。</p>
+  <table>
+    <tr><th style="width:210px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>误删了一张表，最近的备份是 24 小时前，binlog 还在</td><td>恢复昨晚的备份，接受丢一天</td><td>可以恢复昨晚的备份，<b>再用 binlog 重放到误删前一刻</b>。能不能做到这一步，取决于中间那段 binlog 有没有真的保留下来并且能被重放——这是 PITR，也是衡量备份体系的第一个分水岭</td></tr>
+    <tr><td>主库不可达，从库 Seconds_Behind_Master 显示 0</td><td>没有延迟，可以立刻切</td><td>这个值在大事务执行过程中会长时间显示为 0，然后跳成一个巨大的数。<b>它不是「能不能切」的判据</b>，GTID 集合的对比和心跳表才可靠</td></tr>
+    <tr><td>磁盘 85%，告警说还有一周写满，于是清了 binlog</td><td>清理最老的那些日志，腾出空间</td><td>从库可能还没拉走这部分 binlog，备份链也可能正好需要它。<b>清完的结果是：空间够了，但这个从库再也追不上，只能重做</b></td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>能不能恢复</div><div class="cd">备份只是原料。真正回答问题的是<b>最近一次成功恢复演练</b>的时间与实测耗时——没有演练，备份只是心理安慰。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>丢多少 / 等多久</div><div class="cd">这两句是同一个问题的两面：<b>RPO 是丢到哪个时间点，RTO 是花多久恢复</b>。多数人刚好答反，答反就暴露没真正做过。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>敢不敢切</div><div class="cd">切换的真正难点不是命令，是<b>三个判断</b>：候选从库数据全不全、旧的那个主库是否真的死了、切完之后还剩几份冗余。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#993C1D"></span>能撑多久</div><div class="cd">容量问题的度量单位不该是「磁盘还有百分之几」，而是<b>备份要多久、DDL 要多久、故障要多久才能恢复</b>。</div></div>
+  </div>
+  <p>这一篇的顺序：先把备份的类型与组合讲清（这是「能不能恢复」的基础），接着是 RPO/RTO 与演练，然后是复制原理、切换流程与它的五个风险点，之后是慢查询闭环、容量与磁盘、高可用中间件的定位、权限与审计。每节收在一句能直接说出口的话上。</p>
+  <div class="callout">
+    <b>一条先把话说死的判断：</b>备份的目的从来不是「有一份文件」，而是<b>「在可接受的丢数据窗口内，用可接受的时长把服务拉起来」</b>。这两个「可接受」必须写成数字：丢多少秒（或多少条）、恢复多少分钟。写不出这两个数字的备份体系，是没有通过验收的。
+  </div>
+  <p>需要说明的是，这篇以 MySQL / Percona / MariaDB 这一类为主（因为它们是运维岗最常考的场景），具体的工具名、参数名和默认行为<b>请以你使用的版本官方文档为准</b>——尤其是 MySQL 8.0 在复制术语上做过一次重命名（早期叫 master/slave，新版叫 source/replica），两边的命令写法都存在。</p>
+  <p><b>面试怎么答：</b>「我评估一套备份体系只看三件事：最近一次成功恢复演练是什么时候、实测 RTO 是多少、恢复到的时间点能不能满足 RPO。备份任务的成功率只能说明文件写出来了，说明不了这份东西能跑起来。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>备份类型：全量、增量、binlog 是三件不同的东西</h2></div>
+  <p class="lead">很多人把「增量备份」和「binlog」混为一谈。它们不是一回事：<b>增量备份是物理层面的页级差异，binlog 是逻辑层面的变更事件</b>。混用这两个词，在讲恢复流程的时候一定会露馅。</p>
+  <p><b>逻辑备份</b>把数据读出来写成 SQL（或类似格式）语句。它的优点是跨版本、跨平台、可以按库按表甚至按行挑着恢复，并且恢复的过程本身就是一次「把数据真真实实写一遍」的校验。代价很实在：<b>慢，尤其是恢复慢</b>——因为要重建索引、重执行 SQL，数据量一大全量恢复可能以小时计。另一个代价是<b>一致性边界</b>：事务型引擎可以靠一致性快照（例如 mysqldump 用单个事务获取一致读）避免锁表，但那个快照只覆盖事务引擎，<b>期间发生的 DDL 不在它的保护范围内</b>，非事务引擎仍然需要锁。</p>
+  <p><b>物理备份</b>直接拷贝数据文件，并在恢复前用 redo/undo 日志把文件前滚回滚到一个一致的点。它的优点是快，而且<b>恢复速度和备份速度是一个量级</b>——这是它最大的价值。代价是：备份文件大、通常要求同版本同平台、粒度往往是整个实例（想只恢复一张表需要额外的技巧），并且这套文件的正确性依赖于工具自身的成熟度。</p>
+  <p><b>快照</b>（云盘快照、存储层快照、文件系统快照）严格说不是数据库备份，是「某一时刻的磁盘状态」。它能用的前提是<b>整个数据目录在同一时刻被完整冻结</b>；在这个前提下，事务引擎自身的崩溃恢复能力可以把那批文件收敛到一个一致的状态。所以快照方案的关键动作是两件：<b>让 InnoDB 处于可一致恢复的状态</b>（例如刷新表与加轻量锁），以及<b>记录下那一刻对应的 binlog 位点</b>，否则你连重放的起点都没有。</p>
+  <table>
+    <tr><th style="width:110px">类型</th><th>代表做法</th><th>优点</th><th>代价与限制</th></tr>
+    <tr><td><b>逻辑备份</b></td><td>mysqldump、mydumper 一类导出工具</td><td>可读、可跨版本、可按对象恢复、天然校验数据可读性</td><td>慢，尤其是<b>恢复慢</b>；DDL 不受快照保护，非事务引擎需要锁表</td></tr>
+    <tr><td><b>物理全量</b></td><td>XtraBackup 一类热备工具、官方企业备份、8.0 的 clone 相关能力</td><td>备份与恢复都快，适合大数据量</td><td>文件大，通常同版本同平台，恢复粒度粗</td></tr>
+    <tr><td><b>增量备份</b></td><td>基于上一次备份之后的页差异</td><td>省空间、省备份时间</td><td><b>恢复是一个链</b>：链上任何一环坏了，后面全废；而且增量越多，恢复越慢</td></tr>
+    <tr><td><b>binlog</b></td><td>把二进制日志持续传走并保留</td><td>是时间点恢复（PITR）的最后一段，能精确到秒级</td><td>它不是「备份」，是<b>变更流</b>；丢了就只能恢复到上一个备份点</td></tr>
+    <tr><td><b>快照</b></td><td>云盘、存储或文件系统层</td><td>几乎不影响源库，创建快</td><td>依赖一致性前提，必须同时记录 binlog 位点</td></tr>
+  </table>
+  <p>把三者拼成一套策略，最典型的组合是<b>「周期性全量 + 周期性增量 + binlog 持续备份」</b>：全量定下基线，增量缩短两次全量之间的批次成本，binlog 负责精确到时间点。频率怎么定，不应该拍脑袋，而应该<b>倒着推</b>：看 RPO 允许多大的丢失窗口，看全量一次的耗时在业务低峰是否放得下，看 binlog 的产生速率决定是否要按小时切段上传。</p>
+  <p>最后讲存放。备份放在数据库本地磁盘上等于没备份——<b>主机坏了、盘坏了、被勒索了，备份跟着一起走</b>。行业里常见的经验是「3-2-1」：三份副本、两种介质、一份异地（这里的数字是该规则本身的表述，不是让你去改）。除此之外现实中要补两条：<b>异地副本的凭据要与生产隔离</b>，否则勒索进运维通道时备份一样能被删；<b>备份要加密且保留只读/不可变窗口</b>，否则「能 delete」就是「能毁掉」。</p>
+  <pre><span class="c"># 逻辑备份：一致性快照只对事务引擎成立，导出时顺带记录位点（参数名以版本为准）</span>
+mysqldump --single-transaction --master-data=2 --all-databases &gt; full.sql
+<span class="c"># 注：较新的版本把 --master-data 改名为 --source-data，老写法仍可用，以你的 --help 为准</span>
+
+<span class="c"># 物理备份：先备份，再 prepare（前滚回滚到一致状态），这一步不能省</span>
+xtrabackup --backup --target-dir=/backup/base
+xtrabackup --prepare --target-dir=/backup/base
+
+<span class="c"># 基于上一次备份做增量</span>
+xtrabackup --backup --target-dir=/backup/inc1 --incremental-basedir=/backup/base
+
+<span class="c"># binlog 的 Point-in-Time 恢复：只 replay 到误操作之前那一刻</span>
+mysqlbinlog --start-datetime='2026-06-01 00:00:00' --stop-datetime='2026-06-01 09:59:59' binlog.000123 | mysql -uroot -p</pre>
+  <div class="callout warn">
+    <b>增量备份的「链」是它最大的风险。</b>全量加一串增量的方案，磁盘省了，但恢复时必须按顺序把链上每一环都对上：少一个文件、环的顺序搞错、某次增量基于错误的基线，整条链就是废的。所以很多人会把「全量 + 连续 binlog」作为更可信的基线方案，因为它的数据恢复路径更短，<b>故障当晚你不会想做链路与时区拼图</b>。
+  </div>
+  <p><b>面试怎么答：</b>「备份我按四类看：逻辑备份可读可挑表但恢复慢，物理备份快但粒度粗、要求版本一致，增量备份省成本但引入恢复链风险，binlog 是 PITR 的最后一段而不是备份本身。生产组合通常是定期全量加 binlog 持续备份，存放遵循 3-2-1，并且异地那份的凭据要和隔离开——因为现在真正要防的常常是勒索而不是磁盘坏道。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>RPO 与 RTO：两个字母答反过的人非常多</h2></div>
+  <p class="lead">先给判断，因为这个知识点经常错：<b>RPO 是「丢多少」，RTO 是「等多久」。</b>一个是 Point（数据恢复到哪个时间点），一个是 Time（服务多久能起来）。面试里把这两个说反，比完全不知道更减分。</p>
+  <table>
+    <tr><th style="width:110px">指标</th><th>问的问题</th><th>由什么决定</th><th>怎么改善</th></tr>
+    <tr><td><b>RPO</b><br>恢复点目标</td><td>事故发生时，最多允许丢多少数据</td><td>全量/增量备份的频率 + binlog 是否连续且能被重放 + <b>主从之间尚未同步的那部分</b></td><td>缩短备份周期、保证 binlog 不丢不断、把异步复制换成半同步或多数派提交（有性能代价）</td></tr>
+    <tr><td><b>RTO</b><br>恢复时间目标</td><td>从故障发生到服务可用，最多允许多久</td><td>介质拉取时间 + 数据与 binlog 的量 + 是物理还是逻辑恢复 + 重建 / 切换 / 连接池重连与应用预热</td><td>本地留一份最近的备份减少拉取、用物理备份、把流程写成脚本并常态化演练</td></tr>
+  </table>
+  <p>很多人只把这两数字当成汇报材料，这是可惜的。<b>它们的真正用途是把「要花多少钱」和「要冒什么险」变成可讨论的量。</b>比如把 RTO 从一小时压到十分钟，代价可能是：备份要多留一份在本地（花钱）、要从逻辑备份改成物理备份（改变恢复方式）、要常备一台预热好的备用机（花钱加运维）。<b>这笔账必须算给做决定的人看，让他选，而不是让运维默认承担。</b></p>
+  <p>接下来是全篇最重要的一句：<b>没有演练过的备份，不能算备份。</b>原因是这些失败模式都不在「备份任务成功」这件事的保护范围内——备份文件只写了一部分就坏掉；备份时刚好在主库上做了一次大的变更导致内部不一致；binlog 看起来在，但恢复需要的时间点已经被过期策略清掉了；甚至最简单也最要命的：<b>目标机器上的磁盘不够，或者版本对不上。</b></p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>定期恢复到一台独立实例。</b>不是查文件是否存在，是真的把它拉起来，变成一个能连能查的数据库。频率由你的变更频率定，常见是每月或每季度一次。</div></div>
+    <div class="step"><div class="txt"><b>做数据校验。</b>表数量、行数、重要字段的校验和、抽样几条业务查询，必要时的辅助手段是表级别的 checksum 工具。<b>能连上不等于数据是对的。</b></div></div>
+    <div class="step"><div class="txt"><b>顺便跑一次 PITR。</b>不加这一步，你永远不知道自己能不能精确的恢复到「误操作前那一刻」，而现实中最常见的恢复需求恰恰是这一类。</div></div>
+    <div class="step"><div class="txt"><b>把每一步的耗时记下来。</b>拉取文件多久、prepare 多久、拉起到可服务多久、回放 binlog 多久。<b>这个总和就是你真实的 RTO</b>，它通常会比你以为的大。</div></div>
+    <div class="step"><div class="txt"><b>把结论落成指标。</b>最近一次成功恢复的时间、实测 RTO、校验是否通过、备份成功率。这几项要能直接放在看板上，而不是只在事故复盘里出现一次。</div></div>
+  </div>
+  <pre><span class="c"># 恢复演练的最小链路：不要看 status，要真的连上去查</span>
+SHOW DATABASES;
+SELECT COUNT(*) FROM orders_core;
+CHECKSUM TABLE orders_core;
+
+<span class="c"># 校验和类工具：主备对比用，能发现「备份能起来但数据不一致」</span>
+pt-table-checksum --host=primary --databases=app
+
+<span class="c"># 确认 binlog 的保留能力是否满足你的 RPO 窗口（参数名与单位因版本而异）</span>
+SHOW VARIABLES LIKE 'binlog_expire%';
+SHOW BINARY LOGS;</pre>
+  <div class="callout danger">
+    <b>最容易被忘掉的是「备份要跟着架构一起改」。</b>做了拆分、换了新实例、加了新库之后，备份的覆盖范围可能没跟着走——新库在线上跑了半年，结果发现它从来没进过备份清单。所以<b>变更评审里应该有一个固定项：这次改动是否影响备份、监控、恢复流程</b>。备份清单要定期用「线上有哪些库」去反向核对一次。
+  </div>
+  <p><b>面试怎么答：</b>「RPO 是允许丢多少数据，RTO 是允许多久恢复，别反着记。我们把它落成两个数字，并且每季度做一次真实恢复演练：捞备份到独立实例、跑校验和、顺带做一次时间点恢复，把每一步的耗时记下来作为真实 RTO。<b>只报备份成功率是没有意义的</b>，它说明不了这份东西能不能用。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>主从复制：三个线程、两种确认，以及那个不准的延迟值</h2></div>
+  <p class="lead">「你们主从延迟多少？」能答出数字的人很多，能答出<b>「这个数字不准」</b>的人不多。理解复制，关键是搞明白「一份数据要经过几次落地、几次回放」，以及每一步的保障是站在什么位置上的。</p>
+  <p>链条是这样的：<b>主库写 binlog → 主库的 binlog dump 线程把事件发给从库 → 从库的 IO 线程收到后写进本端的 relay log → 从库的 SQL 线程（回放者）读 relay log 并执行。</b>这里出现了两次「落地」：一次是主库的 binlog，一次是从库的 relay log。这也是「 <b>relay log 和主库 binlog 的差、跟 SQL 线程执行进度的差，是两个不同的延迟</b>」这句话的由来——网络抖动影响前者，回放慢影响后者。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>选项</th><th>含义与取舍</th></tr>
+    <tr><td><b>binlog 格式</b></td><td>STATEMENT / ROW / MIXED</td><td>STATEMENT 记 SQL 语句，体积小但有不确定性函数（比如取当前时间、取随机值）在从库重放会产生不同结果；<b>ROW 记行变化</b>，重放确定性强、生产常用，但日志体积变大；MIXED 是按场景自动选</td></tr>
+    <tr><td><b>位点</b></td><td>文件 + 位置 / GTID</td><td>GTID 给每个事务一个全局标识，好处是<b>切换时不用人工换算「哪个文件哪个位置」</b>：从库用 GTID 自动定位的方式告诉主库自己已经执行了哪些事务，主库接着往下发就可以了。这是自动故障转移的重要前提</td></tr>
+    <tr><td><b>确认方式</b></td><td>异步 / 半同步 / 组复制</td><td>异步是默认且最快的，<b>主库提交不等从库</b>，所以主库崩溃时未同步的部分会丢；半同步要求至少一个从库确认收到后才返回客户端 <b>（AFTER_SYNC 模式把这个等待放在引擎提交之前，因此已返回给客户端的事务不会丢；早期的 AFTER_COMMIT 模式则存在已提交但没同步的窗口）</b>；组复制用多数派确认，一致性最强、代价是写性能</td></tr>
+    <tr><td><b>回放方式</b></td><td>单线程 / 多线程</td><td>早期只能串行回放，主库高并发写时从库天然追不上；之后逐步支持按库并行、基于组提交的并行（逻辑时钟）、以及基于 writeset 的并行。<b>能开并行就开并行</b>，具体参数名和能力以你的版本为准</td></tr>
+  </table>
+  <p>现在说那个不准的数字：<b>Seconds_Behind_Master（新版本的字段名也在改，以你版本的输出为准）。</b> 它的计算基础是「正在执行的那个事件的时间戳」与「当前时间」的差。这意味着三种失真：<b>从库回放卡住时它可能一直显示一个很大的数却不动</b>；<b>一个大事务执行到一半时，它可以是 0</b>（因为还没开始算这段）；<b>主库长时间没有写操作时它失去意义</b>。所以「显示 0 就是没延迟」这句话在第三种场景下是不成立的。</p>
+  <p>两种更可靠的做法。<b>其一是心跳表</b>：主库定期往一张小表里写当前时间戳，从库上读这张表，算差值——它衡量的是真实的端到端时延，而且在网络或 IO 线程出问题时也能看出来。<b>其二是对比 GTID 集合</b>：两边各自已执行的 GTID 集合做差，差多少就是还差多少个事务，这个值是精确的，也是切换时挑候选者的正确依据。</p>
+  <p>延迟的成因，按出现频率排大概是这几类：<b>大事务</b>（一次删几十万行，主库几秒完成，从库要回放很久）；<b>从库扛了太多读</b>（规格不足或 IO 被占用）；<b>并行回放没开或开了也没用</b>（参数对了但事务之间没有可以并行的关系，比如都在争同一行）；<b>表没有主键</b>——这个点非常值得记住：ROW 格式记录的是行的前后变化，从库回放时要定位到具体那一行，<b>没有主键就只能全表扫描比对</b>，一条更新可能变成几秒。<b>还有就是从库被人写了，导致数据漂移</b>——注意 <span class="k">read_only</span> 挡不住有高级权限的账号，需要额外的只读开关。</p>
+  <pre><span class="c"># 复制状态：两份信息一起看 —— IO/SQL 线程是否健康，以及 GTID 集合的差</span>
+SHOW REPLICA STATUS\G          <span class="c"># 老版本写法的等价写法是 SHOW SLAVE STATUS\G</span>
+SHOW MASTER STATUS\G
+
+<span class="c"># 精确判断落后多少：比较两边已执行的 GTID 集合差集</span>
+SELECT @@gtid_executed;
+SELECT GTID_SUBTRACT(&lt;主库的集合&gt;, &lt;从库的集合&gt;);
+
+<span class="c"># 心跳表：比内置延迟值可信（写入间隔与工具用法以你采用的实现为准）</span>
+pt-heartbeat --host=primary -D heartbeat --update --daemonize
+pt-heartbeat --host=replica  -D heartbeat --monitor
+
+<span class="c"># 长事务往往等价于长回放：经常出现在主库上也造成了连锁影响</span>
+SELECT trx_id, trx_started, TIMESTAMPDIFF(SECOND, trx_started, NOW()) AS secs, trx_rows_modified
+FROM information_schema.innodb_trx ORDER BY trx_started LIMIT 10;</pre>
+  <div class="cmds">
+    <div class="crow"><code>SHOW REPLICA STATUS\G</code><span class="desc">复制状态：IO/SQL 线程是否健康、GTID 集合走到哪（老版本写法为 SHOW SLAVE STATUS）</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT @@gtid_executed;</code><span class="desc">两边各自执行的事务集合，做差集才是精确的落后量</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT @@read_only, @@server_id;</code><span class="desc">切换前后确认角色与只读状态，防止双写</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW BINARY LOGS;</code><span class="desc">清理前的必看清单：后面的 PURGE 要参考它</span><button class="copy">复制</button></div>
+    <div class="crow"><code>pt-query-digest slow.log --limit 20</code><span class="desc">按语句模板聚合慢日志，按总耗时而不单次耗时排序</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout warn">
+    <b>ROW 格式 + 无主键表 = 延迟放大器。</b>这一点在很多团队是用一次线上故障换来的：<b>表加主键这个动作，既是设计问题，也是复制性能问题</b>。同理，一次大批量订正（比如 UPDATE 百万行）应该拆成带 LIMIT 的小批次，并且在主库上也要考虑它对长事务和锁等待的影响——它往往同时对主库和从库都是冲击。
+  </div>
+  <p><b>面试怎么答：</b>「复制是三段：主库写 binlog、从库 IO 线程写 relay log、SQL 线程回放。判断延迟我不信 Seconds_Behind_Master，因为大事务执行中它可以一直是 0；我用 GTID 集合差（精确）和心跳表（端到端）两个角度交叉判断。延迟最常见的原因是大事务、从库扛读、并行回放没生效，以及 ROW 格式下目标表没有主键。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>切换流程：命令不难，难的是五个必须回答的判断</h2></div>
+  <p class="lead">「主库挂了怎么办？」这道题的满分答案不是一串命令，是你在按下回车前<b>依次否决掉哪些不应该做的情况</b>。切换真正的难点在这里：它是一次不可逆的拓扑改变，而当时的信息通常是不完整的。</p>
+  <p>先说<b>计划内切换</b>，因为它有相对充裕的时间，顺序基本是固定的：把老主设为只读（这步很重要，它创造了「不再有新的写入」的边界）→ 等所有从库追平 → 确认候选节点的 GTID 集合包含所有其他节点的 → 提升候选为新主（解除只读、清理它的复制配置）→ <b>把流量层切过去</b>（VIP、代理或应用的连接配置）→ 其余从库重新指向新主 → 校验并重跑一次备份。</p>
+  <p>再说<b>故障切换</b>，也就是老主不可达的情况。这时要回答的判断缺一不可：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>它真的死了吗？</b>「连不上」和「死了」是两件事。网络分区、进程假死、磁盘卡住都可能表现为不可达。<b>这一步不确认，后面就会产生最糟的一种故障：双写。</b></div></div>
+    <div class="step"><div class="txt"><b>候选从库的数据全不全？</b>比较 GTID 集合，选出包含最多事务的那个（通常在异步复制下，从库之间可能互相有别人没有的事务，这种情形更复杂，处理原则是<b>以事务集最大的为准，并明确接受差值部分需要人工核对</b>）。</div></div>
+    <div class="step"><div class="txt"><b>残留的 binlog 能不能补回来？</b>如果老主还能连上（哪怕是只读地读它的文件系统），优先把它本地还没同步走的那段 binlog 取回来补到新主上。<b>这一步直接决定了最后丢失窗口有多大。</b></div></div>
+    <div class="step"><div class="txt"><b>怎么保证老主永远不会再被写？</b>这是所谓的隔离（ fencing）：摘除 VIP、切断网络、关掉进程，或者干脆让它所在的机器失去服务能力。<b>不要指望「它自己不会起来」。</b></div></div>
+    <div class="step"><div class="txt"><b>切完之后还剩几份冗余？</b>一个健康的集群是「一主多从」。切换完如果没有立刻让其余节点指向新主，你就处在<b>单点运行</b>状态——这才是「第二个故障导致不可逆」的典型剧本。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:170px">风险</th><th>表现</th><th>防控手段</th></tr>
+    <tr><td><b>脑裂 / 双写</b></td><td>老主其实没死，恢复网络后继续写；新主也在写。两边数据再也对不上</td><td>严格隔离（网络或主机层面），切换前确认原主的写路径已断；有条件的做 STONITH 类机制</td></tr>
+    <tr><td><b>数据残留丢失</b></td><td>异步复制下老主已提交但没传出去的事务永远消失</td><td>先尝试取回残留 binlog；用半同步减小这个窗口；<b>把「可能丢多少」提前告诉业务方（这就是 RPO）</b></td></tr>
+    <tr><td><b>应用连接池有旧连接</b></td><td>切换成功但应用还在用旧主的长连接，写入「黑洞」或者直接报错</td><td>切换脚本里包含连接清理；确认应用有重连机制；注意 DNS 的缓存时间也会延长影响窗口</td></tr>
+    <tr><td><b>切换后单点运行</b></td><td>只有新主一个节点在跑，其余节点没重指向</td><td>把「重建其余节点」写进同一个脚本和验收清单，不允许分两步手动做</td></tr>
+    <tr><td><b>只读没设 / 从库被写</b></td><td>切换后有人还在往原主或从库写数据</td><td>只读要成对设置，并确认它对高级权限也生效；从库写入必须被视为故障而不只是违规</td></tr>
+  </table>
+  <pre><span class="c"># 计划切换第一步：让老主停止接收写</span>
+SET GLOBAL read_only = ON;
+SET GLOBAL super_read_only = ON;      <span class="c"># 让高权限账号也只读，这一步常被漏掉</span>
+
+<span class="c"># 确认每个候选都已追平（两边都有自己的执行集，比较差集，不是看 Seconds_Behind）</span>
+SELECT @@gtid_executed;
+SHOW REPLICA STATUS\G
+
+<span class="c"># 把其余从库指向新主（老写法 STOP SLAVE / CHANGE MASTER TO，新版本用 REPLICA / SOURCE，以版本为准）</span>
+STOP REPLICA;
+CHANGE REPLICATION SOURCE TO SOURCE_HOST='10.0.0.11', SOURCE_AUTO_POSITION=1;
+START REPLICA;
+
+<span class="c"># 提升完成后，立刻把这个节点解锁，并检查有没有残留的复制配置</span>
+SET GLOBAL read_only = OFF;
+SET GLOBAL super_read_only = OFF;
+RESET REPLICA ALL;</pre>
+  <div class="callout danger">
+    <b>最需要说出口的一句话：切换是有可能丢数据的，关键在于丢多少是事先接受的。</b>在异步复制下，主库崩溃时那一段已经提交但没传出去的事务<b>就是会丢</b>。把它说成「我们能做到零丢失」是不诚实的，也是面试里最容易被追问崩的一句。<b>诚实的说法是：默认可能丢失的量对应我们在 RPO 里的承诺，这个值可以由半同步或多数派提交进一步缩小，代价是写入性能。</b>
+  </div>
+  <p>最后提醒一个容易被漏掉的收尾：<b>切换之后，备份策略也要跟着变。</b>备份打向「原主」的任务如果不更新，后续所有新备份可能都在一个已经降级的节点上跑，而它甚至不再有新数据。<b>变更之后的验收清单里，应该包含「备份任务打向谁」这一项。</b></p>
+  <p><b>面试怎么答：</b>「故障切换我不直接拉从库。先确认原主是真的不可用还是只是网络分区——这一步没确认就切换会导致双写；然后比较 GTID 集合挑数据最全的候选；如果原主还能连上就先取回残留 binlog；切换时同时做隔离确保老主不可能再被写；切完立刻让其余节点指向新主、并重跑一次备份。全过程要建立在一个前提上：<b>异步复制下允许丢的那一段，就是我们写在 RPO 里的值。</b>」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>慢查询闭环：发现、归类、分析、上线、复查</h2></div>
+  <p class="lead">「慢了怎么处理」的廉价答案是「加索引」。这个答案之所以廉价，是因为它跳过了前两步和后一步：<b>不先确认是不是 SQL 的问题，也不确认加完之后到底有没有变快。</b></p>
+  <p><b>第一步：发现。</b>慢日志记录执行时间超过阈值的语句，这是入口。它的阈值要按业务的实际延迟容忍来设，而不是随便挑一个。<b>另外一条辅助记录「未使用索引的查询」，需要谨慎开启</b>——一旦开启，日志可能会被大量扫描小表的语句灌满，反而把真正的慢查询淹掉，磁盘也会跟着吃紧。除了日志，performance_schema 与 sys 提供的摘要视图是更轻量的发现方式：它们不需要日志解析，按语句模板（digest）聚合，总耗时与执行次数等指标已经内置。</p>
+  <p><b>第二步：归类。</b>关键是不要把「执行次数多」和「单次慢」混为一谈。一条每天只跑一次但每次跑十分钟的报告查询，和一条每秒一千次但每次一毫秒的点查，优化价值完全不同。<b>正确的排序是按「总耗时占比」而不是单次耗时</b>，因为总耗时才是资源账单上的那一行。日志分析工具的价值就在这里：它把同一模板的语句聚合，给出总耗时、平均、高分位、以及最关键的<b>扫描行数与返回行数的比值</b>。</p>
+  <p><b>第三步：分析。</b>看执行计划。真正常用的就四列：<b>类型（有没有走索引、是哪种访问方式）、实际用的索引、预估扫描行数，以及额外信息里有没有临时表或文件排序。</b>如果预估行数与实际行数差得很远，往往意味着统计信息过时或者优化器判断失误。较新的版本还提供了带实际执行数据的执行计划输出，能把「预估」和「实际」放在同一张结果里对比，这比单纯的 EXPLAIN 更可靠。</p>
+  <table>
+    <tr><th style="width:130px">症状</th><th>常见成因</th><th>优先手段</th></tr>
+    <tr><td>扫描行数远大于返回行数</td><td>没有可用索引，或索引失效</td><td>补 / 改索引，目标是让扫描行数贴近返回行数</td></tr>
+    <tr><td>列上包了函数或发生了隐式类型转换</td><td>导致索引不可用</td><td>改 SQL 或改字段类型，让比较发生在裸列上</td></tr>
+    <tr><td>排序 / 分组走到临时表与文件排序</td><td>排序字段与索引顺序不匹配</td><td>调整索引顺序使其覆盖排序；或减少参与排序的数据量</td></tr>
+    <tr><td>深分页越来越慢</td><td>需要跳过大量行</td><td>改写成基于上一页最大值的游标方式</td></tr>
+    <tr><td>单表数据量本身太大</td><td>即使走索引也要大量随机 IO</td><td>归档历史数据、按业务拆分、加缓存</td></tr>
+  </table>
+  <p><b>第四步：上线。</b>加索引这个动作本身就有风险。<b>在线 DDL</b> 能力已经覆盖了大部分加索引的场景，但必须确认三件事：它可能仍然要重建表（取决于具体操作和版本）、它可能挤占磁盘和 IO、以及<b>它一定会带来从库的延迟</b>（因为从库也要回放同一变更）。对大表更稳妥的做法是用影子表类工具（触发器模式的 PT-OSC，或拖 binlog 式的 <span class="k">gh-ost</span> 之类）：它们先在后台建一张影子表、把数据搬过去、再通过有限的窗口切换表名。<b>共同前提是：表要有主键、磁盘要足够、并且要能限速与随时暂停</b>——后两条是这类工具真正的安全阀。外键与触发器的限制请以工具本身的文档为准。</p>
+  <p><b>第五步：复查。</b>这一步被跳过得最多。上线当天要对比：执行计划的预估行数有没有降下来、慢日志里这个语句模板是不是消失了、接口的响应时间和数据库资源使用有没有变化。<b>并且必须在几天后再看一次</b>——因为上线当天的数据分布可能不具有代表性，某些查询在数据量增长后才暴露问题。闭环的意义就在这里：它不是一个动作，是一个持续重复的周期。</p>
+  <pre><span class="c"># 发现：先确认开关与阈值是否按你想要的方式开着</span>
+SHOW VARIABLES LIKE 'slow_query_log%';
+SHOW VARIABLES LIKE 'long_query_time';
+
+<span class="c"># 归类：按语句模板聚合，看总耗时与扫描/返回比</span>
+pt-query-digest slow.log --limit 20
+
+<span class="c"># 分析：预估 vs 实际，两条语句一起跑</span>
+EXPLAIN FORMAT=JSON SELECT ...\G
+EXPLAIN ANALYZE SELECT ...\G        <span class="c"># 较新版本支持，能给出实际行数与耗时</span>
+
+<span class="c"># 上线：大表用影子表工具，并明确限速；限速与安全阀的具体参数以工具文档为准</span>
+gh-ost --alter="ADD INDEX idx_x (col)" --database=app --table=orders --execute --max-load=Threads_running=50</pre>
+  <div class="callout warn">
+    <b>索引不是越多越好。</b>每多一个索引，写入就要多维护一份结构、占用更多空间，而且<b>优化器面对多个候选索引时更容易选错</b>——你可能看到「加了索引反而更慢」。所以索引优化的方向通常是<b>合并冗余索引、调整复合索引的字段顺序以获得覆盖能力</b>，而不是单纯做加法。判断依据回到那条老实话：<b>看扫描行数与返回行数的比值。</b>
+  </div>
+  <p><b>面试怎么答：</b>「慢查询我走闭环：慢日志或性能摘要发现，用日志分析工具按模板归类并按总耗时排序，看执行计划的四列（访问类型、实际索引、扫描行数、临时表与文件排序），然后才决定是补索引、改 SQL、归档还是加缓存。上线一定要对比前后的预估行数与响应时间，并且几天后复查一次。另外要注意索引不是越多越好，多余的索引会增加写成本和误导优化器。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>容量与磁盘：用「动作要多久」代替「还剩百分之几」</h2></div>
+  <p class="lead">「磁盘 85% 要不要处理？」这个问题问错了。真正该问的是：<b>按照当前的增长速率，我还有多少时间来从容地做一件事；以及这件事本身需要多久。</b>百分比不告诉你任何行动窗口。</p>
+  <p>增长速率的算法很朴素：<b>同一个对象在两个时间点上的大小差，除以间隔</b>。但有三件事容易错。第一，<b>要看多个间隔</b>：只看最近一天，会被一次临时的批量导入误导；至少要看周级别和月级别两条曲线。第二，<b>要剔除周期性</b>：月末结算、季度关账、大促会形成台阶，把它们算进线性预测会低估或者高估。第三，<b>要考虑已知变更</b>：下周要上线一个新库、要开一个新的日志源，这些不在历史曲线里。</p>
+  <p>然后是更有价值的那个视角转变。<b>判断一个实例是不是「太大了」，标准是运维动作的时间。</b>具体说是三个时间：<b>全量备份多久</b>、<b>一次结构变更多久</b>（含影子表搬迁）、<b>故障后恢复多久</b>。当这三个数字大到让你不敢在业务低峰完整地跑一遍时，这个实例就已经超出了它的运维半径，这时候该谈拆分或归档，而不是继续看还剩多少磁盘。</p>
+  <table>
+    <tr><th style="width:150px">占用来源</th><th>为什么会长</th><th>处理手段</th></tr>
+    <tr><td><b>表数据与索引</b></td><td>业务增长；索引数量多也会明显占空间</td><td>归档历史数据、清理冗余索引、必要时拆分</td></tr>
+    <tr><td><b>binlog</b></td><td>写入量大且保留期长；大事务会产生巨大的日志</td><td>保留期与实际占用要<b>双指标同时监控</b>；清理前确认从库已拉取且备份已包含</td></tr>
+    <tr><td><b>relay log</b></td><td>从库积压或复制异常时会持续堆积</td><td>先修复制；单点堆积时确认是否还有拉取价值</td></tr>
+    <tr><td><b>临时文件</b></td><td>大排序、大分组、大去重在内存不够时落盘</td><td>先看是哪条 SQL 导致的，多半会回到慢查询那一节</td></tr>
+    <tr><td><b>undo / 历史版本</b></td><td>长事务不结束，历史版本就无法被回收</td><td>监控长事务；必要时靠独立的表空间与自动回收能力处理（能力依赖版本）</td></tr>
+    <tr><td><b>本地残留的备份</b></td><td>备份产出后没有传走或没有清理</td><td>把「传走 + 校验 + 删除本地」串成一个任务</td></tr>
+  </table>
+  <p>归档这件事必须说清楚边界：<b>保留年限往往不是运维能决定的</b>，它来自合规和业务要求。所以归档方案的产出应该是「按年/月把冷数据搬到归档库或对象存储，并保证可以按细节找回」，而不是「删除」。这种时候，比技术手段更重要的其实是流程：<b>归档策略要写在文档里并有人签字</b>。</p>
+  <p>关于回收空间有一个常见误区：<b>删了大量行之后，文件并不会变小。</b>这些空间被标成可复用，留着给后续的写入使用。想真正把文件缩小，需要重建表，而重建表<b>需要额外的空间（接近表大小）并且会带来明显的复制延迟</b>。所以除非磁盘真的必须回收，通常建议接受这些「空洞」，把它们当作数据库自己的空闲空间。</p>
+  <pre><span class="c"># 大小分布：先看清被谁吃了</span>
+SELECT table_schema, ROUND(SUM(data_length+index_length)/1024/1024/1024, 2) AS size_gb
+FROM information_schema.tables GROUP BY table_schema ORDER BY size_gb DESC;
+
+<span class="c"># 单实例总大小与增长：定期采样同一条语句，两次相减再除以天数</span>
+SELECT ROUND(SUM(data_length+index_length)/1024/1024/1024, 2) AS total_gb
+FROM information_schema.tables WHERE table_schema NOT IN ('information_schema','performance_schema','mysql','sys');
+
+<span class="c"># binlog：先看清单，再决定清理到哪个点</span>
+SHOW BINARY LOGS;
+PURGE BINARY LOGS BEFORE '2026-06-01 00:00:00';
+
+<span class="c"># 长事务导致版本回收不掉：这一条既是容量问题也是稳定性问题</span>
+SELECT trx_started, trx_rows_modified, TIMESTAMPDIFF(SECOND, trx_started, NOW()) AS secs
+FROM information_schema.innodb_trx ORDER BY trx_started LIMIT 10;</pre>
+  <div class="callout danger">
+    <b>PURGE BINARY LOGS 是清理动作里最危险的一个。</b>它删掉的日志可能有两个还在用它的消费者：<b>还没拉到这段的从库</b>（删完之后这个从库再也追不上，只能重做），以及<b>依赖这段做 PITR 的备份</b>（删完之后恢复就只能回到上一个全量点）。所以清理的正确前提是依次确认：先看最落后的从库已经拉到哪个文件，再看时间点恢复窗口需要的最早时间，取二者更早的那个作为保留边界。
+  </div>
+  <p><b>面试怎么答：</b>「容量我看的是增长速率和三个动作的时间——全量备份多久、结构变更多久、故障恢复多久——而不是磁盘百分比。磁盘被谁占了要分开看：数据索引、binlog、临时文件、长事务导致的版本堆积、以及本地残留的备份。清理 binlog 之前必须同时确认从库已拉取、备份不再需要这段做 PITR，否则就从『磁盘紧张』升级成『重做一个从库』。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>高可用与中间件：Orchestrator 做决策，代理做流量</h2></div>
+  <p class="lead">「你们用什么做高可用？」背出一串工具名没有价值。<b>有价值的是说清每个组件站在哪一层、负责什么、凭什么认为它可靠。</b>因为一旦说错层次，问一句「那切换是谁做的」就接不上了。</p>
+  <p>先把角色分开。<b>拓扑管理与故障转移工具</b>（如 Orchestrator）解决的是「<b>谁该成为新的主</b>」：它持续发现拓扑、检查每个节点的健康与复制关系、并在主库不可用时选出一个候选者完成提升。它的关键能力是<b>钩子（hooks）</b>：因为提升完成之后还必须伴随一堆「外部世界的改变」（VIP 漂移、DNS 更新、代理层摘除、告警通知），这些必须由钩子驱动。<b>代理或路由层</b>（ProxySQL、MaxScale、MySQL Router 一类）解决的是「<b>流量怎么走到正确的地方</b>」：它做连接池、读写分离、查询路由与重写、以及对后端做健康检查并自动摘除。<b>两者是互补而不是替代关系</b>：前者决定拓扑，后者让拓扑变化对应用透明。</p>
+  <table>
+    <tr><th style="width:150px">方案</th><th>站在哪一层</th><th>特点与限制</th></tr>
+    <tr><td><b>Orchestrator</b></td><td>拓扑管理与决策</td><td>持续发现拓扑、支持 GTID 的半自动/自动切换、通过钩子把切换结果通知到 VIP、代理、监控等外部系统。<b>它本身也要高可用</b>（多节点 + 后端共识），否则它成了新的单点</td></tr>
+    <tr><td><b>ProxySQL / MaxScale / Router</b></td><td>流量层</td><td>连接池与读写分离、健康检查自动摘除坏节点、可重写或路由特定查询。<b>缺点是增加一跳，并且它自己必须成对部署</b></td></tr>
+    <tr><td><b>MHA</b></td><td>拓扑管理（较早期）</td><td>曾经广泛使用，思路是尽量抓取原主的残留 binlog 来减小丢失窗口。<b>活跃度已明显低了，选型前请按当前时间确认其维护状态</b>，新项目多数转向前两类或官方方案</td></tr>
+    <tr><td><b>InnoDB Cluster / 组复制</b></td><td>存储层的一致性承诺</td><td>基于组复制的多数派确认，一致性更强、自动切换是内置能力；<b>代价是写性能开销和 quorum 要求</b>（一般要求奇数个节点）</td></tr>
+    <tr><td><b>Keepalived + VIP</b></td><td>网络层</td><td>简单直观，但<b>不跨网络分区</b>，且必须仔细处理故障恢复时的抢占，否则会出现两台同时持有 VIP</td></tr>
+  </table>
+  <p>读写分离的现实问题值得单独讲，因为它是最容易被「过度承诺」的一环。<b>只要读走了从库，就一定会引入延迟一致性问题</b>。所以必须有一条明确的规则：<b>写完立刻读的那次请求强制走主</b>（按会话、按事务或者按语句标记），其余对实时性不敏感的查询才允许走从库。<b>还要有自动保护：延迟超过阈值的从库应该被自动摘除，而不是继续接收读请求</b>——否则用户会读到「明明刚提交却查不到」的数据，那比慢一点难解释得多。</p>
+  <pre><span class="c"># 代理层常见的健康检查与摘除思路（命令以你使用的代理文档为准）</span>
+SELECT hostgroup_id, srv_host, status, max_replication_lag FROM runtime_mysql_servers;
+
+<span class="c"># 切换事件的可观测性：拓扑变更后第一件事是确认新拓扑</span>
+SHOW REPLICA STATUS\G
+SELECT @@server_id, @@read_only;
+
+<span class="c"># 一致性核对：切换/迁移之后的必备动作</span>
+CHECKSUM TABLE app.orders;
+SELECT COUNT(*) FROM app.orders;</pre>
+  <div class="callout warn">
+    <b>每引入一个中间件，就引入一个新的单点。</b>代理把数据库的高可用搬到了自己身上，所以<b>代理必须成对部署并且彼此互相监控</b>；拓扑管理工具同样如此。<b>更重要的是要有「绕过中间件」的应急通道</b>：一旦代理本身出问题时，能不能快速让应用直连主库？这个方案要提前写好并演练，不要等到故障当晚才讨论。
+  </div>
+  <p><b>面试怎么答：</b>「我把高可用拆成决策层和流量层。决策层负责『谁主』，比如 Orchestrator，它靠拓扑发现和 GTID 选择候选者，再通过钩子去改 VIP、通知代理；流量层负责『流量怎么走』，比如 ProxySQL，做读写分离和健康检查摘除。两者互补。如果往更强的一致性走，可以考虑基于组复制的官方集群方案，代价是写性能和节点数要求。另外每加一层中间件都必须成对部署，并且预留绕过它的应急通道。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>权限、审计与安全：最高风险的动作往往是一句 UPDATE</h2></div>
+  <p class="lead">数据库运维里真正不可逆的损失，多数不是硬件故障，而是<b>一句权限过宽的授权，或者一次没有边界的订正</b>。所以这一节的两个重点是：把权限收窄，把高危动作变慢。</p>
+  <p><b>权限：</b>应用账号按最小可用原则授权，通常只需要具体库的读写能力；<b>报表/只读类账号单独给 SELECT</b>；不要给应用账号高级权限（比如能改全局状态、读任意文件的那些），也不要远程允许 root 并且用通配主机加全部权限。<b>从库上除了只读，还要让高权限账号也只读</b>——只设普通只读开关是拦不住高权限账号写入的，这一点在切换场景里特别重要（否则老节点被写脏的概率会上升）。</p>
+  <p><b>凭据：</b>密码不要写在代码仓库里，也不要以明文的形式长期停留在配置中心或容器环境变量里。<b>轮换要有周期和流程</b>：轮换要同时在应用和数据库侧生效，最容易出的事是「改了库这边，应用那边的连接全部失败」——所以它必须配合连接池的平滑重连来设计。</p>
+  <p><b>审计：</b>要能回答「谁在什么时候改了什么」。做法通常是启用审计插件把连接与查询写进日志。<b>通用查询日志（general log）不是审计的替代品</b>：它写所有语句、开销大、也不便于长期留存，只适合短时间临时排查。<b>审计日志本身要外发</b>——留在数据库本地，被攻击者覆盖了就等于没有。</p>
+  <p><b>数据保护：</b>传输层的加密要解决的是「内网流量能不能被窃听」，生产环境普遍要求开启并要求必须使用加密连接。落盘加密（依赖 keyring 之类的密钥管理组件，具体能力与你的版本和发行版有关，请以官方文档为准）解决的是「存储介质与快照被拿走」的风险。<b>真正的风险点在敏感字段：</b>能在设计上不落明文的就不要存明文，能哈希的用哈希（注意哈希不能用于需要还原的场景），出报表与导出一律走脱敏流程。</p>
+  <pre><span class="c"># 授权：按库、按用途，不给通配</span>
+CREATE USER 'app_w'@'10.0.%' IDENTIFIED BY '****';
+GRANT SELECT, INSERT, UPDATE, DELETE ON appdb.* TO 'app_w'@'10.0.%';
+CREATE USER 'report_r'@'10.0.%' IDENTIFIED BY '****';
+GRANT SELECT ON appdb.* TO 'report_r'@'10.0.%';
+
+<span class="c"># 查看谁拥有多余权限：定期盘点</span>
+SHOW GRANTS FOR 'app_w'@'10.0.%';
+SELECT user, host, account_locked FROM mysql.user;
+
+<span class="c"># 传输加密与强制要求（参数名以版本为准）</span>
+SHOW VARIABLES LIKE 'require_secure_transport';
+SHOW STATUS LIKE 'Ssl_cipher';
+
+<span class="c"># 高危订正：先用 SELECT 确认命中范围，再在事务里分批执行</span>
+START TRANSACTION;
+SELECT COUNT(*) FROM orders WHERE status='x' AND created_at &lt; '2026-01-01';
+UPDATE orders SET status='archived' WHERE status='x' AND created_at &lt; '2026-01-01' LIMIT 1000;
+<span class="c"># 确认行数符合预期再 COMMIT，否则 ROLLBACK</span></pre>
+  <div class="callout danger">
+    <b>不带 LIMIT 的 UPDATE/DELETE 是运维事故排行榜上的常客。</b>三条硬性动作原则：<b>一、先用同样条件的 SELECT 数一遍</b>，确认命中的行数与业务方说的一致；<b>二、放进事务里，查一眼再提交</b>，给一次反悔的机会；<b>三、分批次带 LIMIT 执行</b>，一次改太多不仅锁范围大、也会在从库上造成巨大的回放延迟。<b>如果条件允许，把「删除」改成「标记删除 + 异步清理」</b>，这是唯一真正能被撤销的做法。
+  </div>
+  <p><b>面试怎么答：</b>「权限我按用途分：写入账号只给具体库的 DML，报表账号只给 SELECT，不给通配主机和高级权限，从库要把只读对高权限也生效。审计我用审计插件而不是通用日志，并且日志必须外发。对最高危的订正操作，原则是先用 SELECT 确认范围、放进事务、分批 LIMIT，并且优先把删除改成标记删除。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>十个坑：备份工作里最贵的十个错误</h2></div>
+  <p class="lead">下面这些不是知识缺口，是<b>把流程简化成一次命令</b>造成的。它们的共同点是：动作本身看起来没做错，缺的是动作之前的那个确认。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">有备份，但从未恢复过</div><div class="pd">备份任务成功只说明文件写出来了。真正要验证的是：能拉起、数据校验一致、并且能精确到误操作前一刻。没演练过，就没有 RTO 这个数字。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">备份留在源库同一块盘、同一套凭据下</div><div class="pd">主机坏、盘坏、被勒索，备份跟着一起没。异地那份必须用<b>隔离的凭据</b>，并开启不可变或只追加的保留窗口。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">只做全量备份，没有连续的 binlog</div><div class="pd">那就只能恢复到备份点，做不到 PITR。反过来，binlog 保留期短于恢复所需窗口，同样等于丢了最后一段。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">RPO 和 RTO 答反，或者只答口号没有数字</div><div class="pd">RPO 是丢多少，RTO 是等多久。这两个数字必须来自实测：一次真实恢复演练的端到端耗时，才是你的 RTO。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">用 Seconds_Behind_Master 判断能不能切换</div><div class="pd">大事务执行到一半时它可以是 0，卡住时又可能停在一个很大的数。判断应该用 GTID 集合的差集，加上心跳表看端到端时延。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">主库不可达就直接拉从库顶上</div><div class="pd">没确认是网络分区还是真死亡，就可能变成双写；也没尝试取回原主的残留 binlog，白白扩大了丢失窗口。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">切换后只改了流量，忘了重建复制</div><div class="pd">新主单点运行的状态下再来一次故障就是不可逆的。重建其余节点、以及更新备份打向谁，必须写进同一个验收清单。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">慢了就加索引，不看扫描/返回比也不复测</div><div class="pd">加索引本身有写成本和误导优化器的风险，且会造成从库延迟。上线必须对比执行计划和响应时间，几天后再复查一次。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">磁盘告警后直接清理 binlog 到最新</div><div class="pd">清掉的可能是从库还没拉走的事件，或者 PITR 需要的那一段。清理前必须先确认最落后从库的进度和 PITR 窗口，取更早的那个作为边界。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">应用账号用通配授权，订正数据不用事务</div><div class="pd">一次范围判断失误、并且连退路都没有。订正的原则是：先数一遍、放进事务、分批 LIMIT，优先改成标记删除 + 异步清理。</div></div></div>
+  <p><b>面试怎么答：</b>挑一条讲成三段：当时的判断、造成的损失、后来改成了什么。比如「有次磁盘告警，我直接把 binlog 清到只剩最近一天，空间确实下来了，但第二天发现那个从库一直追不上——它当时落后了两天。最后只能重做从库，反而多花了一晚上。从那以后清理 binlog 前必须先确认两件事：最落后的从库拉到哪了、PITR 需要的最早时间是多少，取更早的那个当边界。」第三段最重要，它证明你改的是流程而不是运气。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 关于 RPO 和 RTO，正确的说法是？</div>
+      <button class="opt">RPO 是恢复需要多长时间，RTO 是允许丢失多少数据</button>
+      <button class="opt">RPO 是允许丢失的数据量（恢复到哪个时间点），RTO 是允许的服务恢复时长</button>
+      <button class="opt">两者都只由备份介质的容量决定</button>
+      <button class="opt">只要开了主从复制，两者就自动为零</button>
+      <div class="ans">正确答案：<b>第二段</b>。RPO 关心的是 Point（数据能回到哪一刻），RTO 关心的是 Time（多久能恢复服务）。异步复制下主库崩溃仍会丢失尚未传出的那部分事务，因此 RPO 不为零；恢复也不是瞬间完成的，所以 RTO 不为零。真实值应当来自一次完整的恢复演练，而不是估算。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">2. 误删一张表，最近一次全量备份是 24 小时前，binlog 完整保留。要尽量不丢数据，正确的恢复顺序是？</div>
+      <button class="opt">直接用最新的从库顶替，不需要备份</button>
+      <button class="opt">只恢复全量备份，接受丢失这 24 小时的数据</button>
+      <button class="opt">先重放 binlog 到误删之后，再恢复全量备份</button>
+      <button class="opt">恢复全量备份到独立实例，再重放 binlog 直到误删操作之前那一刻，然后校验并对业务开放</button>
+      <div class="ans">正确答案：<b>第四段</b>。这就是时间点恢复（PITR）：全量给出基线，binlog 精确补到误操作前一刻。顺序不能颠倒；「只恢复全量」会白白丢一天的变更；「直接将某个从库顶替」不能解决已经同步过去的删除动作——误删会同样复制到从库。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. 从库的延迟指标（<span class="k">Seconds_Behind_Master</span> 或新版本对应字段）显示为 0，能否据此认为它没有落后？</div>
+      <button class="opt">能，这是官方权威指标，为 0 就是完全同步</button>
+      <button class="opt">能，但只有在复制未开启时才可信</button>
+      <button class="opt">不能。大事务执行过程中它可以是 0，卡住时又可能停在旧值；应改用 GTID 集合差与心跳表</button>
+      <button class="opt">不能，应该改看从库的 CPU 使用率</button>
+      <div class="ans">正确答案：<b>第三段</b>。这个值的计算依赖「正在回放的事件时间戳」，因此在大事务未结束、从库卡住、或者主库长时间无写入时都会失真。可靠判据是两边已执行 GTID 集合的差集（精确到事务数）与心跳表（端到端时延）。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">4. 主库失联，准备提升从库为新主。下面哪一步被漏掉的风险最大？</div>
+      <button class="opt">给新主配置更强的硬件规格</button>
+      <button class="opt">确认原主是否真的不可用（是否为网络分区），并对其进行隔离，防止双写</button>
+      <button class="opt">提前通知所有业务方暂停一切读请求</button>
+      <button class="opt">先把所有慢查询日志清空以便观察</button>
+      <div class="ans">正确答案：<b>第二段</b>。「不可达」不等于「已停止服务」。如果原主只是网络分区、之后又恢复，而你已经把写流量切到新主，就会形成双写，两边数据再也对不上——这是切换里最难收拾的一类故障。因此必须先确认状态并做隔离（摘 VIP、断网、停实例等），再谈提升。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">5. 磁盘告警后需要清理 binlog 腾空间。清理的边界应该怎么定？</div>
+      <button class="opt">取「最落后从库已拉取到的位置」与「PITR 所需的最早时间点」两者中更早的那个</button>
+      <button class="opt">直接清理到只剩当前正在写的文件</button>
+      <button class="opt">按文件数量删掉一半，既简单又公平</button>
+      <button class="opt">把 binlog 关掉，这样就永远不会再占空间</button>
+      <div class="ans">正确答案：<b>第一段</b>。binlog 有两个还在使用它的消费者：尚未拉到该位置的从库（删了它再也追不上，只能重做）和依赖它做时间点恢复的备份（删了就只能回到全量点）。边界必须取两者中<b>更保守</b>的那个。关闭 binlog 会同时切断 PITR 与复制能力，绝不能作为腾空间的手段。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">6. 关于慢查询优化，做法最完整的是？</div>
+      <button class="opt">发现慢日志里有一条慢 SQL，立刻给它所在表的每个字段都加上索引</button>
+      <button class="opt">按单次执行时间排序，优化耗时最长的那一条</button>
+      <button class="opt">先盯住当前那一条 SQL，加完索引就收尾</button>
+      <button class="opt">按总耗时占比归类定位 → 用执行计划分析类型/索引/扫描行数与临时表 → 决定是改索引、改 SQL、归档还是加缓存 → 上线后对比前后指标并择日复查</button>
+      <div class="ans">正确答案：<b>第四段</b>。慢查询要闭环，四个环节缺一不可。排序应按<b>总耗时</b>而不是单次耗时；「给每个字段都加索引」会带来写成本、空间占用并误导优化器；加完索引不复测，则无法确认是否真的变快，也可能在数据量增长后重新暴露问题。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:180px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>逻辑备份</b></td><td>导出为 SQL 语句，可读可挑表可跨版本，代价是恢复慢</td></tr>
+    <tr><td><b>物理备份</b></td><td>直接拷贝数据文件再用日志前滚回滚，备份与恢复都快，粒度通常以实例为单位</td></tr>
+    <tr><td><b>PITR</b></td><td>Point-in-Time Recovery，时间点恢复：全量备份 + 重放 binlog 到指定时刻</td></tr>
+    <tr><td><b>RPO</b></td><td>恢复点目标：允许丢失的数据量或时间窗口</td></tr>
+    <tr><td><b>RTO</b></td><td>恢复时间目标：从故障到服务可用所允许的时长</td></tr>
+    <tr><td><b>GTID</b></td><td>全局事务标识，让从库不必人工换算 binlog 文件名与位置即可定位同步点</td></tr>
+    <tr><td><b>relay log</b></td><td>从库端的中转日志，IO 线程写入、SQL 线程回放，因此也带来第二种「延迟」</td></tr>
+    <tr><td><b>ROW 格式</b></td><td>记录行的前后变化，重放确定性强但体积大；<b>目标表无主键会严重放大回放成本</b></td></tr>
+    <tr><td><b>半同步复制</b></td><td>主库提交前等待至少一个从库确认收到，缩小丢失窗口，代价是写入延迟</td></tr>
+    <tr><td><b>影子表变更</b></td><td>用触发器或拖 binlog 的方式在后台建影子表并切换，是大表结构变更的主流做法</td></tr>
+    <tr><td><b>Orchestrator</b></td><td>拓扑发现与故障转移的决策者，靠钩子把切换结果同步给 VIP、代理与监控</td></tr>
+    <tr><td><b>ProxySQL</b></td><td>流量层代理，做连接池、读写分离、健康检查与自动摘除后端</td></tr>
+    <tr><td><b>super_read_only</b></td><td>让拥有高级权限的账号也无法写入，是普通只读开关的必要补充</td></tr>
+    <tr><td><b>Checksum</b></td><td>表级校验和，用来发现「能连上但数据不一致」，是迁移与切换后的必做动作</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 在本地建一个主从，主库上执行一个大事务，同时观察从库延迟指标失真（前面的阶段一直是 0），再用 GTID 集合差确认真实落后量；② 完整跑一次 PITR：全量备份 → 恢复到一个新实例 → 故意执行一条误删 → 用 binlog 重放到误删之前 → 校验数据存在；③ 造一张几百万行的无索引表，用日志分析工具看扫描行数与返回行数的比值，加索引后对比执行计划的高位变化；④ 执行一次带 LIMIT 的分批订正，先数行、再放进事务、确认后再提交，把这个顺序练成肌肉记忆。<br><br>
+    <b>之后值得单独学：</b>第 17 期 MySQL 基础与索引是这一篇的直接前置；第 21 期事故复盘，讲的正是「故障时你依赖的那个数字有没有演练」；第 32 期讲韧性设计，与切换过程中的容错（超时、重试、熔断）是同一套思路在应用层和数据层的两次落地。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 41 期 · 备份的价值不在备份任务成功，而在恢复演练那天它真的能用</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

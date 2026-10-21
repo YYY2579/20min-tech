@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>混沌工程与故障演练：怎么证明你的系统真的可靠</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 44 期</span>
+    <h1>混沌工程与故障演练：怎么证明你的系统真的可靠</h1>
+    <p class="sub">「我们做过灾备演练」不算，<b>能说出上次演练发现了什么才叫做过</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>9</b> 大模块</span>
+      <span class="chip"><b>10</b> 个实验</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你上次演练，注入真的生效了吗？用什么指标证明它生效了？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：演练做了，可靠性没涨</h2></div>
+  <p class="lead">「演练报告写的是一切正常。」「混沌平台上了半年，一个问题都没发现。」「上次演练把生产搞挂了，现在没人敢提演练。」这三句话来自三种完全不同的团队，但根因是同一个：<b>把混沌工程当成了「测试」而不是「实验」</b>。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>演练报告写「一切正常，未发现异常」</td><td>系统很稳，演练通过</td><td>实验选的是已经知道成立的场景（比如随机杀一个无状态副本）。它验证的是你早就有的冗余，没碰真正的单点。<b>「未发现异常」在混沌工程里是负面结果，不是成绩</b></td></tr>
+    <tr><td>平台半年零发现</td><td>平台没用，或者系统真的没弱点</td><td>更可能是两件事：注入没真的生效（但没人验证），或者稳态指标接错了，用户已经能感知的降级在指标上没动</td></tr>
+    <tr><td>一次演练搞挂生产</td><td>混沌工程太危险，不适合我们</td><td>爆炸半径没定义、终止条件没自动化、而且选在业务高峰做。这不是混沌危险，是实验设计缺了三样东西</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>实验不是测试</div><div class="cd">测试验证已知行为，结果是「通过/不通过」；实验探索未知行为，结果是「假设成立/被推翻」。允许被推翻，才叫实验。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>假设必须可证伪</div><div class="cd">「系统不会挂」不是假设，「注入 500ms 延迟后下单成功率仍高于 99.9%，因为 A 服务配了超时和熔断」才是。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>发现是资产</div><div class="cd">演练的唯一产出不是报告，是带 owner 和 deadline 的改进项，以及复跑实验时那组前后对比的数字。</div></div>
+  </div>
+  <p>这一篇的顺序是：先把「混沌工程是什么、能不能做」讲清（前提不满足就别做，做了只会制造事故），然后花两节讲<b>实验设计四要素</b>和<b>稳态指标怎么选</b>——这两节是本篇的核心，也是面试官判断你真做过还是看过的分水岭；接着给 10 个常见实验和注入手段，再讲演练怎么组织、结果怎么闭环，最后划清它和压测、灾备切换的边界，并给一套面试话术。</p>
+  <div class="callout">
+    <b>先把一句话记住：</b>混沌工程的目的不是「制造故障」，是<b>用一个受控的、可停止的故障，去检验你对系统的理解是不是对的</b>。所以它的产出不是「我们扛住了」，而是「我们以为 X 会顶住，结果它没有，原因是 Y」——后者才是价值所在。
+  </div>
+  <p><b>面试怎么答：</b>「混沌工程是在系统里做受控实验，通过注入真实世界可能发生的故障，来检验我们对系统行为的假设。它和测试最大的区别是：测试的结果是已知的对错，实验的结果未知，假设可能被推翻。判断有没有真做过，我问一句就够了——上次演练发现了什么、改了什么、复跑的结果如何。答不上来，基本就是走过场。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>定义与前提：没有可观测性就别做实验</h2></div>
+  <p class="lead">定义先说准：<b>混沌工程是在系统上做受控实验，通过注入真实世界可能发生的故障，建立对系统抵御失控条件能力的信心</b>。三个关键词——受控、真实世界事件、信心。少了任何一个，它就退化成「随机搞破坏」。</p>
+  <p>业界流传较广的是五条原则（源自 Netflix 最早的实践总结），面试里说出来会显得你对这个领域有整体认识：</p>
+  <table>
+    <tr><th style="width:190px">原则</th><th>说的是什么</th><th>落到动作上</th></tr>
+    <tr><td><b>围绕稳态行为建立假设</b></td><td>先定义「正常长什么样」，再问「故障下它还这样吗」</td><td>实验单的第一行必须是稳态指标</td></tr>
+    <tr><td><b>多样化真实世界的事件</b></td><td>注入的应该是真会发生的故障：节点宕机、网络分区、磁盘满、时钟漂移、依赖超时</td><td>故障清单来自历史故障复盘，不是拍脑袋</td></tr>
+    <tr><td><b>在生产环境运行实验</b></td><td>只有生产才有真实的流量、真实的依赖、真实的规模</td><td>用最小爆炸半径换取在生产上做的资格</td></tr>
+    <tr><td><b>持续自动化运行实验</b></td><td>一次演练只能证明「那天是这样」，配置一变结论就失效</td><td>高频场景固化成定时任务，纳入 CI 或低峰例行</td></tr>
+    <tr><td><b>最小化爆炸半径</b></td><td>能影响 1 个 Pod 就不要影响 10 个，能影响 1% 用户就不要影响全量</td><td>按标签、命名空间、比例收敛，并且验证过能停</td></tr>
+  </table>
+  <p>第三条「在生产做」最容易引起争论，也最容易被误解。它不是说「一上来就在生产搞」，而是说<b>如果你只在测试环境做，你验证的是测试环境</b>——那里的流量模型、数据量、依赖拓扑、缓存命中率都和生产不同，结论不能直接迁移。折中的路径是：先在测试环境证明「工具能注入、能停止」，再在生产用最小半径开始，逐步放大。</p>
+  <p>接下来是准入条件，也就是「现在能不能开始做」的判断清单。这五条里任何一条不满足，我都建议先补它，而不是先做实验：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>可观测性</b>：稳态指标能被度量，且能在秒级看到。没有它，实验根本没有判定依据——你连「有没有偏离稳态」都不知道。</div></div>
+    <div class="step"><div class="txt"><b>已知的健康标准</b>：有 SLO 或明确的成功/失败定义。「成功率低于多少算坏」必须在实验前写死，否则事后会各自解释。</div></div>
+    <div class="step"><div class="txt"><b>可停止</b>：有一键终止实验的手段，并且<b>提前验证过它真的能停</b>。这是安全底线，也是「敢不敢做」的前提。</div></div>
+    <div class="step"><div class="txt"><b>起码的理论冗余</b>：系统至少在纸面上有应对手段（副本冗余、超时、熔断、降级）。如果一个依赖是单点且没有任何兜底，实验的答案必然是「会挂」，那不叫实验，那叫确认已知事实——先把冗余建起来。</div></div>
+    <div class="step"><div class="txt"><b>组织准备</b>：有人有权叫停、有值班在岗、有通知渠道和公告模板。技术之外的这一条，决定了出事时是「可控事件」还是「事故」。</div></div>
+  </div>
+  <pre><span class="c"># 准入自检：这五条答不上来，先别注入任何东西</span>
+1. 稳态指标是什么？在哪个面板看？采集间隔多少？
+2. 判定「坏了」的阈值是多少？谁定的？
+3. 一键停止的命令是什么？上一次验证它有效是什么时候？
+4. 这条链路上已知的单点有哪些？（答不出来说明先该做架构梳理，不是做实验）
+5. 谁有权叫停？值班是谁？通知谁？公告模板在哪？</pre>
+  <div class="callout warn">
+    <b>「先做可观测性还是先做混沌工程」——永远是先做可观测性。</b>顺序反了的团队会陷入一个死循环：注入了故障，看不到变化，于是加大故障强度，直到把系统搞挂才「看到结果」。这不是实验，这是用故障代替监控。正确顺序是：<b>先把指标做出来 → 再做基线（正常时长什么样）→ 再注入最小故障 → 观察指标是否按预期动 → 逐步放大。</b>
+  </div>
+  <p><b>面试怎么答：</b>「定义是在系统上做受控实验，注入真实世界可能发生的故障，来检验我们对系统行为的假设。五条原则是围绕稳态建假设、多样化真实事件、在生产运行、持续自动化、最小化爆炸半径。做之前有五个准入条件：可观测性、已知的健康标准、可停止、起码的理论冗余、组织准备。其中可观测性排第一，没有它，实验就退化成用故障代替监控。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>实验四要素：假设、爆炸半径、稳态指标、终止条件</h2></div>
+  <p class="lead">这是本篇最该背下来的一节，也是面试高频到几乎必考的一节。四要素缺一个，实验就不是实验，是一次有风险的线上操作。<b>它们的分工是：假设决定你要看什么，稳态指标把「看什么」变成可度量的量，爆炸半径决定最坏会坏到哪，终止条件决定什么时候必须收手。</b></p>
+  <table>
+    <tr><th style="width:140px">要素</th><th>回答什么问题</th><th>写的时候要落到</th><th>写错的后果</th></tr>
+    <tr><td><b>假设</b></td><td>我们相信会发生什么</td><td>可证伪的陈述 + 支撑它的机制</td><td>假设太泛（「系统不会挂」）→ 无法判定，实验变成走过场</td></tr>
+    <tr><td><b>稳态指标</b></td><td>怎么判断它有没有发生</td><td>具体的指标名 + 数值范围 + 观察窗口</td><td>指标选错 → 用户已经感知降级，指标纹丝不动</td></tr>
+    <tr><td><b>爆炸半径</b></td><td>最坏会影响多少人</td><td>环境、实例比例、用户比例、区域、时长</td><td>没定义 → 一次注入波及全站，「演练搞挂生产」</td></tr>
+    <tr><td><b>终止条件</b></td><td>什么时候必须停</td><td>可自动判定的阈值 + 回滚动作 + 人工叫停权</td><td>没写 → 靠人盯，人一走神就变成事故</td></tr>
+  </table>
+  <p><b>假设</b>是四要素里最容易被写坏的。一条合格的假设长这样：「当对【目标对象】注入【什么故障】时，【稳态指标】将保持在【什么范围】内，因为【我们有的什么机制】」——这个句式本身就是一个检查清单，<span class="k">缺少任何一括号，假设就不完整</span>。四个括号缺一不可，最后一个尤其重要——<b>写出「因为」，等于写下你对系统的理解；假设被推翻时，你才知道错的是哪一层</b>（是机制不存在，还是机制存在但配置不对）。</p>
+  <p>举例：「当对库存服务 10% 的实例注入 500 毫秒的网络延迟时，下单接口的成功率仍高于 99.9%、P99 仍低于 800 毫秒，因为订单服务对库存的调用配了 200 毫秒超时、熔断阈值 50%，且熔断后走缓存兜底。」这条假设可被推翻的方式很明确：成功率掉了，或者 P99 涨了。而推翻之后的排查方向也很明确：是超时没生效、还是熔断没触发、还是兜底路径是坏的——<b>这就是「因为」那一句的价值</b>。</p>
+  <p><b>爆炸半径</b>要按五个维度分别定义，不能只写一个「10%」：环境（预发 / 生产）、区域（单节点 / 单可用区 / 全地域）、实例比例（1 个 Pod / 10% / 全部）、用户比例（内部账号 / 1% 真实用户 / 全量）、时长（注入多久、在什么时段）。原则是<b>从最小开始</b>：先在单个实例上验证「能注入、能停、指标会动」，再逐级放大。每一次放大都要重新评估终止条件是否还够用——因为半径越大，同样的阈值意味着越大的绝对影响。</p>
+  <p><b>稳态指标</b>这里先给判断标准，下一节专门展开：它必须和用户体验相关（下单成功率，不是 CPU 使用率）、必须敏感（用户能感知的变化它要动）、必须及时（采集间隔要远小于实验时长）、必须在实验前确认它是稳的。四个条件里，「实验前确认它是稳的」最常被忽略——<b>如果基线本身在抖，你无法区分「注入造成的」和「本来就那样」</b>。</p>
+  <p><b>终止条件</b>有三条硬性要求：<b>必须提前写</b>（写在实验单上，不是现场商量）；<b>必须能自动判定</b>（一个阈值，到了就停，不依赖人）；<b>必须保留人工叫停权</b>（任何人觉得不对都能叫停，指挥有最终决定权）。此外还要写清「终止之后的动作」——是删除故障对象让它自然恢复，还是主动重启、切流量、回滚配置，以及最长持续时间（<span class="k">time-box</span>，到了就停，不管有没有结论）。</p>
+  <pre><span class="c"># 一张完整的实验单（四要素必须都能从这里找到）</span>
+实验名称：库存服务网络延迟下的下单链路验证
+假设：      对 inventory 的 10% 实例注入 500ms 出站延迟，
+            下单成功率 ≥ 99.9%、下单 P99 ≤ 800ms；
+            因为 order→inventory 配了 200ms 超时 + 熔断 50% + 缓存兜底
+稳态指标：  order_create_success_rate（1 分钟窗口）、order_create_p99
+            基线：成功率 99.97%、P99 320ms（取自过去 7 天同时段）
+            判定：连续 2 个窗口跌破 99.9%，即判定假设被推翻
+爆炸半径：  生产环境 / 单可用区 / inventory 的 10% 实例 / 只影响真实流量 / 持续 10 分钟 / 业务低峰
+终止条件：  成功率 &lt; 99.5% 或 P99 &gt; 1500ms 立即停止；订单值班可随时叫停；
+            停止动作 = 删除故障对象 + 必要时重启受影响实例；最长 15 分钟
+负责人：    XXX   观测面板：链接   通知范围：订单+库存+值班群</pre>
+  <div class="callout ok">
+    <b>四要素之外，「注入是否生效」必须有独立证据。</b>这是很多团队漏掉的一环：实验跑完结论是「无影响」，实际上是因为注入规则没匹配上任何 Pod、或者注入的延迟被客户端超时提前截断了。所以实验单里还要有第五项：<b>注入生效的证据</b>（比如被注入 Pod 上的 Envoy 指标、或者一条专用的探针请求）。没有这一项，「无影响」这个结论是不可信的。
+  </div>
+  <p><b>面试怎么答：</b>「实验设计有四个要素。假设要写成可证伪的陈述——注入什么故障、稳态指标保持在什么范围、以及『因为我们有哪个机制』，最后这一句最重要，假设被推翻时它决定你从哪里查。爆炸半径按环境、区域、实例比例、用户比例、时长五个维度定义，从最小开始逐级放大。稳态指标要和用户可感知的体验相关，且实验前必须确认它是稳的。终止条件要提前写、能自动判定、并保留人工叫停权，还要写清停止后的回滚动作和最长时长。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>稳态指标怎么选：这是最容易做错的一环</h2></div>
+  <p class="lead">四要素里，假设可以套模板、半径可以按百分比、终止条件可以照抄，唯独稳态指标必须你自己想——因为<b>它决定了这次实验到底在验证什么</b>。选错了，实验的全部投入都会打水漂。</p>
+  <table>
+    <tr><th style="width:150px">层级</th><th>例子</th><th>用途</th><th>能不能当稳态指标</th></tr>
+    <tr><td><b>业务指标</b></td><td>下单成功率、支付成功率、首页可用率、活跃用户数</td><td>判定用户是否受影响，是最终的成败标准</td><td><b>应该。这是首选</b></td></tr>
+    <tr><td><b>服务黄金信号</b></td><td>延迟（P99）、流量（QPS）、错误率、饱和度</td><td>定位受影响的是哪一层</td><td>可以，作为辅助判定和定位</td></tr>
+    <tr><td><b>资源指标</b></td><td>CPU、内存、连接池占用、线程池队列、磁盘 IO</td><td>解释「为什么会这样」</td><td>不适合单独用。资源正常不代表用户没受影响</td></tr>
+  </table>
+  <p>为什么资源指标不能单独当稳态指标？举个典型情况：你把某个服务的线程池打满，但因为入口有限流，用户看到的只是「请求被拒」，成功率掉了 5%，而 CPU 使用率因为线程都在等待反而<b>下降</b>了。只看 CPU 的人会得出「注入无影响」的结论。反过来也一样：CPU 冲到 90%，只要队列还没排到超时，用户体验可能完全没变。<b>资源和服务指标是「为什么」，业务指标才是「是不是」。</b></p>
+  <p>选指标的四条标准，缺一条都会在实验里反噬你：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>相关性</b>：和用户可感知的体验直接相关。选不出业务指标时，退而求其次选「入口的成功率和分位延迟」。</div></div>
+    <div class="step"><div class="txt"><b>敏感性</b>：用户能感知的变化，它必须动。太粗的指标（服务是否存活）会让「明显降级」被判成「正常」。</div></div>
+    <div class="step"><div class="txt"><b>及时性</b>：采集与聚合延迟要远小于实验时长。实验跑 10 分钟而指标 5 分钟才出一个点，你只能看到两个点，无法判断过程。</div></div>
+    <div class="step"><div class="txt"><b>稳定性</b>：实验前基线是稳的。抖动大的指标要先做降噪（拉长窗口、换聚合方式），或者换一个。</div></div>
+  </div>
+  <p>接下来是<b>怎么判定「偏离了稳态」</b>，这里最能体现实验设计水平。三种方法，可靠性递增：</p>
+  <table>
+    <tr><th style="width:170px">方法</th><th>怎么做</th><th>优点</th><th>局限</th></tr>
+    <tr><td><b>绝对阈值</b></td><td>「成功率 &lt; 99.9% 就算偏离」</td><td>简单，能自动化，适合做终止条件</td><td>受时段影响大；阈值本身要合理</td></tr>
+    <tr><td><b>与基线对比</b></td><td>和过去 7 天同一时刻、同样流量的数值比</td><td>消除时段差异，比绝对阈值准</td><td>需要历史数据，且要对齐流量模型</td></tr>
+    <tr><td><b>对照组</b></td><td>注入组和未注入组同时跑，比较差值</td><td>最科学，能排除「刚好那会儿有别的抖动」</td><td>要求流量能被按比例分流且两组可比</td></tr>
+  </table>
+  <p>对照组这一点值得多说一句。很多演练事后争论不休，根源是「这个下跌到底是注入造成的，还是刚好有别的事」。有对照组就直接解决了：注入组掉了 3%、对照组没动，那基本可以确定是注入造成的。<b>能说出「我们用了对照组」的人，在面试里会被判定为真的懂实验设计</b>，因为这是唯一能在噪声环境里得出因果结论的办法。</p>
+  <pre><span class="c"># 稳态指标的定义要写成这样（可自动化判定的形式）</span>
+指标：      order_create_success_rate
+聚合：      1 分钟滑动窗口，按入口网关统计，排除压测流量
+基线：      99.97%（过去 7 天同时段的 P50）；实验当天实测基线 99.96%
+判定偏离：  连续 2 个窗口 &lt; 99.9%
+终止触发：  &lt; 99.5%
+对照：      inventory 未注入的 90% 实例所服务的流量作为对照组
+注入生效证据：被注入 Pod 的 Envoy upstream 响应时间 P99 由 80ms 升至 500ms 以上
+
+<span class="c"># 一条反例：这样的稳态指标不要用</span>
+<span class="c">#   指标： inventory 服务 CPU 使用率 &lt; 70%</span>
+<span class="c">#   问题： 用户体验已降级但 CPU 可能反而下降（线程都在等）；且资源指标</span>
+<span class="c">#          与用户体验没有单调关系，既不能判定成败，也不能作为终止条件</span></pre>
+  <div class="callout danger">
+    <b>「演练没发现问题」通常有三种解释，只有第一种是好事：</b>① 这个环节确实有冗余，假设成立（好事，但要记录为资产）；② <b>注入根本没生效</b>（最常见，因为没有独立的生效证据）；③ 稳态指标接错了，用户能感知的降级在指标上看不出来（第二常见）。所以在宣布「系统很稳」之前，先排除后两种。做法是：<b>先用一个已知会造成影响的强度做一次「阳性对照」</b>——比如注入到 100% 实例、延迟加到 5 秒，确认指标真的会动，再恢复正常强度。医学实验里叫阳性对照，混沌工程里同样必要。
+  </div>
+  <p><b>面试怎么答：</b>「稳态指标首选业务指标，比如下单成功率，因为它是最终成败标准；黄金信号用来定位，资源指标只能解释原因，不能单独当判据。选择标准是相关、敏感、及时、稳定四条，尤其要在实验前确认基线是稳的。判定偏离有三种方法：绝对阈值、与历史基线对比、以及设对照组，对照组最能排除『刚好有别的事』这类争论。另外每次实验都要有独立的注入生效证据，否则『无影响』这个结论不可信。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>10 个常见实验：从最安全的开始往上加</h2></div>
+  <p class="lead">实验清单不是越全越好，而是要<b>按风险从低到高排一个推进路线</b>。下面 10 个覆盖了绝大多数故障形态，每个都写了「它在验证什么」和「通常会发现什么」——发现项才是你面试里的弹药。</p>
+  <table>
+    <tr><th style="width:150px">实验</th><th>注入什么</th><th>验证什么假设</th><th>常见发现</th></tr>
+    <tr><td><b>杀 Pod</b></td><td>删除一个或若干 Pod</td><td>副本冗余生效、能快速重建、用户无感</td><td>没配 preStop 导致发布/重建期 502；重建后又落在同一节点；启动慢导致容量缺口</td></tr>
+    <tr><td><b>杀容器 / 容器 OOM</b></td><td>杀掉业务容器或打满内存</td><td>重启策略、探针、连接池重建都正常</td><td>连接池没重建逻辑，重启后一直连不上；探针配错导致反复重启</td></tr>
+    <tr><td><b>节点宕机</b></td><td>停节点或 drain</td><td>PDB 生效、Pod 跨节点打散、扩容能补上容量</td><td>硬反亲和导致副本无处可去；扩容需要几分钟，期间容量不足</td></tr>
+    <tr><td><b>网络延迟</b></td><td>往出站注入固定延迟</td><td>超时与熔断按预算触发，P99 可控</td><td>超时没配或各层设成同一个值，串联后远超预算；重试放大</td></tr>
+    <tr><td><b>丢包 / 网络分区</b></td><td>丢包、或切断两个服务间的连通</td><td>重试策略正确、不会出现脑裂、降级生效</td><td>重试读超时造成重复写；有状态组件在分区下出现双写</td></tr>
+    <tr><td><b>磁盘写满 / IO 延迟</b></td><td>填满磁盘或给读写注入延迟</td><td>日志写满不至于拖垮进程、能降级而非崩溃</td><td>日志没有轮转、写失败直接 panic；本地缓存目录写满后服务不可用</td></tr>
+    <tr><td><b>时钟偏移</b></td><td>改容器时钟（前后偏移）</td><td>证书校验、定时任务、租约/锁、token 过期都安全</td><td>时钟向前跳导致证书「尚未生效」、定时任务是漏执行或重复执行；向后跳导致锁提前过期</td></tr>
+    <tr><td><b>依赖超时/报错</b></td><td>让下游返回超时或 5xx</td><td>熔断打开、降级路径可用、用户看到的是兜底内容</td><td><b>降级路径从没被验证过</b>，一开就报错或返回结构不一致；熔断阈值样本数太小导致误判</td></tr>
+    <tr><td><b>DNS 故障</b></td><td>让解析失败或返回错误</td><td>客户端有解析缓存、失败后有合理重试</td><td>没有任何缓存，DNS 一抖全站不可用；重试没有退避导致 DNS 被打爆</td></tr>
+    <tr><td><b>CPU / 内存压力</b></td><td>打满 CPU 或内存</td><td>限流与资源上限生效、被节流时仍能服务</td><td>CPU limit 配太低导致被 cgroup 节流而监控看不出来；GC 停顿放大</td></tr>
+  </table>
+  <p>推进路线建议是这样：<b>先杀 Pod（最安全、最真实、最容易解释）→ 再做依赖故障注入（最能暴露降级路径的问题）→ 再做网络延迟和丢包 → 再做资源压力 → 最后做时钟偏移和控制面不可用（风险最高、影响面最难预测）</b>。每一次向上推进都要重新评估爆炸半径和终止条件。</p>
+  <p>还有三个实验值得单独提，因为它们能发现非常隐蔽的问题，但很少有人做：<b>控制面/配置中心不可用</b>（验证应用是否依赖本地缓存还能启动和运行——很多服务在配置中心不可用时连重启都起不来）；<b>证书过期</b>（把证书有效期临时改短到快过期，验证监控有没有告警、轮换流程是否自动）；<b>可用区断网</b>（这是最大的半径，验证跨区容灾是否成立，通常放在 GameDay 里做，一年一两次）。</p>
+  <pre><span class="c"># 优先级判断：先做哪个实验？用两个维度排</span>
+发生概率（历史故障里出现过几次） ×  影响程度（发生后会坏到什么程度）
+
+<span class="c"># 高概率 × 高影响  → 立刻做，且要固化成定期任务</span>
+<span class="c"># 低概率 × 高影响  → 放进 GameDay，一年做一两次（如可用区断网）</span>
+<span class="c"># 高概率 × 低影响  → 自动化持续跑（如随机杀 Pod）</span>
+<span class="c"># 低概率 × 低影响  → 不做，别浪费时间</span>
+
+<span class="c"># 一个具体例子：验证「依赖变慢」这条链路</span>
+<span class="c"># 假设：inventory P99 从 80ms 变 500ms，下单成功率仍 ≥ 99.9%</span>
+<span class="c"># 因为：order 侧配了 200ms 超时 + 熔断 + 缓存兜底</span>
+<span class="c"># 注入：只对 inventory 10% 实例的 8080 端口注入 500ms 延迟</span>
+<span class="c"># 看：   下单成功率 / 下单 P99 / 熔断是否打开 / 兜底命中率 / 重试次数</span></pre>
+  <div class="callout warn">
+    <b>时钟偏移是风险最高的一类，别一上来就做。</b>它影响的不是某一个服务，而是所有依赖「时间」的东西：证书有效期校验、JWT/token 过期、分布式锁和租约的 TTL、定时任务调度、以及监控数据的时序。向前跳和向后跳的后果完全不同（前者常导致「证书尚未生效」，后者常导致「锁提前过期/重复执行」）。做这类实验要把半径压到一个 Pod，并且先确认该系统对时钟的假设到底有哪些——<b>排查不清假设之前注入时钟故障，等于盲测</b>。
+  </div>
+  <p><b>面试怎么答：</b>「实验按风险从低到高推进：先杀 Pod 验证冗余和优雅退出，再做依赖故障注入验证熔断降级，然后网络延迟和丢包，再资源压力，最后才是时钟偏移和控制面不可用。优先级按『历史故障里出现过几次 × 发生后坏到什么程度』排。我最常发现的问题是降级路径从来没被验证过——代码写了、开关配了，但真按下去才发现兜底查询是坏的，这类问题只有实验能发现，看代码和压测都发现不了。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>工具与注入点：按「注入在哪一层」选，不按工具名背</h2></div>
+  <p class="lead">面试官问「你们用什么工具」，答一个名字是最弱的答案。有价值的答案是<b>「我们按注入层级分了几类手段，各自适合什么场景」</b>——因为工具会变，层级不会变。</p>
+  <table>
+    <tr><th style="width:140px">注入层级</th><th>手段</th><th>能模拟什么</th><th>局限</th></tr>
+    <tr><td><b>平台层</b></td><td>删 Pod、drain 节点、停实例</td><td>最真实的故障形态，因为这就是生产真实发生的事</td><td>粒度粗，无法模拟「慢」这类部分故障</td></tr>
+    <tr><td><b>网络层</b></td><td>tc/netem（delay、loss、duplicate、corrupt）、iptables 丢包或 REJECT</td><td>延迟、丢包、乱序、分区——几乎所有网络故障</td><td>需要进入目标网络命名空间；和 CNI 有耦合</td></tr>
+    <tr><td><b>容器/内核层</b></td><td>cgroup 限流与内存压力、容器运行时的进程注入、部分内核故障</td><td>CPU/内存打满、IO 延迟与错误、进程被杀</td><td>通常需要节点上的 agent 和较高权限</td></tr>
+    <tr><td><b>代理/应用层</b></td><td>Envoy 与网关的故障注入（第 43 期讲的 VirtualService fault）、SDK 里的 mock</td><td>精准的延迟与错误码，可以按 header 只打给指定流量</td><td>只覆盖经过代理的流量；注入点必须真的在链路上</td></tr>
+    <tr><td><b>云平台层</b></td><td>云厂商的故障注入服务（停实例、断可用区）</td><td>大规模的区域级故障</td><td>半径极大，只适合 GameDay；成本和审批都重</td></tr>
+  </table>
+  <p>工具层面，Kubernetes 生态里最常见的两个是 <b>Chaos Mesh</b> 和 <b>Litmus</b>。Chaos Mesh 用 CRD 声明实验，按类型分有 PodChaos、NetworkChaos、IOChaos、StressChaos、TimeChaos、DNSChaos、HTTPChaos、KernelChaos 等，支持定时/周期调度、Workflow 编排，也提供暂停、恢复、终止的能力；Litmus 的核心概念是 ChaosExperiment（场景定义）、ChaosEngine（把场景绑到应用上）和 ChaosResult（实验结果），并有一个公开的场景库 ChaosHub。此外还有 ChaosBlade（偏向单机与进程级注入）、Toxiproxy（专门做 TCP 层的网络故障）等。<b>具体支持哪些类型、CRD 的字段名是什么，以你使用的版本官方文档为准</b>。</p>
+  <p>选型时的判断标准，按重要性排：<b>能不能一键停止</b>（这是安全底线）、<b>能不能按标签/命名空间/百分比收敛爆炸半径</b>、<b>能不能声明式管理并进 Git</b>、<b>有没有执行记录和审计</b>、<b>能不能定时持续跑</b>。工具的水印功能（比如「这个 Pod 是否被注入过」）和权限模型也值得看一眼——它需要相当高的权限，这意味着它本身就是攻击面的一部分。</p>
+  <pre><span class="c"># Chaos Mesh 的 PodChaos 示例（字段名以你装的版本为准）</span>
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata: {name: kill-one-inventory, namespace: default}
+spec:
+  action: pod-kill
+  mode: fixed-percent        <span class="c"># 按比例挑目标，而不是全部</span>
+  value: "10"                <span class="c"># 10% 的实例，这就是爆炸半径</span>
+  selector:
+    labelSelectors: {app: inventory}
+  duration: "5m"             <span class="c"># time-box：到点自动恢复，不依赖人</span>
+
+<span class="c"># 网络延迟：本质是把 tc netem 规则下到目标容器的 netns 里</span>
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+spec:
+  action: delay
+  mode: fixed-percent
+  value: "10"
+  selector: {labelSelectors: {app: inventory}}
+  delay: {latency: "500ms", correlation: "0", jitter: "50ms"}
+  duration: "10m"
+
+<span class="c"># 不依赖平台时，手工等价命令（在目标容器内/其 netns 里执行）</span>
+tc qdisc add dev eth0 root netem delay 500ms 50ms       <span class="c"># 延迟 + 抖动</span>
+tc qdisc add dev eth0 root netem loss 5%                <span class="c"># 丢包</span>
+tc qdisc del dev eth0 root netem                        <span class="c"># 这是你的「回滚动作」</span>
+iptables -A OUTPUT -p tcp --dport 3306 -j REJECT        <span class="c"># 模拟数据库不可达</span></pre>
+  <div class="cmds">
+    <div class="crow"><code>kubectl get podchaos,networkchaos,stresschaos -A</code><span class="desc">先确认有哪些实验在跑，别在已有实验上叠加第二个</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl describe podchaos NAME</code><span class="desc">看它的 selector 和 mode，确认爆炸半径和你以为的一致</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl annotate podchaos NAME experiment.chaos-mesh.org/pause=true</code><span class="desc">暂停实验（具体注解名以你版本为准），这是止损手段之一</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl delete podchaos NAME</code><span class="desc">删除即停止；要提前验证过这一步能在多少秒内生效</span><button class="copy">复制</button></div>
+    <div class="crow"><code>tc qdisc show dev eth0</code><span class="desc">确认网络类故障当前是否真的挂在网卡上——这是「注入生效」的证据</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl get events -n default --sort-by=.lastTimestamp</code><span class="desc">实验的注入/恢复动作通常会留下事件，用来复盘时间线</span><button class="copy">复制</button></div>
+  </div>
+  <p>最后提醒一个容易被忽略的点：<b>混沌工具本身是一个高权限组件</b>，它能在任意 Pod 里注入任意故障。所以它的 RBAC 要收紧、操作要审计、Dashboard 要纳入统一认证，并且要考虑「如果它自己被误触发会怎样」。我见过的最稳妥的做法是给它加一层审批（生产环境的实验走工单），并把「单次实验的最大时长和最大半径」做成准入校验——<b>工具要能限制人，而不只是赋能人</b>。</p>
+  <div class="callout">
+    <b>选注入点的一个实用判断：</b>先问「这个故障在真实世界里是怎么发生的」，然后选最接近它的那层。真实的 Pod 消失应该真的去删 Pod（而不是给它注入 100% 丢包），因为删 Pod 会连带触发调度、重建、探针、Endpoints 摘除这一整条链路，而丢包不会。<b>用「看起来像」的注入代替「真实发生」的故障，会让你漏掉整条链路上的问题。</b>反过来说，「依赖变慢」这类没法靠删东西模拟的，才用网络延迟注入。
+  </div>
+  <p><b>面试怎么答：</b>「我按注入层级选手段，不按工具名。平台层删 Pod、drain 节点，最真实，因为它触发的是完整链路；网络层用 tc/netem 做延迟丢包分区；容器层用 cgroup 做 CPU 内存压力；代理层用 Envoy 的故障注入做精准的延迟和错误码，可以按 header 把半径压到单个请求。工具上 K8s 生态常用 Chaos Mesh 和 Litmus，选型我最看重三件事：能不能一键停止、能不能按标签和百分比收敛半径、能不能声明式进 Git 并留审计。另外混沌工具本身是高权限组件，要收紧 RBAC 并加审批。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>演练流程与 GameDay：日常实验与集中演练是两件事</h2></div>
+  <p class="lead">把这两件事混为一谈是很多团队做不好的原因。它们的规模、组织方式、成功标准完全不同：<b>日常实验是「一个人 + 一个假设 + 十几分钟」的常规动作，GameDay 是「多团队 + 一个场景 + 半天」的集中活动</b>。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>日常实验</th><th>GameDay</th></tr>
+    <tr><td><b>规模</b></td><td>单个假设、小半径、十几分钟</td><td>一个复杂场景（如可用区断网）、跨多个团队、半天到一天</td></tr>
+    <tr><td><b>参与者</b></td><td>实验负责人 + 相关服务的值班</td><td>指挥、执行、记录、观测、联络，还有一批观摩者</td></tr>
+    <tr><td><b>目标</b></td><td>验证（或推翻）一个具体假设</td><td>验证跨团队的协作与预案，顺带验证系统</td></tr>
+    <tr><td><b>频率</b></td><td>每周甚至每天，最好自动化</td><td>一季度或半年一次</td></tr>
+    <tr><td><b>成功标准</b></td><td>假设是否被推翻、有没有可执行的改进项</td><td>是否按预案完成、RTO/RPO 是否达标、沟通是否顺畅</td></tr>
+  </table>
+  <p>日常实验的标准流程，八步，其中第四步最容易被省掉、也最不该省：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>选题</b>：来自历史故障复盘和风险评审，不是凭兴趣。优先级按「发生概率 × 影响程度」排。</div></div>
+    <div class="step"><div class="txt"><b>写实验单</b>：四要素 + 时长 + 负责人 + 回滚动作 + 通知范围 + 观测面板链接。</div></div>
+    <div class="step"><div class="txt"><b>评审</b>：相关服务的负责人确认半径和终止条件可接受，值班确认时段合适。</div></div>
+    <div class="step"><div class="txt"><b>预演</b>：先在测试环境或单个实例上跑一遍，<b>目的是验证工具能注入、能停止、指标会动</b>，而不是验证系统。</div></div>
+    <div class="step"><div class="txt"><b>执行</b>：低峰期，按实验单来，实时播报状态。</div></div>
+    <div class="step"><div class="txt"><b>记录时间线</b>：注入时刻、指标变化时刻、终止时刻、恢复时刻。事后复盘全靠它。</div></div>
+    <div class="step"><div class="txt"><b>复盘</b>：假设成立还是被推翻？如果被推翻，真实机制是什么？</div></div>
+    <div class="step"><div class="txt"><b>改进与回归</b>：改进项带 owner 和 deadline，完成后复跑同一实验验证。</div></div>
+  </div>
+  <p>GameDay 的组织要点，很多人只记得「搞事情」的部分，其实准备才是主体：</p>
+  <table>
+    <tr><th style="width:170px">角色 / 事项</th><th>要做什么</th><th>为什么</th></tr>
+    <tr><td><b>指挥</b></td><td>唯一有最终决定权的人，负责叫停和恢复</td><td>多个声音会导致该停的时候没人拍板</td></tr>
+    <tr><td><b>执行者</b></td><td>只按剧本注入，不擅自加码</td><td>「顺便试试别的」是 GameDay 变成事故的主要原因</td></tr>
+    <tr><td><b>记录员</b></td><td>记录时间线和每个人的判断</td><td>复盘时没有人记得清「当时谁说了什么」</td></tr>
+    <tr><td><b>观测者</b></td><td>专门盯监控，不参与操作和讨论</td><td>执行者一边操作一边看监控，两头都做不好</td></tr>
+    <tr><td><b>联络人</b></td><td>对接客服、业务方、管理层</td><td>外部反馈往往比监控更早暴露问题</td></tr>
+    <tr><td><b>事前通知</b></td><td>监控、客服、值班、业务方都要知道</td><td>避免把演练当成真故障去处理，浪费应急资源</td></tr>
+  </table>
+  <p>GameDay 有个反直觉但非常重要的规则：<b>任何人都可以叫停，不需要举证</b>。因为在大半径场景里，「我觉得不对」往往是第一信号，等证据齐了可能已经晚了。同时也要有明确的恢复标准（什么状态算恢复完成），否则结束条件是模糊的。</p>
+  <div class="callout danger">
+    <b>有三种时候绝对不要做演练：</b>① 业务高峰期（影响面乘以流量，风险不可控）；② 值班人手不足或关键人休假（响应能力不够，本来可控的会变成不可控）；③ 系统正在故障或刚发完版（你无法区分「演练造成的」和「本来就坏的」，结论也失去意义）。另外，<b>一次 GameDay 只验证一个场景</b>——同时注入多个故障，事后你根本说不清是哪个导致的。
+  </div>
+  <p><b>面试怎么答：</b>「我把它分成日常实验和 GameDay。日常实验是单人、小半径、十几分钟，八步流程：选题、写实验单、评审、预演、低峰执行、记时间线、复盘、改进加回归；其中预演是验证工具能注入能停、指标会动。GameDay 是跨团队半天，要设指挥、执行、记录、观测、联络五个角色，事前通知到位，任何人都可以叫停。三种时候不做：业务高峰、人手不足、系统已经在故障或刚发版。一次只验证一个场景。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>闭环：演练的唯一产出是带 owner 的改进项</h2></div>
+  <p class="lead">一次演练做完，报告里写「发现 3 个问题」是不够的。真正的闭环标准只有一条：<b>三个月后你能说出「那 3 个问题改了没有，改完之后复跑的结果是什么」</b>。达不到这条，演练就是一次性活动。</p>
+  <table>
+    <tr><th style="width:150px">发现类型</th><th>典型例子</th><th>改进形态</th><th>验收方式</th></tr>
+    <tr><td><b>架构问题</b></td><td>某个依赖是单点、缓存没有兜底、跨可用区不均衡</td><td>加冗余、加兜底、改拓扑</td><td>复跑同一实验，看指标是否回到预期范围</td></tr>
+    <tr><td><b>配置问题</b></td><td>超时没配、各层超时一致、熔断样本数太小、重试没退避</td><td>改配置并纳管（第 32 期那套）</td><td>复跑，并确认没有引入新的误触发</td></tr>
+    <tr><td><b>监控缺失</b></td><td>降级触发没有打点、某个关键指标没人看、采集间隔太长</td><td>补指标和告警</td><td>复跑时能看到该指标变化，即算验收</td></tr>
+    <tr><td><b>流程问题</b></td><td>预案没写、没人知道该联系谁、叫停权不明确</td><td>写 Runbook、明确职责</td><td>下一次 GameDay 按 Runbook 走一遍</td></tr>
+    <tr><td><b>认知问题</b></td><td>没人知道这个依赖存在、以为有冗余实际没有</td><td>更新架构图和依赖关系</td><td>新人能靠文档答对这个问题</td></tr>
+  </table>
+  <p>每条改进项必须有三样东西：<b>owner（具体到人对不对）、deadline、验收标准</b>。而验收标准最好是「复跑同一个实验，对比前后数字」——这比其他任何验收方式都硬。比如「依赖超时 500 毫秒时，下单成功率从 97.2% 提升到 99.95%，P99 从 3.2 秒降到 420 毫秒」，这样一组前后对比，才是演练价值的直接证据。</p>
+  <p>「假设成立」的实验也要记录，但要区分两种情况：<b>假设成立</b>（确实有冗余顶住了，这是资产，记进知识库，下次可以少做一次）和<b>实验无效</b>（注入没生效、指标没接对，这不是资产，要重做）。混淆这两者会导致「我们这块很稳」的错误自信——而错误自信比不知道更危险。</p>
+  <p>演练本身也要被度量，否则你无法判断这个体系是不是在变好。四个指标够用：</p>
+  <pre><span class="c"># 演练体系的四个度量（用来判断「我们是不是真的越来越可靠」）</span>
+覆盖度：    已做实验数 / 风险清单里的故障场景数
+发现率：    有发现的实验数 / 实验总数        <span class="c"># 长期为 0 说明实验设计有问题</span>
+关闭率：    已关闭改进项 / 发现项总数        <span class="c"># 低说明闭环断了</span>
+回归验证率：复跑验证过的改进项 / 已关闭改进项  <span class="c"># 低说明「改了」没被证明有效</span>
+
+<span class="c"># 自动化：把高频实验固化成持续验证，防止配置回退</span>
+<span class="c"># 思路：选 3~5 个安全且高价值的实验，在低峰期定时跑，结果自动入报表</span>
+schedule: "0 3 * * 2"          <span class="c"># 每周二凌晨 3 点（低峰）</span>
+<span class="c"># 前提：半径足够小、终止条件可靠、且已经手工跑通过至少一次</span></pre>
+  <div class="callout ok">
+    <b>闭环的一个实操技巧：把改进项和实验绑定，而不是和演练活动绑定。</b>很多团队的复盘文档是按「某月某日演练」组织的，翻起来很痛苦，也无法追踪。改成按「实验」组织：每个实验一条记录，下面挂着每次执行的时间、结果、产生的改进项、改进项的关闭状态和复跑结果。这样三个月后你想知道「依赖超时这个场景现在还脆不脆」，一眼就能看到。<b>按实验组织，才能积累；按活动组织，只能归档。</b>
+  </div>
+  <p><b>面试怎么答：</b>「闭环的标准是改进项有 owner、有 deadline、有验收标准，而验收标准最好是复跑同一个实验对比前后数字。发现项我分成架构、配置、监控缺失、流程、认知五类，其中『监控缺失』和『认知问题』特别容易被漏掉，但它们的价值很高。假设成立的实验也要记录，但要和『实验无效』区分开。演练体系本身我用四个指标度量：覆盖度、发现率、关闭率、回归验证率，其中发现率长期为零说明实验选错了场景。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>与压测、灾备切换的区别：三件事回答三个不同问题</h2></div>
+  <p class="lead">这三个词经常被并列，也经常被当成一回事。它们的关系不是替代，而是互补：<b>压测回答「能扛多少」，混沌回答「坏了会怎样」，灾备回答「真坏了怎么救」</b>。把它们分清楚，你才知道什么时候该做哪一个。</p>
+  <table>
+    <tr><th style="width:130px">维度</th><th>压测</th><th>混沌实验</th><th>灾备切换</th></tr>
+    <tr><td><b>问题</b></td><td>容量上限与拐点在哪</td><td>故障下系统行为是否符合假设</td><td>预案能不能执行、能不能恢复</td></tr>
+    <tr><td><b>输入</b></td><td>加负载（已知变量，逐档加压）</td><td>注入故障（模拟真实世界事件）</td><td>执行剧本（已知流程）</td></tr>
+    <tr><td><b>结果</b></td><td>确定：多少 QPS、拐点在哪、瓶颈是什么</td><td><b>未知</b>：假设可能成立也可能被推翻</td><td>明确：RTO / RPO 是否达标</td></tr>
+    <tr><td><b>环境</b></td><td>独立环境，或生产低峰的影子流量</td><td>尽量接近生产，甚至就在生产</td><td>真实备用环境/备用地域</td></tr>
+    <tr><td><b>频率</b></td><td>大促前、大版本前</td><td>持续、自动化</td><td>半年到一年一次</td></tr>
+    <tr><td><b>风险</b></td><td>可能压垮被测系统（要隔离）</td><td>可能影响真实用户（靠半径控制）</td><td>切换本身就是高风险动作</td></tr>
+  </table>
+  <p>最容易混淆的是混沌和压测，因为两者都在「给系统压力」。区分点在于<b>变量是谁</b>：压测改变的是负载量（并发从 100 加到 5000），系统的组件都是健康的，你要找的是「什么时候开始撑不住」；混沌改变的是组件的状态（某个依赖变慢、某个节点没了），负载维持正常水平，你要看的是「系统会不会按我想的那样应对」。<b>一个找上限，一个找行为。</b></p>
+  <p>混沌和灾备切换的区别则在于<b>是否有剧本</b>。灾备切换是「我们有一个预案，现在按它执行一遍，看 RTO 和 RPO 是否达标、数据是否一致」——它的成功标准是事先明确的，执行过程也是已知的。混沌实验的成功标准是「假设是否被推翻」，而结果事先未知。所以灾备演练是流程验证，混沌是假设验证。两者的交集是：你可以用混沌的方式去验证灾备（比如不按剧本，直接把主地域断网，看系统会不会自己切），这是更高阶的做法。</p>
+  <div class="callout warn">
+    <b>还有一个容易混的：红蓝对抗 / 安全攻防演练不是混沌工程。</b>红蓝是安全视角，模拟攻击者行为，目标是发现安全弱点；混沌是可靠性视角，模拟基础设施与依赖故障，目标是发现可用性弱点。两者可以共用「演练」这套组织形式，但目标、注入手段、成功标准都不同。面试里把它们并列说出来，会显得你对这个领域有边界感。
+  </div>
+  <p><b>面试怎么答：</b>「三者回答三个问题：压测回答能扛多少，混沌回答坏了会怎样，灾备回答真坏了怎么救。压测加的是负载，找的是容量上限和拐点；混沌注入的是故障，负载不变，看的是系统行为是否符合假设，结果事先未知；灾备切换执行的是剧本，有明确的 RTO/RPO 标准。它们互补而不是替代，高阶做法是用混沌的方式去验证灾备——不按剧本，直接断，看系统会不会自己切。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：讲一次演练发现的问题</h2></div>
+  <p class="lead">混沌工程这道题，面试官真正想听的不是定义，是<b>一次具体的、可验证的经历</b>。而且他能立刻判断真假——因为假的讲不到「验证方法」和「固化动作」这两层。准备的时候用五段式。</p>
+  <pre>第一段：场景（要具体到哪个系统、哪个依赖）
+  「订单服务下单时同步查库存，库存是一个独立服务，跨两个可用区部署。」
+
+第二段：假设（四要素里那一句，要带「因为」）
+  「我假设库存 P99 从 80ms 变成 500ms 时，下单成功率仍高于 99.9%，
+    因为订单侧配了 200ms 超时、熔断阈值 50%、熔断后读本地缓存兜底。」
+
+第三段：注入方式与爆炸半径
+  「用平台的网络延迟能力，只对库存 10% 的实例注入 500ms，持续 10 分钟，业务低峰。」
+
+第四段：实际发现（重点讲「与假设不符的地方」）
+  「成功率掉到 97.2%，P99 涨到 3.2 秒。查下来是三件事叠加：
+    超时确实生效了，但熔断的最小样本数没配，低峰期一个失败就误判；
+    兜底缓存的 key 去年改过格式，读出来永远是空，等于没有兜底；
+    最慢的是连接池——超时释放的连接没有立刻回收，池子被占满后排队。」
+
+第五段：改进与复跑（这一段决定你是不是「做过」）
+  「改了三处：补熔断样本数、修兜底 key 格式并加了一条兜底命中率的告警、
+    连接池加最小空闲和回收策略。两周后复跑同一实验，
+    成功率 99.95%、P99 420ms。这个实验后来固化成每周二凌晨自动跑。」</pre>
+  <table>
+    <tr><th style="width:220px">追问</th><th>一句话回答</th></tr>
+    <tr><td>四要素是什么</td><td>假设、爆炸半径、稳态指标、终止条件；假设要带「因为」，半径按五个维度定，指标选业务指标，终止条件要能自动判定</td></tr>
+    <tr><td>怎么保证不影响用户</td><td>最小半径起步、先预演验证能停、终止条件自动触发、低峰期、任何人可叫停</td></tr>
+    <tr><td>没发现问题说明什么</td><td>先排除「注入没生效」和「指标没接对」，用阳性对照验证指标真的会动；排除后才是真的稳</td></tr>
+    <tr><td>和压测有什么区别</td><td>压测加负载找上限，混沌注入故障看行为，结果事先未知</td></tr>
+    <tr><td>为什么在生产做</td><td>测试环境的流量模型、数据量、依赖拓扑都不同，结论不可迁移；用最小半径换取在生产做的资格</td></tr>
+    <tr><td>演练出了事故怎么办</td><td>先按终止条件停、恢复；复盘时区分「实验设计缺陷」和「系统缺陷」，前者改流程，后者当发现项</td></tr>
+  </table>
+  <p>如果实在没有演练经历怎么办？有一个诚实的替代方案：<b>讲一个你用实验思维验证过的东西</b>。比如「我手工做过一次小规模验证：把某个下游用 tc 注入 200 毫秒延迟，观察我们的超时和降级是否生效，结果发现降级返回的是错误码而不是同构数据，改完之后又验证了一次」。它规模小、没有平台，但<b>假设、注入、观察、改进、复跑</b>五步齐全——这比背一遍定义可信得多。</p>
+  <div class="callout ok">
+    <b>自检清单（回答之前过一遍）：</b>① 有没有具体数字（成功率、P99、持续时长）；② 有没有讲「与假设不符」的部分（只讲成功的都是编的）；③ 有没有验证方法（怎么确认注入生效、怎么定位原因）；④ 有没有固化动作（配置、告警、自动化）；⑤ 有没有复跑结果（前后对比）。五条齐全，这个故事就站得住。
+  </div>
+  <p><b>面试怎么答：</b>「我会讲一次具体的演练。讲的时候分五段：场景、假设（带因为）、注入方式与半径、实际发现了什么（重点讲和假设不符的地方）、改进和复跑的数字。我觉得最关键的是第四段和第五段——只讲『我们扛住了』很可疑，讲清楚『哪些地方和我们想的不一样』才是真的做过。如果没有平台经历，就讲一次手工的小规模验证，只要五步齐全，同样可信。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：一半是把实验做成了走过场</h2></div>
+  <p class="lead">这些坑分两类：一类是「实验设计本身不成立」（第 1、3、4、7 条），结论从一开始就是错的；另一类是「安全护栏没搭好」（第 2、5、6 条），实验有可能变成事故。前一类更隐蔽，因为它看起来风平浪静。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把混沌当测试，只跑已知成立的场景</div><div class="pd">随机杀一个无状态副本，结论永远是「没问题」。这类实验验证的是你早就有的冗余，不碰真正的单点。要按「历史故障 × 影响程度」选场景，专挑你心里没底的那个。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">没有终止条件，或终止条件靠人盯</div><div class="pd">人一走神、或者同时看三个面板，就错过了停止时机。终止条件必须提前写、能自动判定、并保留任何人可叫停的权利，还要写清停止后的回滚动作。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">不验证注入是否真的生效</div><div class="pd">「无影响」很可能只是「没注入成功」。每次实验都要有独立的生效证据（被注入对象的指标、网卡上的 tc 规则、探针请求），并且用一次高强度的阳性对照确认指标真的会动。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">稳态指标选了资源指标</div><div class="pd">看 CPU 和内存判断成败是错的：线程池打满时 CPU 可能反而下降，而用户已经被拒绝。稳态指标首选业务指标（成功率、下单量），资源指标只能解释原因。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">一上来就按全集群注入</div><div class="pd">爆炸半径要从最小开始：先单个实例验证能注入能停、指标会动，再逐级放大。每放大一次都要重新评估终止条件。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">在业务高峰、人手不足或刚发完版时演练</div><div class="pd">这三种时候的影响面和响应能力都不匹配。另外系统正在故障时做演练，你无法区分哪些是演练造成的，结论也失去意义。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">没有对照组也没有基线</div><div class="pd">事后说不清那个下跌是不是演练造成的，争论半天没结论。要么和过去 7 天同时段的基线比，要么设一个未注入的对照组，后者能直接给出因果结论。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">在和生产配置不一致的环境里演练</div><div class="pd">副本数、资源规格、依赖拓扑、数据量都不一样，结论不可迁移。要么把环境对齐，要么在生产用最小半径做。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">只做一次，不复跑</div><div class="pd">配置会回退、代码会变、依赖会加。一次演练只能证明「那天是这样」。高频场景要固化成定时任务持续验证。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">发现了问题但不闭环</div><div class="pd">没有 owner、没有 deadline、没有验收标准，三个月后同样的演练又发现一遍。验收标准应该是「复跑同一个实验，对比前后数字」。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个你真踩过的。比如「我们最早做的实验是随机杀 Pod，跑了半年全是『没问题』，大家觉得系统挺稳。后来我按历史故障重排了场景，改成对依赖注入延迟，第一次就发现降级路径是坏的——兜底缓存的 key 格式去年改过，读出来永远是空。这件事让我意识到：『没发现问题』首先要怀疑实验设计，而不是庆祝系统可靠。之后我们加了一条规矩：每个实验必须有注入生效的独立证据，并且新实验第一次跑要做一次高强度的阳性对照。」</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="3">
+      <div class="qt">1. 混沌工程实验设计的四个要素是？</div>
+      <button class="opt">目标、范围、时间表、报告模板</button>
+      <button class="opt">故障类型、注入工具、执行人员、复盘会议</button>
+      <button class="opt">注入强度、持续时间、监控面板、恢复步骤</button>
+      <button class="opt">假设、爆炸半径、稳态指标、终止条件</button>
+      <div class="ans">正确答案：<b>假设、爆炸半径、稳态指标、终止条件</b>。假设要写成可证伪的陈述并带上「因为我们有哪个机制」；爆炸半径按环境、区域、实例比例、用户比例、时长五个维度定义并从最小起步；稳态指标首选与用户体验相关的业务指标；终止条件要提前写、能自动判定、并保留人工叫停权。缺任何一个，这次操作就不构成实验。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 稳态指标应该优先选哪一类？</div>
+      <button class="opt">CPU 使用率和内存占用，因为它们最直接反映系统压力</button>
+      <button class="opt">与用户体验直接相关的业务指标，如下单成功率、支付成功率</button>
+      <button class="opt">Pod 的存活状态和副本数</button>
+      <button class="opt">错误日志的条数</button>
+      <div class="ans">正确答案：<b>业务指标</b>。判断标准是「用户能不能用」，而不是「机器忙不忙」。反例很典型：线程池被打满时，请求都在等待，CPU 使用率可能反而下降，只看资源指标会得出「注入无影响」的错误结论。黄金信号（延迟、流量、错误率、饱和度）用来定位受影响的层级，资源指标只能解释原因，都不能单独作为成败判据。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">3. 一次实验跑完，结论是「无影响」。最应该先怀疑什么？</div>
+      <button class="opt">系统确实很稳定，可以直接宣布通过</button>
+      <button class="opt">实验工具选型不对，应该换一个平台</button>
+      <button class="opt">注入是否真的生效，以及稳态指标是否能反映用户可感知的变化</button>
+      <button class="opt">故障强度不够，应该直接加大到全集群</button>
+      <div class="ans">正确答案：<b>先排除「注入没生效」和「指标没接对」</b>。这两条是「零发现」最常见的真实原因，而不是系统真的稳。做法是给每次实验配独立的注入生效证据，并且先做一次高强度的阳性对照（比如注入到全部实例、延迟加到很大），确认指标真的会动，再回到正常强度。直接加大到全集群是违反爆炸半径原则的。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于终止条件，下面哪种做法是对的？</div>
+      <button class="opt">提前写在实验单上、能用阈值自动触发、任何人可手工叫停，并写清停止后的回滚动作与最长时长</button>
+      <button class="opt">由负责人现场盯着监控，感觉不对就叫停</button>
+      <button class="opt">不设终止条件，让实验自然跑到注入时长结束</button>
+      <button class="opt">只在影响真实用户时才需要终止条件，预发环境不需要</button>
+      <div class="ans">正确答案：<b>提前写、可自动判定、保留人工叫停权</b>。靠人盯是不可靠的：一个人同时看多个面板时很容易错过时机。终止条件还必须有配套的回滚动作（删除故障对象、重启实例、切流量）和 time-box（最长时长），到点就停，不管有没有得出结论。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">5. 混沌工程与压测的核心区别是？</div>
+      <button class="opt">压测在测试环境做，混沌在生产做，其他都一样</button>
+      <button class="opt">压测用工具，混沌靠手工</button>
+      <button class="opt">压测是安全视角，混沌是可靠性视角</button>
+      <button class="opt">压测改变负载量、找容量上限与拐点，结果确定；混沌注入故障、观察系统行为是否符合假设，结果事先未知</button>
+      <div class="ans">正确答案：<b>变量不同、结果性质不同</b>。压测逐档加负载，组件都是健康的，找的是「什么时候开始撑不住」，结果是确定的数字；混沌维持正常负载、改变组件状态（依赖变慢、节点没了），看的是「系统会不会按我们想的方式应对」，假设可能被推翻。另外安全视角的攻防演练叫红蓝对抗，不是混沌工程。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 给容器注入时钟偏移，最容易打到下面哪类依赖？</div>
+      <button class="opt">CPU 调度和内存分配</button>
+      <button class="opt">证书有效期校验、token/JWT 过期、分布式锁与租约的 TTL、定时任务调度</button>
+      <button class="opt">TCP 重传与拥塞控制</button>
+      <button class="opt">DNS 解析结果</button>
+      <div class="ans">正确答案：<b>所有依赖「时间」的东西</b>。向前跳常导致证书或 token 被判为「尚未生效」，向后跳常导致锁和租约提前过期、定时任务重复或漏执行。这是风险最高的一类实验，因为影响面不限单个服务，半径要压到单个 Pod，并且注入前必须先梳理清楚系统对时钟有哪些假设。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:210px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>混沌工程</b></td><td>在系统上做受控实验，注入真实世界故障，检验对系统行为的假设</td></tr>
+    <tr><td><b>假设</b></td><td>可证伪的陈述：注入什么故障、稳态指标保持什么范围、因为有什么机制</td></tr>
+    <tr><td><b>稳态指标</b></td><td>判断系统是否健康的指标，首选业务指标，需相关、敏感、及时、稳定</td></tr>
+    <tr><td><b>爆炸半径</b></td><td>实验最坏影响到的范围，按环境/区域/实例比例/用户比例/时长定义</td></tr>
+    <tr><td><b>终止条件</b></td><td>触发即停止并回滚的阈值，要能自动判定，并保留人工叫停权</td></tr>
+    <tr><td><b>time-box</b></td><td>实验最长持续时间，到点就停，不管有没有结论</td></tr>
+    <tr><td><b>对照组 / 基线</b></td><td>未注入组或历史同时段数值，用来排除「刚好有别的事」这类争论</td></tr>
+    <tr><td><b>阳性对照</b></td><td>先用高强度注入确认指标真的会动，用来排除「注入没生效」</td></tr>
+    <tr><td><b>注入生效证据</b></td><td>独立于稳态指标的证据（tc 规则、被注入方的指标、探针请求）</td></tr>
+    <tr><td><b>GameDay</b></td><td>跨团队、有时间盒的集中演练，设指挥/执行/记录/观测/联络五个角色</td></tr>
+    <tr><td><b>tc / netem</b></td><td>Linux 流量控制工具，可注入延迟、丢包、重复、乱序、损坏</td></tr>
+    <tr><td><b>Chaos Mesh / Litmus</b></td><td>K8s 生态的混沌平台，用 CRD 声明实验，支持定时与编排</td></tr>
+    <tr><td><b>PodChaos / NetworkChaos</b></td><td>按故障类型划分的实验对象：杀 Pod、网络延迟丢包分区等</td></tr>
+    <tr><td><b>TimeChaos</b></td><td>时钟偏移注入，影响证书、token、租约与定时任务，风险最高</td></tr>
+    <tr><td><b>回归验证率</b></td><td>复跑验证过的改进项占已关闭改进项的比例，衡量闭环质量</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 找一个你最没底的依赖（心里不确定它挂了会怎样），先<b>写下你的假设</b>，包括「因为我们有什么机制」那一句——写不出来的部分就是你的知识缺口，比实验本身更有价值。② 用最小半径做一次：对它的一个实例注入 500 毫秒延迟，先做一次高强度的阳性对照确认指标会动，再回到目标强度，记录时间线和数字。③ 做完后把改进项写成带 owner、deadline、验收标准的条目，两周后复跑，把前后数字放在一起。<br><br>
+    <b>之后值得单独学：</b>第 43 期讲服务网格，VirtualService 的 fault 注入是本篇里最便宜、半径最好控制的注入点；第 45 期讲容量与压测，压测找上限、混沌找行为，两者配套才能回答「能扛多少」和「坏了会怎样」；第 15 期讲 SLO 与告警，演练的终止条件本质上就是 SLO 的加速版，两篇的阈值思路是一致的。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 44 期 · 演练的产出不是「我们扛住了」，而是带 owner、deadline 和复跑数字的改进项</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terraform 与基础设施即代码：state 被改坏了怎么救</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 38 期</span>
+    <h1>Terraform 与基础设施即代码：state 被改坏了怎么救</h1>
+    <p class="sub"><span class="k">terraform apply</span> 谁都会，难的是<b>你知道 state 里存了什么、坏了怎么恢复</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>30+</b> 条命令</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：如果 state 文件丢了，你怎么知道线上哪些资源是你建的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都是「plan 看着没问题」之后出的事</h2></div>
+  <p class="lead">「两个人同时 apply，state 被写坏了。」「我在控制台上手动加了个安全组规则，下次 apply 说要创建一堆东西。」「把资源挪到 module 里，plan 出来是 destroy 再 create——那是一台有数据的数据库。」这三句话的共同点是：<b>Terraform 完全按 state 和配置的差异在工作，而这三件事都破坏了那个差异的正确性</b>。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉反应</th><th>真正发生了什么</th></tr>
+    <tr><td>两人并发 apply，报错或 state 异常</td><td>Terraform 有 bug</td><td>本地 state 或没配锁的 backend 没有并发保护，两份 state 互相覆盖；即使只是「读到的状态过期」，也会算出错误的 diff</td></tr>
+    <tr><td>控制台改了一下，plan 说要重建</td><td>plan 算错了，不敢 apply</td><td>这就是<b>漂移</b>。Terraform 忠实报告「现实和声明不一致」，它要做的正是把现实拉回声明——包括删掉你手动加的东西</td></tr>
+    <tr><td>重构代码后 plan 出 destroy + create</td><td>只是换个位置，应该没事</td><td>资源的<b>地址</b>（address）变了，Terraform 认为旧地址的资源要删、新地址的要建。数据库、磁盘、IP 这类资源一旦重建就是数据丢失</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>state 是唯一权威</div><div class="cd">Terraform 不扫描云上有什么，它只读 state 里的清单，再拿去和真实 API 对。state 错了，它所有的判断都是错的。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>声明式意味着会删东西</div><div class="cd">和「跑一遍脚本」最大的区别：Terraform 敢销毁。这是它的价值，也是它最大的风险来源。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#A32D2D"></span>地址即身份</div><div class="cd">资源在 state 里的地址（<span class="k">module.x.aws_instance.y</span>）就是它的身份。改地址等于「旧的资源删掉、新的建一个」。</div></div>
+  </div>
+  <p>这一篇的组织方式是：先讲 IaC 到底带来什么（可复现、可评审、可回滚），再把核心流程和 state 的角色讲准，然后整节讲 state 的三个坑（本地、锁、明文），接着是 provider/module、漂移与 import、重构时的 state 搬迁，再是环境隔离、和 Ansible/K8s 的边界、生产里怎么跑，最后是面试话术。</p>
+  <div class="callout danger">
+    <b>先把一句最容易被说错的话纠正：</b>「Terraform 会扫描云上资源，所以 state 丢了也没关系」——错。Terraform 的一切判断都基于 state 里的资源清单：它按 state 里的地址去 refresh 每个资源的真实属性，再和你的配置比。<b>state 丢了，Terraform 就认为这些资源不存在</b>，plan 会「重新创建」一遍——而创建时大概率因为名字冲突失败，或者更糟，真的创建了重复资源。所以 state 的备份和锁，是 Terraform 运维里优先级最高的两件事。
+  </div>
+  <p><b>面试怎么答：</b>「我用 Terraform 主要管资源的生命周期：VPC、子网、安全组、云主机、数据库实例、IAM、DNS。我对它的理解是——state 是唯一的权威清单，Terraform 不扫描云上有什么，所以 state 的备份、加锁、访问控制是最优先的三件事。日常流程是 CI 里跑 fmt、validate、plan，plan 结果进 PR 评审，apply 由受限角色执行。遇到漂移我会先判断是『承认现实改代码』还是『拉回声明』，不会盲目 apply。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>IaC 的价值：可复现、可评审、可回滚</h2></div>
+  <p class="lead">「为什么要用 IaC」这个问题，答案很容易说成「效率高」。效率确实是结果，但不是核心价值。真正的价值是三个<b>在没有 IaC 时根本做不到</b>的能力：可复现、可评审、可回滚。说清楚这三条，你就比「提高效率」高一档。</p>
+  <table>
+    <tr><th style="width:130px">价值</th><th>没有 IaC 时</th><th>有 IaC 后</th><th>它的代价</th></tr>
+    <tr><td><b>可复现</b></td><td>「再建一套一样的测试环境」是一个需要人回忆的操作清单，建出来总有几处不一样</td><td>同一份代码 + 不同变量，产出结构一致的环境</td><td>要求所有资源都进代码，不能有「手工补一下」的环节</td></tr>
+    <tr><td><b>可评审</b></td><td>变更发生在控制台里，别人看不见、事后查不到</td><td>变更以 diff 的形式出现在 PR 里，能被 review、能被讨论、能留记录</td><td>团队要真的看 plan，走形式的评审等于没有评审</td></tr>
+    <tr><td><b>可回滚</b></td><td>「回滚」意味着人肉反向操作，容易漏</td><td>回退 Git 提交再 apply，或者用版本化的 plan 文件</td><td><b>回滚不是万能的</b>：删除类变更回滚可能需要 import，有状态资源不能重建</td></tr>
+  </table>
+  <p><b>「可回滚」这一条要说得保守一点，因为它是三者里最弱的。</b>代码回退再 apply 能解决「改错了参数」这类问题，但解决不了「资源已经被销毁且里面有数据」——这时候回滚只能重建一个空的资源。所以成熟的说法是：<b>IaC 让「变更过程」可回滚，不能让「数据」可回滚</b>。数据层面的保护要靠 <span class="k">prevent_destroy</span>、备份、以及删除前的二次确认。</p>
+  <pre><span class="c"># 对不能重建的资源显式声明「别删我」</span>
+resource "aws_db_instance" "main" {
+  identifier = "prod-main"
+  # ... 其它参数
+
+  lifecycle {
+    prevent_destroy = true                     <span class="c"># 任何会销毁它的 plan 都会直接报错</span>
+    ignore_changes  = [engine_version]         <span class="c"># 托管服务自动升版本时不要触发重建</span>
+  }
+}
+
+<span class="c"># 需要先替换再删除的场景（如 IP、证书挂载顺序有依赖时）</span>
+lifecycle {
+  create_before_destroy = true
+}</pre>
+  <p>还有一个常被问到的角度：<b>IaC 的收益怎么量化？</b>别编数字，讲你观察到的现象：环境一致性问题变少了（「测试环境能跑生产不能跑」这类工单减少）；变更从「一个人操作、其他人不知道」变成「有 diff、有审批、有记录」；新环境的准备时间从「按天」变成「按分钟」（具体时长以你自己的实测为准，不要套用别人的数字）。<b>讲你测过的，不讲你听说的。</b></p>
+  <div class="callout warn">
+    <b>IaC 有一个容易被忽略的前提：它要求「代码是唯一入口」。</b>只要还有人习惯性去控制台点两下，漂移就会出现，然后下一次 apply 会把那些改动悄悄撤销——表现出来就是「我明明配好了，怎么又没了」。所以上 IaC 不只是引入工具，还要把「控制台只读、写操作走代码」变成团队规则，并且给只读权限。否则你会同时承受 IaC 的复杂度和手工变更的混乱，两头不讨好。
+  </div>
+  <p><b>面试怎么答：</b>「IaC 的价值我讲三条：可复现——同一份代码加不同变量产出结构一致的环境，新环境不再是靠人回忆的操作清单；可评审——变更以 diff 形式出现在 PR 里，能被 review 和留痕；可回滚——回退提交再 apply。但要说清边界：IaC 让『变更过程』可回滚，不能让『数据』可回滚，所以关键资源要加 prevent_destroy，删除类变更要单独确认。另外 IaC 的前提是代码是唯一入口，只要还有人手工改控制台，漂移就一定会出现。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>核心流程与 state 的角色：每一步到底做了什么</h2></div>
+  <p class="lead">很多人把 <span class="k">init / plan / apply</span> 当成「三步走」，但每一步内部做了什么决定了你遇到问题时该怀疑谁。尤其 <span class="k">plan</span>：它<b>不是</b>单纯比较本地文件和云上资源，它是「读 state → refresh 真实属性 → 和配置比较」。</p>
+  <table>
+    <tr><th style="width:110px">命令</th><th>它做了什么</th><th>常见误判</th></tr>
+    <tr><td><b>init</b></td><td>初始化 backend、下载 provider 插件、下载 module、生成 <span class="k">.terraform/</span> 与 <span class="k">.terraform.lock.hcl</span></td><td>以为它只在第一次跑。换分支、换 backend、换 provider 版本后都要重跑</td></tr>
+    <tr><td><b>fmt</b></td><td>格式化代码（<span class="k">-check</span> 只检查不改）</td><td>把它当可选项。CI 里加一行 <span class="k">fmt -check -recursive</span> 能省掉大量无意义 diff</td></tr>
+    <tr><td><b>validate</b></td><td>检查语法和引用是否成立，<b>不访问远程 API</b></td><td>以为 validate 过了就没问题。它查不出「这个实例类型在你的区域不存在」</td></tr>
+    <tr><td><b>plan</b></td><td>refresh 每个资源的真实属性 → 和配置比 → 算出增删改</td><td>以为它只读本地。它<b>会访问云 API</b>，所以慢、需要权限、也会失败</td></tr>
+    <tr><td><b>apply</b></td><td>默认重新 plan 后执行；带 plan 文件时只执行</td><td>以为 apply 会自己重新检查。带 <span class="k">-out</span> 的 plan 文件是「当时那一刻」的快照，时间久了会过期</td></tr>
+    <tr><td><b>destroy</b></td><td>销毁 state 里记录的所有资源</td><td>在错的 workspace 或错的目录下执行——这是最严重的一类误操作</td></tr>
+  </table>
+  <pre><span class="c"># 标准流程（后端配置按环境分开）</span>
+terraform init -backend-config=env/prod.hcl
+terraform fmt -check -recursive
+terraform validate
+terraform plan  -var-file=env/prod.tfvars -out=tfplan
+terraform show -json tfplan &gt; tfplan.json      <span class="c"># 交给策略引擎或存档</span>
+terraform apply tfplan                        <span class="c"># 只执行，不重新 plan</span>
+
+<span class="c"># 只看漂移、不改资源：把现实同步进 state</span>
+terraform plan -refresh-only -out=refresh.tfplan
+terraform apply refresh.tfplan
+
+<span class="c"># 强制替换某个资源（taint 已不推荐，用 -replace）</span>
+terraform plan -replace=aws_instance.web
+terraform apply -replace=aws_instance.web
+
+<span class="c"># 并发保护：拿不到锁时等待而不是立刻失败</span>
+terraform plan -lock-timeout=5m</pre>
+  <p><b>state 里到底存了什么？</b>四类内容：① <b>资源清单与地址</b>（每个 resource 的地址、类型、provider）；② <b>云端 ID 和全部属性</b>（实例 ID、IP、ARN、标签等）；③ <b>依赖关系图</b>（Terraform 据此决定创建和销毁顺序）；④ <b>元数据</b>（terraform 版本、backend 配置、serial 序号、lineage）。因为第 ② 项包含全部属性，<b>任何写在配置里的敏感值都会以明文形式出现在 state 里</b>——这是下一节的重点。</p>
+  <p><b>serial 和 lineage 值得记一下</b>，因为救 state 时会用到：<span class="k">serial</span> 每次写入递增，用来检测 state 是否被旧版本覆盖；<span class="k">lineage</span> 是 state 创建时生成的一次性 ID，用 <span class="k">terraform state push</span> 覆盖时如果 lineage 不匹配会被拒绝——这是一道防止「把 A 环境的 state 推到 B 环境」的保护。</p>
+  <pre><span class="c"># 看 state 里有什么（只读，安全）</span>
+terraform state list                        <span class="c"># 所有资源地址</span>
+terraform state show aws_instance.web       <span class="c"># 单个资源的全部属性</span>
+terraform state pull &gt; backup-$(date +%F).tfstate   <span class="c"># 拉下来备份，动手前必做</span>
+
+<span class="c"># 看 state 文件的版本信息（救 state 时先确认）</span>
+terraform state pull | python -c "import json,sys; d=json.load(sys.stdin); print(d['terraform_version'], d['serial'], d['lineage'])"</pre>
+  <div class="callout ok">
+    <b>一个必须养成的习惯：</b>任何会写 state 的操作（<span class="k">apply</span>、<span class="k">state mv</span>、<span class="k">state rm</span>、<span class="k">import</span>、<span class="k">state push</span>）之前，先 <span class="k">terraform state pull &gt; 备份文件</span>。这条命令几秒钟，但它把你从「不可恢复」变成「可以回退」。用远程 backend 时，还要确认 backend 本身开了<b>版本控制</b>（如对象存储的版本号功能），这样即使 state 被覆盖也能取回上一个版本——这一条比本地备份更可靠，因为它不依赖人记得执行。
+  </div>
+  <p><b>面试怎么答：</b>「流程上我记四点：init 不只是第一次跑，换分支或换 provider 版本都要重跑；validate 只查语法不访问 API，查不出区域里没有这个实例类型；plan 会 refresh 真实属性，所以它慢、需要权限、可能失败；apply 带 -out 的 plan 文件是那一刻的快照，放久了会过期。state 里存资源清单、云端 ID 和全部属性、依赖图和元数据，其中属性是明文，所以敏感值一定会出现在 state 里。动手改 state 前先 state pull 备份，并且 backend 要开版本控制。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>state 的三个坑：本地、没锁、明文</h2></div>
+  <p class="lead">Terraform 在生产上的绝大多数事故，最后都能归到 state 上。而 state 的问题基本只有三种形态：<b>放在本地（会丢、不能协作）、没有锁（会并发写坏）、内容明文（等于把密钥写在一个文件里）</b>。这三种都有对应的、成本不高的解法，所以它们属于「不该犯」的错误。</p>
+  <h3>坑一：本地 state</h3>
+  <p>默认不配 backend 时，state 就是目录下的 <span class="k">terraform.tfstate</span>。它有三个致命问题：只在这台机器上（换个人就没有）、不在版本控制里也不在备份里（机器没了就没了）、没有任何并发保护。解法只有一条——<b>配 remote backend</b>（对象存储 + 版本控制 + 加密，或者 Terraform Cloud/Enterprise），并且把 backend 配置写进代码。</p>
+  <pre><span class="c"># backend 配置：加密 + 版本控制 + 锁，三者都要</span>
+terraform {
+  required_version = "&gt;= 1.5.0"          <span class="c"># 以你团队使用的版本为准</span>
+
+  backend "s3" {
+    bucket       = "company-tfstate-prod"
+    key          = "network/prod/terraform.tfstate"
+    region       = "cn-north-1"
+    encrypt      = true                  <span class="c"># 服务端加密</span>
+    # 锁的机制随 backend 与 provider 版本演进，具体参数以你使用的
+    # backend 文档为准（对象锁 / 独立锁表 / 托管服务内置锁都可能存在）
+    use_lockfile = true
+  }
+}
+
+<span class="c"># 敏感的环境相关参数不要写死在代码里，用 -backend-config 传入</span>
+terraform init -backend-config=env/prod.hcl
+
+<span class="c"># 换 backend 或迁移 state 时用 init 的迁移选项，它会问你要不要把本地 state 搬过去</span>
+terraform init -migrate-state</pre>
+  <h3>坑二：没有锁</h3>
+  <p>锁的作用是<b>让同一份 state 在同一时刻只有一个写操作</b>。没有锁时，两个 apply 会各自基于旧 state 计算 diff，然后先后写回，结果是 state 里混着两次操作的产物，甚至直接损坏。Terraform 的报错通常是一个明确的「Error acquiring the state lock」，并带上持有锁的 ID 和时间——<b>看到这个报错，正确做法是等，不是强行解锁</b>。</p>
+  <table>
+    <tr><th style="width:180px">情况</th><th>该做什么</th><th>不该做什么</th></tr>
+    <tr><td>报错「state lock」且确实有人在跑</td><td>等他跑完，或者用 <span class="k">-lock-timeout</span> 让命令自动等待</td><td>不要 force-unlock，会打断别人的操作</td></tr>
+    <tr><td>上一个进程崩了，锁没释放</td><td>确认没有任何 terraform 进程在跑，再 <span class="k">terraform force-unlock &lt;LOCK_ID&gt;</span></td><td>不要凭感觉解锁；先查进程、查 CI 流水线状态</td></tr>
+    <tr><td>锁的 backend 本身不可用</td><td>先修 backend（如锁表被删、权限变了）</td><td>不要删锁文件或绕过锁继续 apply</td></tr>
+  </table>
+  <h3>坑三：state 里的敏感信息是明文</h3>
+  <p>这一条最容易被误解。很多人以为给变量加了 <span class="k">sensitive = true</span> 就安全了——<b>不是</b>。<span class="k">sensitive</span> 只影响 <b>CLI 输出和日志</b>，让值不打印在屏幕上；state 文件里这个值仍然以明文存储。因为 state 必须保存资源的全部属性，而密码、密钥、token 就是属性的一部分。</p>
+  <div class="callout danger">
+    <b>所以「state 的访问控制」等于「密钥的访问控制」。</b>这意味着：state 的存储桶必须加密（服务端加密 + KMS）、必须限制访问（只有 CI 的 apply 角色和人肉救火的少数账号能读）、必须开版本控制和访问日志、绝对不能提交到 Git、也不能把 <span class="k">terraform state pull</span> 的输出随手贴到聊天群里。<b>更进一步的做法是：根本不让 Terraform 生成密钥</b>——用 <span class="k">random_password</span> 或 <span class="k">tls_private_key</span> 生成的密码会明文落在 state 里，更好的方式是让密钥管理系统生成，Terraform 只通过 data source 引用。
+  </div>
+  <pre><span class="c"># sensitive 只挡 CLI 输出，不挡 state</span>
+variable "db_password" {
+  type      = string
+  sensitive = true
+}
+
+<span class="c"># 反例：生成的密码会明文进 state</span>
+resource "random_password" "db" { length = 32 }
+
+<span class="c"># 更稳的做法：密钥由外部系统生成，Terraform 只引用</span>
+data "external_secret" "db" {
+  name = "prod/rds/master"
+}
+
+<span class="c"># 定期自检：确认 state 里确实有/没有敏感字段</span>
+terraform state pull | grep -i -E 'password|secret|private_key|token' | head</pre>
+  <p><b>面试怎么答：</b>「state 的三个坑我都见过或防过。第一是本地 state，必须配 remote backend，开加密、版本控制，敏感参数用 -backend-config 传。第二是没锁，并发 apply 会基于过期 state 算出错误的 diff，正确做法是 -lock-timeout 等待，force-unlock 只在确认没有进程在跑时才用。第三是敏感信息明文——sensitive 只影响 CLI 输出，state 里仍然是明文，所以 state 的存储桶访问控制就等于密钥访问控制，而且我倾向于不让 Terraform 生成密钥，让密钥管理系统生成、Terraform 只引用。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>provider、resource、data source、module：四类对象怎么配合</h2></div>
+  <p class="lead">这四类对象的区别，决定了「什么东西该以什么形式进代码」。最常见的错位是：<b>把本该是 data source 的东西写成了 resource</b>（于是 Terraform 想去创建一个已经存在的东西），或者<b>把本该抽成 module 的东西复制了三遍</b>。</p>
+  <table>
+    <tr><th style="width:140px">对象</th><th>它的语义</th><th>放进 state 吗</th></tr>
+    <tr><td><b>provider</b></td><td>插件，负责把 HCL 翻译成某个平台的 API 调用；要显式锁版本</td><td>不进（但版本锁进 <span class="k">.terraform.lock.hcl</span>）</td></tr>
+    <tr><td><b>resource</b></td><td>「我声明这个东西应该存在，并且长这样」，Terraform 负责创建、更新、销毁</td><td>进。它是 state 的主体</td></tr>
+    <tr><td><b>data source</b></td><td>「查一下已存在的东西，把它的属性给我用」，只读</td><td>不进（每次 plan 时查询）</td></tr>
+    <tr><td><b>module</b></td><td>一组资源的封装，用来复用；调用时传变量、拿 output</td><td>进，地址带 <span class="k">module.</span> 前缀</td></tr>
+  </table>
+  <pre><span class="c"># provider 必须锁版本，否则不同人 init 出来的插件版本不一样</span>
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~&gt; 5.0"          <span class="c"># 允许 5.x 的补丁/小版本，不跨大版本</span>
+    }
+  }
+}
+
+<span class="c"># data source：引用已存在的资源（比如别的团队建的 VPC）</span>
+data "aws_vpc" "shared" {
+  tags = { Name = "shared-prod" }
+}
+
+resource "aws_subnet" "app" {
+  vpc_id     = data.aws_vpc.shared.id    <span class="c"># 只读引用，不会去创建 VPC</span>
+  cidr_block = "10.0.1.0/24"
+}
+
+<span class="c"># module 调用：地址变成 module.app_vpc.aws_subnet.app</span>
+module "app_vpc" {
+  source     = "../modules/vpc"
+  cidr_block = "10.0.0.0/16"
+  env        = "prod"
+}</pre>
+  <p><b>provider 版本锁</b>是这一节最容易被忽略但后果很严重的点。<span class="k">~&gt; 5.0</span> 表示允许 5.x 的更新但不跨到 6.0；如果只写 <span class="k">version = "5.1.0"</span> 是完全锁死；不写则 <span class="k">init</span> 会拉最新大版本。<b>为什么必须锁？</b>因为 provider 的默认值会变、属性的行为会变——某次升级后，一个原本可选的字段变成必填，或者某个字段的默认值改变，plan 就会突然出现「要替换这个资源」。这类变更出现在生产数据库的 plan 里，是非常吓人的。</p>
+  <p><span class="k">.terraform.lock.hcl</span> 记录的是<b>具体平台和具体版本</b>的校验和，它应该提交到 Git。这样团队里所有人、CI 里所有 runner 用的都是同一份插件。要升级时用 <span class="k">terraform init -upgrade</span>，它会更新 lock 文件——<b>这个更新会出现在 PR 的 diff 里，正好是一个评审点</b>。</p>
+  <p><b>count 和 for_each 的选择</b>也是这一节的重点，因为它直接决定「增删一项会不会牵连别人」：</p>
+  <table>
+    <tr><th style="width:130px">写法</th><th>地址形态</th><th>删中间一项会发生什么</th></tr>
+    <tr><td><b>count</b></td><td><span class="k">aws_instance.web[0]、[1]、[2]</span></td><td>删掉第 1 项，原来的 [2] 变成 [1] —— Terraform 认为 [1] 的内容变了、[2] 要删，<b>后面的资源被连锁重建</b></td></tr>
+    <tr><td><b>for_each</b></td><td><span class="k">aws_instance.web["a"]、["b"]、["c"]</span></td><td>删掉 "b"，只有 "b" 被删，<b>"a" 和 "c" 完全不受影响</b></td></tr>
+  </table>
+  <div class="callout warn">
+    <b>规则很简单：只要这组资源可能会增减，就用 for_each，别用 count。</b>count 只适合「数量固定、且中间不会抽掉一个」的场景（比如固定的 3 个可用区）。因为 count 用下标做身份，下标变了就等于身份变了。把已有的 count 改成 for_each 时，注意地址会整体变化，需要配合 state 搬迁（见模块 5），否则就是一次全量重建。
+  </div>
+  <p><b>面试怎么答：</b>「四类对象我按『是否进 state』区分：resource 进，data source 只查询不进，module 是资源分组、地址带 module 前缀。provider 必须锁版本，因为 provider 的默认值和字段行为会变，不锁的话某次 init 之后 plan 可能突然出现资源替换；.terraform.lock.hcl 要提交到 Git。另外 count 用下标做身份，删中间一项会连锁重建后面的资源，所以可能增减的资源集合一律用 for_each。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>漂移、import 与重构：让 state 追上现实而不炸掉现实</h2></div>
+  <p class="lead">这一节是 Terraform 运维里最有技术含量的一块，也是面试最爱追问的：<b>「有一批资源是手工建的，怎么纳入管理？」</b>「代码重构后 plan 出 destroy，怎么办？」两个问题的核心都是同一件事——<b>想办法只改 state 里的地址或清单，而不动真实资源</b>。</p>
+  <h3>漂移（drift）：先分清三种处理方向</h3>
+  <p>漂移是「现实与声明不一致」的正常状态，不是错误。原因是多样的：有人在控制台改了、别的工具（CI、应用）改了、provider 默认值变了、或者资源被外部系统自动调整（比如托管数据库的自动小版本升级）。<b>关键是不要一看到 diff 就 apply</b>，先判断它属于哪一类：</p>
+  <table>
+    <tr><th style="width:180px">漂移来源</th><th>正确动作</th><th>错误动作</th></tr>
+    <tr><td>手工改动是<b>错的</b>，声明是对的</td><td>apply，把它拉回声明</td><td>改代码去迁就错误的现实</td></tr>
+    <tr><td>手工改动是<b>对的</b>，代码落后了</td><td>改代码，让声明追上现实，再 plan 确认零 diff</td><td>apply（会把正确的改动撤销掉）</td></tr>
+    <tr><td>平台自动调整（如托管服务升版本）</td><td>用 <span class="k">ignore_changes</span> 忽略该字段，或用 <span class="k">-refresh-only</span> 同步 state</td><td>强行拉回，导致不必要的重建</td></tr>
+  </table>
+  <pre><span class="c"># 1. 先看清楚漂在哪：只刷新 state、不改任何资源</span>
+terraform plan -refresh-only -out=refresh.tfplan
+terraform show refresh.tfplan          <span class="c"># 确认每一个差异都是你能接受的</span>
+terraform apply refresh.tfplan         <span class="c"># 把现实同步进 state，不碰真实资源</span>
+
+<span class="c"># 2. 定时漂移检测（CI 里跑，非零差异就告警）</span>
+terraform plan -detailed-exitcode      <span class="c"># 0=无差异 1=出错 2=有差异（退出码以你版本文档为准）</span>
+
+<span class="c"># 3. -target 是逃生舱，不是常规手段</span>
+terraform apply -target=module.app.aws_instance.web   <span class="c"># 只动这一个</span></pre>
+  <p><span class="k">-target</span> 必须说清楚它的危险性：它让 Terraform 只考虑目标资源及其依赖，<b>state 里其它资源不会被刷新、也不会被校验</b>，于是 state 与完整配置逐渐脱节。而且下次不带 -target 的正常 plan 可能因为「中间状态」算出意外结果。它的正当用途只有一个：<b>紧急止血</b>——比如某个资源卡住了、或者要单独修一个坏掉的资源。用完之后要尽快跑一次完整 plan 确认状态干净。</p>
+  <h3>import：把已存在的资源纳入管理</h3>
+  <p>老式做法（<span class="k">terraform import</span> CLI）有一个重要限制：<b>它只写 state，不生成配置</b>。所以流程是——先在代码里手写 resource block，再执行 import 把真实资源的 ID 关联到这个地址，然后 <span class="k">terraform plan</span> 看差异，把缺的属性补齐，直到 plan 干净。这个「补齐属性」的过程很琐碎，但<b>必须做</b>，否则下次 apply 会试图把这些属性改成默认值。</p>
+  <p>较新的版本提供了配置驱动的 import（<span class="k">import {}</span> block 配合 <span class="k">plan -generate-config-out</span>），可以由 Terraform 生成配置骨架，省掉手写这一步。<b>具体可用性和参数以你的 Terraform 版本文档为准</b>，不要凭记忆写版本号。</p>
+  <pre><span class="c"># 老式 CLI import：先写配置，再关联</span>
+terraform import aws_instance.web i-0123456789abcdef0
+terraform state show aws_instance.web      <span class="c"># 看它读到了哪些属性</span>
+terraform plan                             <span class="c"># 补属性，直到零 diff</span>
+
+<span class="c"># 配置驱动 import（较新版本支持，细节以版本文档为准）</span>
+import {
+  to = aws_instance.web
+  id = "i-0123456789abcdef0"
+}
+<span class="c"># 然后：</span>
+terraform plan -generate-config-out=generated.tf
+
+<span class="c"># 批量导入小技巧：用 for_each + 变量清单，逐个 import 到同一个地址族</span>
+<span class="c"># 但注意每次 import 都是一次 state 写操作，务必先备份</span></pre>
+  <h3>重构：改地址而不重建</h3>
+  <p>这就是开头那个「把数据库挪进 module 结果 plan 出 destroy」的解法。两条路：<b>声明式的 <span class="k">moved</span> block</b>（推荐，因为它进代码、可评审、团队共享）和<b>命令式的 <span class="k">terraform state mv</span></b>（立即可用，但只改了你自己那份 state，别人不同步就会出错）。</p>
+  <pre><span class="c"># 推荐：写进代码的 moved block（较新版本支持，以版本文档为准）</span>
+moved {
+  from = aws_db_instance.main
+  to   = module.database.aws_db_instance.main
+}
+
+<span class="c"># 从 state 移除但保留真实资源（不再由 Terraform 管理）</span>
+removed {
+  from = aws_instance.legacy
+  lifecycle {
+    destroy = false
+  }
+}
+
+<span class="c"># 命令式方式：先备份，再搬，再验证</span>
+terraform state pull &gt; backup-before-mv.tfstate
+terraform state mv aws_db_instance.main module.database.aws_db_instance.main
+terraform plan            <span class="c"># 必须确认是 "0 to change"，如果有 destroy 说明地址写错了</span></pre>
+  <div class="callout danger">
+    <b>判断搬迁是否成功的唯一标准是 plan 输出「0 to add, 0 to change, 0 to destroy」。</b>如果 plan 里出现 destroy，说明地址没对上，<b>立即停手</b>——这时候 apply 会真的删掉资源。补救办法是从备份恢复 state（<span class="k">terraform state push</span> 回去，或者从 backend 的版本历史取回），然后重新核对地址。所以这一节的每一条命令前面都该有一句 <span class="k">state pull &gt; 备份</span>。
+  </div>
+  <p><b>面试怎么答：</b>「漂移我不会直接 apply，先判断方向：现实错了就拉回，代码落后了就改代码，平台自动调整的用 ignore_changes 或 -refresh-only 同步。看漂移用 plan -refresh-only，定时检测用 -detailed-exitcode。-target 只用于紧急止血，因为它会让 state 与完整配置脱节。import 有两种：老式 CLI 只写 state 不生成配置，需要自己补属性直到 plan 干净；较新版本有配置驱动的 import 能生成配置骨架。重构改地址用 moved block，它进代码可评审，比 state mv 好；判断成功的标准是 plan 显示零变更，出现 destroy 就立刻停手并从备份恢复。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>模块设计与环境隔离：workspace 还是目录</h2></div>
+  <p class="lead">「多环境怎么组织」是必问题，而且它有标准答案的倾向：<b>生产环境用目录隔离，workspace 只用于「同一份代码的临时副本」场景</b>。答对不难，难的是说清为什么。</p>
+  <table>
+    <tr><th style="width:130px">方案</th><th>state 位置</th><th>优点</th><th>致命缺点</th></tr>
+    <tr><td><b>目录隔离</b></td><td>每个环境一个 backend key（甚至不同桶）</td><td>代码差异可见、权限可分开、plan 时目录即环境不易搞错</td><td>环境之间会复制代码，需要靠 module 抽取公共部分来避免重复</td></tr>
+    <tr><td><b>workspace</b></td><td>同一个 backend 下的不同 workspace 前缀</td><td>一份代码切换环境，命令短</td><td><b>共享凭证、共享 backend 权限、环境差异只能靠变量表达</b>；切换错了就是生产事故</td></tr>
+    <tr><td><b>两者结合</b></td><td>目录管环境，workspace 管「同一环境的短期副本」</td><td>兼顾</td><td>规则复杂，团队容易搞混，需要在 README 里写死约定</td></tr>
+  </table>
+  <p>为什么 workspace 不适合做环境隔离？三个具体原因。<b>第一，凭证共享。</b>同一份代码、同一个 backend 配置意味着用同一套权限去操作所有环境，「在 staging 上试一下」的操作对生产同样有效。<b>第二，环境的结构性差异无法表达。</b>比如生产要跨三个可用区、staging 只要一个，这种差异用变量表达会很别扭，最后变成一堆 <span class="k">count = var.env == "prod" ? 3 : 1</span>，代码可读性迅速下降。<b>第三，误操作成本低得可怕。</b><span class="k">terraform workspace select prod</span> 敲成 <span class="k">default</span> 然后 apply，就是一个没有回退的生产变更。</p>
+  <pre><span class="c"># 目录隔离的标准结构：公共逻辑进 module，环境目录只放组合</span>
+infra/
+├── modules/
+│   ├── vpc/            <span class="c"># 纯参数化的公共模块</span>
+│   ├── rds/
+│   └── eks/
+├── env/
+│   ├── prod/
+│   │   ├── main.tf     <span class="c"># 调用 modules，组合出生产拓扑</span>
+│   │   ├── prod.tfvars
+│   │   └── backend.hcl
+│   ├── staging/
+│   │   ├── main.tf
+│   │   ├── staging.tfvars
+│   │   └── backend.hcl
+│   └── dev/
+└── README.md           <span class="c"># 写清「目录即环境」和 init/apply 的准确命令</span>
+
+<span class="c"># 每个环境目录各自 init，backend 配置各自独立</span>
+cd env/prod &amp;&amp; terraform init -backend-config=backend.hcl</pre>
+  <p><b>module 的设计原则</b>也说三条：① <b>模块应该是「一个可独立理解的组件」</b>，比如「一个带子网和路由表的 VPC」，而不是「所有网络资源的集合」；② <b>输入用变量、输出用 output</b>，模块内部不要引用外部的相对路径或全局变量，否则它就不具备可移植性；③ <b>模块要有版本</b>——用 Git tag 或者 registry 版本号来引用 <span class="k">source</span>（<span class="k">source = "git::https://...?ref=v1.2.0"</span>），不要用分支名或 <span class="k">main</span>，否则模块的改动会直接打到所有引用它的环境。</p>
+  <div class="callout ok">
+    <b>一个可以立刻检查的点：</b>看你们的 <span class="k">source</span> 用的是 tag 还是分支。如果写的是 <span class="k">?ref=main</span> 或者干脆是本地相对路径 <span class="k">../modules/vpc</span>，那么「改一个模块」就等于「同时改所有环境」——没有评审、没有灰度、没有回滚点。改成 tag 之后，环境升级模块就是一个明确的、可评审的版本号变更。
+  </div>
+  <p><b>面试怎么答：</b>「多环境我推荐目录隔离：每个环境一个目录、各自的 backend 配置和 tfvars，公共逻辑抽成 module。workspace 我只用来做同一环境的短期副本，不用来做环境隔离，因为它共享凭证和 backend 权限，而且环境间的结构性差异用变量表达会很别扭，最关键是 workspace 切错就是生产事故。module 我要求用 tag 或版本号引用，不能用分支名，否则改模块等于同时改所有环境。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>与 Ansible、K8s 的边界：谁管什么，为什么这么分</h2></div>
+  <p class="lead">这一节和第 37 期是同一件事的两面，这里从 Terraform 的角度讲。<b>划分依据只有一条：这个东西的生命周期归谁管。</b>有云平台 API、需要被创建和销毁的，归 Terraform；需要持续收敛的内部状态，归各自的控制器。</p>
+  <table>
+    <tr><th style="width:180px">对象</th><th>该谁管</th><th>为什么</th></tr>
+    <tr><td>VPC、子网、安全组、路由表</td><td>Terraform</td><td>有 API、有生命周期、很少变、需要可复现</td></tr>
+    <tr><td>云主机、磁盘、负载均衡、数据库实例</td><td>Terraform</td><td>同上；注意有状态资源要加 <span class="k">prevent_destroy</span></td></tr>
+    <tr><td>IAM 角色、策略、DNS 记录、证书</td><td>Terraform</td><td>声明式和权限模型的契合度高，且需要评审</td></tr>
+    <tr><td>机器上的软件包、配置文件、systemd 单元</td><td>Ansible（或镜像构建）</td><td>属于「已存在机器的内部状态」，Terraform 管它会让 state 与机器现实迅速脱节</td></tr>
+    <tr><td>Pod、Deployment、ConfigMap、Service</td><td>Helm / Kustomize / GitOps</td><td>集群内有控制器持续收敛，外部工具写同一对象一定会打架</td></tr>
+    <tr><td>集群本身（节点组、控制面）</td><td>Terraform</td><td>它是云资源，集群之外；集群之内的东西不归它</td></tr>
+  </table>
+  <p><b>Kubernetes provider 该怎么用？</b>这是一个真实的两难题，值得给一个明确的判断：<b>可以用，但要克制。</b>它适合的场景是「集群刚建好时的一次性引导」——装几个必须存在的 CRD、Namespace、或者 Helm release 的初始版本。不适合的是「日常发布业务 Deployment」，因为：① 业务 manifest 属于应用团队，混在基础设施仓库里会让两边的发布节奏绑死；② provider 需要能连到 apiserver，CI 里要打通网络，扩大了攻击面；③ 集群里的控制器（HPA、operator）会修改对象字段，Terraform 下次 plan 会认为「被改了」并试图改回去，形成拉锯。</p>
+  <pre><span class="c"># 合理的用法：Terraform 只做「引导」，业务交给 GitOps</span>
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argo-cd"
+  version    = "5.51.4"          <span class="c"># 版本要锁</span>
+  namespace  = "argocd"
+  create_namespace = true
+}
+
+<span class="c"># 不建议的用法：把几十个业务 Deployment 写成 kubernetes_manifest</span>
+<span class="c"># 它们会被 operator / HPA 修改，Terraform 每次 plan 都想改回去</span></pre>
+  <div class="callout warn">
+    <b>一个判断「这个东西该不该进 Terraform」的快捷问题：</b>「如果 Terraform 明天把它 destroy 掉，会发生什么？」如果答案是「可以用同一份代码在十分钟内重建，且没有数据损失」，它适合 Terraform；如果答案是「里面有用户数据，重建不出来」，那它要么加 <span class="k">prevent_destroy</span>、要么用 data source 引用已有的、要么干脆交给专门的备份与恢复体系。<b>这个问题能帮你把「有状态资源」从普通资源里挑出来单独对待。</b>
+  </div>
+  <p>交接方式也值得说清：Terraform 产出什么、下游怎么拿到。<b>用 output</b>——集群名、节点组、数据库地址、子网 ID 都可以作为 output 暴露，然后由 Ansible 通过 <span class="k">terraform output -json</span> 生成 inventory，或者由 CI 读取后传给下一步。<b>不要把 Terraform 的内部细节直接暴露给下游</b>（比如让应用去读 tfstate），那会让两边耦合在 state 的格式上。</p>
+  <p><b>面试怎么答：</b>「边界按生命周期划分：有云平台 API、需要创建销毁的（VPC、主机、数据库实例、IAM、DNS、集群本身）归 Terraform；机器内部的软件和配置归 Ansible；集群里的 Pod、Deployment 归 Helm 和 GitOps。Kubernetes provider 我只用它做集群引导（装 CRD、装 Argo CD 这类），不用它发业务，因为集群里的控制器会改对象字段，Terraform 会和它拉锯，而且业务 manifest 属于应用团队，混进来会绑死两边的发布节奏。交接用 output，不让下游直接读 tfstate。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>生产实践：让 apply 这件事变得无聊</h2></div>
+  <p class="lead">Terraform 在生产上的目标不是「跑得快」，是<b>「跑得无聊」</b>——每次都是同样的步骤、同样的检查、同样的权限，没有人能在本地随手 apply 一下。这一节讲怎么把流程固定下来。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>本地与 PR 阶段：只做静态检查。</b><span class="k">terraform fmt -check -recursive</span>、<span class="k">terraform validate</span>、<span class="k">tflint</span>，这几步不需要任何云凭证，成本极低，应该最早跑。</div></div>
+    <div class="step"><div class="txt"><b>PR 里跑 plan 并把结果贴出来。</b>用只读凭证执行 plan，把输出贴到 PR 评论里（有专门的工具或 GitHub Action 做这件事）。<b>评审的对象是 plan，不是代码 diff</b>——因为「改了一个变量导致十个资源被替换」这种事，从代码 diff 里看不出来。</div></div>
+    <div class="step"><div class="txt"><b>策略检查。</b>用 Checkov、tfsec、或者 OPA/Sentinel 之类的策略引擎扫 plan 的 JSON：<span class="k">terraform show -json tfplan</span> 之后交给引擎，规则比如「不允许 0.0.0.0/0 的安全组入站」「存储桶必须加密」。</div></div>
+    <div class="step"><div class="txt"><b>合并后由受限角色 apply。</b>执行 apply 的身份只能由流水线持有，人默认没有这个权限；apply 用的是 PR 里生成的那个 plan 文件，而不是重新算一遍——这样可以保证「评审的内容就是执行的內容」。</div></div>
+    <div class="step"><div class="txt"><b>定时漂移检测。</b>每天或每周跑一次 <span class="k">plan -detailed-exitcode</span>，有差异就告警。<b>这一步的价值不只是发现手工改动</b>，它还能发现「代码已经不能描述现实了」这种长期风险。</div></div>
+  </div>
+  <pre><span class="c"># CI 里的典型顺序（伪代码，按你的 CI 语法改写）</span>
+terraform fmt -check -recursive
+terraform init -backend-config=env/$ENV.hcl
+terraform validate
+terraform plan -var-file=env/$ENV.tfvars -out=tfplan -lock-timeout=5m
+terraform show -json tfplan &gt; tfplan.json
+<span class="c"># 策略引擎扫 tfplan.json；把人类可读的 plan 贴到 PR</span>
+<span class="c"># 审批通过 → 同一份 tfplan 由受限角色执行：</span>
+terraform apply -lock-timeout=5m tfplan
+
+<span class="c"># 变量注入：敏感值不要写进 tfvars 再提交</span>
+export TF_VAR_db_password="$SECRET_FROM_CI"</pre>
+  <table>
+    <tr><th style="width:190px">控制点</th><th>防的是什么</th><th>不做会怎样</th></tr>
+    <tr><td><b>plan 文件作为审批对象</b></td><td>「评审的代码」和「执行的变更」不一致</td><td>评审通过了，但执行时因为时间差算出了另一个 plan</td></tr>
+    <tr><td><b>apply 用受限角色</b></td><td>人在本地随手 apply 生产</td><td>变更绕过评审、绕过记录，出了问题查不到</td></tr>
+    <tr><td><b>backend 只允许 CI 写</b></td><td>本地 state 覆盖远程 state</td><td>state 被旧版本覆盖，资源清单丢失</td></tr>
+    <tr><td><b>-lock-timeout</b></td><td>并发 apply</td><td>报错中断，或者有人用 force-unlock 强行打断别人</td></tr>
+    <tr><td><b>state 版本控制</b></td><td>state 被错误覆盖后无法恢复</td><td>只能靠 import 一个一个重建清单，耗时且易错</td></tr>
+    <tr><td><b>prevent_destroy</b></td><td>关键资源被误删</td><td>数据库连同数据一起消失</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>「用 plan 文件而不是重新 plan」这条要特别强调。</b>如果合并之后重新跑一次 plan 再 apply，那么评审的和执行的就不是同一份：中间可能有人改了 main 分支、可能云上的状态变了、可能 provider 被升级了。正确做法是 PR 阶段生成 <span class="k">tfplan</span> 并作为<b>产物</b>保存（artifact），apply 阶段直接执行这个文件。<b>顺带一提，plan 文件会过期</b>——放太久之后 apply 会拒绝执行，这是设计如此，说明你该重新评审了。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>terraform fmt -check -recursive</code><span class="desc">格式化检查，不需要任何云凭证，CI 第一步</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform plan -var-file=env/prod.tfvars -out=tfplan -lock-timeout=5m</code><span class="desc">生成 plan 文件作为评审对象与执行产物</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform show -json tfplan &gt; tfplan.json</code><span class="desc">转成 JSON 交给策略引擎扫描</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform state pull &gt; backup-$(date +%F).tfstate</code><span class="desc">动 state 前的备份，几秒钟换一条退路</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform plan -refresh-only -out=refresh.tfplan</code><span class="desc">只看漂移、只同步 state，不碰任何真实资源</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform plan -detailed-exitcode</code><span class="desc">用退出码区分无差异/出错/有差异，做定时漂移检测</span><button class="copy">复制</button></div>
+    <div class="crow"><code>terraform state mv aws_db_instance.main module.database.aws_db_instance.main</code><span class="desc">搬迁资源地址，只改清单不动资源；之后必须 plan 确认零变更</span><button class="copy">复制</button></div>
+  </div>
+  <p>还有一个经常被忽略的工程问题：<b>apply 的超时和中断</b>。Terraform 在创建云资源时可能等很久（数据库实例、负载均衡都是分钟级）。如果 CI 有超时杀掉进程，锁可能没释放、state 可能停在半路。所以：CI 的超时要设得足够长；被中断后要<b>先确认没有进程在跑再处理锁</b>；state 半路的后果是某些资源已创建但没记录——这时候的恢复手段是 import，或者从 backend 版本历史恢复 state 再重跑。</p>
+  <p><b>面试怎么答：</b>「生产流程我按五步：PR 阶段跑 fmt、validate、tflint，不需要凭证；然后只读凭证跑 plan，把输出贴到 PR 里——评审的对象是 plan 不是代码 diff，因为『改一个变量导致十个资源替换』从 diff 看不出来；策略引擎扫 plan 的 JSON；合并后由流水线持有的受限角色执行 PR 里生成的那个 plan 文件，而不是重新 plan；另外每天跑一次 plan -detailed-exitcode 做漂移检测。配套控制是 backend 只允许 CI 写、-lock-timeout 防并发、state 开版本控制、关键资源加 prevent_destroy。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：把「我用了 Terraform」讲成一段有因果的经历</h2></div>
+  <p class="lead">「你用 IaC 解决过什么问题」这题，大部分人答的是功能清单（「我用它管理了 VPC 和 ECS」），而得分的答案是<b>「问题 → 我做的事 → 结果 → 怎么证明」</b>四段。四段里最容易被省略的是最后一段「怎么证明」，而它恰恰是区分「做过」和「听说过」的地方。</p>
+  <table>
+    <tr><th style="width:110px">段</th><th>讲什么</th><th>反例</th></tr>
+    <tr><td><b>问题</b></td><td>具体的痛点：环境不一致、变更没人知道、重建要半天</td><td>「我们想提高运维效率」</td></tr>
+    <tr><td><b>动作</b></td><td>你具体做了什么：抽 module、接 CI、加策略检查、迁移 state</td><td>「我们把资源都用 Terraform 管理了」</td></tr>
+    <tr><td><b>结果</b></td><td>可观察的变化：新建环境的耗时、变更流程、漂移工单数量</td><td>「效果很好」（没有证据）</td></tr>
+    <tr><td><b>证明</b></td><td>你怎么知道结果成立：计时、工单统计、漂移检测告警</td><td>——（这一段最常被整个省略）</td></tr>
+  </table>
+  <p>「证明」这一段怎么写才不空洞？给三个可用的来源：<b>① 时间——</b>「之前新建一个环境要按天排期，之后是跑一次流水线，具体时长以你们的实测为准，不要借用别人的数字」；<b>② 计数——</b>「漂移检测上线后，每周能发现几处手工改动，这个数字本身说明了『控制台还在被写』，是推动规则落地的依据」；<b>③ 事件——</b>「有一次某资源的 plan 出现 destroy，因为 XXX 配置了 prevent_destroy 被拦下」。<b>不要编造具体数字</b>，讲你测过的量级和测量方法即可，面试官追问「怎么测的」时你能答上来就行。</p>
+  <div class="callout">
+    <b>一个完整的示范（可以照着改）：</b>「我们之前的问题是环境不一致，测试环境能跑的配置到生产就出问题，而且变更都在控制台做，事后查不到是谁改的。我做的事是先把网络和一个核心服务抽成 module，环境用目录隔离、公共部分走 module 的 tag 版本，然后接进 CI：PR 里跑 plan 并把结果贴出来评审，apply 由流水线角色执行。结果是变更都有 diff 和评审记录了，环境差异只剩下变量文件。我怎么知道它成立——一是漂移检测上线后每周能扫出几处手工改动，这个数字让我们推动『控制台只读』有了依据；二是有一次重构把资源挪进 module，plan 出了 destroy，被 prevent_destroy 拦下了，我们改用 moved block 重做，最后 plan 零变更。这件事之后我把『动 state 前先备份』写进了 runbook。」
+  </div>
+  <p>还有几个追问要准备好。<b>「state 坏了你怎么救？」</b>——从 backend 的版本历史取回上一个版本；如果没有版本控制，用本地备份 <span class="k">state push</span> 回去（注意 lineage 要匹配）；如果都没有，只能 <span class="k">import</span> 逐个重建清单，或者接受重建资源。<b>「你们怎么防止误删生产？」</b>——目录隔离 + 受限角色 + <span class="k">prevent_destroy</span> + 删除类变更单独审批 + backend 版本控制。<b>「Terraform 的缺点是什么？」</b>——这个问题一定要有答案，只讲优点会显得没真用过：state 是单点风险、provider 质量和覆盖度参差、复杂逻辑用 HCL 表达很别扭（循环和条件能力有限）、拆分不合理时一个 apply 会牵动过大范围、以及团队需要真的看懂 plan 否则评审流于形式。</p>
+  <p><b>面试怎么答：</b>「我用四段讲：问题是什么、我做了什么、观察到了什么变化、以及我怎么证明这个变化。四段里我一定会带上『怎么证明』，因为它才是区分做过和听说过的部分。数字我只讲自己测过的量级和测量方法，不借用别人的结论。另外我会主动说 Terraform 的缺点——state 是单点风险、provider 质量参差、HCL 表达复杂逻辑很别扭、apply 的爆炸半径可能过大，这些只有真用过才知道。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：每一个都对应一次「幸好是预发」</h2></div>
+  <p class="lead">这一节的坑有个共同点：<b>它们在 plan 阶段往往看不出异常，直到 apply 才暴露，而那时已经晚了。</b>所以防范手段基本都在流程里，不在代码里。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">不配 remote backend，用本地 state</div><div class="pd">只在这台机器上、没有备份、没有并发保护。机器重装或人离职交接，资源清单就没了。必须配远程 backend 并开加密和版本控制。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把 tfstate 提交到 Git</div><div class="pd">state 里是所有资源的属性和敏感值明文，提交上去等于把整套基础设施的清单和密码公开。.gitignore 里必须排除 *.tfstate 和 .terraform/。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">不加锁，两个人同时 apply</div><div class="pd">双方基于过期 state 计算 diff，写回时互相覆盖。看到「Error acquiring the state lock」应该等，用 -lock-timeout 自动等待，而不是强行解锁。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">乱用 force-unlock</div><div class="pd">在有 apply 正在跑时解锁，等于让两个写操作同时进行。用之前必须确认没有任何 terraform 进程和 CI 任务在跑。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">以为 sensitive = true 就加密了</div><div class="pd">sensitive 只挡 CLI 输出，state 里仍然是明文。所以 state 的访问控制就是密钥访问控制；更好的是不让 Terraform 生成密钥，只从外部系统引用。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">看到漂移就 apply</div><div class="pd">漂移可能是「代码落后于正确的现实」。盲目 apply 会把别人正确的手工改动撤销掉。先判断方向：拉回声明、还是改代码追上现实、还是用 ignore_changes 忽略。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">-target 用成习惯</div><div class="pd">它只考虑目标资源，state 与完整配置逐渐脱节，后续正常 plan 可能算出意外结果。只用于紧急止血，用完立刻跑完整 plan 确认。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用 count 管理会增减的资源集合</div><div class="pd">count 用下标做身份，删掉中间一项会导致后面所有资源被连锁重建。会增减的集合一律用 for_each，用 key 做身份。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">重构时直接改名或挪进 module</div><div class="pd">地址变了就是「旧的删、新的建」，数据库这类资源会丢数据。用 moved block 或 state mv 搬迁，判断标准是 plan 输出零变更，出现 destroy 立刻停手并从备份恢复。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">用 workspace 做环境隔离</div><div class="pd">共享凭证和 backend 权限，环境的结构性差异只能靠变量表达，而且 workspace 切错就是生产事故。生产环境用目录隔离，workspace 只做短期副本。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个带着后果的讲。「我们踩过最险的一次是重构：把一批资源从根目录挪进 module，plan 出来是 destroy 再 create，其中有一个是有数据的数据库实例。幸好那次 plan 是在评审环节被拦下的——我养成了习惯，凡是 plan 里出现 destroy，先停下来问『这个资源重建得回来吗』。后来我们用 moved block 重做，plan 变成零变更。这件事之后我加了两条规矩：关键资源一律加 prevent_destroy；动 state 之前一律先 state pull 备份，并且 backend 开版本控制。」</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="1">
+      <div class="qt">1. 如果 <span class="k">terraform.tfstate</span> 丢失且没有备份，直接执行 <span class="k">terraform apply</span> 会发生什么？</div>
+      <button class="opt">Terraform 会自动扫描云上资源并重建 state，什么都不会发生</button>
+      <button class="opt">Terraform 认为这些资源不存在，plan/apply 会尝试重新创建它们，通常会因名称冲突失败，或者真的创建出重复资源</button>
+      <button class="opt">Terraform 会进入只读模式并拒绝执行</button>
+      <button class="opt">Terraform 会从 provider 缓存里恢复 state</button>
+      <div class="ans">正确答案：<b>它会尝试重新创建</b>。Terraform 的一切判断都基于 state 里的资源清单，它不会扫描云上有什么；state 丢了就等于清单为空。恢复手段是：从 remote backend 的版本历史取回上一个版本、用本地备份 state push 回去（注意 lineage 要匹配），两者都没有就只能逐个 import 重建清单。所以 state 的版本控制和备份是优先级最高的配置。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">2. 关于变量的 <span class="k">sensitive = true</span>，正确的是？</div>
+      <button class="opt">它会把值加密后再存进 state</button>
+      <button class="opt">它会阻止该变量被任何 resource 使用</button>
+      <button class="opt">它只影响 CLI 输出与日志，state 文件中该值仍然是明文存储</button>
+      <button class="opt">它会在 apply 之后自动从 state 中删除该字段</button>
+      <div class="ans">正确答案：<b>只挡输出，不加密 state</b>。state 必须保存资源的全部属性，密码/密钥/token 作为属性的一部分必然以明文出现。所以 state 的存储桶访问控制等于密钥访问控制：要开服务端加密、限制访问、开版本控制和访问日志，绝不提交到 Git。更进一步是不让 Terraform 生成密钥（如 random_password），改由外部密钥系统生成、Terraform 只引用。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">3. 控制台上有人手动改了一个安全组规则，<span class="k">terraform plan</span> 显示要把这个规则删掉。最稳妥的第一步是？</div>
+      <button class="opt">先判断这个改动是对是错：现实错了就 apply 拉回；代码落后了就改代码追上；平台自动调整的用 ignore_changes 或 -refresh-only</button>
+      <button class="opt">立刻 apply，因为代码才是唯一权威</button>
+      <button class="opt">立刻改代码把这个规则写进去</button>
+      <button class="opt">删掉 state 里这个资源，让它不再被管理</button>
+      <div class="ans">正确答案：<b>先判断方向，不要盲目 apply</b>。漂移不等于错误：可能是别人做了一个正确的临时修复，你 apply 就会把它撤销。三种处理方向分别是「拉回声明」「改代码追上现实」「用 ignore_changes 或 -refresh-only 承认现实」。看漂移用 plan -refresh-only（只同步 state 不碰资源），定时检测用 -detailed-exitcode。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">4. 把资源从根目录挪进 module 后，plan 出现 destroy + create。正确的做法是？</div>
+      <button class="opt">直接 apply，Terraform 会保证数据不丢</button>
+      <button class="opt">先 apply destroy，再手动重建</button>
+      <button class="opt">删掉 state 里对应条目，让它重新创建</button>
+      <button class="opt">用 moved block 或 terraform state mv 改变资源在 state 中的地址，只改清单不动真实资源；判断成功的标准是 plan 输出零变更</button>
+      <div class="ans">正确答案：<b>改地址而不重建</b>。资源的地址（如 module.database.aws_db_instance.main）就是它的身份，地址变了等于「旧的删、新的建」。moved block 是声明式做法、进代码可评审，优于命令式的 state mv；命令式方式动工前必须 terraform state pull 备份。<b>判断搬迁成功的唯一标准是 plan 显示 0 to add / 0 to change / 0 to destroy</b>，出现 destroy 说明地址没对上，应立即停手并从备份恢复。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">5. 为什么要避免在会增减的资源集合上使用 <span class="k">count</span>？</div>
+      <button class="opt">因为 count 不支持变量，只能写死数字</button>
+      <button class="opt">因为 count 用数组下标作为资源身份，删除中间一项会导致后面所有资源被连锁重建；应改用 for_each 以 key 作为身份</button>
+      <button class="opt">因为 count 生成的资源不会进 state</button>
+      <button class="opt">因为 count 在 Terraform 新版本中已被移除</button>
+      <div class="ans">正确答案：<b>下标即身份</b>。count 生成的地址是 aws_instance.web[0]、[1]、[2]，删掉第 1 项后原来的 [2] 变成 [1]，Terraform 认为 [1] 的内容变了、[2] 要删，于是后面的资源被连锁重建。for_each 生成的地址是 aws_instance.web["a"] 这种，增删只影响对应的 key。<b>规则：只要集合可能增减，就用 for_each。</b></div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">6. 关于 <span class="k">terraform workspace</span> 用于环境隔离，最准确的说法是？</div>
+      <button class="opt">它是官方推荐的生产环境隔离方式</button>
+      <button class="opt">它隔离了 state 和凭证，所以安全性比目录隔离更高</button>
+      <button class="opt">它共享同一份代码和 backend 权限，环境结构性差异只能用变量表达，且切错 workspace 就是生产事故；生产更推荐目录隔离</button>
+      <button class="opt">它会为每个环境生成独立的 provider 插件副本</button>
+      <div class="ans">正确答案：<b>不适合做生产环境隔离</b>。workspace 隔离了 state 的存放位置，但没有隔离凭证和 backend 权限，同一套权限对所有环境都有效；环境间的结构性差异（如生产三个可用区、staging 一个）用变量表达会很别扭；最关键是 workspace 切错就会把变更打到生产。推荐做法是目录隔离（各自 backend 配置与 tfvars）+ 公共逻辑抽成带版本号的 module，workspace 只用于同一环境的短期副本。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:200px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>state</b></td><td>Terraform 的唯一权威清单：资源地址、云端 ID 与全部属性、依赖图、元数据；属性是明文</td></tr>
+    <tr><td><b>backend</b></td><td>state 的存放位置；远程 backend 应开加密、版本控制、访问限制与锁</td></tr>
+    <tr><td><b>lock</b></td><td>保证同一时刻只有一个写操作的机制；拿到不到锁应等待（-lock-timeout）而非强解</td></tr>
+    <tr><td><b>force-unlock</b></td><td>强制释放锁，只在确认无进程运行时使用</td></tr>
+    <tr><td><b>drift（漂移）</b></td><td>现实与声明不一致；处理方向有拉回、追上、忽略三种</td></tr>
+    <tr><td><b>refresh-only</b></td><td>只把现实同步进 state、不修改任何资源的 plan 模式</td></tr>
+    <tr><td><b>import</b></td><td>把已存在的资源纳入 state；CLI 方式只写 state 不生成配置，较新版本支持配置驱动导入</td></tr>
+    <tr><td><b>moved block</b></td><td>声明式地改变资源在 state 中的地址，避免 destroy + create</td></tr>
+    <tr><td><b>removed block</b></td><td>把资源移出 state 但保留真实资源（配合 destroy = false）</td></tr>
+    <tr><td><b>data source</b></td><td>只读查询已存在资源的属性，不进 state</td></tr>
+    <tr><td><b>module</b></td><td>资源的封装单元；引用要用 tag 或版本号，不要用分支名</td></tr>
+    <tr><td><b>provider lock 文件</b></td><td>.terraform.lock.hcl，锁定具体平台和插件版本，应提交到 Git</td></tr>
+    <tr><td><b>for_each / count</b></td><td>前者以 key 为身份（推荐），后者以下标为身份（删中间项会连锁重建）</td></tr>
+    <tr><td><b>lifecycle</b></td><td>资源生命周期开关：prevent_destroy、ignore_changes、create_before_destroy</td></tr>
+    <tr><td><b>-target</b></td><td>只操作指定资源，用于紧急止血；滥用会让 state 与配置脱节</td></tr>
+    <tr><td><b>-detailed-exitcode</b></td><td>plan 的退出码区分「无差异/出错/有差异」，用于 CI 漂移检测</td></tr>
+    <tr><td><b>workspace</b></td><td>同一份代码的多份 state；不适合做生产环境隔离</td></tr>
+    <tr><td><b>prevent_destroy</b></td><td>阻止该资源被销毁的 lifecycle 开关，关键有状态资源必配</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 用免费额度或本地环境（如有可用的本地 provider 或模拟器）建一个最小资源，然后手动 <span class="k">state pull</span> 看 state 里到底存了什么——亲眼看到明文属性，比读十遍文档有用。② 故意制造一次漂移（在控制台改一个标签），跑 <span class="k">plan -refresh-only</span> 看它怎么报告，再决定是拉回还是改代码。③ 把一个资源从根目录挪进 module，先不用 moved block 看 plan 的 destroy，加上 moved block 再看一次零变更——这个对比会让你记住「地址即身份」。<br><br>
+    <b>之后值得单独学：</b>第 37 期讲 Ansible 的幂等与变量优先级，和这一篇的分工一节正好互补，两篇一起看能建立「资源编排 vs 配置管理」的完整图景；第 19 期讲 CI/CD 与发布流程，能解释 plan/apply 在流水线里应该卡在哪一步；第 35 期讲云成本，IaC 的一个直接收益就是让资源清单和标签治理可落地；第 34 期讲容器安全的 RBAC 与密钥管理，可以和这一篇「不让 Terraform 生成密钥」的做法对照。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 38 期 · Terraform 的功夫不在 apply，在于你知道 state 里存了什么、以及它坏了你拿什么恢复</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

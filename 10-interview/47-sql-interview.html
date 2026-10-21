@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL 面试 30 题：从慢查询到窗口函数</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 47 期</span>
+    <h1>SQL 面试 30 题：从慢查询到窗口函数</h1>
+    <p class="sub">运维岗不写业务 SQL，但<b>出报表、查数据、定位慢查询</b>全靠它。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>30</b> 道题</span>
+      <span class="chip"><b>34</b> 段可跑 SQL</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：LEFT JOIN 之后把条件写在 ON 和写在 WHERE，结果什么时候不一样？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>面试官不考语法，考的是「你先确认什么」</h2></div>
+  <p class="lead">「写一条 SQL，统计上个月每个城市消费金额前三的用户。」很多人听到这句就开始敲键盘，敲完发现漏了一个条件：同一个用户在多个城市有订单怎么办、退款的算不算、注册时间在上个月的才算还是下过单就算。<b>面试官在第一分钟看到的不是你的 SQL，是你有没有问这些问题。</b></p>
+  <p>运维岗的 SQL 题和开发岗不太一样。开发考的是「业务逻辑能不能表达清楚」，运维考的是另外三样：<b>你能不能从一堆表里快速拼出一张临时报表</b>、<b>你能不能判断一条慢 SQL 慢在哪</b>、<b>你能不能给出一句可执行的索引建议而不是「加个索引」</b>。这三样都不需要你背语法，但都需要你知道执行顺序。</p>
+  <table>
+    <tr><th style="width:210px">现场</th><th style="width:200px">脱口而出的答案</th><th>正确的第一步</th></tr>
+    <tr><td>「统计每个用户的订单数」</td><td>直接写 GROUP BY</td><td>先问：没下过单的用户要不要出现？决定了用 JOIN 还是 LEFT JOIN</td></tr>
+    <tr><td>「查没有订单的用户」</td><td>NOT IN 子查询</td><td>先确认子查询列有没有 NULL。<b>有 NULL 就返回空集</b>，这是最经典的静默错误</td></tr>
+    <tr><td>「这条 SQL 很慢」</td><td>加索引</td><td>先看 EXPLAIN 的 rows 和 Extra，确认是扫得多、回表多、还是排序多</td></tr>
+    <tr><td>「取每组前三条」</td><td>GROUP BY 加 LIMIT</td><td>LIMIT 是对整个结果集生效的，不是对每组。要用窗口函数</td></tr>
+  </table>
+  <div class="callout">
+    <b>版本假设（这一篇的所有 SQL 都基于它）：</b>本文按 <b>MySQL 8.0</b> 语法写。窗口函数和 CTE 需要 8.0 及以上；<span class="k">EXPLAIN ANALYZE</span> 需要 8.0.18 及以上；8.0 默认的 <span class="k">sql_mode</span> 包含 <span class="k">ONLY_FULL_GROUP_BY</span>，所以 SELECT 里出现非聚合列时必须出现在 GROUP BY 中。5.7 及更早版本没有窗口函数和 CTE。<b>具体以你环境 <span class="k">SELECT VERSION();</span> 和 <span class="k">SELECT @@sql_mode;</span> 的输出为准。</b>
+  </div>
+  <p>下面的 30 道题共用一张表结构，你可以整个复制到本地跑一遍。<b>能跑通这件事本身就是面试加分项</b>——很多人答题时写出的 SQL 连语法都过不了。</p>
+  <pre><span class="c">-- 建表：结构贴近真实业务，字段类型刻意选了常见的几种</span>
+CREATE TABLE users (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(64)     NOT NULL,
+  city        VARCHAR(32)     NOT NULL,
+  created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_city (city)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE orders (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id     BIGINT UNSIGNED NOT NULL,
+  status      TINYINT         NOT NULL DEFAULT 0,  <span class="c">-- 0待付 1已付 2已退</span>
+  amount      DECIMAL(10,2)   NOT NULL,
+  created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_user_status_created (user_id, status, created_at),
+  KEY idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;</pre>
+  <p>测试数据量建议灌到几十万行以上，否则你会看到「加了索引和没加索引一个样」——因为小表优化器本来就会走全表扫。<b>优化器的决策和表大小强相关，这点在面试里说出来很加分。</b></p>
+  <p><b>面试落点：</b>「我写 SQL 之前会先确认语义：统计口径是什么、要不要包含零记录的行、时间范围按哪个字段算、NULL 怎么处理。确认完再动手，写出来的 SQL 我会用 EXPLAIN 看一眼扫描行数和有没有额外排序。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>基础查询与过滤：WHERE 和 HAVING 到底谁先跑</h2></div>
+  <p class="lead">「统计订单数超过 3 笔的用户」——这句需求里藏着两个过滤条件：一个是对行的（订单状态、时间范围），一个是对组的（订单数 &gt; 3）。<b>把它们写到同一个地方，是你写完 SQL 却跑不出结果的第一大原因。</b></p>
+  <p>MySQL 的执行顺序（逻辑上的）是这样的：<span class="k">FROM</span> → <span class="k">WHERE</span> → <span class="k">GROUP BY</span> → 聚合 → <span class="k">HAVING</span> → <span class="k">SELECT</span> 里的表达式 → <span class="k">ORDER BY</span> → <span class="k">LIMIT</span>。记住两点就够了：<b>WHERE 在分组之前过滤行，所以不能写聚合函数</b>；<b>HAVING 在分组之后过滤组，所以才能写 COUNT、SUM</b>。窗口函数的位置更靠后（在 SELECT 阶段计算），这个放到模块 3 讲。</p>
+  <table>
+    <tr><th style="width:150px">子句</th><th>作用时机</th><th>能写什么</th><th>典型错误</th></tr>
+    <tr><td><b>WHERE</b></td><td>分组前，逐行判断</td><td>列条件、表达式，<b>不能写聚合</b></td><td><span class="k">WHERE COUNT(*) &gt; 3</span> 会直接报错</td></tr>
+    <tr><td><b>GROUP BY</b></td><td>把行收敛成组</td><td>列名或表达式。<span class="k">ONLY_FULL_GROUP_BY</span> 下 SELECT 的非聚合列必须在这里</td><td>SELECT 里出现没分组也没聚合的列</td></tr>
+    <tr><td><b>HAVING</b></td><td>分组后，逐组判断</td><td>聚合条件，也可以写分组列</td><td>把本该在 WHERE 的行条件写到这里，白白多扫一遍</td></tr>
+    <tr><td><b>ORDER BY</b></td><td>最后排序</td><td>列、表达式、别名</td><td>大结果集排序会落临时表或磁盘</td></tr>
+  </table>
+  <h3>第 1 题：统计每个用户的订单数与总金额</h3>
+  <pre><span class="c">-- 只统计已支付订单（status=1），按用户聚合</span>
+SELECT user_id,
+       COUNT(*)          AS cnt,
+       ROUND(SUM(amount), 2) AS total
+FROM orders
+WHERE status = 1
+GROUP BY user_id
+ORDER BY total DESC
+LIMIT 20;</pre>
+  <p>这一句里 <span class="k">WHERE status = 1</span> 写在 GROUP BY 之前，意味着<b>先把不相关的行砍掉再分组</b>，参与聚合的行数最少。如果把它挪到 HAVING，MySQL 会把全表行都分组一遍再过滤，白白多算。</p>
+  <h3>第 2 题：只保留订单数 ≥ 3 的用户</h3>
+  <pre><span class="c">-- 聚合条件只能进 HAVING；WHERE 里写 COUNT(*) 会报语法错</span>
+SELECT user_id, COUNT(*) AS cnt, ROUND(SUM(amount), 2) AS total
+FROM orders
+WHERE status = 1
+GROUP BY user_id
+HAVING COUNT(*) &gt;= 3
+ORDER BY cnt DESC;</pre>
+  <h3>第 3 题：统计金额在 100 到 1000 之间的已支付订单</h3>
+  <pre><span class="c">-- BETWEEN 是闭区间，等价于 &gt;= 100 AND &lt;= 1000</span>
+SELECT COUNT(*) AS cnt, ROUND(SUM(amount), 2) AS total
+FROM orders
+WHERE status = 1 AND amount BETWEEN 100 AND 1000;</pre>
+  <h3>第 4 题：一次扫描算出各状态的订单数</h3>
+  <pre><span class="c">-- 用条件聚合，一次扫描拿到多列；比写三条 SQL 或一个 UNION 便宜得多</span>
+SELECT COUNT(*)                                                   AS all_cnt,
+       SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END)                AS unpaid_cnt,
+       SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END)                AS paid_cnt,
+       SUM(CASE WHEN status = 2 THEN 1 ELSE 0 END)                AS refund_cnt,
+       ROUND(SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END)
+             / COUNT(*) * 100, 2)                                 AS paid_pct
+FROM orders;</pre>
+  <p>MySQL 里 <span class="k">SUM(status = 1)</span> 也能工作（布尔表达式返回 1 或 0），但 <span class="k">CASE WHEN</span> 的可读性更好、换数据库也不会出错。注意 <span class="k">COUNT(*)</span> 为 0 时除法会得到 NULL 或报错，取决于是否开启了错误模式；稳妥写法是外面套一层 <span class="k">IFNULL(..., 0)</span>。</p>
+  <h3>第 5 题：找出从未下过单的用户</h3>
+  <pre><span class="c">-- 推荐写法：NOT EXISTS。语义直白，也不受 NULL 影响</span>
+SELECT u.id, u.name, u.city
+FROM users u
+WHERE NOT EXISTS (
+  SELECT 1 FROM orders o WHERE o.user_id = u.id
+)
+ORDER BY u.id
+LIMIT 50;</pre>
+  <p>这里先给 EXISTS 版本而不是 NOT IN，是因为 <b>NOT IN 遇到 NULL 会静默返回空集</b>，这是面试里出现频率最高的一类错误。完整对比放在模块 6。</p>
+  <div class="callout warn">
+    <b>COUNT 的三个写法结果不一样。</b><span class="k">COUNT(*)</span> 数行；<span class="k">COUNT(col)</span> 只数 <span class="k">col</span> 不为 NULL 的行，列有 NULL 时两者结果不同；<span class="k">COUNT(DISTINCT col)</span> 数去重后的非 NULL 值。<b>「统计用户数」写成 <span class="k">COUNT(user_id)</span> 在有 NULL 的列上会算少</b>，而且不会报错——静默的错误结果比报错危险得多。
+  </div>
+  <p><b>面试落点：</b>「WHERE 在分组前过滤行、不能写聚合；HAVING 在分组后过滤组。我会把行条件尽量写在 WHERE 里减少参与分组的行数，聚合条件才放 HAVING。另外 COUNT(*) 和 COUNT(col) 在有 NULL 时结果不同，这个我每次都会确认一遍列的 NULL 属性。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>JOIN 全家桶：LEFT JOIN 悄悄退化成 INNER</h2></div>
+  <p class="lead">「我用 LEFT JOIN 了，为什么没订单的用户没出现？」——十次里有九次，答案是<b>你在 WHERE 里对右表的列加了条件</b>。这个坑的可怕之处在于它不报错，只是安静地少了几行，而少掉的那几行往往正是你要统计的对象。</p>
+  <p>原理很简单：LEFT JOIN 会把左表没有匹配的行也保留，右表的列填 NULL。此时 <span class="k">WHERE o.status = 1</span> 对这些行来说就是 <span class="k">NULL = 1</span>，结果是未知，行被丢弃。<b>效果等同于 INNER JOIN。</b>把条件挪到 ON 里，它就变成连接条件的一部分，只影响「哪些右表行能匹配上」，不影响左表行的保留。</p>
+  <table>
+    <tr><th style="width:150px">写法</th><th>保留左表无匹配的行吗</th><th>适用场景</th></tr>
+    <tr><td><span class="k">INNER JOIN ... ON</span></td><td>不保留</td><td>只要两边都有的数据</td></tr>
+    <tr><td><span class="k">LEFT JOIN ... ON</span></td><td>保留</td><td>要列出左表全部行，右表没有就补 NULL</td></tr>
+    <tr><td><span class="k">LEFT JOIN ... ON 右表条件</span></td><td>保留</td><td>「所有用户 + 他们的已支付订单（没有就为空）」</td></tr>
+    <tr><td><span class="k">LEFT JOIN ... WHERE 右表条件</span></td><td><b>不保留，退化成 INNER</b></td><td>几乎总是写错了，除非你本来就要 INNER</td></tr>
+    <tr><td><span class="k">LEFT JOIN ... WHERE 右表主键 IS NULL</span></td><td>只保留无匹配的行</td><td>求差集，模块 6 会用到</td></tr>
+  </table>
+  <h3>第 6 题：查出用户名和订单信息（只要两边都有的）</h3>
+  <pre>SELECT u.id AS user_id, u.name, o.id AS order_id, o.amount, o.created_at
+FROM users u
+INNER JOIN orders o ON o.user_id = u.id
+WHERE o.status = 1
+ORDER BY o.created_at DESC
+LIMIT 50;</pre>
+  <h3>第 7 题：列出所有用户，没有订单的也要出现</h3>
+  <pre><span class="c">-- 注意 COUNT(o.id) 而不是 COUNT(*)：前者对无订单用户返回 0</span>
+SELECT u.id, u.name, COUNT(o.id) AS order_cnt, ROUND(IFNULL(SUM(o.amount), 0), 2) AS total
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id AND o.status = 1
+GROUP BY u.id, u.name
+ORDER BY order_cnt DESC;</pre>
+  <p>把 <span class="k">o.status = 1</span> 写在 ON 里而不是 WHERE 里，是这道题唯一的考点。如果你写成 WHERE，结果只会剩下有已支付订单的用户，而「零订单用户」恰恰是这类报表通常最想看的那部分。</p>
+  <h3>第 8 题：同一个需求，写成 WHERE 会怎样</h3>
+  <pre><span class="c">-- 错误示范：条件在 WHERE，LEFT JOIN 退化成 INNER JOIN</span>
+SELECT u.id, u.name, COUNT(o.id) AS order_cnt
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE o.status = 1
+GROUP BY u.id, u.name;
+
+<span class="c">-- 验证方式：对比两个写法返回的行数</span>
+SELECT COUNT(*) FROM (
+  SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id AND o.status = 1 GROUP BY u.id
+) a;
+SELECT COUNT(*) FROM (
+  SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE o.status = 1 GROUP BY u.id
+) b;</pre>
+  <h3>第 9 题：查出每个用户的第一笔订单金额</h3>
+  <pre><span class="c">-- 先聚合出每个用户的最早时间，再关联回明细</span>
+SELECT f.user_id, o.id AS first_order_id, o.amount, o.created_at
+FROM orders o
+JOIN (
+  SELECT user_id, MIN(created_at) AS first_at
+  FROM orders
+  GROUP BY user_id
+) f ON f.user_id = o.user_id AND o.created_at = f.first_at
+ORDER BY f.user_id;</pre>
+  <p>这个写法有一个必须说明的边界：<b>如果同一用户有两笔订单的 created_at 完全相同，会返回两行</b>。要严格取一条，用模块 3 的 ROW_NUMBER 版本（第 11 题），并在排序里补上 <span class="k">id</span> 作为决胜键。</p>
+  <h3>第 10 题：JOIN 之前先聚合，避免行数放大</h3>
+  <pre><span class="c">-- 反例：直接 JOIN orders 再 COUNT(DISTINCT) 或 SUM 会重复计算</span>
+<span class="c">-- 正例：先把 orders 收敛成「每用户一行」，再关联</span>
+SELECT u.id, u.name, u.city,
+       IFNULL(t.cnt, 0)            AS cnt,
+       ROUND(IFNULL(t.total, 0), 2) AS total
+FROM users u
+LEFT JOIN (
+  SELECT user_id, COUNT(*) AS cnt, SUM(amount) AS total
+  FROM orders
+  WHERE status = 1
+  GROUP BY user_id
+) t ON t.user_id = u.id
+ORDER BY total DESC
+LIMIT 30;</pre>
+  <p>「先聚合再关联」是写报表 SQL 最重要的一条纪律。一对多关联会把左表行数放大 N 倍，此时任何 SUM 都会被重复计算，而很多人是靠加 <span class="k">DISTINCT</span> 去「修」——那只是掩盖问题，性能还更差。</p>
+  <div class="callout">
+    <b>验证行数有没有被放大的一个笨办法但很有效：</b>分别跑 <span class="k">SELECT COUNT(*) FROM users</span> 和你的 JOIN 结果的行数。如果 JOIN 后的行数大于左表行数，而你又没预料到，那就是关联键不唯一（比如关联了 orders 却按 user_id 分组）。<b>每次写完多表查询都做这个对比，能挡掉大部分「报表数字对不上」。</b>
+  </div>
+  <p><b>面试落点：</b>「LEFT JOIN 的条件写在 ON 和 WHERE 语义完全不同：写在 WHERE 里会退化成 INNER JOIN，因为无匹配行的右表列是 NULL，条件判断为未知就被丢弃了。另外多表查询我一定会先聚合再关联，避免一对多放大导致 SUM 重复计算。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>窗口函数：排名、累计、环比，一次扫描全搞定</h2></div>
+  <p class="lead">窗口函数和 GROUP BY 的区别一句话说清：<b>GROUP BY 把多行压成一行，窗口函数保留原来的每一行，同时附加上一个「基于一组行算出来的值」</b>。所以「每组 TopN」「累计求和」「环比」这些需要「既要看明细又要看组内统计」的场景，非它不可。</p>
+  <table>
+    <tr><th style="width:170px">函数</th><th>做什么</th><th>关键参数</th></tr>
+    <tr><td><b>ROW_NUMBER()</b></td><td>组内连续编号，1、2、3…… 并列也强制区分</td><td><span class="k">PARTITION BY</span> 分组，<span class="k">ORDER BY</span> 定序</td></tr>
+    <tr><td><b>RANK()</b></td><td>并列同名次，下一名跳号（1、1、3）</td><td>同上</td></tr>
+    <tr><td><b>DENSE_RANK()</b></td><td>并列同名次，下一名不跳号（1、1、2）</td><td>同上</td></tr>
+    <tr><td><b>LAG / LEAD</b></td><td>取当前行之前 / 之后第 N 行的值</td><td><span class="k">LAG(col, N, 默认值)</span></td></tr>
+    <tr><td><b>SUM() OVER</b></td><td>组内累计求和</td><td>可加 <span class="k">ROWS BETWEEN ... PRECEDING AND CURRENT ROW</span></td></tr>
+  </table>
+  <p><b>窗口函数只能出现在 SELECT 和 ORDER BY 里，不能直接写进 WHERE。</b>因为它是在 WHERE 过滤之后才计算的。想「只保留组内第一名」，必须在外面套一层子查询或 CTE，用 WHERE 过滤那个编号列。这是面试里的一道高频追问，也是初学者最容易写出语法错误的地方。</p>
+  <h3>第 11 题：查出每个用户最近的一笔订单</h3>
+  <pre><span class="c">-- rn = 1 的过滤必须在外层：窗口函数在 WHERE 之后才计算</span>
+SELECT user_id, order_id, amount, created_at
+FROM (
+  SELECT o.user_id,
+         o.id AS order_id,
+         o.amount,
+         o.created_at,
+         ROW_NUMBER() OVER (
+           PARTITION BY o.user_id
+           ORDER BY o.created_at DESC, o.id DESC   <span class="c">-- id 作决胜键，保证结果确定</span>
+         ) AS rn
+  FROM orders o
+) t
+WHERE t.rn = 1
+ORDER BY t.user_id;</pre>
+  <h3>第 12 题：RANK / DENSE_RANK / ROW_NUMBER 差在哪</h3>
+  <pre><span class="c">-- 三个函数并列跑一遍，看同一批金额下的名次差异</span>
+SELECT id,
+       amount,
+       ROW_NUMBER() OVER (ORDER BY amount DESC, id) AS rn,   <span class="c">-- 1,2,3,4</span>
+       RANK()       OVER (ORDER BY amount DESC)     AS rk,   <span class="c">-- 1,1,3,4</span>
+       DENSE_RANK() OVER (ORDER BY amount DESC)     AS drk   <span class="c">-- 1,1,2,3</span>
+FROM orders
+WHERE status = 1
+ORDER BY amount DESC, id
+LIMIT 20;</pre>
+  <p>注意 <span class="k">ROW_NUMBER()</span> 的 ORDER BY 里加了 <span class="k">id</span>：如果排序键有重复，ROW_NUMBER 的分配是不确定的，同一条 SQL 两次跑可能给出不同结果。<b>「结果不确定」在分页场景里会表现成「翻页时有的行重复出现、有的行失踪」</b>，非常难查。</p>
+  <h3>第 13 题：按天统计订单量，并算出环比</h3>
+  <pre>WITH daily AS (
+  SELECT DATE(created_at) AS d, COUNT(*) AS cnt
+  FROM orders
+  WHERE created_at &gt;= '2026-09-01' AND created_at &lt; '2026-10-01'
+  GROUP BY DATE(created_at)
+)
+SELECT d,
+       cnt,
+       LAG(cnt) OVER (ORDER BY d) AS prev_cnt,
+       ROUND((cnt - LAG(cnt) OVER (ORDER BY d))
+             / LAG(cnt) OVER (ORDER BY d) * 100, 2) AS pct_change
+FROM daily
+ORDER BY d;</pre>
+  <p>第一天的 <span class="k">prev_cnt</span> 是 NULL，所以 <span class="k">pct_change</span> 也是 NULL——<b>NULL 参与算术会传播</b>，这其实是我们想要的行为（除法分母为 NULL 不会报除零错）。如果你希望显示 0 而不是 NULL，外面套 <span class="k">IFNULL(..., 0)</span>。</p>
+  <h3>第 14 题：累计求和（running total）</h3>
+  <pre>WITH daily AS (
+  SELECT DATE(created_at) AS d, COUNT(*) AS cnt
+  FROM orders GROUP BY DATE(created_at)
+)
+SELECT d,
+       cnt,
+       SUM(cnt) OVER (ORDER BY d
+                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS run_cnt
+FROM daily
+ORDER BY d;</pre>
+  <h3>第 15 题：7 日移动平均</h3>
+  <pre>WITH daily AS (
+  SELECT DATE(created_at) AS d, COUNT(*) AS cnt
+  FROM orders GROUP BY DATE(created_at)
+)
+SELECT d,
+       cnt,
+       ROUND(AVG(cnt) OVER (ORDER BY d
+                            ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 2) AS ma7
+FROM daily
+ORDER BY d;</pre>
+  <p>窗口框架 <span class="k">ROWS BETWEEN 6 PRECEDING AND CURRENT ROW</span> 的意思是「当前行加上前面 6 行，共 7 行」。<b>它的前提是按天连续</b>；如果中间有几天没有订单（行不存在），这 7 行覆盖的实际天数会超过 7 天。要严格按 7 天窗口，得先补齐日期（第 25 题）。</p>
+  <div class="callout ok">
+    <b>窗口函数的性能提醒：</b>窗口函数要对整个分区排序或累积，分区很大时会用临时空间。给 <span class="k">PARTITION BY ... ORDER BY ...</span> 配上一致的索引，可以让 MySQL 直接按索引顺序扫，省掉一次排序。这一点在 EXPLAIN 里表现为 Extra 中没有 <span class="k">Using filesort</span>。
+  </div>
+  <p><b>面试落点：</b>「窗口函数保留明细行的同时给出组内统计值，这是它和 GROUP BY 的本质差别。它只能出现在 SELECT 和 ORDER BY，不能直接进 WHERE，所以取组内 TopN 必须外面套一层。另外 ROW_NUMBER 的 ORDER BY 要加唯一决胜键，否则结果不确定。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>分组 TopN 与去重：LIMIT 管不了每组</h2></div>
+  <p class="lead">「取每个城市消费前三的用户」——第一次写这道题的人有一半会写出 <span class="k">GROUP BY city LIMIT 3</span>。这个写法返回的是「整个结果集的前 3 行」，和「每组前 3」毫无关系。<b>它没有报错，只是给了一个看起来合理的错误答案。</b></p>
+  <h3>第 16 题：每个城市消费金额 Top3 的用户</h3>
+  <pre>SELECT city, user_id, total, rn
+FROM (
+  SELECT u.city,
+         o.user_id,
+         ROUND(SUM(o.amount), 2) AS total,
+         ROW_NUMBER() OVER (
+           PARTITION BY u.city
+           ORDER BY SUM(o.amount) DESC      <span class="c">-- 窗口的 ORDER BY 里可以用聚合函数</span>
+         ) AS rn
+  FROM orders o
+  JOIN users u ON u.id = o.user_id
+  WHERE o.status = 1
+  GROUP BY u.city, o.user_id
+) t
+WHERE t.rn &lt;= 3
+ORDER BY city, rn;</pre>
+  <p>关键点：<b>窗口函数在 GROUP BY 之后执行</b>，所以窗口的 <span class="k">ORDER BY</span> 里可以直接写 <span class="k">SUM(o.amount)</span>。如果你觉得这样写难读，用 CTE 拆成两步（第 17 题）会更清楚，也让每一步都能单独验证。</p>
+  <h3>第 17 题：用 CTE 把上面那题拆清楚</h3>
+  <pre>WITH city_user AS (
+  SELECT u.city,
+         o.user_id,
+         ROUND(SUM(o.amount), 2) AS total
+  FROM orders o
+  JOIN users u ON u.id = o.user_id
+  WHERE o.status = 1
+  GROUP BY u.city, o.user_id
+),
+ranked AS (
+  SELECT city, user_id, total,
+         ROW_NUMBER() OVER (PARTITION BY city ORDER BY total DESC) AS rn
+  FROM city_user
+)
+SELECT city, user_id, total, rn
+FROM ranked
+WHERE rn &lt;= 3
+ORDER BY city, rn;</pre>
+  <p>想让并列第三名的用户都出现，把 <span class="k">ROW_NUMBER()</span> 换成 <span class="k">DENSE_RANK()</span>、条件改成 <span class="k">WHERE rn &lt;= 3</span> 即可，此时每组可能返回多于 3 行。<b>这个取舍要跟需求方确认，不是技术选择。</b></p>
+  <h3>第 18 题：删除重复数据，只保留 id 最小的一条</h3>
+  <pre><span class="c">-- 这里按 (user_id, created_at) 判定重复，实际按你的业务唯一键替换</span>
+DELETE FROM orders
+WHERE id IN (
+  SELECT id
+  FROM (
+    SELECT id,
+           ROW_NUMBER() OVER (PARTITION BY user_id, created_at ORDER BY id) AS rn
+    FROM orders
+  ) t
+  WHERE t.rn &gt; 1
+);</pre>
+  <p>外面那层 <span class="k">SELECT id FROM (...) t</span> 不是多余的：MySQL 不允许一边修改某张表一边直接从它本身的子查询里读，包一层派生表会被物化，从而绕开这个限制。<b>这是 MySQL 特有的写法约束。</b>另外，生产上删数据前先跑一遍对应的 SELECT 看会删多少行，再改成 DELETE。</p>
+  <h3>第 19 题：找出有重复下单记录的用户</h3>
+  <pre>SELECT user_id, COUNT(*) AS cnt
+FROM orders
+GROUP BY user_id
+HAVING COUNT(*) &gt; 1
+ORDER BY cnt DESC
+LIMIT 20;</pre>
+  <h3>第 20 题：订单行数 vs 下单用户数</h3>
+  <pre>SELECT COUNT(*)                 AS order_rows,
+       COUNT(DISTINCT user_id)   AS user_cnt
+FROM orders
+WHERE status = 1;</pre>
+  <p>这一句常被用来回答「我们有多少下单用户」。<b>COUNT(DISTINCT) 在大数据量上是比较贵的</b>（需要去重结构），如果这张表的统计是高频需求，更好的做法是维护一张按日预聚合的汇总表，报表直接查汇总表。</p>
+  <div class="callout warn">
+    <b>「去重」这件事要先定义清楚什么叫重复。</b>订单表里 <span class="k">(user_id, created_at)</span> 相同的两行，可能是重复写入的脏数据，也可能是用户同一秒下了两笔不同的单——<b>看 id 之外的字段才能判断</b>。所以在动手删之前，先把疑似重复的行完整 SELECT 出来人工看几条，确认判重键选对了。删错了不可回滚，这是运维岗少数几个「必须先确认再执行」的操作之一。
+  </div>
+  <p><b>面试落点：</b>「分组 TopN 我用窗口函数，因为 LIMIT 作用于整个结果集而不是每个分组。写法是先按分组键聚合、再在外层按 ROW_NUMBER 过滤；并列要不要都保留取决于需求，用 DENSE_RANK 就行。去重前我会先把疑似重复的行完整查出来确认判重键，删数据是一次性的、不可回滚。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>时间维度统计：按天、按周、按月、留存</h2></div>
+  <p class="lead">报表需求里一半以上都带时间维度。这一块的考点不是函数记不记得住，而是<b>你会不会为了能用上索引，把条件写成范围而不是函数</b>——这一条直接决定报表是 200ms 还是 20 秒。</p>
+  <table>
+    <tr><th style="width:180px">写法</th><th>能不能用上 created_at 的索引</th><th>为什么</th></tr>
+    <tr><td><span class="k">WHERE DATE(created_at) = '2026-10-01'</span></td><td>不能（普通索引）</td><td>列被函数包住，B+ 树里存的是原值，没法按函数结果定位</td></tr>
+    <tr><td><span class="k">WHERE created_at &gt;= '2026-10-01' AND created_at &lt; '2026-10-02'</span></td><td><b>能</b></td><td>纯范围条件，可以直接在索引上定位区间</td></tr>
+    <tr><td><span class="k">GROUP BY DATE(created_at)</span></td><td>分组不受影响</td><td>分组表达式不参与索引定位，但会影响会不会出现临时表</td></tr>
+  </table>
+  <h3>第 21 题：按天统计订单量与金额</h3>
+  <pre>SELECT DATE(created_at)        AS d,
+       COUNT(*)                AS cnt,
+       ROUND(SUM(amount), 2)   AS amt
+FROM orders
+WHERE created_at &gt;= '2026-09-01' AND created_at &lt; '2026-10-01'
+  AND status = 1
+GROUP BY DATE(created_at)
+ORDER BY d;</pre>
+  <p>注意 <span class="k">WHERE</span> 用的是半开区间 <span class="k">[09-01, 10-01)</span>，而不是 <span class="k">BETWEEN '09-01' AND '09-30'</span>。后者会漏掉 9 月 30 日当天 00:00 之后的数据（因为日期字面量会被补成 00:00:00）。<b>时间范围一律用半开区间，能避开所有边界问题。</b></p>
+  <h3>第 22 题：按周统计</h3>
+  <pre><span class="c">-- %x = ISO 周所在的年份，%v = ISO 周序号(01-53)，周一为一周第一天</span>
+<span class="c">-- 用 %x 而不是 %Y，能避开跨年那周「年份和周数对不上」的问题</span>
+SELECT DATE_FORMAT(created_at, '%x-%v') AS yw,
+       COUNT(*)                         AS cnt,
+       ROUND(SUM(amount), 2)            AS amt
+FROM orders
+WHERE created_at &gt;= '2026-01-01' AND created_at &lt; '2026-11-01'
+GROUP BY yw
+ORDER BY yw;</pre>
+  <h3>第 23 题：按月统计并算环比</h3>
+  <pre>WITH monthly AS (
+  SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym,
+         ROUND(SUM(amount), 2)            AS amt
+  FROM orders
+  WHERE status = 1
+  GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+)
+SELECT ym,
+       amt,
+       LAG(amt) OVER (ORDER BY ym) AS prev_amt,
+       ROUND((amt - LAG(amt) OVER (ORDER BY ym))
+             / LAG(amt) OVER (ORDER BY ym) * 100, 2) AS mom_pct
+FROM monthly
+ORDER BY ym;</pre>
+  <p><span class="k">'%Y-%m'</span> 生成的字符串（如 <span class="k">'2026-09'</span>）按字典序排序和按时间排序是一致的，所以这里直接 <span class="k">ORDER BY ym</span> 是安全的。<b>如果格式写成 '9月' 或 'Sep'，排序就会乱</b>——这是很低级但真的会犯的错。</p>
+  <h3>第 24 题：次日留存率</h3>
+  <pre>WITH new_users AS (
+  SELECT id, DATE(created_at) AS reg_date
+  FROM users
+),
+first_order AS (
+  SELECT user_id, MIN(DATE(created_at)) AS first_order_date
+  FROM orders
+  GROUP BY user_id
+)
+SELECT n.reg_date,
+       COUNT(*) AS new_cnt,
+       SUM(CASE WHEN f.first_order_date = DATE_ADD(n.reg_date, INTERVAL 1 DAY)
+                THEN 1 ELSE 0 END) AS retained_d1,
+       ROUND(SUM(CASE WHEN f.first_order_date = DATE_ADD(n.reg_date, INTERVAL 1 DAY)
+                      THEN 1 ELSE 0 END) / COUNT(*) * 100, 2) AS d1_pct
+FROM new_users n
+LEFT JOIN first_order f ON f.user_id = n.id
+GROUP BY n.reg_date
+ORDER BY n.reg_date;</pre>
+  <p>这里把留存的口径明确写成了「注册后第 1 天首次下单」。<b>留存的定义至少有四五种</b>（次日是否有任何行为、次日起 7 天内是否回访、注册当天是否下单……），面试里务必先问清口径再写，写完在 SQL 注释里把口径写下来。口径不同，数字可以差好几倍。</p>
+  <h3>第 25 题：补齐没有订单的日期（让折线图不断点）</h3>
+  <pre>WITH RECURSIVE cal AS (
+  SELECT DATE('2026-09-01') AS d
+  UNION ALL
+  SELECT DATE_ADD(d, INTERVAL 1 DAY) FROM cal WHERE d &lt; DATE('2026-09-30')
+),
+daily AS (
+  SELECT DATE(created_at) AS d, COUNT(*) AS cnt
+  FROM orders
+  WHERE created_at &gt;= '2026-09-01' AND created_at &lt; '2026-10-01'
+  GROUP BY DATE(created_at)
+)
+SELECT c.d,
+       IFNULL(t.cnt, 0) AS cnt
+FROM cal c
+LEFT JOIN daily t ON t.d = c.d
+ORDER BY c.d;</pre>
+  <p>递归 CTE 的默认递归深度是 1000（<span class="k">cte_max_recursion_depth</span>），一次生成 30 天完全够用；要生成几年的日历就要调这个参数，或者干脆建一张物理日期维表。<b>日期维表是数据仓库里的标准做法，运维做长期报表时建一张很划算。</b></p>
+  <div class="callout">
+    <b>时间字段的类型决定了你能不能省事。</b>用 <span class="k">DATETIME</span> 存本地时间，跨时区业务会出现对不齐；用 <span class="k">TIMESTAMP</span> 会随会话时区变化，且范围有限。无论选哪个，<b>团队内要统一，并且明确「报表按哪个时区出」</b>。这个决定做错了，后面所有按天的报表都要重算一遍。
+  </div>
+  <p><b>面试落点：</b>「按时间过滤我一定写成半开区间而不是 BETWEEN，也不在索引列上套 DATE()，否则索引失效。跨年周我用 %x-%v 避免年份错配。留存我先问清口径再写，并把口径写进 SQL 注释。折线图断点用递归 CTE 或日期维表补齐。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>存在性判断与 NULL：NOT IN 的静默陷阱</h2></div>
+  <p class="lead">这是整篇里最值得记住的一节，因为它导致的错误<b>不报错、不警告，只是安静地返回一个空结果集</b>。如果你不知道这个规则，可能会盯着一条「看起来完全正确」的 SQL 查一个小时。</p>
+  <p>规则是这样的：<span class="k">x NOT IN (a, b, c)</span> 等价于 <span class="k">x &lt;&gt; a AND x &lt;&gt; b AND x &lt;&gt; c</span>。一旦列表里出现 NULL，某个 <span class="k">x &lt;&gt; NULL</span> 的结果是「未知」，整个 AND 表达式的结果就是「未知」，而 WHERE 只接受「真」——<b>所以一行都不会返回。</b></p>
+  <h3>第 26 题：亲眼看到 NOT IN 遇 NULL 的结果</h3>
+  <pre><span class="c">-- 三条表达式并排跑，结果分别是 1、NULL、0</span>
+SELECT (1 NOT IN (2, 3))       AS r_no_null,   <span class="c">-- 1（真）</span>
+       (1 NOT IN (2, 3, NULL)) AS r_with_null, <span class="c">-- NULL，不是 1！</span>
+       (1 NOT IN (1, 2))       AS r_false;     <span class="c">-- 0（假）</span>
+
+<span class="c">-- 由此推出的结论：下面这句在 orders.user_id 可能为 NULL 时，一行都不返回</span>
+SELECT id, name FROM users WHERE id NOT IN (SELECT user_id FROM orders);
+
+<span class="c">-- 加上非空过滤可以救回来，但远不如直接改写成 NOT EXISTS 清晰</span>
+SELECT id, name FROM users
+WHERE id NOT IN (SELECT user_id FROM orders WHERE user_id IS NOT NULL);</pre>
+  <p>本例的 <span class="k">orders.user_id</span> 是 <span class="k">NOT NULL</span>，所以第一种写法是安全的；但<b>你不能依赖「我记得这个列是非空的」</b>——表结构会变，中间可能加了允许 NULL 的列，或者子查询里的表达式产生了 NULL。用 NOT EXISTS 就没有这个问题，因为 EXISTS 只判断有没有行，不做值比较。</p>
+  <h3>第 27 题：EXISTS 与 IN 的互换</h3>
+  <pre><span class="c">-- 写法 A：EXISTS（推荐，语义清晰，不受 NULL 影响）</span>
+SELECT u.id, u.name
+FROM users u
+WHERE EXISTS (
+  SELECT 1 FROM orders o WHERE o.user_id = u.id AND o.amount &gt; 100
+);
+
+<span class="c">-- 写法 B：IN（MySQL 8 会把它优化成半连接，性能通常与 EXISTS 接近）</span>
+SELECT u.id, u.name
+FROM users u
+WHERE u.id IN (SELECT user_id FROM orders WHERE amount &gt; 100);</pre>
+  <p>在 MySQL 8 里，IN 子查询常被优化成 semi-join，和 EXISTS 的执行计划往往很接近，<b>所以这两者的选择主要看可读性和 NULL 语义，而不是性能</b>。但 <span class="k">NOT IN</span> 和 <span class="k">NOT EXISTS</span> 就不一样了：前者有 NULL 陷阱，且优化空间更小。<b>写「不存在」一律用 NOT EXISTS。</b></p>
+  <h3>第 28 题：求差集（在 users 但不在 orders）</h3>
+  <pre><span class="c">-- LEFT JOIN + IS NULL：另一种写法，语义是「关联不到任何一行」</span>
+SELECT u.id, u.name
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE o.id IS NULL;</pre>
+  <p>这里的 <span class="k">WHERE o.id IS NULL</span> 必须用<b>右表的主键或非空列</b>。用 <span class="k">o.user_id IS NULL</span> 也可以，但可读性差；如果右表有个允许 NULL 的列，用它判断就会误判。</p>
+  <table>
+    <tr><th style="width:170px">写法</th><th>遇到 NULL 的行为</th><th>建议</th></tr>
+    <tr><td><span class="k">NOT IN (子查询)</span></td><td>子查询含 NULL 时<b>返回空集</b></td><td>避免使用</td></tr>
+    <tr><td><span class="k">NOT EXISTS</span></td><td>不受影响</td><td><b>首选</b></td></tr>
+    <tr><td><span class="k">LEFT JOIN ... IS NULL</span></td><td>不受影响</td><td>可用，注意判空列要选非空的</td></tr>
+    <tr><td><span class="k">IN (子查询)</span></td><td>不受影响</td><td>可用，MySQL 8 会做半连接优化</td></tr>
+  </table>
+  <div class="callout danger">
+    <b>一个相关但更容易被忽略的陷阱：聚合函数遇到 NULL。</b><span class="k">SUM(col)</span>、<span class="k">AVG(col)</span>、<span class="k">COUNT(col)</span> 都<b>跳过 NULL</b>，且当所有行都是 NULL 时返回 NULL 而不是 0。所以「平均订单金额」在有 NULL 金额时会算成「非 NULL 部分的平均」，分母悄悄变小了。要按全部行数算平均，写 <span class="k">SUM(col) / COUNT(*)</span> 并配 <span class="k">IFNULL</span>，而不是直接 <span class="k">AVG(col)</span>。
+  </div>
+  <p><b>面试落点：</b>「写『不存在』我一律用 NOT EXISTS。NOT IN 在子查询含 NULL 时会返回空集，而且不报错——它是 x &lt;&gt; a AND x &lt;&gt; b 的展开，任一比较为未知整体就为未知。另外聚合函数跳过 NULL，全 NULL 时返回 NULL，所以我算平均值会先想清楚分母该是行数还是非 NULL 数。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>慢查询诊断：EXPLAIN 要看哪几列</h2></div>
+  <p class="lead">「这条 SQL 慢」在工单里等于没说。运维岗的 SQL 题，真正的分水岭是你能不能<b>把「慢」拆成可比较的数字</b>：扫了多少行、回了多少次表、排序用了多少内存、实际耗时分布在哪个环节。</p>
+  <table>
+    <tr><th style="width:120px">列</th><th>它在说什么</th><th>怎么用</th></tr>
+    <tr><td><b>type</b></td><td>访问方式，从好到差大致是 const &gt; eq_ref &gt; ref &gt; range &gt; index &gt; ALL</td><td>只说明方式，<b>不说明代价</b>。range 也可能扫几百万行</td></tr>
+    <tr><td><b>key</b></td><td>实际选中的索引</td><td>为 NULL 不等于有问题，要结合 rows 判断是不是优化器主动放弃</td></tr>
+    <tr><td><b>rows</b></td><td><b>预估</b>要扫多少行</td><td>成本的核心指标。rows 接近全表行数，说明索引没起到过滤作用</td></tr>
+    <tr><td><b>filtered</b></td><td>扫出来的行里能通过后续条件的百分比</td><td><span class="k">rows × filtered</span> 才近似等于真正参与后续计算的行数</td></tr>
+    <tr><td><b>Extra</b></td><td>补充动作</td><td>信息量最大的一列，见下表</td></tr>
+  </table>
+  <table>
+    <tr><th style="width:250px">Extra 里的字样</th><th>含义</th><th>要不要处理</th></tr>
+    <tr><td><b>Using index</b></td><td>覆盖索引，没有回表</td><td>好信号，别去「优化」它</td></tr>
+    <tr><td><b>Using index condition</b></td><td>索引下推生效，过滤在引擎层完成</td><td>好信号</td></tr>
+    <tr><td><b>Using where</b></td><td>Server 层还要再过滤一遍</td><td>索引用得不够充分，配合 rows 判断值不值得加索引</td></tr>
+    <tr><td><b>Using filesort</b></td><td>无法利用索引顺序，额外排序</td><td>小结果集可接受，大结果集要改索引或改 SQL</td></tr>
+    <tr><td><b>Using temporary</b></td><td>用了内部临时表，常见于 GROUP BY、DISTINCT、UNION</td><td>大表上出现必须处理，可能落到磁盘</td></tr>
+  </table>
+  <h3>第 29 题：诊断一条具体 SQL</h3>
+  <pre><span class="c">-- 1. 先看优化器的估算（不执行）</span>
+EXPLAIN
+SELECT o.id, o.amount
+FROM orders o
+WHERE o.user_id = 42 AND o.status = 1
+ORDER BY o.created_at DESC
+LIMIT 20;
+
+<span class="c">-- 2. 8.0.18+ 用 EXPLAIN ANALYZE 看真实行数和耗时</span>
+<span class="c">--    注意：它会真的执行这条语句，DML 请务必不要直接跑</span>
+EXPLAIN ANALYZE
+SELECT o.id, o.amount
+FROM orders o
+WHERE o.status = 1
+ORDER BY o.created_at DESC
+LIMIT 20;
+
+<span class="c">-- 3. 从实例侧找最耗时的语句模板（digest 聚合）</span>
+SELECT DIGEST_TEXT AS sql_tpl,
+       COUNT_STAR  AS exec_cnt,
+       ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_sec,
+       ROUND(AVG_TIMER_WAIT / 1000000000000, 4) AS avg_sec,
+       SUM_ROWS_EXAMINED AS rows_examined
+FROM performance_schema.events_statements_summary_by_digest
+ORDER BY SUM_TIMER_WAIT DESC
+LIMIT 10;</pre>
+  <p>这段 digest 查询是运维岗最实用的一条：<b>它按语句模板聚合，直接告诉你「哪类 SQL 总共最耗时」</b>。注意要按总耗时排而不是按单次耗时排——一条跑 3 秒但一天只跑 1 次的 SQL，危害远小于一条 50ms 但一天跑 10 万次的。</p>
+  <div class="callout warn">
+    <b>EXPLAIN 的 rows 是估算，不是真实值。</b>它基于索引的采样统计，数据分布倾斜时可能差一个数量级。所以不要因为「rows 只有 10」就放心，也不要因为「rows 是 80 万」就立刻加索引——用 <span class="k">EXPLAIN ANALYZE</span> 看真实值，或者对比 <span class="k">performance_schema</span> 里的 <span class="k">ROWS_EXAMINED</span>。统计信息不准时可以用 <span class="k">ANALYZE TABLE</span> 重采样，但大表上它有开销，别在高峰期跑。
+  </div>
+  <div class="cmds">
+    <div class="crow"><code>EXPLAIN ANALYZE SELECT ...;</code><span class="desc">8.0.18+，给出真实行数与耗时；会真的执行，DML 别直接跑</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 10\G</code><span class="desc">按语句模板聚合，找全实例总耗时最高的 SQL</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT DIGEST_TEXT, COUNT_STAR, SUM_ROWS_EXAMINED FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_ROWS_EXAMINED DESC LIMIT 10\G</code><span class="desc">按扫描行数排，找出「单行成本不高但扫得多」的语句</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SHOW VARIABLES LIKE 'long_query_time'; SET GLOBAL slow_query_log = ON;</code><span class="desc">确认并开启慢日志，阈值与是否需重启以版本为准</span><button class="copy">复制</button></div>
+    <div class="crow"><code>SELECT * FROM information_schema.processlist WHERE command != 'Sleep' ORDER BY time DESC LIMIT 10\G</code><span class="desc">看当前正在跑的长查询与长事务</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ANALYZE TABLE orders;</code><span class="desc">统计信息明显失真时重采样；大表有开销，别在高峰期跑</span><button class="copy">复制</button></div>
+  </div>
+  <p>其中「按扫描行数排」这一条常被忽略：<b>一条 SQL 单次耗时不高，但每次扫 50 万行，一天跑十万次，对实例的总压力远大于一条偶尔跑一次的慢查询。</b>看总耗时能找到最慢的，看总扫描行数能找到「最浪费的」——两个视角都要有。</p>
+  <p><b>面试落点：</b>「我看 EXPLAIN 的顺序是 type → rows → Extra。type 只说明访问方式，rows 才说明扫多少。要真实值就用 EXPLAIN ANALYZE（注意它会真的执行）。找全实例最慢的 SQL 我查 performance_schema 的 digest 汇总表，按总耗时排，也会按总扫描行数排一次。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>索引建议怎么给：最左前缀、覆盖索引与代价</h2></div>
+  <p class="lead">「加个索引」不是建议，是一句没有信息量的话。一条可执行的建议至少要包含：<b>建在哪些列上、什么顺序、能解决这条 SQL 的哪一段成本、以及代价是什么</b>。</p>
+  <p>联合索引的排序规则是<b>先按第一列排、相同再按第二列</b>，就像电话簿先按姓再按名。由此推出最左前缀原则的两个推论：<b>缺少最左列就无法用于定位</b>；<b>范围条件之后的列失去定位能力</b>（因为前一列已经是范围了，后面的列在整体上不再有序）。</p>
+  <table>
+    <tr><th style="width:200px">条件写法（索引 (a, b, c)）</th><th>能用上几列</th><th>能做什么</th></tr>
+    <tr><td><span class="k">a = 1</span></td><td>a</td><td>定位</td></tr>
+    <tr><td><span class="k">a = 1 AND b = 2</span></td><td>a, b</td><td>定位</td></tr>
+    <tr><td><span class="k">a = 1 AND b &gt; 2</span></td><td>a, b（b 之后失效）</td><td>定位，c 无法再用</td></tr>
+    <tr><td><span class="k">a = 1 ORDER BY b</span></td><td>a 定位，b 提供有序</td><td>省掉排序</td></tr>
+    <tr><td><span class="k">b = 2</span>（不带 a）</td><td>无法定位</td><td>最多做索引全扫描，比全表扫便宜</td></tr>
+  </table>
+  <h3>第 30 题：给这条 SQL 一条完整的索引建议</h3>
+  <pre><span class="c">-- 需求：后台按状态查最近 20 条订单</span>
+SELECT id, amount, created_at
+FROM orders
+WHERE status = 1
+ORDER BY created_at DESC
+LIMIT 20;
+
+<span class="c">-- 建议一：等值列在前、排序列在后</span>
+ALTER TABLE orders ADD KEY idx_status_created (status, created_at);
+<span class="c">-- 效果：status=1 定位 + created_at 直接有序，LIMIT 20 只扫 20 行</span>
+
+<span class="c">-- 建议二：8.0 支持降序索引，排序方向一致时更直接</span>
+ALTER TABLE orders ADD KEY idx_status_created_desc (status, created_at DESC);
+
+<span class="c">-- 建议三：如果查询列固定就这三列，做成覆盖索引，连回表都省掉</span>
+ALTER TABLE orders ADD KEY idx_status_created_cover (status, created_at, amount);
+<span class="c">-- 验证：Extra 出现 Using index（覆盖索引），并用 EXPLAIN ANALYZE 看实际扫描行数</span></pre>
+  <p>给出建议时必须同时说代价，否则会被追问：<b>每多一个索引，写操作就要多维护一棵 B+ 树</b>，INSERT/UPDATE/DELETE 变慢，磁盘和 buffer pool 占用变大。<b>所以「加索引」是拿写性能和空间换读性能</b>，一张表上堆十几个索引通常是设计问题（往往是「每个报表需求来一个」积累出来的）。</p>
+  <pre><span class="c">-- 建完之后必须验证：对比建索引前后的执行计划</span>
+EXPLAIN SELECT id, amount, created_at FROM orders WHERE status = 1 ORDER BY created_at DESC LIMIT 20;
+
+<span class="c">-- 看看这张表上已经堆了多少索引，有没有重复的</span>
+SHOW INDEX FROM orders;
+
+<span class="c">-- 8.0 可以建不可见索引，先验证效果再决定是否真正启用</span>
+ALTER TABLE orders ALTER INDEX idx_status_created INVISIBLE;
+ALTER TABLE orders ALTER INDEX idx_status_created VISIBLE;</pre>
+  <div class="callout">
+    <b>面试里「给索引建议」的完整话术：</b>「我会先确认这条 SQL 的访问模式（过滤列是什么、排序列是什么、返回哪些列、命中比例大概多少），然后按『等值列在前、范围/排序列在后』设计联合索引，尽量做成覆盖索引。建之前我会先看这张表现在有哪些索引，避免重复；建之后用 EXPLAIN 对比前后 rows 和 Extra 的变化，并说明代价是写变慢和空间变大。」<b>说出代价，是这道题的及格线。</b>
+  </div>
+  <p><b>面试落点：</b>「索引建议我给三样：建在哪些列什么顺序、解决这条 SQL 哪一段成本、代价是什么。顺序按『等值在前、范围或排序在后』，能覆盖就覆盖。建完用 EXPLAIN 对比前后，并且说明写性能会下降、空间会变大——不说代价的建议是不完整的。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：先确认语义，再动手写</h2></div>
+  <p class="lead">SQL 题的表现分，一半在写之前的三十秒。面试官真正观察的是：<b>你是直接开敲，还是先把模糊的地方问清楚</b>。因为线上出问题的 SQL，八成不是语法错，是语义错——数字算对了口径，或者算错了口径但没人发现。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>确认口径。</b>「统计上个月的下单用户」——按创建时间还是支付时间？包含退款吗？同一用户多笔算一人还是多笔？这三问不问，写出来的 SQL 大概率要返工。</div></div>
+    <div class="step"><div class="txt"><b>确认边界。</b>空集合怎么办（除零、NULL）、时区按哪个、时间范围是闭区间还是半开。这些决定了你的 SQL 在极端情况下会不会崩或给出怪值。</div></div>
+    <div class="step"><div class="txt"><b>确认规模。</b>「这张表多大、每天增多少、这个查询多久跑一次」。报表跑一次十几秒可以接受，接口里每次请求都跑就不行——规模决定了你是写 SQL 还是要建汇总表。</div></div>
+    <div class="step"><div class="txt"><b>边写边说。</b>说出你为什么用 LEFT JOIN、为什么用窗口函数、为什么把条件放在 ON 里。<b>面试官听的是你的推理，不是最终结果</b>，很多题他根本不看你跑没跑通。</div></div>
+  </div>
+  <table>
+    <tr><th style="width:200px">被追问</th><th>怎么答</th></tr>
+    <tr><td>「这条 SQL 能优化吗？」</td><td>「先看 EXPLAIN 的 rows 和 Extra 再回答。是扫得多就加索引或改条件，是排序多就调整索引顺序让它提供有序性，是回表多就做成覆盖索引，是 offset 大就换游标。不同原因做法完全不同。」</td></tr>
+    <tr><td>「窗口函数和 GROUP BY 怎么选？」</td><td>「要保留明细行就用窗口函数，只要汇总结果就用 GROUP BY。窗口函数在 WHERE 之后计算，所以过滤窗口函数的结果必须外面套一层。」</td></tr>
+    <tr><td>「你怎么保证报表数字是对的？」</td><td>「我会用两种独立算法交叉验证：比如『下单用户数』同时用 COUNT(DISTINCT) 和先聚合再 COUNT 两种写法对比；另外会抽查几条明细，看能不能对上汇总值。」</td></tr>
+    <tr><td>「数据量大了之后怎么办？」</td><td>「两条路：一是按天预聚合到汇总表，报表查汇总表；二是把明细归档出去，只保留近期的。要不要分库分表要看单表容量和写入压力，不是一上来就分。」</td></tr>
+    <tr><td>「你写过最复杂的 SQL 是什么？」</td><td>「讲一个带窗口函数和多层 CTE 的报表，重点讲你怎么拆步骤、怎么验证每一步。不要吹规模，讲结构和验证。」</td></tr>
+  </table>
+  <div class="callout warn">
+    <b>三个一定会被扣分的说法：</b>「加个索引就好了」（没说建在哪、代价是什么）、「这个我一般用 ORM 生成」（说明你没手写过多表查询）、「我记不清函数名叫什么了」（窗口函数和日期函数是这一篇的基础，函数名记不住基本等于没写过）。<b>运维岗的 SQL 不要求你写得花，但要求你写得对、说得清为什么这么写。</b>
+  </div>
+  <p><b>面试落点：</b>「我写 SQL 的习惯是先确认口径、边界和规模，再动手。写的时候会把每一步拆成 CTE，这样每一步都能单独跑、单独验证。写完用 EXPLAIN 看一眼，并且用另一种算法交叉验证汇总数字。规模大到一定程度我会建议建汇总表，而不是硬扛明细查询。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：每一个都会给你一个看起来合理的错答案</h2></div>
+  <p class="lead">这十条的共同特点是<b>不报错</b>。语法错误会被立刻发现，语义错误会安静地返回一个错的数字，然后被写进日报。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">把聚合条件写进 WHERE</div><div class="pd">WHERE 在分组前执行，里面不能出现 COUNT/SUM。聚合条件必须放 HAVING。反过来，本该在 WHERE 的行条件放进 HAVING，会让全表都参与分组。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">LEFT JOIN 的条件写在 WHERE 里</div><div class="pd">无匹配行的右表列是 NULL，条件判断为未知，行被丢弃，LEFT JOIN 退化成 INNER JOIN。要保留左表全部行就得写在 ON 里。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">用 COUNT(列) 当行数</div><div class="pd">COUNT(列) 跳过 NULL，行数会算少；全 NULL 时返回 NULL 而不是 0。数行一律用 COUNT(*)。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">NOT IN 撞上 NULL</div><div class="pd">它展开成 x &lt;&gt; a AND x &lt;&gt; b，任一比较为未知时整体为未知，WHERE 只接受真，于是返回空集且无任何提示。写「不存在」一律用 NOT EXISTS。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">窗口函数直接写进 WHERE</div><div class="pd">窗口函数在 WHERE 之后才计算，直接写会报语法错。取组内 TopN 必须在子查询或 CTE 里算出编号，外层再过滤。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">用 GROUP BY + LIMIT 做分组 TopN</div><div class="pd">LIMIT 作用于整个结果集，不是每个分组。分组 TopN 必须用 ROW_NUMBER/RANK，另外 ROW_NUMBER 的排序要加唯一决胜键。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">在索引列上套 DATE() 做过滤</div><div class="pd">列被函数包住就无法用索引定位。改成半开区间范围条件：&gt;= '2026-10-01' AND &lt; '2026-10-02'，既准确又能走索引。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">用 BETWEEN 框时间范围</div><div class="pd">日期字面量会被补成 00:00:00，BETWEEN '09-01' AND '09-30' 会漏掉 9 月 30 日当天几乎全部数据。时间范围一律用半开区间。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">一对多 JOIN 后直接 SUM</div><div class="pd">关联把左表行数放大，SUM 会被重复计算。正确做法是先在子查询里把多的一方聚合到「每个键一行」，再关联。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把 SELECT * 的明细拉到客户端再统计</div><div class="pd">几十万行数据全量过网络，客户端内存和数据库连接都被占住。聚合应该让数据库做，只把汇总结果传回来。</div></div></div>
+  <p><b>面试落点：</b>挑一条讲，按「当时的判断 → 造成的后果 → 后来改成什么」三段说。第三段最重要：它决定面试官认为你是「踩过坑」还是「长了记性」。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 要「统计订单数不少于 3 笔的用户」，下面说法正确的是？</div>
+      <button class="opt">WHERE COUNT(*) &gt;= 3，因为 WHERE 先执行效率更高</button>
+      <button class="opt">HAVING 里写，但订单状态条件也必须一起放 HAVING</button>
+      <button class="opt">状态这种行条件放 WHERE，COUNT(*) &gt;= 3 这种聚合条件放 HAVING</button>
+      <button class="opt">两个都放 WHERE，用子查询包一层就能写聚合</button>
+      <div class="ans">正确答案：<b>行条件放 WHERE，聚合条件放 HAVING</b>。WHERE 在分组之前逐行过滤，不能出现聚合函数（MySQL 会直接报错）；HAVING 在分组之后过滤组，才能写 COUNT/SUM。把行条件也放进 HAVING 会让全表行都参与分组，白白多算一遍。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. <span class="k">FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE o.status = 1</span>，结果和哪种 JOIN 一致？</div>
+      <button class="opt">LEFT JOIN，因为关键字写的是 LEFT</button>
+      <button class="opt">INNER JOIN，因为 WHERE 里对右表列的条件把无匹配行（右表列为 NULL）全部滤掉了</button>
+      <button class="opt">结果比 INNER JOIN 多，因为 LEFT 会保留全部左表行</button>
+      <button class="opt">取决于优化器，两种都有可能</button>
+      <div class="ans">正确答案：<b>等价于 INNER JOIN</b>。LEFT JOIN 保留的无匹配行里，右表列全是 NULL，<span class="k">o.status = 1</span> 对这些行的判断结果是「未知」，WHERE 只接受「真」，于是整行被丢弃。想保留零订单用户，必须把条件移到 ON 里。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 子查询 <span class="k">SELECT user_id FROM orders</span> 的结果里存在 NULL，那么 <span class="k">WHERE id NOT IN (子查询)</span> 的结果是？</div>
+      <button class="opt">正常返回不在订单表里的用户，NULL 会被自动忽略</button>
+      <button class="opt">报错，提示子查询含 NULL</button>
+      <button class="opt">只返回 id 比所有非 NULL 值都大的用户</button>
+      <button class="opt">返回空结果集，且不报任何错</button>
+      <div class="ans">正确答案：<b>返回空集，没有任何提示</b>。<span class="k">x NOT IN (...)</span> 展开为 <span class="k">x &lt;&gt; a AND x &lt;&gt; b AND ...</span>，一旦列表里有 NULL，某个比较的结果就是「未知」，整个 AND 表达式为「未知」，而 WHERE 只接受「真」。这也是为什么写「不存在」应该用 NOT EXISTS。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 要「每个城市消费金额前三的用户」，正确的做法是？</div>
+      <button class="opt">先按城市和用户聚合出金额，再用 ROW_NUMBER() 按城市分区编号，外层过滤 rn &lt;= 3</button>
+      <button class="opt">GROUP BY city 后加 LIMIT 3，MySQL 会自动对每组生效</button>
+      <button class="opt">用一个 GROUP_CONCAT 把用户拼起来再截取前三</button>
+      <button class="opt">按金额倒序排整个表，取前 3 行再按城市分组</button>
+      <div class="ans">正确答案：<b>窗口函数编号后过滤</b>。LIMIT 作用于整个结果集而不是每个分组，<span class="k">GROUP BY city LIMIT 3</span> 只会返回总共 3 行。正确写法是先聚合到「每城市每用户一行」，再用 <span class="k">ROW_NUMBER() OVER (PARTITION BY city ORDER BY total DESC)</span> 编号，最后在外层过滤——窗口函数不能写进 WHERE，必须套一层。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 为什么 <span class="k">WHERE ROW_NUMBER() OVER (...) = 1</span> 会失败？</div>
+      <button class="opt">因为 ROW_NUMBER 从 0 开始编号，应该写 = 0</button>
+      <button class="opt">因为 PARTITION BY 写错了，必须先 ORDER BY</button>
+      <button class="opt">因为窗口函数在 WHERE 之后才计算，不能直接出现在 WHERE 里，必须在子查询或 CTE 中算出编号再外层过滤</button>
+      <button class="opt">因为 MySQL 不支持 ROW_NUMBER，只能用变量模拟</button>
+      <div class="ans">正确答案：<b>窗口函数在 WHERE 之后计算</b>。逻辑执行顺序是 FROM → WHERE → GROUP BY → 聚合 → HAVING → 窗口/SELECT → ORDER BY → LIMIT，所以窗口函数只能出现在 SELECT 和 ORDER BY 里。取组内第一名要在子查询或 CTE 中生成编号列，再由外层 WHERE 过滤。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. EXPLAIN 显示 <span class="k">key</span> 有值、<span class="k">rows</span> 只有 50，但这条 SQL 线上跑了 3 秒。最合理的解释是？</div>
+      <button class="opt">索引一定失效了，需要 FORCE INDEX 强制指定</button>
+      <button class="opt">rows 是基于统计信息的估算值，可能严重偏离真实值，应该用 EXPLAIN ANALYZE 或 performance_schema 看真实扫描行数</button>
+      <button class="opt">type 是 ALL 就是全表扫，与 key 无关</button>
+      <button class="opt">只要 Extra 里没有 Using filesort，慢一定在网络上</button>
+      <div class="ans">正确答案：<b>rows 是估算</b>。它来自索引采样统计，数据分布倾斜时可能差一个数量级。要真实值用 <span class="k">EXPLAIN ANALYZE</span>（注意它会真的执行语句，DML 不要直接跑），或查 <span class="k">performance_schema</span> 里的 <span class="k">ROWS_EXAMINED</span>。另外慢也可能来自回表、排序或锁等待，不能只盯 key 一列。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:190px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>ONLY_FULL_GROUP_BY</b></td><td>8.0 默认 sql_mode 之一，SELECT 中的非聚合列必须出现在 GROUP BY 里</td></tr>
+    <tr><td><b>CTE</b></td><td>WITH 定义的临时结果集，8.0 支持；<span class="k">WITH RECURSIVE</span> 可递归，深度受 cte_max_recursion_depth 限制</td></tr>
+    <tr><td><b>窗口函数</b></td><td>保留明细行同时给出组内统计值，只能出现在 SELECT 和 ORDER BY</td></tr>
+    <tr><td><b>ROW_NUMBER / RANK</b></td><td>连续编号 / 并列跳号（1、1、3）；DENSE_RANK 并列不跳号</td></tr>
+    <tr><td><b>LAG / LEAD</b></td><td>取当前行之前/之后第 N 行的值，做环比和日环比的基础</td></tr>
+    <tr><td><b>窗口框架</b></td><td>ROWS BETWEEN ... PRECEDING AND CURRENT ROW，定义累计或移动平均的范围</td></tr>
+    <tr><td><b>窗口函数的决胜键</b></td><td>ORDER BY 里补上的唯一列（如 id），保证排序键重复时结果仍然确定</td></tr>
+    <tr><td><b>半连接 semi-join</b></td><td>MySQL 对 IN / EXISTS 子查询的优化方式，只关心存在性不产生重复行</td></tr>
+    <tr><td><b>覆盖索引</b></td><td>查询需要的列都在索引里，无需回表，Extra 显示 Using index</td></tr>
+    <tr><td><b>索引下推 ICP</b></td><td>把过滤条件下推到引擎层，在回表前用索引值先筛掉不匹配的行</td></tr>
+    <tr><td><b>Using filesort</b></td><td>无法利用索引顺序而做的额外排序，不代表一定落磁盘</td></tr>
+    <tr><td><b>digest</b></td><td>把 SQL 模板化后的指纹，performance_schema 用它做语句级汇总</td></tr>
+    <tr><td><b>半开区间</b></td><td>&gt;= 起始 AND &lt; 结束，写时间范围的标准做法，避免 BETWEEN 的边界丢失</td></tr>
+    <tr><td><b>不可见索引</b></td><td>8.0 的 INVISIBLE 索引，优化器忽略它，用于验证「删掉这个索引有没有影响」</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 把本篇开头的建表语句复制到本地，灌几十万行数据，把 30 道题全部跑一遍——<b>能跑通本身就是面试加分项</b>；② 专门制造一次 NOT IN 遇 NULL 的静默空集，体会它有多难发现；③ 对同一条 SQL 分别看 EXPLAIN 和 EXPLAIN ANALYZE，把「估算行数」和「真实行数」的差距记下来；④ 用 <span class="k">events_statements_summary_by_digest</span> 找出你自己环境里最耗时的三类 SQL，试着给每一类写一条完整的索引建议（含代价）。<br><br>
+    <b>之后值得单独学：</b>第 17 期讲 MySQL 的索引、事务与锁，这一篇里「为什么这个索引能用上」在那边有 B+ 树和成本模型的完整解释；第 41 期讲数据库运维，会讲到备份恢复、主从切换和慢查询治理的闭环；第 20 期把数据库放进系统设计题，考的是分库分表和容量估算，而不是单条 SQL。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 47 期 · SQL 写错通常不报错，它只是安静地返回一个错的数字</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>容量规划与压测：问「多少台够」时在问什么</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 45 期</span>
+    <h1>容量规划与压测：问「多少台够」时在问什么</h1>
+    <p class="sub">他嘴里是数字，考的是<b>你怎么得到这个数字、误差在哪</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>9</b> 大模块</span>
+      <span class="chip"><b>12</b> 个指标</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：你的单副本「能扛多少 QPS」，是在什么约束下测出来的？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：数字都对，结论全错</h2></div>
+  <p class="lead">「压测说能扛 3000 QPS，线上 1500 就雪崩。」「按公式算只要 8 台，买了 20 台还是不够。」「大促前扩了三倍，0 点照样超时。」这三个团队都做了压测，也都算过数，问题出在同一个地方：<b>他们把「测出来的一个数」当成了「系统的一个属性」，而它其实只是「那一次实验在特定条件下的结果」</b>。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>压测 3000 QPS 通过，线上 1500 雪崩</td><td>线上机器更差，或者压测数据造假</td><td>压测时下游是好的、缓存是热的、流量是均匀的。真实链路里每个请求还要调三四个依赖，<b>你压的是自己那一段，不是整条链路</b></td></tr>
+    <tr><td>公式算 8 台，买了 20 台还不够</td><td>公式错了</td><td>公式没错，缺了三个约束：可用区失效后的剩余容量、单节点宕机后的余量、以及扩容到位之前的空窗期</td></tr>
+    <tr><td>大促前扩了三倍，0 点照样超时</td><td>扩得还不够</td><td>扩容出来的副本是冷的：连接池没建立、本地缓存是空的、JIT 还没编译。冷启动这段时间它的能力远低于稳态</td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>容量是一个区间</div><div class="cd">「能扛多少」的答案应该是「在 P99 不超过某值的前提下」，脱离约束谈 QPS 没有任何意义。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>拐点比峰值重要</div><div class="cd">峰值告诉你「最多能扛多少」，拐点告诉你「从哪开始就不该再进了」。生产容量应该定在拐点左边。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>压测是实验不是验收</div><div class="cd">压测的产出不是「通过/不通过」，是一条吞吐-延迟曲线，以及曲线拐头的位置和原因。</div></div>
+  </div>
+  <p>这一篇按「容量怎么算 → 压测怎么做 → 看哪些指标 → 哪些结论不可信 → 瓶颈怎么找 → 扩容为什么不是即时的 → 怎么预测和复盘 → 面试怎么写在白板上」走。中间有一节专门讲<b>小定律（并发 = 吞吐 × 响应时间）</b>和排队效应，它是把「QPS」和「RT」这两个数连起来的唯一公式，也是所有容量推导的基础。<b>本专栏不会给你任何「某配置能扛多少 QPS」的数字</b>——所有数字都要用你自己的压测结果代入，我只给公式和推导方法。</p>
+  <div class="callout">
+    <b>先把一句话记住：</b>容量问题的标准答案是三段式的——<b>「目标是多少、我怎么测出来的、误差可能来自哪里」</b>。只给第一个的是背的，能给第二个的是做过的，能主动说第三个的，才是面试官想招的人。
+  </div>
+  <p><b>面试怎么答：</b>「问『多少台够』的时候，我不会直接给数字，先确认约束：峰值 QPS 是多少、延迟目标（P99 多少）是多少、错误率容忍多少、要不要扛住可用区失效。然后我用压测得到的单副本能力去除，再叠加可用区冗余和节点余量，最后还要校验一件事——扩容从触发到真正能扛流量需要多久，这段时间靠什么顶。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>容量模型：从 QPS 到副本数，中间隔着四个约束</h2></div>
+  <p class="lead">容量模型的主干只有一行除法：<b>副本数 = 峰值 QPS ÷ 单副本有效能力</b>。但真正决定「够不够」的是它后面的四个约束。只算除法的人，就是那个「买了 20 台还不够」的人。</p>
+  <pre>第一层：单副本能力（压测得到，必须带约束）
+  单副本能力 C = 在「P99 ≤ 目标值 且 错误率 ≤ 目标值」前提下能稳定承载的 QPS
+  单副本配额 Q = C × 安全系数 k        <span class="c"># k 取多少由你的压测与线上差异决定，需代入自己的数据</span>
+
+第二层：基础副本数
+  N_base = ceil(峰值 QPS / Q)
+
+第三层：可用区冗余（假设副本在 k 个区均分，要能扛住 1 个区失效）
+  N_az = ceil(峰值 QPS / Q × k / (k - 1))
+
+第四层：节点余量（任意一台节点宕机后仍够用）
+  N_node = N_base + ceil(N_base / 单节点容纳副本数)
+
+最终：N = max(N_base, N_az, N_node)，并向上取整到能被可用区数整除</pre>
+  <p>四个约束里最常被漏的是第三个，而它恰恰是最贵的那个。举个例子（数字是示例，用你自己的压测结果代入）：峰值 3000 QPS、单副本配额 500，基础副本数是 6；如果部署在 3 个可用区并要求扛住 1 个区失效，那就要 <span class="k">3000 ÷ 500 × 3 ÷ 2 = 9</span> 个副本。<b>多出来的 3 个不是浪费，是「一个区没了还能扛住」的价格</b>。很多团队在算容量时只算 6，然后在某个可用区故障时发现容量只有三分之二，才开始临时扩容——而扩容是有延迟的。</p>
+  <table>
+    <tr><th style="width:150px">约束</th><th>在防什么</th><th>忘了它的后果</th><th>怎么定参数</th></tr>
+    <tr><td><b>安全系数 k</b></td><td>压测环境与生产的差异：GC 抖动、慢查询、噪声邻居、流量不均</td><td>按压测上限设容量，一有抖动就开始排队</td><td>用「压测上限」和「生产实际可承载值」的历史差距反推。<b>没有历史数据就先取保守值，再用线上数据校准</b></td></tr>
+    <tr><td><b>可用区冗余</b></td><td>单个可用区整体失效</td><td>故障瞬间容量掉 1/3 到 1/2，且来不及补</td><td>按可用区数量和要求扛住几个区失效来算</td></tr>
+    <tr><td><b>节点余量</b></td><td>单个节点宕机、节点维护、驱逐</td><td>一次节点维护就触发容量不足</td><td>至少留出一个节点的容量；N+1 是常见下限</td></tr>
+    <tr><td><b>扩容空窗</b></td><td>从「需要扩容」到「新副本能扛流量」之间的时间差</td><td>峰值来了，副本还在启动，请求已经超时</td><td>用第 7 节的方法量出扩容链路耗时，这段时间靠预留余量（minReplicas）顶</td></tr>
+  </table>
+  <p>还有一个容易被忘掉的维度：<b>容量不只是副本数</b>。同样是一千 QPS，读写比例不同、请求大小不同、缓存命中率不同，落到数据库和磁盘上的压力可以差一个量级。所以完整的容量台账至少要有四列：<b>应用层副本数、数据库连接与 QPS、缓存容量与命中率、消息生产和消费速率</b>。只算应用层的容量模型，会在瓶颈转移到下游时失效——这也是「应用层扩了三倍还是超时」的常见原因。</p>
+  <pre><span class="c"># 一份能直接用的容量台账（每行都要有「测出来的」而不是「估的」）</span>
+服务        单副本能力C   配额Q   峰值QPS   基础N   AZ冗余N   最终N   瓶颈资源   测量日期
+order        （压测）    （算）   （历史峰值×放大）  （算）   （算）    （max）   CPU/DB/连接池
+inventory    ...
+<span class="c"># 备注：C 必须在同一套流量模型、同一个下游状态下测；换了依赖就要重测</span></pre>
+  <div class="callout warn">
+    <b>「峰值 QPS」本身也是一个需要推导的数字，不能拍。</b>大促场景的常用做法是：<b>预测峰值 = 日常峰值 × 放大系数</b>，而放大系数只能来自历史同类活动的实测倍数（比如上次大促零点峰值是日常的几倍），再叠加业务方给出的活动力度预估。没有历史数据时，第一年就要么多留余量，要么准备限流预案——<b>承认预测有误差，并把误差用预案兜住，比假装预测很准要专业。</b>
+  </div>
+  <p><b>面试怎么答：</b>「主干是副本数等于峰值 QPS 除以单副本有效能力，但真正决定够不够的是四个叠加约束：安全系数（压测值和生产值的差距）、可用区冗余（要扛住一个区失效就要乘 k/(k-1)）、节点余量（至少留一个节点）、以及扩容空窗期需要的预留。另外容量台账不能只算应用层，数据库、缓存、消息队列都要有各自的容量行，因为瓶颈会转移。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>小定律与排队：把 QPS 和响应时间连起来的那个公式</h2></div>
+  <p class="lead">这一节是整个容量推导的地基。<b>小定律（Little's Law）：稳态下，系统内的平均并发数 L = 吞吐 λ × 平均响应时间 W</b>。它不需要排队模型假设，适用范围极广，是唯一能把「我能扛多少 QPS」和「我的响应时间是多少」绑在一起的公式。</p>
+  <pre>L = λ × W
+
+L：系统内平均的请求数（在途请求数、并发数、被占用的线程/连接数）
+λ：吞吐（每秒完成的请求数，QPS 或 TPS）
+W：平均响应时间（从进入到离开系统的时间，含排队）
+
+<span class="c"># 单位必须一致：λ 用「每秒」，W 就要用「秒」</span>
+
+<span class="c"># 用法一：由吞吐和 RT 反推需要多少并发</span>
+λ = 2000 QPS，W = 100ms = 0.1s  →  L = 2000 × 0.1 = 200
+<span class="c"># 意味着稳态下有 200 个请求同时在系统里，</span>
+<span class="c"># 你的线程池、连接池、以及压测机的并发数都必须大于这个量级，否则吞吐上不去</span>
+
+<span class="c"># 用法二：并发被限制时，吞吐上限直接由 RT 决定</span>
+连接池 50，RT 从 20ms 变成 2s  →  λ_max = 50 / 2 = 25 QPS
+<span class="c"># 原来能到 2500 QPS，下游慢 100 倍，吞吐掉到 25——这就是「慢」比「错」更可怕</span>
+
+<span class="c"># 用法三：压测中判断瓶颈在哪一侧</span>
+<span class="c"># 增加并发，吞吐不再涨而 RT 线性上涨 → 系统已经饱和到达拐点</span>
+<span class="c"># 增加并发，吞吐同步上涨、RT 基本不变 → 还没饱和，瓶颈可能在压测机</span></pre>
+  <p>第三个用法是压测时最实用的一个判断工具，值得展开：<b>当你增加客户端并发数，如果吞吐跟着涨而 RT 基本不变，说明系统还有余量；如果吞吐不涨了、RT 开始线性上涨，说明已经到拐点了——多出来的请求只是在排队</b>。这条判断不需要任何工具，看两条曲线就能做。</p>
+  <p>接下来是排队效应，它解释「为什么接近饱和时延迟会突然爆炸」。用一个最简单的模型 M/M/1（单服务台、泊松到达、指数服务时间）看趋势：</p>
+  <table>
+    <tr><th style="width:110px">利用率 ρ</th><th>平均队列长度 Lq = ρ²/(1−ρ)</th><th>直观含义</th></tr>
+    <tr><td>0.50</td><td>0.5</td><td>几乎不排队，来一个处理一个</td></tr>
+    <tr><td>0.80</td><td>3.2</td><td>开始有可见的排队，P99 明显抬头</td></tr>
+    <tr><td>0.90</td><td>8.1</td><td>排队成为延迟的主要来源</td></tr>
+    <tr><td>0.95</td><td>18.05</td><td>延迟对任何微小抖动都极其敏感</td></tr>
+  </table>
+  <p>这张表的关键不在具体数字，而在<b>形状</b>：ρ 从 0.8 涨到 0.95（涨不到 20%），队列长度从 3.2 涨到 18（涨了 5 倍多）。<b>延迟随利用率是超线性增长的，而且是凸的——越接近饱和，涨得越快</b>。这就是为什么「CPU 到 90% 才开始扩容」的策略一定会出事：从 90% 到 100% 的那段路，延迟涨得比前面全部加起来还快。</p>
+  <p>但是——这两条必须说清，否则就是半瓶水：<b>第一，真实系统不是 M/M/1</b>。服务时间不是指数的、有多级队列、有限并发、还有超时和重试。所以上表只能用来理解趋势，<b>真正的拐点位置必须用你自己的压测曲线确定</b>。<b>第二，服务时间的波动越大，拐点来得越早</b>。同样的平均 RT，一个稳定的服务能跑到更高的利用率；一个有 GC 停顿、慢查询、下游抖动的服务，可能在 60% 利用率时 P99 就已经不可接受了。这也是为什么「降低抖动」和「提高容量」一样重要。</p>
+  <pre><span class="c"># 拐点的定义（这是本篇最该记住的一个概念）</span>
+拐点 = 随着并发增加，「吞吐」不再明显增长、而「延迟」开始超线性上升的那个并发值
+
+  吞吐
+   │        ┌──────────────────────  饱和区（吞吐到顶）
+   │      ／
+   │    ／      ← 拐点就在这里：曲线从这里开始变平
+   │  ／
+   │／
+   └─────────────────────────────&gt; 并发
+
+  P99
+   │              ／  ← 同一位置，P99 开始陡升
+   │            ／
+   │          ／
+   │━━━━━━━━／
+   └─────────────────────────────&gt; 并发
+
+<span class="c"># 生产容量应该定在拐点左边的安全区，而不是拐点上，更不是峰值上。</span>
+<span class="c"># 安全区取拐点并发的多少百分比，用你自己的压测曲线和 SLO 决定，别抄别人的。</span></pre>
+  <div class="callout danger">
+    <b>排队不增加吞吐，只增加延迟。</b>这句话值得单独记。当系统饱和后，你加大并发只是让队列变长：请求还是那么多地被处理完，但每一个都要多等一会儿，最后变成超时。<b>所以「把队列/线程池队列调大」不能解决容量问题，只会把「快速失败」变成「慢慢超时」</b>——而后者对用户体验和上游资源的占用都更糟。真正的解法是加容量（副本）或者减需求（限流、降级）。
+  </div>
+  <p><b>面试怎么答：</b>「小定律是 L = λ × W，稳态下系统内的平均并发等于吞吐乘平均响应时间。它有三个用法：由目标 QPS 和 RT 反推需要多少并发；由并发上限和 RT 算吞吐上限（所以下游变慢会直接把吞吐砍掉）；以及在压测里判断拐点——加并发吞吐不涨而 RT 线性涨就是饱和了。排队效应告诉我们延迟随利用率是凸的、超线性增长，所以容量要定在拐点左边的安全区。另外排队不增加吞吐只增加延迟，把队列调大不能解决容量问题。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>压测怎么做：目标、环境、数据、流量模型，四件事先定死</h2></div>
+  <p class="lead">压测做废的最常见原因不是工具不行，是<b>开始前没说清「这次压测要回答什么问题」</b>。目标不同，环境、数据、流量模型完全不同；混着做，出来的数字谁都解释不了。</p>
+  <table>
+    <tr><th style="width:130px">目标</th><th>要回答什么</th><th>流量模型</th><th>主要输出</th></tr>
+    <tr><td><b>找上限</b></td><td>这个服务在 SLO 约束下最多能扛多少 QPS</td><td>阶梯加压，每档稳定几分钟</td><td>单副本能力 C + 拐点并发</td></tr>
+    <tr><td><b>找瓶颈</b></td><td>先到顶的是 CPU、锁、IO、还是下游</td><td>压到拐点以上，同时采集各层指标</td><td>瓶颈资源 + 证据</td></tr>
+    <tr><td><b>验证容量</b></td><td>按预估峰值跑，能不能达标</td><td>恒定负载（有时加脉冲）</td><td>通过/不通过 + 各资源水位</td></tr>
+    <tr><td><b>验证弹性</b></td><td>扩容能不能跟上、冷启动多久</td><td>阶跃加压（突然加几倍）</td><td>扩容链路耗时 + 冷启动曲线</td></tr>
+    <tr><td><b>验证稳定性</b></td><td>长时间跑会不会泄漏、劣化</td><td>恒定负载跑数小时</td><td>内存/连接/句柄趋势</td></tr>
+  </table>
+  <p>环境的选择是一个真取舍：<b>独立压测环境</b>安全（搞挂了不影响用户），但它的规格、依赖拓扑、数据量、缓存命中率和生产不同，结论要打折；<b>生产环境压测</b>结论最准，但必须解决两件事——压测流量不能污染生产数据，压测指标不能污染生产监控。常见做法是给压测流量打标（统一 header 或独立入口），链路各层识别这个标记后走影子逻辑（写影子库/影子表，或只读），监控侧也按标记分流统计。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>定目标</b>：这次回答什么问题。找上限、找瓶颈、验证容量，三选一，不要一次全要。</div></div>
+    <div class="step"><div class="txt"><b>定环境</b>：独立环境还是生产；如果是生产，压测流量怎么打标、怎么隔离数据、谁能一键停止。</div></div>
+    <div class="step"><div class="txt"><b>定数据</b>：数据量级、分布、缓存命中率都要向生产看齐；大促场景还要模拟热点集中。</div></div>
+    <div class="step"><div class="txt"><b>定流量模型</b>：QPS 曲线（阶梯/恒定/阶跃/脉冲）、读写比例、接口配比、think time、连接是长连接还是短连接。</div></div>
+    <div class="step"><div class="txt"><b>定通过标准</b>：吞吐达到多少、P99 不超过多少、错误率不超过多少——<b>三条同时满足才算通过</b>，只看 QPS 是没有意义的。</div></div>
+    <div class="step"><div class="txt"><b>预热与稳态</b>：先小流量跑一段让 JIT、连接池、缓存进入稳态，再开始计数；每档至少跑到指标稳定再取数。</div></div>
+  </div>
+  <p>数据这一项值得多说，因为它造成过大量「压测乐观」。<b>缓存命中率是压测数据最容易失真的地方</b>：如果你用一个小数据集反复压，缓存命中率会接近 100%，测出来的 QPS 远高于生产；反过来，如果压测前不预热，前几分钟的命中率远低于生产，测出来又过于悲观。正确做法是<b>先量出生产的命中率，再调压测的数据分布去逼近它</b>，并把命中率作为压测必须记录的一个指标。</p>
+  <pre><span class="c"># 压测脚本里必须记录的（少一个就无法解释结果）</span>
+时间窗      并发   发起QPS  成功QPS  错误数  错误率   P50    P95    P99    P999
+10:00-10:05  100    980      978      2      0.2%    18ms   45ms   82ms   140ms
+10:05-10:10  200   1950     1944      6      0.3%    19ms   52ms   98ms   190ms
+10:10-10:15  400   3800     3750     50      1.3%    22ms   88ms  320ms   900ms   ← P99 开始抬头
+10:15-10:20  800   6000     5600    400      6.7%    45ms  310ms 1500ms  3000ms   ← 拐点已过
+
+<span class="c"># 同时要记录的资源指标（用来找瓶颈）</span>
+CPU(us/sy/wa)  内存  网络带宽  磁盘util  线程池活跃/队列  连接池占用/等待  GC停顿  下游RT
+
+<span class="c"># 缓存命中率、数据库 QPS、慢查询数 —— 这三个是解释「为什么」的关键</span>
+
+<span class="c"># 上面所有数字都是示例占位，请用你自己的压测结果替换，本专栏不提供基准值</span></pre>
+  <div class="callout">
+    <b>一个能直接用的加压方式：阶梯加压 + 每档稳定。</b>比如从 100 并发开始，每档跑 5 分钟，前 1 分钟预热不计入统计，后 4 分钟取稳态值；每档把并发乘以 2，直到出现下面任一信号就停止加压：<b>P99 超过目标值、错误率超过阈值、吞吐增长低于上一档的一半</b>。停止时的前一档，就是你本次压测得到的「有效容量」，再往上一档是拐点区。这个方法的好处是每一档都有完整数据，事后能画出完整的曲线而不只是一个点。
+  </div>
+  <p><b>面试怎么答：</b>「压测前我先定四件事：目标（找上限、找瓶颈还是验证容量，一次只做一个）、环境（独立还是生产，生产的话压测流量怎么打标和隔离）、数据（数据量级和分布要逼近生产，尤其缓存命中率要对齐）、流量模型（阶梯还是恒定、读写比例、长短连接）。加压用阶梯法，每档跑到稳态再取数，P99 或错误率超标就停。通过标准必须是吞吐、P99、错误率三条同时满足，只看 QPS 没意义。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>关键指标：12 个，少一个就解释不了结果</h2></div>
+  <p class="lead">压测报告里最没用的数字是「平均响应时间」和「QPS 峰值」。真正有信息量的是下面这 12 个，它们分成四组：<b>吞吐、延迟、错误、饱和度</b>——正好对应黄金信号的四个维度。</p>
+  <table>
+    <tr><th style="width:120px">分组</th><th>指标</th><th>怎么读</th><th>容易看错的地方</th></tr>
+    <tr><td rowspan="3"><b>吞吐</b></td><td>成功 QPS（完成速率）</td><td>吞吐说的是「完成」而不是「发起」，被拒绝的请求不该计入分子</td><td>用发起速率当吞吐，会把限流期间的成绩算得很好看</td></tr>
+    <tr><td>并发数（客户端 / 服务端在途）</td><td>两个都要记：客户端并发是输入，服务端在途是系统状态</td><td>只记客户端并发，会误以为「并发加到 1000 系统就扛了 1000」</td></tr>
+    <tr><td>拐点并发</td><td>吞吐不再随并发增长的那个并发值</td><td>把它当成容量上限——容量应该定在它左边</td></tr>
+    <tr><td rowspan="3"><b>延迟</b></td><td>P50 / P95</td><td>反映大多数用户的体验</td><td>只看这两个会漏掉长尾</td></tr>
+    <tr><td><b>P99 / P999</b></td><td>长尾是容量问题的第一信号，它比 P50 早得多地反映排队</td><td><b>分位数不能跨实例取平均</b>，必须在服务端按原始样本聚合</td></tr>
+    <tr><td>延迟分布（直方图）</td><td>双峰往往意味着两条不同路径（缓存命中/未命中）</td><td>用平均值看不出双峰</td></tr>
+    <tr><td rowspan="2"><b>错误</b></td><td>错误率</td><td>分母必须是收到的请求总数，<b>超时要算错误</b></td><td>把超时单独剔除，或者用「业务失败」当分母</td></tr>
+    <tr><td>错误构成（5xx / 429 / 超时 / 连接失败）</td><td>不同错误指向完全不同的原因</td><td>只看总数，无法区分「被打挂」和「被限流」</td></tr>
+    <tr><td rowspan="4"><b>饱和度</b></td><td>CPU 利用率（us / sy / wa 分开看）</td><td>sy 高指向系统调用与切换，wa 高指向 IO 等待</td><td>只看总利用率</td></tr>
+    <tr><td>线程池：活跃数 / 队列长度</td><td>队列持续不为 0 就是饱和的直接证据</td><td>只看线程数不看队列，会以为「还有线程可用」</td></tr>
+    <tr><td>连接池：占用数 / 等待时间</td><td><b>等待时间常常不计入应用 RT</b>，是隐藏的延迟来源</td><td>只看池子大小，不看等待时间</td></tr>
+    <tr><td>资源余量（内存、网络带宽、磁盘 util）</td><td>哪一项先到顶，哪一项就是当前瓶颈</td><td>只看 CPU，忽略网络和磁盘</td></tr>
+  </table>
+  <p>关于分位数，有一条必须说清的技术事实：<b>P99 不能对多个实例的 P99 取平均</b>。数学上，两个实例各自 P99 是 100ms，合并后的 P99 可能是 100ms，也可能是 180ms，取决于分布形状——取平均是错的，而且误差方向不确定。正确做法是在采集侧聚合原始样本（用直方图分桶），或者让服务端上报桶计数后再合并。这一点在面试里讲出来很加分，因为它是「分位数」这个指标最容易出错的实现细节。</p>
+  <pre><span class="c"># 正确：服务端按直方图分桶上报，再在查询侧算分位（Prometheus 的 histogram）</span>
+histogram_quantile(0.99, sum by (le) (rate(http_request_duration_bucket[1m])))
+
+<span class="c"># 错误：先把每个实例的 P99 算出来，再对这些 P99 取平均</span>
+avg(p99_by_instance)     <span class="c"># 数学上不成立，结果没有意义</span>
+
+<span class="c"># 错误率的分母要明确定义</span>
+error_rate = (5xx + 超时 + 连接失败) / 收到的请求总数
+<span class="c"># 不要写：/ 成功请求数     —— 这样错误率永远小于 100%，且饱和时会失真</span>
+<span class="c"># 429（限流）是否计入错误，要在压测前定好并写进报告；</span>
+<span class="c">#   我倾向于单独统计：它反映的是「保护生效」，和「系统被打挂」是两回事</span></pre>
+  <p>还有一条关于「饱和度」的经验：<b>利用率是最容易被误读的指标</b>。CPU 80% 既可能是健康的（还有余量），也可能已经饱和（有排队），区别就在队列长度和 P99。所以判断「到顶了没有」，看饱和度（队列、等待时间）比看利用率（百分比）可靠得多。这也是为什么第 2 节强调的拐点要用「吞吐-延迟曲线」来找，而不是用「CPU 到 90%」来找。</p>
+  <div class="callout warn">
+    <b>三个「看起来正常但其实已经坏了」的组合：</b>① <b>吞吐达标、P99 超标</b>——系统在排队，用户已经在等了，只是还没报错；② <b>吞吐达标、错误率 3%</b>——可能已经在限流或超时，只是被平均值掩盖；③ <b>CPU 只有 50%、吞吐上不去</b>——瓶颈不在 CPU，可能在锁、连接池、下游、或者压测机自己满了。<b>压测结论必须四组指标一起看，任何一组单独达标都不能算通过。</b>
+  </div>
+  <p><b>面试怎么答：</b>「我按吞吐、延迟、错误、饱和度四组看，一共 12 个指标。吞吐要区分发起速率和完成速率；延迟重点看 P99 和分布，而且分位数必须在采集侧按直方图聚合，不能对实例的 P99 取平均；错误率的分母是收到的请求总数，超时要算错误，429 单独统计；饱和度看队列长度和等待时间，比看利用率百分比可靠——CPU 80% 可能健康也可能已经饱和，区别就在队列。最后，四组指标要同时达标才算通过。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>常见误判：压出来的数字为什么会骗你</h2></div>
+  <p class="lead">这一节列的每一条都会让压测结果<b>偏乐观</b>——也就是让你以为容量比实际大。这不是巧合：凡是让被测系统更轻松的因素，都会伪装成「系统很强」。</p>
+  <table>
+    <tr><th style="width:180px">误判</th><th>现象</th><th>判断方法</th></tr>
+    <tr><td><b>压测机打满</b></td><td>RT 很高但服务端很闲；加并发吞吐不涨</td><td>看压测机 CPU、网络出带宽、TIME_WAIT 数量；<b>最硬的判据是加一台压测机</b>，如果吞吐明显上涨，说明之前是客户端瓶颈</td></tr>
+    <tr><td><b>连接数不够</b></td><td>吞吐卡在一个整数上不动（比如正好等于连接池大小除以 RT）</td><td>用第 2 节的公式反推：λ = 并发 / RT，看算出来的并发是否撞到某个上限（连接池、ulimit、端口范围）</td></tr>
+    <tr><td><b>缓存命中率失真</b></td><td>QPS 特别好看，但生产的慢查询数和 CPU 都对不上</td><td>压测必须记录命中率，并和生产的命中率对齐；数据集要大、分布要散</td></tr>
+    <tr><td><b>下游被 mock 掉</b></td><td>压测结果远好于线上真实表现</td><td>全链路压测：下游要么是真的，要么用影子实例；绝不能用「返回固定值」的 mock</td></tr>
+    <tr><td><b>预热不足</b></td><td>前几轮数据偏低，且越跑越好</td><td>每档先跑预热再计数；对比同档位跑两遍的结果，差异大说明预热不够</td></tr>
+    <tr><td><b>压测时长太短</b></td><td>没到稳态就取数；也漏掉了 GC、连接回收、日志轮转这类周期现象</td><td>每档至少跑到指标稳定；稳定性验证要跑数小时</td></tr>
+    <tr><td><b>环境与生产规格不一致</b></td><td>压测机是物理机、生产是容器且有限额；CPU 型号不同</td><td>对齐 CPU 型号、内存、容器 limits、网络；无法对齐时要在结论里写明折扣</td></tr>
+    <tr><td><b>流量分布与生产不一致</b></td><td>只压了主接口，忽略了占比小但很重的接口</td><td>按生产真实的接口配比构造流量；大促场景要模拟热点集中</td></tr>
+    <tr><td><b>只看服务端时间</b></td><td>服务端 RT 正常，客户端却在超时</td><td>以客户端视角的 RT 为准；服务端的统计往往不含排队、连接等待、网络传输</td></tr>
+    <tr><td><b>压测流量污染生产</b></td><td>生产监控被打乱、数据被写脏</td><td>压测流量打标，统计侧分流，写入走影子表；压测结束后核对数据</td></tr>
+  </table>
+  <p>第一条「压测机打满」值得单独展开，因为它是新手最常踩、也最容易得出荒谬结论的一条。原理很简单：<b>压测机也是一台机器，它要建连接、发包、收包、解析响应、计时</b>。当它自己到瓶颈时，你看到的「响应时间变长」其实是压测机排队造成的，跟被测系统无关。判断方法有三个，可靠性递增：看压测机的 CPU 是否接近饱和、看它的网络出带宽是否到上限、以及<b>最直接的办法——加一台压测机，看吞吐涨不涨</b>。第三个是唯一能给出确定答案的。</p>
+  <pre><span class="c"># 压测机侧的检查清单（发现 RT 异常时的第一步）</span>
+top                                  <span class="c"># CPU 是否打满（单核打满也算）</span>
+ss -s ; ss -tan state time-wait | wc -l   <span class="c"># TIME_WAIT 是否堆积（短连接场景）</span>
+sar -n DEV 1                         <span class="c"># 出带宽是否到网卡上限</span>
+ulimit -n                            <span class="c"># 文件描述符上限</span>
+cat /proc/sys/net/ipv4/ip_local_port_range   <span class="c"># 可用端口范围，决定并发连接上限</span>
+
+<span class="c"># 用长连接还是短连接？这直接决定上面哪些会成为瓶颈</span>
+<span class="c"># 生产是长连接（大多数 HTTP 客户端默认复用）就压长连接，反之亦然</span>
+<span class="c"># 用短连接压一个长连接系统，测出来的是 TCP 握手和端口回收的能力，不是业务能力</span></pre>
+  <div class="callout danger">
+    <b>最后一个、也是最贵的一个误判：拿压测值当生产容量。</b>压测环境里没有 GC 的极端停顿、没有邻居 Pod 抢 CPU、没有慢查询、没有下游抖动、没有流量的自然不均（负载均衡从来不是完全均匀的）。所以压测值和生产可承载值之间一定有一个折扣，这个折扣是多少<b>只能用线上长期数据反推</b>。做法是：先按保守折扣定容量，上线后持续记录「实际承载 QPS / 压测值」这个比值，跑几次之后你就有了自己的系数。<b>这个系数是你团队独有的资产，比任何公开基准都准。</b>
+  </div>
+  <p><b>面试怎么答：</b>「压测数字偏乐观是常态，我排查时按一张清单过：压测机有没有打满（最硬的判据是加一台压测机看吞吐涨不涨）、连接数和端口有没有撞上限、缓存命中率有没有和产线对齐、下游是不是被 mock 掉了、预热和稳态时间够不够、环境和产线规格是否一致、流量配比是否真实、以及是不是只看了服务端时间。最后一条最重要：压测值到生产值之间一定有折扣，这个系数要靠线上长期数据反推，不能照抄压测值。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>瓶颈定位：先分清是谁的问题，再找为什么</h2></div>
+  <p class="lead">压测到拐点之后，下一个问题是「先到顶的是什么」。定位的顺序比工具重要：<b>先分清是客户端、网络、还是服务端，再在服务端里分层往下走</b>。跳过第一步直接去查 CPU，是浪费时间最常见的方式。</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>第一步：客户端还是服务端？</b>加并发看吞吐涨不涨（第 2 节用法三），并检查压测机资源。客户端瓶颈的特征是「服务端资源很闲」。</div></div>
+    <div class="step"><div class="txt"><b>第二步：网络还是应用？</b>看带宽、重传率、连接数；看网关/负载均衡的排队和在途请求数。很多「应用慢」其实是网关在排队。</div></div>
+    <div class="step"><div class="txt"><b>第三步：应用层的哪一类资源？</b>CPU（计算）、锁（串行化）、线程池（并发上限）、连接池（下游并发上限）、GC（停顿）、IO（磁盘/网络）。</div></div>
+    <div class="step"><div class="txt"><b>第四步：还是下游？</b>看下游的 RT 分位数和错误率，以及<b>连接池等待时间</b>——等待时间往往不计入你的应用 RT，是隐藏的延迟来源。</div></div>
+    <div class="step"><div class="txt"><b>第五步：确认因果。</b>找到疑似瓶颈后做一次对照实验（调大它、或者去掉它），看吞吐是否真的提升。<b>相关性不等于因果，不验证就下结论是压测报告最大的水分来源。</b></div></div>
+  </div>
+  <p>第三步里那六类资源各有各的特征信号，整理成表比较好记。这套思路沿用业界常用的 USE 方法（对每一类资源看利用率 Utilization、饱和度 Saturation、错误 Errors，出自 Brendan Gregg 的性能分析方法论），它对「该看什么」这个问题给了一个不会漏项的框架：</p>
+  <table>
+    <tr><th style="width:120px">瓶颈</th><th>特征信号</th><th>怎么确认</th><th>常见修法</th></tr>
+    <tr><td><b>CPU</b></td><td>us 高；或 sy 高（系统调用、上下文切换多）；或 wa 高（在等 IO）</td><td>看 CPU 剖析（采样火焰图）；容器中还要看 cgroup 是否被节流（throttling）</td><td>优化热点代码、扩容、调大 CPU 限额</td></tr>
+    <tr><td><b>锁竞争</b></td><td>CPU 不高但吞吐上不去；线程大量处于阻塞态</td><td>连续多次线程转储，看是否大量线程等在同一把锁上</td><td>缩小锁粒度、改无锁结构、拆分热点</td></tr>
+    <tr><td><b>线程池</b></td><td>活跃线程满、队列持续不为 0</td><td>看活跃数与队列长度；队列不为 0 就是饱和的直接证据</td><td>调大池子（要同时看 CPU 是否跟得上）、或改为快速失败</td></tr>
+    <tr><td><b>连接池</b></td><td>等待获取连接的时间长；下游 RT 没变但本地 RT 涨</td><td>看池子的占用数与等待时间；用 λ = 并发/RT 反推是否撞到池子上限</td><td>调大池子（同时确认下游扛得住）、或隔离不同依赖的池子</td></tr>
+    <tr><td><b>GC / 内存</b></td><td>吞吐周期性跌落；延迟出现规律性尖刺</td><td>看 GC 日志的停顿时长与频率、内存趋势是否单调上升（泄漏）</td><td>调堆与收集器、减少临时对象；泄漏要修代码</td></tr>
+    <tr><td><b>IO / 网络</b></td><td>wa 高、磁盘 util 接近满、带宽到网卡上限、重传率高</td><td>iostat 的 await 与 util、网络重传与带宽</td><td>换更快的存储、批量化、压缩、减少无效传输</td></tr>
+    <tr><td><b>下游依赖</b></td><td>本服务资源都很闲，但 RT 很高</td><td>看下游的 RT 与错误率；必要时在链路两端同时埋点对比</td><td>超时与熔断、缓存、批量合并、让下游扩容</td></tr>
+  </table>
+  <pre><span class="c"># 一个实用的定位顺序（按「最快能排除什么」排）</span>
+1. 客户端：top / 网络带宽 / TIME_WAIT / 加一台压测机           <span class="c"># 一分钟排除</span>
+2. 入口：  网关的在途请求数、排队时间、5xx 与 429 的比例         <span class="c"># 区分限流与打挂</span>
+3. 应用：  线程池活跃/队列、连接池占用/等待、GC 停顿
+4. 系统：  CPU(us/sy/wa)、内存、磁盘 util、网络重传、容器节流
+5. 依赖：  下游 RT 分位、错误率、下游自己的资源水位
+6. 验证：  改一个变量，重跑一次，看吞吐是否真的变化
+
+<span class="c"># 火焰图/剖析是定位 CPU 与锁最快的方式，比反复猜参数有效得多</span>
+<span class="c"># 具体工具以你的语言与运行时为准（如 perf、async-profiler、pprof）</span></pre>
+  <div class="cmds">
+    <div class="crow"><code>ss -tan state time-wait | wc -l</code><span class="desc">压测机 TIME_WAIT 是否堆积，短连接压测的第一个瓶颈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>sar -n DEV 1</code><span class="desc">看压测机与被测机的出带宽是否接近网卡上限</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /proc/sys/net/ipv4/ip_local_port_range</code><span class="desc">可用端口范围，决定单机的最大并发连接数</span><button class="copy">复制</button></div>
+    <div class="crow"><code>ulimit -n</code><span class="desc">文件描述符上限，撞到它之后新建连接会直接失败</span><button class="copy">复制</button></div>
+    <div class="crow"><code>iostat -x 1</code><span class="desc">看 await 与 %util，判断磁盘是不是瓶颈</span><button class="copy">复制</button></div>
+    <div class="crow"><code>cat /sys/fs/cgroup/cpu.stat | grep throttled</code><span class="desc">容器是否被 CPU 限额节流（路径以你的 cgroup 版本为准）</span><button class="copy">复制</button></div>
+  </div>
+  <div class="callout ok">
+    <b>一条判断口诀：「吞吐看并发，延迟看排队，瓶颈看 saturation」。</b>吞吐上不去先查并发是不是被某个池子卡住；延迟变长先查队列（线程队列、连接等待、网络缓冲）；找瓶颈不看利用率百分比，看饱和度——<b>哪一项的队列在持续累积，哪一项就是瓶颈</b>。这条口诀能覆盖大多数压测现场，而且不需要任何高级工具。
+  </div>
+  <p><b>面试怎么答：</b>「我分五步：先分清是客户端还是服务端（加并发看吞吐涨不涨，并检查压测机），再看网络与网关有没有排队，然后在应用层按 CPU、锁、线程池、连接池、GC、IO 六类逐个看，再往下查依赖，最后改一个变量重跑验证因果。找瓶颈用 USE 思路，重点看饱和度而不是利用率——哪一项的队列在持续累积，哪一项就是瓶颈。连接池的等待时间特别容易漏，因为它常常不计入应用自己的 RT。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>弹性与预热：扩容不是瞬间的，新副本也不是满血的</h2></div>
+  <p class="lead">这是容量模型里最贵的一个隐藏项：<b>从「需要更多容量」到「新容量真的能扛流量」，中间有一段不短的时间；而新副本刚起来时，它的能力远低于稳态</b>。忽略这两点，你的容量表在峰值面前就是一张废纸。</p>
+  <pre>扩容的完整链路（每一段都要耗时，总时长必须自己量）
+
+  指标采集延迟 → 决策延迟（含稳定窗口）→ 改副本数 → 调度 →
+  → 拉镜像 → 容器启动 → 应用初始化 → 预热（JIT/连接池/缓存）→
+  → 通过 readiness → 进入 Endpoints → 上游规则同步 → 真正接到流量
+
+  如果节点不够，还要在最前面加一段：Cluster Autoscaler 创建节点 + 加入集群 + 拉镜像
+
+<span class="c"># 这段链路的总时长，才是「扩容响应时间」，它决定了你要预留多少余量</span></pre>
+  <table>
+    <tr><th style="width:150px">环节</th><th>耗时取决于</th><th>怎么压缩</th></tr>
+    <tr><td><b>采集与决策</b></td><td>指标采集间隔、稳定窗口、扩缩容策略</td><td>缩短采集间隔；扩容方向的稳定窗口可以设短（缩容要长，避免抖动）</td></tr>
+    <tr><td><b>调度与建节点</b></td><td>节点是否有余量；没有就要等云厂商创建</td><td><b>预留节点余量或低优先级占位 Pod</b>，让调度永远有地方放</td></tr>
+    <tr><td><b>拉镜像</b></td><td>镜像大小、仓库位置、节点本地是否已有该层</td><td>精简镜像、多架构/分层优化、节点预拉取</td></tr>
+    <tr><td><b>应用启动</b></td><td>类加载、配置拉取、依赖初始化</td><td>延迟初始化、配置本地缓存、并行化启动</td></tr>
+    <tr><td><b>预热</b></td><td>JIT 编译、连接池建立、本地缓存填充</td><td>见下面的四种手段</td></tr>
+  </table>
+  <p>冷启动为什么慢？因为它同时发生了三件事：<b>代码还是解释执行的</b>（没经过 JIT 编译和类加载优化，前一段请求明显更慢）；<b>连接池是空的</b>（每个下游都要新建连接，握手和认证都算在请求里）；<b>本地缓存是空的</b>（每次都穿透到数据库，既慢又可能在峰值时把数据库打穿——这就是缓存击穿）。三者叠加的结果，是<b>新副本在刚接流量的那段时间里，能力远低于稳态，而且它自己还会给下游制造额外压力</b>。</p>
+  <p>对应的四种预热手段，按可靠性排：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>就绪前预热</b>：在 readiness 通过之前，先用脚本或应用自身逻辑打一批预热请求（触发 JIT、建立连接池、填充本地缓存）。代价是启动变慢，但换来的是「接流量时已经是满血的」。</div></div>
+    <div class="step"><div class="txt"><b>慢启动（warmup）</b>：让新副本在一段时间内只承接少量流量，逐步升到全量。这既可以用服务端的负载均衡权重实现，也可以靠网关的分批放量。它解决的是「新副本被瞬间打满」。</div></div>
+    <div class="step"><div class="txt"><b>连接池预热</b>：启动时就建立并保活到下游的连接，而不是等第一个请求来。这条成本最低、收益最直接。</div></div>
+    <div class="step"><div class="txt"><b>预留余量</b>：用最低副本数（minReplicas）保证常态就有一批热着的实例，让扩容只需要补增量。<b>这是最简单也最贵的办法，但对核心链路往往值得。</b></div></div>
+  </div>
+  <pre><span class="c"># 压测里的两种能力要分开测，别混成一个数</span>
+稳态能力 = 跑了一段时间的副本在 SLO 约束下的 QPS         <span class="c"># 用于常态容量</span>
+冷启动能力 = 副本从启动到达到稳态能力所需的时间与期间的 QPS  <span class="c"># 用于扩容场景</span>
+
+<span class="c"># 弹性验证压测的做法：阶跃加压</span>
+<span class="c">#   1. 稳态跑在较低水位（比如目标峰值的 30%）</span>
+<span class="c">#   2. 瞬间把负载阶跃到目标峰值</span>
+<span class="c">#   3. 记录：多久开始扩容、多久新副本 Ready、期间 P99 峰值、错误率峰值、多久恢复到 SLO</span>
+<span class="c"># 这组数字才是「我们能不能扛住突发流量」的答案，比任何稳态压测都有说服力</span>
+
+<span class="c"># 还要测一次缩容：缩得太快会在流量回落再抬升时把热实例删掉</span></pre>
+  <div class="callout warn">
+    <b>扩容是「用余量换时间」。</b>既然扩容链路要花时间，那么这段时间里的流量只能靠已经存在的容量扛——所以<b>预留余量不是浪费，是购买扩容的时间</b>。具体预留多少，取决于「扩容响应时间」和「峰值到来的速度」：如果流量是缓坡（几分钟涨上来），扩容能跟上，余量可以少一点；如果是阶跃（秒杀开场一瞬间到顶），扩容必然来不及，余量必须一次给足。<b>判断你的业务属于哪种，比调任何扩缩容参数都重要。</b>
+  </div>
+  <p><b>面试怎么答：</b>「容量模型里必须算上扩容空窗期。扩容链路是采集、决策、调度、拉镜像、启动、预热、规则同步，节点不够还要先建节点，总时长要自己量。而且新副本是冷的：JIT 没编译、连接池没建立、本地缓存是空的，能力低于稳态，还可能把下游打穿。应对是就绪前预热、慢启动、连接池预热、以及用最低副本数预留一批热实例。做法上我把稳态能力和冷启动能力分开测，弹性用阶跃加压来验证——记录多久开始扩容、多久 Ready、期间 P99 峰值是多少。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>容量复盘与预测：把「这次」变成「下次」</h2></div>
+  <p class="lead">大促前的容量准备，本质是一次预测；而预测的准确性只能靠上一次的复盘来提高。所以这一节的方法论只有一句：<b>每次活动结束都要写一份「预估 vs 实际」的对照，并把偏差归因</b>。</p>
+  <table>
+    <tr><th style="width:150px">阶段</th><th>做什么</th><th>产出</th></tr>
+    <tr><td><b>基线</b></td><td>记录当前单副本能力、拐点并发、各资源水位、缓存命中率</td><td>一张容量台账（第 1 节那个表）</td></tr>
+    <tr><td><b>预测</b></td><td>峰值 = 日常峰值 × 放大系数（系数来自历史同类活动实测），再叠加业务方预估</td><td>一个峰值 QPS 区间，不是一个点</td></tr>
+    <tr><td><b>换算</b></td><td>按第 1 节的模型把 QPS 换成副本数、连接数、缓存容量</td><td>各层的容量需求表</td></tr>
+    <tr><td><b>验证</b></td><td>全链路压测，按预测峰值跑，并做一次阶跃弹性验证</td><td>通过/不通过 + 瓶颈清单</td></tr>
+    <tr><td><b>预案</b></td><td>限流阈值、降级开关、扩容预案、回滚方案</td><td>一份可执行的操作手册</td></tr>
+    <tr><td><b>复盘</b></td><td>预估 vs 实际的偏差与归因</td><td>修正后的系数和台账</td></tr>
+  </table>
+  <p>预测这一步要坦白一个事实：<b>任何峰值预测都有误差，而且误差往往是几十个百分点，不是百分之几</b>。承认这一点之后，正确的做法不是「把预测做得更准」，而是<b>「把误差用预案兜住」</b>——也就是提前定好：如果实际流量是预估的 1.5 倍，第一步做什么（限流阈值开到多少、降级哪个功能、要不要紧急扩容）。<b>预案的价值在预测失效时才体现，所以它是必需品而不是可选项。</b></p>
+  <pre><span class="c"># 容量复盘表（每次活动后必填，这张表会越用越准）</span>
+项目            预估        实际        偏差        归因                     下次怎么改
+峰值 QPS        （数）      （数）      +x%        某渠道流量超出预期        找业务方提前对齐渠道计划
+应用层 P99      （数）      （数）      +x ms      缓存命中率比压测低 x%     压测数据分布要对齐
+数据库 QPS      （数）      （数）      +x%        新增了一个查询未纳入模型   容量台账要随需求更新
+扩容触发次数    （数）      （数）      —          扩容响应 x 分钟，慢在拉镜像  镜像瘦身 + 节点预热
+限流是否触发    否          是          —          阈值按旧容量定的           阈值随容量台账同步更新
+
+<span class="c"># 关键不是「填完」，是「归因」那一列：写不出归因的偏差，下次还会再来一遍</span></pre>
+  <p>还有一个容易被忽略的更新时机：<b>容量台账要随需求变化更新，不是只在活动前更新</b>。一个新的查询、一个新的下游调用、一次缓存结构调整，都会改变单副本能力。如果台账一年只在压测时更新一次，那它中间有十个月是错的。实用的做法是把它挂在变更流程上：<b>凡是新增下游依赖、新增重查询、调整缓存结构的变更，都要标注「需重新压测」</b>。</p>
+  <div class="callout ok">
+    <b>一套能直接用的活动前检查清单：</b>① 容量台账是最近一次压测更新的，且覆盖了所有核心接口；② 全链路压测按预测峰值跑通，四组指标同时达标；③ 阶跃加压验证过扩容能在可接受时间内到位；④ 限流阈值按最新单副本能力算过，且写在配置里而不是脑子里；⑤ 降级开关逐个演练过（打开、观察、关闭）；⑥ 监控看板包含：QPS、P99、错误率、饱和度、下游 RT、缓存命中率；⑦ 值班表和升级路径明确；⑧ 「如果实际流量是预估的 1.5 倍」的预案有人演练过。八条缺一条，都建议推迟活动或降低预期。
+  </div>
+  <p><b>面试怎么答：</b>「我按基线、预测、换算、验证、预案、复盘六步走。预测峰值用日常峰值乘放大系数，系数来自历史同类活动的实测倍数，而且我给的永远是区间不是点。因为预测一定有误差，所以预案是必需的：限流阈值、降级开关、紧急扩容都要提前定好并演练过。活动后必填一张『预估 vs 实际』对照表，重点是归因那一列。另外容量台账要随变更更新——新增依赖、新增重查询、改缓存结构都要触发重新压测，不能只在活动前更新一次。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>面试话术：给一套能写在白板上的估算</h2></div>
+  <p class="lead">面试官问「多少台够」，他要的不是数字，是<b>一条能被追问到底的推导链</b>。下面这套模板可以直接背，但里面的数字必须用你自己的压测结果替换——<b>背数字会露馅，背推导不会</b>。</p>
+  <pre>第一步：先确认约束（这一步最能体现专业度，别忘了）
+  「峰值 QPS 是多少？延迟目标（P99）是多少？错误率能接受多少？
+    要不要扛住一个可用区失效？流量是缓坡还是阶跃？」
+
+第二步：给单副本能力，并说明它是在什么约束下测出来的
+  「单副本在 P99 ≤ 100ms、错误率 ≤ 0.1% 的前提下能扛 C QPS
+    （C 来自我们最近一次全链路压测，用阶梯加压法测的，拐点在并发 X）」
+
+第三步：加安全系数
+  「线上取 Q = C × k，因为压测环境比生产干净。
+    k 是我们用线上长期数据反推的（实际承载 / 压测值），目前是 …」
+
+第四步：算副本数，叠加可用区冗余
+  「基础 N = ceil(峰值 / Q)；3 个可用区要求扛住 1 个区失效，
+    所以 N = ceil(峰值 / Q × 3 / 2)；再留出至少一个节点的余量。」
+
+第五步：用并发验算一遍（这一步是加分项，用上小定律）
+  「验算：峰值 λ、RT 目标 W，则稳态并发 L = λ × W。
+    要求线程池和连接池都大于 L / 副本数，否则副本数够了也跑不到那个 QPS。」
+
+第六步：补上扩容空窗期
+  「我们量过扩容链路是 T 分钟，峰值是阶跃式的，
+    所以还要有 minReplicas 保底，让常态就有一批热实例。」
+
+第七步：说误差在哪（这一段决定可信度）
+  「误差主要来自三处：峰值预测本身、压测值与生产的折扣系数、
+    以及缓存命中率波动。所以预案是：限流阈值按当前容量设，
+    降级开关演练过，并且定义了『流量超预估 50%』时的第一步动作。」</pre>
+  <table>
+    <tr><th style="width:230px">追问</th><th>一句话回答</th></tr>
+    <tr><td>并发、吞吐、响应时间什么关系</td><td>L = λ × W，稳态并发等于吞吐乘平均响应时间；单位要一致</td></tr>
+    <tr><td>拐点是什么</td><td>吞吐不再随并发增长、而延迟开始超线性上升的那个并发值；容量要定在它左边</td></tr>
+    <tr><td>怎么知道压测机没打满</td><td>加一台压测机，吞吐如果明显上涨，说明之前是客户端瓶颈</td></tr>
+    <tr><td>为什么压测值和线上不一样</td><td>压测环境没有 GC 极端停顿、邻居抢 CPU、慢查询、流量不均；折扣系数要线上反推</td></tr>
+    <tr><td>扩了容为什么还是超时</td><td>扩容有链路延迟，且新副本是冷的（JIT、连接池、缓存空）；要预热和预留</td></tr>
+    <tr><td>P99 怎么算才对</td><td>在采集侧按直方图分桶聚合，不能对多个实例的 P99 取平均</td></tr>
+  </table>
+  <p>如果面试官让你「现场算一个」，给一个可复用的速算方法：<b>先估单副本能力（要给约束），再用峰值除，最后乘冗余系数（可用区）和倒数安全系数</b>。全程把假设说出口（「我假设 P99 目标是 100 毫秒」「我假设 3 个可用区扛 1 个区失效」），因为<b>面试考的是你能不能把假设摆出来，而不是心算能力</b>。算完之后主动补一句「这个数字还要用并发验算一遍，并且要留出扩容空窗期的余量」，基本就到位了。</p>
+  <div class="callout">
+    <b>绝对不要做的事：引用别人文章里的基准数字。</b>「某某框架能扛 5 万 QPS」「加了某组件性能提升 40%」——这类数字脱离了请求大小、依赖链路、硬件和数据分布，毫无意义，而且很容易被追问到答不上来。正确的说法永远是：<b>「这个数字我没有，我们自己的压测结果是 X，它是在什么条件下测的」</b>。承认没有公开基准，比编一个数字安全得多，也更可信。
+  </div>
+  <p><b>面试怎么答：</b>「我不会直接给数字，先确认四个约束：峰值 QPS、P99 目标、错误率容忍、要不要扛可用区失效。然后按『单副本能力（带约束）→ 安全系数 → 基础副本数 → 可用区冗余 → 节点余量』推，再用小定律 L = λ × W 验算并发是否够，最后补上扩容空窗期的余量。收尾我会主动说误差来自哪三处，以及对应的预案。所有数字都来自我们自己的压测，我不引用公开基准。」</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">模块 10</span><h2>10 个坑：几乎全部都让结论偏乐观</h2></div>
+  <p class="lead">这一节的坑有一个统一的偏向：<b>它们都会让你高估容量</b>。这不是巧合——凡是让被测系统更轻松的因素，都会伪装成「系统很强」。所以看到一份特别漂亮的压测报告时，先怀疑，再高兴。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">只看 QPS 不看 P99 和错误率</div><div class="pd">吞吐达标但用户已经在排队等 3 秒，或者每 20 个请求就有 1 个超时。通过标准必须三条同时满足：吞吐、P99、错误率。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">把压测上限当成生产容量</div><div class="pd">压测环境没有 GC 极端停顿、邻居抢 CPU、慢查询、流量不均。压测值到生产值有折扣，系数必须用线上长期数据反推。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">压测机自己打满了还在加压</div><div class="pd">RT 变长其实是压测机在排队。判据是加一台压测机看吞吐涨不涨，同时检查压测机的 CPU、出带宽和 TIME_WAIT。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">缓存命中率没和产线对齐</div><div class="pd">数据集小、key 集中会让命中率虚高，测出来的 QPS 全是缓存的功劳。压测必须记录命中率，并调到与生产一致。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">下游被 mock 掉</div><div class="pd">你压的是自己那一段，不是整条链路。全链路压测的下游要么是真的，要么是影子实例，绝不能返回固定值。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">拿拐点当容量上限</div><div class="pd">拐点是「从这里开始变坏」的位置，不是「可以跑到这里」。生产容量要定在拐点左边的安全区，具体留多少由你的 SLO 和曲线形状决定。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">对多个实例的 P99 取平均</div><div class="pd">分位数不能这样合并，结果在数学上没有意义。要在采集侧按直方图分桶聚合，再用分位函数查询。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">没算可用区失效后的剩余容量</div><div class="pd">3 个区均分，1 个区没了容量就剩 2/3，而扩容来不及。要求的冗余要提前乘进副本数里，不是等故障再补。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">把扩容当成瞬时生效</div><div class="pd">采集、决策、调度、拉镜像、启动、预热、规则同步，节点不够还要先建节点。这段空窗期只能靠预留余量顶。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">压测只在活动前做一次，台账不再更新</div><div class="pd">新增依赖、新增重查询、改缓存结构都会改变单副本能力。台账要挂在变更流程上，标注哪些变更触发重新压测。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个带数字的讲。比如「我们压测单副本能扛 1200 QPS，就按 1200 定了容量，结果线上 800 就开始排队。查下来是两个原因叠加：压测数据集太小，缓存命中率 96%，而生产只有 75%；另外压测下游用的是影子实例，比真实链路快。后来我们把命中率作为压测必记录指标，要求对齐生产，并用线上长期数据反推出一个折扣系数写进容量表。现在定容量用的是压测值乘这个系数，误差小多了。」有现象、有误判、有量化修正，比背十条坑有用。</p>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 一个服务稳态吞吐 2000 QPS、平均响应时间 100 毫秒。按小定律，系统内平均有多少个请求？</div>
+      <button class="opt">20 个</button>
+      <button class="opt">100 个</button>
+      <button class="opt">200 个</button>
+      <button class="opt">2000 个</button>
+      <div class="ans">正确答案：<b>200 个</b>。小定律 L = λ × W，单位要一致：λ = 2000/秒，W = 100ms = 0.1 秒，L = 2000 × 0.1 = 200。这意味着稳态下有 200 个请求同时在系统里，线程池、连接池和压测机的并发数都必须大于这个量级，否则吞吐根本达不到 2000。反过来用也一样：并发上限 50、RT 变成 2 秒时，吞吐上限就只有 25 QPS。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. 「拐点」指的是什么？</div>
+      <button class="opt">系统彻底崩溃、错误率达到 100% 的那个负载点</button>
+      <button class="opt">吞吐不再随并发明显增长、而延迟开始超线性上升的那个并发值</button>
+      <button class="opt">CPU 利用率达到 100% 的时刻</button>
+      <button class="opt">压测机被压垮的那个点</button>
+      <div class="ans">正确答案：<b>吞吐曲线变平、延迟曲线变陡的那个并发值</b>。它的实用价值在于判断容量该定在哪：生产容量应该定在拐点左边的安全区，而不是拐点上，更不是峰值上。判断方法也很简单——加压时如果增加并发而吞吐不再涨、RT 线性上涨，就说明已经过拐点了。另外要注意排队不增加吞吐只增加延迟，所以把队列调大并不能提高容量。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. 压测时 RT 很高，但服务端 CPU 很闲、队列也不长。最应该先怀疑什么？</div>
+      <button class="opt">服务端的 CPU 统计有问题</button>
+      <button class="opt">下游数据库慢了，一定是数据库瓶颈</button>
+      <button class="opt">压测时长不够，再跑久一点就好了</button>
+      <button class="opt">压测机自己到瓶颈了；最硬的判据是加一台压测机，看吞吐是否明显上涨</button>
+      <div class="ans">正确答案：<b>先怀疑压测机</b>。服务端资源很闲而 RT 很高，是客户端瓶颈的典型特征。判断方法有三个：看压测机的 CPU、看出带宽、看 TIME_WAIT 是否堆积；但最能给出确定答案的是「加一台压测机」——吞吐如果明显上涨，说明之前就是客户端瓶颈。另外还要检查连接池上限、文件描述符上限和可用端口范围是否撞顶。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 关于分位数（P99），下面哪个做法是正确的？</div>
+      <button class="opt">在采集侧按直方图分桶聚合原始样本，再用分位函数查询</button>
+      <button class="opt">先算每个实例的 P99，再对所有实例的 P99 取算术平均</button>
+      <button class="opt">用所有请求响应时间的算术平均值代替 P99</button>
+      <button class="opt">把 P99 和 P50 相加除以 2</button>
+      <div class="ans">正确答案：<b>在采集侧按直方图分桶聚合</b>。分位数不能跨实例取平均：两个实例各自 P99 是 100ms，合并后的 P99 可能是 100ms 也可能是 180ms，取决于分布形状，取平均在数学上不成立。平均值更不能替代 P99，因为它会把长尾完全掩盖掉——这正是「平均响应时间正常但用户投诉很慢」的原因。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 3 个可用区均分部署，要求扛住 1 个可用区失效；峰值 3000 QPS，单副本配额 500 QPS。副本数至少应为？</div>
+      <button class="opt">6 个</button>
+      <button class="opt">8 个</button>
+      <button class="opt">9 个</button>
+      <button class="opt">12 个</button>
+      <div class="ans">正确答案：<b>9 个</b>。基础副本数是 3000 ÷ 500 = 6；3 个区均分、要扛住 1 个区失效，剩余 2 个区必须能扛下全部峰值，所以需要 3000 ÷ 500 × 3 ÷ 2 = 9。多出来的 3 个不是浪费，是「一个区没了还能扛住」的价格。很多团队只按 6 算，然后在可用区故障时发现容量只剩三分之二，而扩容是来不及的。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 大促前把容量扩到三倍，0 点仍然大量超时。最可能的原因是？</div>
+      <button class="opt">扩得还不够多，应该扩十倍</button>
+      <button class="opt">新副本是冷的：JIT 未编译、连接池未建立、本地缓存为空，能力远低于稳态，且扩容本身有链路延迟</button>
+      <button class="opt">压测工具不准，换一个工具就好</button>
+      <button class="opt">0 点的流量一定是预估错了</button>
+      <div class="ans">正确答案：<b>冷启动 + 扩容延迟</b>。扩容链路包含采集、决策、调度、拉镜像、启动、预热、规则同步，节点不够还要先建节点，这段时间内流量只能靠已有容量扛；而且新副本在刚接流量时能力低于稳态，空缓存还会造成缓存击穿、把数据库打穿。应对是就绪前预热、慢启动、连接池预热，以及用最低副本数预留一批热实例；压测时要把稳态能力和冷启动能力分开测，弹性用阶跃加压验证。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:210px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>小定律（Little's Law）</b></td><td>L = λ × W：稳态并发 = 吞吐 × 平均响应时间，单位要一致</td></tr>
+    <tr><td><b>拐点</b></td><td>吞吐不再随并发增长、延迟开始超线性上升的并发值；容量定在它左边</td></tr>
+    <tr><td><b>单副本能力 C</b></td><td>在 P99 与错误率约束下，单副本能稳定承载的 QPS</td></tr>
+    <tr><td><b>安全系数</b></td><td>压测值到生产可承载值的折扣，必须用线上长期数据反推</td></tr>
+    <tr><td><b>可用区冗余</b></td><td>要求扛住 k 个区中的 m 个失效时的容量放大倍数</td></tr>
+    <tr><td><b>饱和度</b></td><td>队列长度、等待时间等「已经在排队」的信号，比利用率百分比更可靠</td></tr>
+    <tr><td><b>USE 方法</b></td><td>对每类资源看利用率、饱和度、错误，是定位瓶颈的通用框架</td></tr>
+    <tr><td><b>阶梯加压</b></td><td>并发逐档翻倍、每档跑到稳态再取数的加压方式，用来画完整曲线</td></tr>
+    <tr><td><b>阶跃加压</b></td><td>负载瞬间拉到峰值，用来验证扩容响应与冷启动能力</td></tr>
+    <tr><td><b>稳态 / 冷启动能力</b></td><td>前者用于常态容量，后者用于扩容场景，两者要分开测</td></tr>
+    <tr><td><b>缓存击穿</b></td><td>新副本本地缓存为空、请求直接打到数据库，是冷启动期的典型风险</td></tr>
+    <tr><td><b>预热 / 慢启动</b></td><td>就绪前先打预热请求 / 新副本先承接少量流量再逐步放量</td></tr>
+    <tr><td><b>影子流量 / 打标</b></td><td>生产压测时给压测流量加标记，隔离数据写入与统计口径</td></tr>
+    <tr><td><b>容量台账</b></td><td>记录各层单副本能力、峰值、副本数与瓶颈资源，随变更更新</td></tr>
+    <tr><td><b>预估 vs 实际复盘</b></td><td>活动后的偏差对照表，价值全在「归因」那一列</td></tr>
+    <tr><td><b>峰值放大系数</b></td><td>大促峰值相对日常峰值的倍数，只来自历史同类活动实测</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 挑一个你最熟的接口，用阶梯加压法从低并发一路压到 P99 超标，把每一档的吞吐、P50/P95/P99、错误率、队列长度记成一张表，然后画出两条曲线，标出拐点——这是你第一次真正拥有「自己的数字」。② 用同一个接口做一次阶跃加压，记录多久开始扩容、多久新副本 Ready、期间的 P99 峰值，你会对「扩容不是瞬时的」有切身体感。③ 把小定律用一次：拿你的目标 QPS 和 P99 目标算一下稳态并发，再去核对线程池和连接池的上限，看看是不是早就撞上了。<br><br>
+    <b>之后值得单独学：</b>第 32 期讲限流熔断降级，那篇里的阈值就是本篇算出来的容量换算成的保护值，两篇要连着看；第 44 期讲混沌工程，压测回答「能扛多少」、混沌回答「坏了会怎样」，配套才是完整的可靠性论证；第 13 期讲调度与扩缩容，本篇说的「扩容链路耗时」就是那一篇的 HPA、调度、镜像拉取这几段时间之和。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 45 期 · 问「多少台够」时，考的是你怎么得到这个数字、以及你知不知道误差在哪</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>

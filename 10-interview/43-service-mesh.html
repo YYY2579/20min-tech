@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>服务网格与流量治理面试：Istio 到底解决了什么</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1A1A18; --muted:#6B6B66; --faint:#9A9A93;
+  --line:#E4E3DE; --accent:#185FA5; --accent-soft:#E6F1FB;
+  --ok:#0F6E56; --ok-soft:#E1F5EE; --warn:#854F0B; --warn-soft:#FAEEDA;
+  --danger:#A32D2D; --danger-soft:#FCEBEB; --violet:#534AB7; --violet-soft:#EEEDFE;
+  --code:#F1EFE8; --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+code,pre,.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace}
+#bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:99;transition:width .1s linear}
+header{background:var(--card);border-bottom:1px solid var(--line);padding:44px 24px 34px}
+.wrap{max-width:900px;margin:0 auto;padding:0 24px}
+.serie{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.5px;color:var(--violet);background:var(--violet-soft);padding:3px 11px;border-radius:999px;margin-bottom:14px}
+.density{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.chip{font-size:12px;color:var(--muted);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:3px 11px}
+.chip b{color:var(--accent);font-weight:600}
+h1{font-size:29px;font-weight:600;letter-spacing:-.4px;line-height:1.3}
+.sub{color:var(--muted);margin-top:10px;font-size:15px}
+.sub b{color:var(--ink);font-weight:500}
+.timerbox{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:24px;padding:16px 20px;background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+#clock{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--accent);min-width:118px}
+#clock.done{color:var(--danger)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 16px;border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{opacity:.88;color:#fff}
+.timerhint{font-size:13px;color:var(--faint);flex:1;min-width:180px}
+main{padding:36px 0 80px}
+section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:28px 30px;margin-bottom:20px}
+.shead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.mins{font-size:12px;font-weight:600;padding:3px 11px;border-radius:999px;background:var(--accent-soft);color:var(--accent);letter-spacing:.3px;white-space:nowrap}
+h2{font-size:20px;font-weight:600;letter-spacing:-.2px}
+h3{font-size:15px;font-weight:600;margin:22px 0 8px}
+h3:first-of-type{margin-top:16px}
+h4{font-size:14px;font-weight:600;margin:16px 0 4px;color:var(--muted)}
+p{color:#3A3A36;margin-top:10px}
+p.lead{color:var(--muted)}
+ul,ol{margin:10px 0 0 20px;color:#3A3A36}
+li{margin:6px 0}
+li::marker{color:var(--faint)}
+strong{font-weight:600;color:var(--ink)}
+.k{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#7A3E00}
+pre{background:#2C2C2A;color:#E8E6E1;padding:14px 16px;border-radius:10px;overflow-x:auto;font-size:13px;line-height:1.65;margin-top:12px}
+pre .c{color:#8A8A82}
+pre .g{color:#9FE1CB}
+pre .y{color:#FAC775}
+pre .b{color:#85B7EB}
+pre .r{color:#F09595}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 16px;border-radius:0 8px 8px 0;margin-top:16px;font-size:14px;color:#0C447C}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft);color:#412402}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.callout.danger{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.callout b{font-weight:600}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;table-layout:fixed}
+th{text-align:left;font-weight:600;font-size:13px;color:var(--muted);padding:9px 12px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:#3A3A36}
+tr:last-child td{border-bottom:none}
+td.f{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:#7A3E00;word-break:break-all}
+.cmds{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:9px;flex-wrap:wrap}
+.crow code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:3px 8px;font-size:13px;color:#7A3E00;white-space:nowrap;overflow-x:auto;max-width:100%}
+.crow .desc{font-size:13.5px;color:var(--muted);flex:1;min-width:150px}
+.copy{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);font-family:inherit}
+.copy:hover{border-color:var(--accent);color:var(--accent)}
+.copy.ok{border-color:var(--ok);color:var(--ok)}
+.steps{counter-reset:s;margin-top:14px}
+.step{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.step:last-child{border-bottom:none}
+.step::before{counter-increment:s;content:counter(s);flex:0 0 26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.step .txt{flex:1;font-size:14.5px;color:#3A3A36}
+.step .txt b{color:var(--ink)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:14px}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.card .ct{font-size:14px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
+.card .cd{font-size:13.5px;color:var(--muted);line-height:1.6}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.quiz{margin-top:14px}
+.q{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.q .qt{font-size:14.5px;font-weight:600;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;border:1px solid var(--line);background:var(--card);border-radius:8px;font-size:14px;cursor:pointer;font-family:inherit;color:#3A3A36;transition:.15s}
+.opt:hover{border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);color:#04342C}
+.opt.wrong{border-color:var(--danger);background:var(--danger-soft);color:#501313}
+.ans{font-size:13.5px;color:var(--muted);margin-top:8px;display:none}
+.ans.show{display:block}
+.pit{display:flex;gap:14px;padding:14px 0;border-bottom:1px dashed var(--line)}
+.pit:last-child{border-bottom:none}
+.pit .num{flex:0 0 28px;height:28px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pit .pb{flex:1}
+.pit .pt{font-size:14.5px;font-weight:600}
+.pit .pd{font-size:13.5px;color:var(--muted);margin-top:3px}
+footer{text-align:center;color:var(--faint);font-size:13px;padding:0 24px 50px}
+@media(max-width:600px){
+  h1{font-size:23px} section{padding:22px 18px} header{padding:32px 0 26px}
+  .wrap{padding:0 16px} table{font-size:13px;table-layout:auto}
+  th,td{padding:8px 8px}
+}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div style="max-width:900px;margin:14px auto 0;padding:0 24px;font-size:13px">
+  <a href="index.html" style="color:#185FA5;text-decoration:none">← 求职冲刺专栏首页</a>
+  <span style="color:#9A9A93;margin:0 8px">·</span>
+  <a href="../index.html" style="color:#6B6B66;text-decoration:none">20分钟速学站点首页</a>
+</div>
+
+<header>
+  <div class="wrap">
+    <span class="serie">20 分钟速学 · 求职冲刺专栏 · 第 43 期</span>
+    <h1>服务网格与流量治理面试：Istio 到底解决了什么</h1>
+    <p class="sub">说「为了可观测性上 Istio」会被追问：<b>那用 SDK 不行吗</b>。</p>
+    <div class="density">
+      <span class="chip">覆盖 <b>8</b> 大模块</span>
+      <span class="chip"><b>12</b> 个考点</span>
+      <span class="chip"><b>10</b> 个坑</span>
+      <span class="chip"><b>6</b> 道自测</span>
+    </div>
+    <div class="timerbox">
+      <div id="clock">20:00</div>
+      <button class="btn primary" id="start">开始计时</button>
+      <button class="btn" id="reset">重置</button>
+      <span class="timerhint" id="hint">读之前先答一句：业务容器的流量，是怎么跑到 Envoy 里去的，你画得出来吗？</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="s0">
+  <div class="shead"><span class="mins">开始前</span><h2>三个现场：都发生在「已经接进去了」之后</h2></div>
+  <p class="lead">「上了 Istio 之后 P99 涨了一截，老板问这钱花在哪了。」「mTLS 一开 STRICT，定时任务和健康检查全挂。」「灰度配了 10%，结果新版本吃了九成流量。」这三件事的共同点是：<b>接入本身没失败，出问题的是「你以为网格替你做的事，它其实只是提供了一个做这件事的地方」</b>。</p>
+  <table>
+    <tr><th style="width:200px">现场</th><th style="width:170px">直觉答案</th><th>真实原因</th></tr>
+    <tr><td>接入后 P99 上涨，业务代码一行没改</td><td>Envoy 性能不行，不该上网格</td><td>每个请求多了两跳用户态代理（出站一跳、入站一跳），还要过一次 iptables NAT。涨多少没有通用数字，<b>只能你自己压测前后对比</b></td></tr>
+    <tr><td>把 mTLS 改成 STRICT，一批调用立刻 503</td><td>证书签发坏了</td><td>STRICT 要求对端也必须是网格身份。没注入 sidecar 的调用方（CronJob、外部系统、监控系统、kubelet 探针）被直接拒绝，跟证书对不对没关系</td></tr>
+    <tr><td>灰度配了 10% 权重，新版本却吃了全量</td><td>权重字段没生效，Istio 有 bug</td><td>VirtualService 里引用的 subset 在 DestinationRule 中不存在，规则被判为无效，Envoy 落回默认路由的 100%。<b>配置不报错，只是静默失效</b></td></tr>
+  </table>
+  <div class="cards">
+    <div class="card"><div class="ct"><span class="dot" style="background:#185FA5"></span>控制面不碰包</div><div class="cd">istiod 只负责算配置、发证书、做校验。它挂了，已经在跑的流量不受影响，但新配置推不下去、新 Pod 拿不到证书。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#0F6E56"></span>数据面不是「一个代理」</div><div class="cd">Envoy sidecar 加 iptables 规则加证书轮换，三件事一起才构成「零代码改造」。少讲任何一个，面试都会被追问到断。</div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:#854F0B"></span>治理能力来自配置</div><div class="cd">网格给你的是「能配」和「配了全集群生效」，不给你「该配多少」。超时、重试、熔断的取值还得靠压测和 SLO。</div></div>
+  </div>
+  <p>这一篇按「网格到底搬走了什么 → 架构是什么 → 流量怎么被劫持 → 能配什么 → mTLS 怎么落地 → 代价是什么 → 什么情况下别上 → 面试怎么讲」走。前两节回答「为什么需要它」，中间三节是技术主体，最后三节是面试里真正拉开差距的部分——<b>能讲清代价和放弃条件的人，比能背下六个 CRD 的人值钱</b>。</p>
+  <div class="callout">
+    <b>先把一句话记住：</b>Istio 卖的不是「灰度」「mTLS」「指标」这三个功能——这些用 SDK 也能做。它卖的是<b>把这些能力从应用代码里搬出来，变成一份可以集中管理、集中审计、自动轮换、语言无关的配置</b>。判断该不该上，就看这个「搬出来」的动作对你值多少钱。
+  </div>
+  <p><b>面试怎么答：</b>「服务网格解决的是三件事的归属问题：流量治理、安全身份、可观测埋点，原本都写在应用代码里，每种语言要写一遍、每次升级要发一次版。网格把它们挪到 sidecar 里，用配置下发。代价是每个请求多两跳代理、每个 Pod 多一份资源开销、多一个要维护的控制面。所以它不是功能问题，是成本交换问题。」</p>
+</section>
+
+<section id="s1">
+  <div class="shead"><span class="mins">模块 1</span><h2>网格要解决的三件事：治理、安全、可观测</h2></div>
+  <p class="lead">「服务网格解决流量治理、安全、可观测」这句话人人会背，但面试官追问的是下一句：<b>这三件事原本是怎么做的，搬走之后好在哪</b>。答不出「原本怎么做」，这句话就只是口号。</p>
+  <table>
+    <tr><th style="width:130px">能力</th><th>SDK 时代怎么做</th><th>网格里怎么做</th><th>搬走之后真正的变化</th></tr>
+    <tr><td><b>流量治理</b></td><td>在代码里写超时、重试、熔断；灰度靠网关或注册中心权重</td><td>VirtualService / DestinationRule 声明，xDS 下发给 Envoy</td><td>改策略不用发版；多语言行为一致；故障注入能力变成配置开关</td></tr>
+    <tr><td><b>安全</b></td><td>自己做 TLS、自己管证书、自己解析调用方身份</td><td>PeerAuthentication 定 mTLS 模式，istiod 签发并按 SPIFFE ID 标识身份，AuthorizationPolicy 做授权</td><td>证书自动轮换，身份从「IP + 端口」变成「ServiceAccount」；授权策略可以集中审计</td></tr>
+    <tr><td><b>可观测</b></td><td>每个服务引一套埋点库，自己打指标、传 trace header</td><td>流量必经 sidecar，L7 指标、访问日志、trace 由 Envoy 统一产出</td><td>埋点不依赖应用配合，跨语言口径统一；代价是 header 传递和采样策略仍要你定</td></tr>
+  </table>
+  <p>注意第三行里我写的「代价」：<b>网格不会自动给你分布式追踪</b>。Envoy 能生成 span、能透传 <span class="k">x-request-id</span>、<span class="k">traceparent</span> 这类头，但应用自身内部的 span、以及业务语义的埋点，还得应用自己接。所谓「上了网格就有了可观测性」，准确说法是「上了网格你才有了<b>一致的 L7 网络层数据</b>」，业务可观测性仍然是你的活。</p>
+  <p>接下来是最关键的比较，也是「用 SDK 不行吗」的答案。这两条路线不是对错关系，是<b>成本曲线不同</b>：SDK 的边际成本随语言数线性增长，网格的固定成本（控制面 + 每个 Pod 的 sidecar）高但边际成本低。</p>
+  <table>
+    <tr><th style="width:150px">维度</th><th>SDK / 框架方案</th><th>Sidecar 网格方案</th></tr>
+    <tr><td><b>语言绑定</b></td><td>每种语言一套库，Java 有 Spring Cloud、Go 有自己的一套，能力不可能完全对齐</td><td>语言无关，所有语言走同一份 Envoy 配置</td></tr>
+    <tr><td><b>升级方式</b></td><td>改依赖、重新编译、重新发布所有服务</td><td>改 CRD 配置；sidecar 版本升级通常需要重建 Pod，但业务代码不动</td></tr>
+    <tr><td><b>策略一致性</b></td><td>靠规范和人，实际上各服务参数五花八门</td><td>同一份配置下发，天然一致，也能集中审计</td></tr>
+    <tr><td><b>证书与身份</b></td><td>自己做，最容易出事的是轮换</td><td>内置 CA 签发并自动轮换，身份来自 ServiceAccount</td></tr>
+    <tr><td><b>性能开销</b></td><td>进程内调用，开销最小</td><td>每个请求多两跳用户态代理，具体延迟增量<b>以你自己压测为准</b></td></tr>
+    <tr><td><b>运维复杂度</b></td><td>没有额外组件</td><td>多一个关键依赖（控制面）、多一层排障（Envoy 还是业务）</td></tr>
+  </table>
+  <p>所以「用 SDK 不行吗」的正确回答不是「SDK 不行」，而是：<b>SDK 在单一语言、服务数不多时是最优解</b>，它的开销最小、排障最短；网格的价值随着「语言种类 × 服务数量 × 策略变更频率」增长。一个 6 个 Go 服务的团队上 Istio，大概率是净亏损。</p>
+  <pre><span class="c"># 三类能力对应的主要资源对象（Istio，具体 API 组以你版本为准）</span>
+流量治理：VirtualService   路由、权重、超时、重试、故障注入、rewrite/redirect
+           DestinationRule  subset 定义、负载均衡策略、连接池上限、异常点驱逐
+           Gateway          进出网格边缘的 listener（ingress / egress）
+           ServiceEntry     把网格外的服务登记进来
+           Sidecar          限缩某个 sidecar 能看到哪些服务（控制 xDS 体积）
+           EnvoyFilter      直接改 Envoy 原生 xDS（最后手段，升级易失效）
+
+安全：    PeerAuthentication      mTLS 模式：STRICT / PERMISSIVE / DISABLE
+           RequestAuthentication  校验终端用户身份（JWT）
+           AuthorizationPolicy    L7 授权：谁可以调谁的什么方法
+
+可观测：  Envoy 自带指标（15090）、访问日志（可配格式）、追踪采样与上报
+           Telemetry 资源（较新版本）    统一配置访问日志、追踪、指标</pre>
+  <div class="callout warn">
+    <b>一个判断顺序：</b>先问「我们现在最痛的是什么」。如果痛点是「灰度发布靠改代码、靠人肉改权重」，网格解决得很快；如果痛点是「接口 P99 高」，网格不但不解决，还会先给你加一点延迟，再用它的指标帮你定位。<b>不要把「我想定位问题」当成上网格的理由</b>——那是可观测性和压测的活。
+  </div>
+  <p><b>面试怎么答：</b>「三件事：流量治理、安全身份、可观测埋点。它们的共同点是原本都写在应用代码里，所以每种语言都要实现一遍、每次调参都要发布一遍。网格把它们挪到 sidecar，用控制面下发配置。跟 SDK 比，网格的优势是语言无关、策略一致、证书自动轮换；劣势是每个请求多两跳代理、多一个控制面要养。所以单语言、服务少的团队用 SDK 更划算，多语言、几十上百服务、有全链路加密要求的团队才划算。」</p>
+</section>
+
+<section id="s2">
+  <div class="shead"><span class="mins">模块 2</span><h2>架构：istiod 只发配置，Envoy 才碰包</h2></div>
+  <p class="lead">面试里最常被问的一句：「istiod 挂了会怎样？」答「全站不可用」的人，是把控制面和网关搞混了。正确的分层是：<b>控制面算配置和发证书，数据面转发流量，两者之间是 xDS 这条单向的配置通道</b>。</p>
+  <table>
+    <tr><th style="width:140px">组成</th><th>具体是谁</th><th>干什么</th><th>挂了会怎样</th></tr>
+    <tr><td><b>控制面</b></td><td>istiod（较新版本把 Pilot、Citadel、Galley 合并成一个进程）</td><td>把 Service、EndpointSlice、以及 Istio 自己的 CRD 翻译成 xDS 配置；作为 CA 签发工作负载证书；通过 admission webhook 做配置校验和 sidecar 注入</td><td>已下发的配置继续生效，流量照常转发；但新配置推不下去、新 Pod 拿不到证书、注入可能失败</td></tr>
+    <tr><td><b>数据面</b></td><td>Envoy sidecar（istio-proxy 容器）+ istio-agent（pilot-agent）</td><td>Envoy 按 listener / route / cluster / endpoint 转发；istio-agent 负责引导 Envoy、向 istiod 申请证书、暴露健康检查与聚合指标</td><td>该 Pod 的流量出问题；非网格调用方访问它可能不通</td></tr>
+    <tr><td><b>边缘</b></td><td>istio-ingressgateway / istio-egressgateway</td><td>本质也是 Envoy，只是独立部署在网格边缘，处理进出集群的流量</td><td>外部流量进不来（ingress 挂了），或访问外部失败（egress 挂了）</td></tr>
+  </table>
+  <p>Sidecar 是怎么进到 Pod 里的？靠<b>自动注入 = 一个 mutating admission webhook</b>：给 namespace 打上注入标签后，apiserver 在创建 Pod 时会把 Pod spec 交给 istiod 的注入 webhook，后者往 spec 里塞两个容器——<span class="k">istio-init</span>（init 容器，写 iptables 规则）和 <span class="k">istio-proxy</span>（Envoy 本体）。这里有两个常考的细节：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>注入只对新建 Pod 生效</b>。给已有 namespace 补标签，正在跑的 Pod 不会凭空长出 sidecar，必须重建（滚动重启 Deployment）。这是「为什么我开了注入，Pod 里还是只有一个容器」的标准答案。</div></div>
+    <div class="step"><div class="txt"><b>Pod 级开关优先于 namespace 级</b>。Pod 注解 <span class="k">sidecar.istio.io/inject: "false"</span> 可以单独排除某个 Pod，常用于 Job、CronJob，以及那些不能接受额外延迟或不需要网格能力的组件。</div></div>
+    <div class="step"><div class="txt"><b>sidecar 和业务容器共享 network namespace</b>。这是「能用 127.0.0.1 互通」的原因，也是「iptables 规则写在这个 netns 里就能劫持全部流量」的原因——同一个 Pod 里所有容器看到的是同一套网络栈。</div></div>
+    <div class="step"><div class="txt"><b>手动注入是另一种路</b>。<span class="k">istioctl kube-inject</span> 在客户端把 YAML 改好再提交，适合 CI 里做审计，或者 webhook 不可用的场景。</div></div>
+  </div>
+  <pre><span class="c"># 1. 确认 namespace 是否开了注入，以及 Pod 到底有没有 sidecar</span>
+kubectl get ns default --show-labels
+kubectl get pod web-0 -o jsonpath='{.spec.containers[*].name}{"\n"}'
+kubectl get pod web-0 -o jsonpath='{.spec.initContainers[*].name}{"\n"}'
+
+<span class="c"># 2. 注入失败最常见的证据：ReplicaSet 的事件里写 webhook 连不上</span>
+kubectl get events --field-selector type=Warning --sort-by=.lastTimestamp | tail -20
+
+<span class="c"># 3. 控制面与数据面是否同步（SYNCED 才是正常；NOT SENT / STALE 都是问题）</span>
+istioctl proxy-status
+istioctl proxy-status web-0
+
+<span class="c"># 4. 让工具替你把「这个 Pod 的配置为什么这样」讲出来</span>
+istioctl x describe pod web-0
+
+<span class="c"># 5. 配置有没有语法/语义问题（不依赖集群里是否真的生效）</span>
+istioctl analyze -n default</pre>
+  <div class="cmds">
+    <div class="crow"><code>kubectl label ns default istio-injection=enabled --overwrite</code><span class="desc">开启自动注入；已有 Pod 需要重建才生效</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl proxy-status</code><span class="desc">看每个 sidecar 与 istiod 的配置同步状态，STALE 说明推送没到位</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl analyze -n default</code><span class="desc">静态检查 CRD 配置，能抓出 subset 不存在、Gateway 没绑定这类错误</span><button class="copy">复制</button></div>
+    <div class="crow"><code>istioctl x describe pod web-0</code><span class="desc">输出该 Pod 生效的 mTLS 模式、路由规则来源，排障第一命令</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl logs web-0 -c istio-proxy --tail=100</code><span class="desc">Envoy 自己的日志，连不上控制面、证书失败都在这里</span><button class="copy">复制</button></div>
+    <div class="crow"><code>kubectl exec web-0 -c istio-proxy -- curl -s localhost:15000/ready</code><span class="desc">Envoy admin 端口（默认 15000）看它自己是否就绪</span><button class="copy">复制</button></div>
+  </div>
+  <p>还有一个版本层面的事实要提一句，因为它是这两年的高频追问：较新的 Istio 提供了 <b>ambient 模式</b>，把数据面拆成节点级的 ztunnel（管 L4 和 mTLS）加可选的 waypoint 代理（管 L7），从而不再给每个 Pod 塞 sidecar。它的动机就是冲着「sidecar 的资源开销和运维负担」来的。<b>但生产落地仍然以 sidecar 模式为主，ambient 的能力边界和稳定性以你使用的版本为准</b>，面试里提一句「我知道这条路，但目前不在生产」比装作很熟要稳。</p>
+  <div class="callout">
+    <b>xDS 是什么，一句话说清：</b>它是一组发现服务的统称——LDS（listener）、RDS（route）、CDS（cluster）、EDS（endpoint）、SDS（secret）。istiod 把它们推给 Envoy，Envoy 热加载，<b>不中断已有连接</b>。理解这一点，你就能回答「改一个 VirtualService 会不会断流」：不会，配置是热更新的，但已有连接上的行为取决于该协议（HTTP 长连接上的新请求会用新配置，已建立的长连接可能继续走旧路由）。
+  </div>
+  <p><b>面试怎么答：</b>「控制面是 istiod，负责把 K8s 的 Service/Endpoint 和 Istio 的 CRD 翻译成 xDS 配置、作为 CA 签发证书、以及通过 webhook 做注入和校验。数据面是 Envoy sidecar，跟业务容器共享网络命名空间。istiod 挂了，已经在跑的流量不受影响，因为转发只依赖 Envoy 本地已有的配置；但新配置推不下去、新 Pod 拿不到证书。另外注入只对新 Pod 生效，开完标签要重建。」</p>
+</section>
+
+<section id="s3">
+  <div class="shead"><span class="mins">模块 3</span><h2>iptables 劫持：流量是怎么被「偷」进 Envoy 的</h2></div>
+  <p class="lead">这是本篇技术含量最高、也最容易被问穿的一节。核心就一句话：<b>业务容器完全不知情，它以为自己在直接连目标地址；是 Pod 网络命名空间里的 iptables NAT 规则把连接重定向到了 Envoy 的监听端口</b>。</p>
+  <pre>出站（业务容器发起调用）
+  应用 connect(10.0.0.7:8080)
+        │
+        ▼  Pod netns 的 OUTPUT 链
+  ISTIO_OUTPUT  ── 匹配排除项？── 是 ──&gt; 直接放行（不劫持）
+        │  排除项：源 uid/gid = 1337（Envoy 自己发的）、
+        │          目标为 localhost、被显式排除的端口/IP 段
+        ▼  其余
+  -j REDIRECT --to-ports 15001        Envoy 的 virtual outbound listener
+        │
+        ▼  Envoy 用 SO_ORIGINAL_DST 拿回「原本要去哪」
+  按原目的地址匹配路由规则 → 选 cluster → 选 endpoint → 建立真实连接
+
+入站（别人来访问这个 Pod）
+  数据包到达 Pod netns
+        │
+        ▼  PREROUTING 链
+  ISTIO_INBOUND ── 目标端口在捕获范围内 ──&gt; -j REDIRECT --to-ports 15006
+        │                                    Envoy 的 virtual inbound listener
+        ▼
+  Envoy 处理完（鉴权、限流、路由）→ 转发到 127.0.0.1:业务端口</pre>
+  <p>三个必须能解释清楚的点：</p>
+  <table>
+    <tr><th style="width:190px">问题</th><th>答案</th><th>不加这个会怎样</th></tr>
+    <tr><td>为什么要用 <span class="k">SO_ORIGINAL_DST</span></td><td>REDIRECT 会把目的地址改写成 Envoy 的端口，Envoy 必须靠内核保存的原始目的地址，才知道「你本来要访问谁」，否则无从路由</td><td>Envoy 收到一堆连到 15001 的连接，但不知道应该转发到哪个服务</td></tr>
+    <tr><td>为什么要排除 uid 1337</td><td>1337 是 Envoy 进程运行的 uid。Envoy 自己发出的包如果也被劫持，就会重定向回它自己，形成无限环路</td><td>连接打转，Envoy 日志里全是自己连自己，CPU 空转</td></tr>
+    <tr><td>为什么需要 NET_ADMIN</td><td>init 容器要在 Pod 的 netns 里写 iptables 规则，这需要对应 capability</td><td>注入成功但规则写不进去，表现为「sidecar 在，但流量没被代理」，最难查的一类</td></tr>
+  </table>
+  <pre><span class="c"># 进去看真实的 iptables 规则（在节点上，用 nsenter 进入 Pod 的 netns）</span>
+PID=$(docker inspect -f '{{.State.Pid}}' &lt;container-id&gt;)   <span class="c"># 或用 crictl 拿 PID</span>
+nsenter -t $PID -n iptables-save -t nat | grep -i istio
+
+<span class="c"># 看 Envoy 实际在监听什么（15001 出站 / 15006 入站）</span>
+kubectl exec web-0 -c istio-proxy -- curl -s localhost:15000/listeners | head
+
+<span class="c"># Envoy 认为自己能去哪些 cluster、哪些 endpoint（这是路由判断的依据）</span>
+istioctl proxy-config cluster web-0
+istioctl proxy-config endpoint web-0 --cluster outbound|8080|svc.ns.svc.cluster.local
+
+<span class="c"># 判断「这一跳到底有没有被代理」：看服务端访问日志里的 downstream/upstream</span>
+kubectl logs web-0 -c istio-proxy | tail -5</pre>
+  <p>「sidecar 在，但流量没被代理」这个现象值得单独说，因为它是接入期的头号疑难。排查顺序是固定的：<b>先看 init 容器是否成功退出</b>（init 容器失败 Pod 根本起不来，但有些环境里规则写了一半）；<b>再进 netns 数规则条数</b>（没有 ISTIO_ 开头的链就说明没写进去）；<b>再看 Envoy 的 listener 里有没有对应端口</b>。这三步能区分是「规则没写」「规则被别人覆盖了」还是「Envoy 没拿到配置」。</p>
+  <p>还有一类是<b>规则被冲掉</b>：某些 CNI、某些安全 agent、或者 Pod 内自己跑的 iptables 管理程序，会在 istio-init 之后重写 nat 表。这类问题的特征是「刚起来正常，过一会儿就不通了」。解决方案通常是改用 <span class="k">istio-cni</span> 插件——它把写规则这件事从 init 容器挪到 CNI 链路上，既不需要给业务 Pod 开 NET_ADMIN，也避免了先后顺序问题。此外也有基于 tproxy、以及基于 eBPF 的加速方案，<b>具体支持程度以你的 Istio 版本为准</b>，不要当成默认事实讲。</p>
+  <div class="callout danger">
+    <b>安全边界要讲准，否则会答错：</b>mTLS 加密的是<b>两个 Envoy 之间</b>的那段链路；业务容器到本机 Envoy 是 <span class="k">127.0.0.1</span> 上的明文（除非你的应用自己也上了 TLS）。所以「上了 Istio 就是全链路加密」这句话不准确，准确说法是「<b>Pod 到 Pod 之间的网络链路是加密且双向认证的，Pod 内部仍是明文</b>」。这也是零信任里「节点上能抓到明文」这个质疑的正确回答位置。
+  </div>
+  <p><b>面试怎么答：</b>「注入时会在 Pod 里加一个 init 容器写 iptables 规则，出站走 OUTPUT 链重定向到 Envoy 的 15001，入站走 PREROUTING 重定向到 15006。Envoy 用 SO_ORIGINAL_DST 拿回被 REDIRECT 改掉的原目的地址，才知道该往哪转发。规则里会把 uid 1337 即 Envoy 自己的流量排除掉，否则会形成环路。init 容器需要 NET_ADMIN，和某些 CNI 冲突时可以改用 istio-cni。还有一点：mTLS 只加密 Pod 与 Pod 之间，业务容器到本机 sidecar 是本机明文。」</p>
+</section>
+
+<section id="s4">
+  <div class="shead"><span class="mins">模块 4</span><h2>流量治理：VirtualService 管怎么走，DestinationRule 管到了怎么打</h2></div>
+  <p class="lead">这两个对象被混淆的概率极高，但它们的分工非常干净：<b>VirtualService 是路由表（这个请求交给谁处理），DestinationRule 是目标策略（连上之后怎么用）</b>。判断一句配置该写在哪，就问自己「它是在选路，还是在定连接行为」。</p>
+  <table>
+    <tr><th style="width:170px">对象</th><th>管什么</th><th>典型字段</th><th>写错的典型后果</th></tr>
+    <tr><td><b>VirtualService</b></td><td>路由与流量动作</td><td>http.match（按 uri / header / 端口）、route.destination（含 subset 和 weight）、timeout、retries、fault（延迟/中止注入）、rewrite、redirect、cors</td><td>规则匹配不上，流量落到默认路由；或权重之和不为 100 时行为不确定</td></tr>
+    <tr><td><b>DestinationRule</b></td><td>目标侧策略</td><td>subset（按标签切版本）、trafficPolicy.loadBalancer（轮询/最少请求/一致性哈希）、connectionPool（连接数与排队上限）、outlierDetection（异常点驱逐）</td><td>subset 名和 VS 里对不上 → 规则静默失效；连接池上限设太小 → 排队而非快速失败</td></tr>
+    <tr><td><b>Gateway</b></td><td>边缘 listener</td><td>servers.port / hosts / tls</td><td>hosts 不匹配 → 边缘 404；Gateway 没和 VS 绑定 → 规则不生效</td></tr>
+  </table>
+  <p>金丝雀是这套分工最典型的用法，而且它是面试高频：<b>DestinationRule 用标签把实例切成 v1、v2 两个 subset，VirtualService 按权重分配</b>。三件事必须同时成立——subset 名字两边一致、weight 之和为 100、Pod 标签真的能选出两个版本。任何一条不满足，表现都不是报错，而是「流量全部走某一个版本」。</p>
+  <pre><span class="c"># 1. 先切版本（DestinationRule）</span>
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata: {name: web}
+spec:
+  host: web.default.svc.cluster.local
+  subsets:
+    - name: v1
+      labels: {version: v1}
+    - name: v2
+      labels: {version: v2}
+
+<span class="c"># 2. 再分流量（VirtualService）：注意 weight 之和应为 100</span>
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata: {name: web}
+spec:
+  hosts: [web.default.svc.cluster.local]
+  http:
+    - route:
+        - destination: {host: web.default.svc.cluster.local, subset: v1}
+          weight: 90
+        - destination: {host: web.default.svc.cluster.local, subset: v2}
+          weight: 10
+
+<span class="c"># 3. 超时与重试：perTryTimeout 必须小于总 timeout，否则重试没有意义</span>
+<span class="c">#    retryOn 建议只放连接类错误和 503，别放 5xx 全量（会放大写操作）</span>
+    timeout: 800ms
+    retries:
+      attempts: 2
+      perTryTimeout: 300ms
+      retryOn: connect-failure,refused-stream,503
+
+<span class="c"># 4. 故障注入：这是混沌工程在网格里最方便的注入点</span>
+<span class="c">#    配合 match 只打给带特定 header 的流量，可以把爆炸半径压到单个请求</span>
+    fault:
+      delay: {percentage: {value: 30}, fixedDelay: 2s}
+<span class="c">#   abort: {percentage: {value: 10}, httpStatus: 503}</span></pre>
+  <p>超时和重试这两项在网格里配，有个和 SDK 时代一样的大坑：<b>重试是乘法</b>。网关重试 2 次、服务 A 重试 2 次、A 调 B 再重试 2 次，最坏是 8 倍压力，而且往往打在对方最忙的时候。网格让重试变容易了，也就让这个坑更容易踩。三条约束要同时满足：只重试连接类错误或明确的 503；单次重试超时（<span class="k">perTryTimeout</span>）乘次数要小于总超时；只对幂等接口重试。此外，<b>总超时必须在调用链的预算之内</b>，各层各设 800 毫秒，最坏链路就是 2.4 秒。</p>
+  <p>熔断在 Istio 里其实是两套机制合在一起，面试说全了会加分：</p>
+  <div class="steps">
+    <div class="step"><div class="txt"><b>连接池上限（connectionPool）</b>：限制到某个目标的并发连接数和排队请求数。超过就快速失败，这是「主动的并发控制」，防的是「把下游连接占满」。</div></div>
+    <div class="step"><div class="txt"><b>异常点驱逐（outlierDetection）</b>：被动健康检查。某实例连续返回 5xx 到一定次数，就把它从负载均衡池里临时摘掉一段时间，之后逐步放回。这是 Envoy 自己做的，不需要业务配合。</div></div>
+    <div class="step"><div class="txt"><b>驱逐的比例上限</b>：必须有 <span class="k">maxEjectionPercent</span>，否则极端情况下可能把大部分实例都摘掉，剩下的被打爆。这是「保护机制本身需要被保护」的典型例子。</div></div>
+    <div class="step"><div class="txt"><b>panic threshold</b>：当健康端点比例低到某个阈值（Envoy 默认是 50%，以你版本为准），Envoy 会忽略健康状态、向所有实例转发，避免在极端情况下把剩下少数健康的实例打挂。它是一层熔断之上的兜底。</div></div>
+  </div>
+  <pre><span class="c"># 熔断：连接池上限 + 异常点驱逐，两者一起配才有意义</span>
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+spec:
+  host: inventory.default.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:  {maxConnections: 100}
+      http: {http1MaxPendingRequests: 50, maxRequestsPerConnection: 10}
+    outlierDetection:
+      consecutive5xxErrors: 5       <span class="c"># 连续多少次 5xx 才驱逐</span>
+      interval: 10s                  <span class="c"># 检测窗口</span>
+      baseEjectionTime: 30s          <span class="c"># 首次驱逐时长，之后按次数递增</span>
+      maxEjectionPercent: 50         <span class="c"># 最多驱逐一半，留一半扛流量</span></pre>
+  <div class="callout warn">
+    <b>限流在网格里不是开箱即用的。</b>Envoy 有本地限流（每个 sidecar 各限各的，总量随副本数线性变化），全局限流需要额外的限流服务（Istio 生态里通常是一个独立的 ratelimit 组件加 Redis）。如果你在面试里说「上 Istio 就有了全局限流」，会被追问到答不上来。正确说法是：<b>本地限流可以配，全局限流要额外部署组件，而且限流阈值仍然要压测给出</b>。
+  </div>
+  <p><b>面试怎么答：</b>「VirtualService 管路由：匹配规则、权重、超时、重试、故障注入；DestinationRule 管目标：subset 划分、负载均衡算法、连接池上限、异常点驱逐。金丝雀就是 DR 切 subset、VS 配权重。熔断是两套机制——连接池做主动的并发限制，outlierDetection 做被动的实例驱逐，驱逐比例要有上限。重试要小心放大，只能在总超时预算内、只针对幂等和连接类错误。全局限流不是开箱即用的，需要额外组件。」</p>
+</section>
+
+<section id="s5">
+  <div class="shead"><span class="mins">模块 5</span><h2>mTLS 与零信任：先加密，再授权，顺序不能反</h2></div>
+  <p class="lead">「我们把 mTLS 打开了」这句话里藏着一个顺序问题。mTLS 是<b>身份的基础设施</b>——有了它，服务端才知道「调用方是谁」；授权策略是<b>基于身份的判断</b>。所以正确顺序一定是先让身份可用、验证没有明文残留在跑，再谈「谁能调谁」。</p>
+  <table>
+    <tr><th style="width:180px">对象</th><th>回答什么问题</th><th>关键模式/字段</th></tr>
+    <tr><td><b>PeerAuthentication</b></td><td>工作负载之间要不要用 mTLS、用什么强度</td><td>STRICT（只接受 mTLS）/ PERMISSIVE（明文和 mTLS 都接受）/ DISABLE（不用 mTLS）。可按 mesh / namespace / 工作负载三级配置，粒度细的覆盖粒度粗的</td></tr>
+    <tr><td><b>RequestAuthentication</b></td><td>终端用户是谁（JWT 校验）</td><td>jwksUri、issuer、audiences、forwardOriginalToken</td></tr>
+    <tr><td><b>AuthorizationPolicy</b></td><td>谁可以调用谁、可以调用什么方法</td><td>action（ALLOW / DENY / CUSTOM / AUDIT）、rules.from.source（principals、namespaces、ipBlocks）、rules.to.operation（methods、paths）。<b>显式 DENY 优先于 ALLOW</b></td></tr>
+  </table>
+  <p>身份从哪来？<b>ServiceAccount</b>，不是 IP。istiod 作为 CA 给每个工作负载签发证书，证书里的身份是一个 SPIFFE ID，形如 <span class="k">spiffe://&lt;信任域&gt;/ns/&lt;命名空间&gt;/sa/&lt;服务账号&gt;</span>。这一步的意义非常大：IP 会变、Pod 会重建、副本会漂移，而 ServiceAccount 是稳定的语义身份。授权策略里写的 <span class="k">principals</span> 用的就是它。</p>
+  <pre><span class="c"># 1. 先 PERMISSIVE：明文和 mTLS 都接受，这一步不会打断任何现有调用</span>
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata: {name: default, namespace: default}
+spec:
+  mtls: {mode: PERMISSIVE}
+
+<span class="c"># 2. 观察：确认没有明文流量了再往下走</span>
+<span class="c">#    手段包括 istioctl x describe、Envoy 上报的连接 mTLS 指标、访问日志里的标</span>
+istioctl x describe pod web-0
+
+<span class="c"># 3. 再 STRICT：只接受 mTLS</span>
+spec:
+  mtls: {mode: STRICT}
+
+<span class="c"># 4. 最后上授权：默认拒绝 + 显式允许，粒度按 ServiceAccount</span>
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata: {name: inventory-allow, namespace: default}
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source: {principals: ["cluster.local/ns/default/sa/order"]}
+      to:
+        - operation: {methods: ["GET"], paths: ["/stock/*"]}</pre>
+  <p>第 2 步是整个落地里最容易被跳过的，也是事故来源。跳过它的后果你已经见过：改 STRICT 的同一秒，所有没注入 sidecar 的调用方全部失败。这类调用方通常包括 <b>CronJob / Job</b>（跑完就结束的任务，很多人不给它注入）、<b>外部系统直连 Pod IP</b>、<b>kubelet 的探针</b>（探针是从节点上发起的，不是网格内的调用，所以要单独处理）、以及<b>数据库和中间件</b>（它们当然不会装 sidecar）。前三类要靠 PERMISSIVE 期间的观察数据逐个找出来。</p>
+  <p>关于 kubelet 探针要多说一句，因为它是接入期最常见的「一开 STRICT 就全 NotReady」：<b>健康检查是从 kubelet 直接发起的，它没有网格身份，走的是节点到 Pod 的路径</b>。常见做法是把探针改为在 sidecar 上暴露的专用健康检查端口（istio-agent 提供一个健康检查端点，端口以你版本为准），或者对探针相关的配置做豁免。这个坑很具体，能讲出来说明你真的接过。</p>
+  <div class="callout danger">
+    <b>mTLS 不等于零信任，也不等于安全。</b>它解决的是「链路加密 + 双向身份认证 + 身份不再依赖 IP」。零信任还需要：最小权限的授权策略（默认拒绝）、策略的审计与版本管理、以及<b>承认边界在哪里</b>——网格内的服务仍然可以互相访问（除非你写了 DENY），Pod 内部业务容器到 sidecar 仍是明文，节点上有权限的人仍然能看到明文。把这些边界说清楚，比说「我们实现了零信任」可信得多。
+  </div>
+  <p><b>面试怎么答：</b>「落地顺序是 PERMISSIVE 先跑，用工具和指标确认没有明文残留，再切 STRICT，最后写 AuthorizationPolicy。身份不是 IP，是 ServiceAccount，istiod 作为 CA 签发 SPIFFE 格式的证书并通过 SDS 自动轮换。三个安全对象要分清：PeerAuthentication 管工作负载之间的 mTLS 模式，RequestAuthentication 管终端用户的 JWT，AuthorizationPolicy 管谁能调谁，且 DENY 优先于 ALLOW。还要记得 kubelet 探针没有网格身份，是最常被 STRICT 打掉的一类调用。」</p>
+</section>
+
+<section id="s6">
+  <div class="shead"><span class="mins">模块 6</span><h2>代价：延迟、资源、复杂度、运维，四笔账都要算</h2></div>
+  <p class="lead">面试官问「上 Istio 有什么代价」时，只答「有性能损耗」是不够的——他想知道你<b>能不能把这笔账拆成四项分别量化</b>。而拆开之后你会发现，最贵的往往不是延迟，是复杂度和运维。</p>
+  <table>
+    <tr><th style="width:120px">代价</th><th>具体是什么</th><th>怎么量化/控制</th></tr>
+    <tr><td><b>延迟</b></td><td>每个请求多两跳用户态代理（出站 sidecar、入站 sidecar），加一次 iptables NAT 处理；连接复用和协议升级也参与其中</td><td>注入前后在同一环境、同一流量模型下压测，对比 P50/P95/P99。<b>本专栏不给通用数字，因为你的业务形态决定一切</b></td></tr>
+    <tr><td><b>资源</b></td><td>每个 Pod 多一个 Envoy 容器，有常驻内存和 CPU；连接数翻倍带来的内核开销；istiod 本身也要资源</td><td>sidecar 的 requests/limits 要单独申明，别和业务容器混算；集群规模上去后，istiod 的规格要跟着调</td></tr>
+    <tr><td><b>复杂度</b></td><td>CRD 语义多、对象之间有隐式依赖（VS 依赖 DR 的 subset、Gateway 要和 VS 绑定）；EnvoyFilter 直接操作 xDS，Istio 升级就可能失效</td><td>优先用高层对象，EnvoyFilter 当最后手段并记录；用 <span class="k">istioctl analyze</span> 进 CI</td></tr>
+    <tr><td><b>运维</b></td><td>排障多一层（是 Envoy 的问题还是业务的问题）；sidecar 升级通常要重建 Pod；控制面成为新的关键依赖；证书和注入链路要监控</td><td>分层排障清单：先看 proxy-status 和 analyze，再看 Envoy 指标，最后看业务日志；升级按 namespace 分批滚动</td></tr>
+  </table>
+  <p>还有一个规模相关的代价值得单独讲，因为它只在服务数上去之后才暴露：<b>xDS 推送量</b>。默认情况下 sidecar 会收到它可能需要的所有服务的配置，服务数上千时，一次变更可能触发大量推送，istiod 的 CPU 和推送延迟都会上去，表现为「改一个路由，几十秒才生效」。控制手段有两个方向：用 <span class="k">Sidecar</span> 资源显式声明每个服务只关心哪些 host（把配置体积降一个量级），以及用 discovery selector 限制 istiod 纳管的命名空间。</p>
+  <pre><span class="c"># 限缩 sidecar 的配置范围：只接收本 namespace 加少数公共服务的配置</span>
+apiVersion: networking.istio.io/v1
+kind: Sidecar
+metadata: {name: default, namespace: default}
+spec:
+  egress:
+    - hosts:
+        - "./*"                       <span class="c"># 本命名空间</span>
+        - "istio-system/*"            <span class="c"># 控制面</span>
+        - "infra/*"                   <span class="c"># 依赖的公共命名空间</span>
+
+<span class="c"># 观测「延迟代价」的正确姿势：看 Envoy 自己暴露的分层耗时</span>
+<span class="c">#   入站 sidecar 的内部处理时间、upstream 的连接等待、以及转发耗时分开看</span>
+kubectl exec web-0 -c istio-proxy -- curl -s localhost:15000/stats/prometheus \
+  | grep -E 'istio_request_duration|upstream_cx_|downstream_cx_'
+
+<span class="c"># 推送是否积压：proxy-status 里长期 STALE 的 sidecar 是信号</span>
+istioctl proxy-status | grep -v SYNCED</pre>
+  <p>再强调一次关于数字的态度：<b>不要引用任何「Istio 会让 P99 增加 X 毫秒」的结论</b>，无论是从哪篇文章看来的。这类数字高度依赖请求大小、并发、连接复用率、Envoy 的配置（尤其是访问日志和追踪采样是否打开）、以及 CPU 型号。面试里正确的说法是「我们注入前后在同一套流量模型下压测对比过，P99 增加了某个量级，并且我们确认了它在 SLO 预算内，同时用关闭访问日志/调整采样率把可观测开销控制在可接受范围」——<b>有方法、有结论、结论是自己的</b>。</p>
+  <div class="callout">
+    <b>控制面可用性这条要讲准，很多人答反。</b>istiod 不可用的时候：<b>数据面继续转发</b>（配置已经在 Envoy 本地），所以存量流量不受影响；但配置更新推不下去、新 Pod 的 sidecar 拿不到引导配置和证书（可能起不来）、自动注入依赖的 webhook 也可能失败。所以 istiod 是一个「<b>影响变更能力、不影响存量转发</b>」的依赖——这个区分在容量和灾备设计里直接决定它的优先级。
+  </div>
+  <p><b>面试怎么答：</b>「代价分四笔。延迟是每个请求多两跳代理，具体增量必须自己压测，我不引用通用数字；资源是每个 Pod 多一份 Envoy 开销，sidecar 的 requests 要单独申明；复杂度是 CRD 之间的隐式依赖，要用 analyze 卡在 CI 里；运维是排障多一层，要能区分 Envoy 和业务的问题。还有规模上去之后的 xDS 推送问题，用 Sidecar 资源限缩配置范围。另外 istiod 挂了不影响存量转发，只影响变更和证书，这个要讲清楚。」</p>
+</section>
+
+<section id="s7">
+  <div class="shead"><span class="mins">模块 7</span><h2>什么时候不该上：放弃条件比功能清单更能说明你做过</h2></div>
+  <p class="lead">能列出「不该上的场景」，是判断是否真做过的分水岭。因为只背功能的人没有放弃条件——在他眼里，网格永远是对的。而实际接过的都知道，<b>有一半的团队上了之后是净亏损的</b>。</p>
+  <table>
+    <tr><th style="width:210px">不该上的信号</th><th>为什么</th></tr>
+    <tr><td>服务数是个位数、语言只有一种</td><td>SDK 一次接入就够，边际成本几乎为零；网格的固定成本（控制面、每 Pod 一份 sidecar、学习成本）收不回来</td></tr>
+    <tr><td>没有专人或专门时间维护控制面</td><td>istiod 是要升级、要扩容、要看推送延迟的组件。没人养它，它会在某次升级或某个规模点上出事</td></tr>
+    <tr><td>连基本的可观测性都还没做起来</td><td>没有指标你就无法回答「上了之后变好还是变坏」，也无法定超时和熔断的阈值。<b>先有观测，再谈治理</b></td></tr>
+    <tr><td>延迟预算极紧且已经贴着 SLO</td><td>多两跳代理的增量可能直接把 P99 顶出预算。要么先优化出余量，要么别上</td></tr>
+    <tr><td>没有合规或多团队协作的硬需求</td><td>统一身份、统一策略、统一审计的价值，只有在多团队多语言、或者有加密合规要求时才真正兑现</td></tr>
+    <tr><td>短期内有大量遗留协议或非 HTTP 流量</td><td>网格的高级治理能力（按路径路由、按方法授权）建立在能解析 L7 协议上。纯 TCP 流量只能拿到 L4 能力，性价比大幅下降</td></tr>
+  </table>
+  <p>反过来，该上的信号也很明确：<b>多语言栈且各语言的治理能力已经明显不一致</b>；<b>服务数几十上百，靠人维护配置已经失控</b>；<b>有全链路加密与身份化的合规要求</b>；<b>需要统一的灰度和故障注入能力</b>（也就是第 44 期要讲的混沌工程，网格能让注入点变得非常便宜）；<b>要做多集群流量管理</b>。</p>
+  <p>中间地带怎么办？给一条能落地的路径：<b>先在一个非核心、流量可控的命名空间试点</b>，把它作为「能力验证」，并且提前定好验收指标——注入前后 P99 变化、资源增量、故障率有没有变化、排障时长有没有变长。跑一两个迭代再决定要不要铺开。这比「全集群一次性上」安全得多，也比「一直讨论不上」有进展。</p>
+  <div class="callout warn">
+    <b>还有一个隐性前提：团队要接受「配置即生产变更」。</b>改一条 VirtualService 就等于改了全集群的路由行为，它的破坏力和发一次版是一样的。所以 Istio 的 CRD 必须进 Git、必须评审、必须能回滚，最好还有 <span class="k">istioctl analyze</span> 在 CI 里卡一道。<b>把网格配置当成随手改的 YAML，是接入之后最大的风险来源</b>。
+  </div>
+  <p><b>面试怎么答：</b>「我不认为网格是默认选项。服务数少、语言单一、没人维护控制面、或者连基本可观测性都没有的团队，上了大概率是净亏损，尤其延迟预算已经贴着 SLO 的时候。我倾向先在非核心命名空间试点，定好注入前后 P99、资源增量、排障时长这几个验收指标，跑通再铺开。真正的触发条件是多语言导致治理能力不一致、服务数上百导致配置失控、或者有全链路加密的合规要求。」</p>
+</section>
+
+<section id="s8">
+  <div class="shead"><span class="mins">模块 8</span><h2>面试话术：讲取舍，不背清单</h2></div>
+  <p class="lead">服务网格这道题，面试官手上通常有三个递进的追问：<b>「它解决什么」→「用 SDK 不行吗」→「你上了之后踩了什么」</b>。前两问考理解，第三问考经历。准备的时候要按这三段各准备一段话，每段都能独立站住。</p>
+  <pre>第一段：为什么需要（讲痛点，不讲功能）
+  「我们当时有 Java 和 Go 两种栈，超时、重试、熔断各写各的，
+    一次调整熔断阈值要发十几个服务。真正痛的不是功能缺失，是行为不一致。」
+
+第二段：为什么是网格而不是 SDK（讲交换，不讲优劣）
+  「SDK 在单语言下开销最小、排障最短，是最优解。但我们有 N 种语言，
+    边际成本是线性增长的；网格的固定成本高、边际成本低。
+    另外证书轮换这件事，靠人做一定会忘，网格能自动做。」
+
+第三段：代价与应对（这一段决定你是背的还是做过的）
+  「延迟增量我们压测过，在 SLO 预算内；sidecar 的 requests 单独申明；
+    用 Sidecar 资源限缩了 xDS 范围避免推送风暴；
+    mTLS 按 PERMISSIVE → 观察 → STRICT 的顺序切，中间抓出三个没注入的调用方；
+    网格 CRD 全部进 Git，CI 里跑 istioctl analyze。」</pre>
+  <table>
+    <tr><th style="width:200px">追问</th><th>一句话回答</th></tr>
+    <tr><td>用 SDK 不行吗</td><td>单语言下 SDK 更好；多语言 + 服务数多 + 要统一身份时，网格的边际成本更低</td></tr>
+    <tr><td>istiod 挂了怎么办</td><td>存量流量不受影响，配置更新和证书签发会停，所以它是「影响变更不影响转发」的依赖</td></tr>
+    <tr><td>流量怎么进 Envoy</td><td>iptables NAT 重定向到 15001 / 15006，Envoy 用 SO_ORIGINAL_DST 拿回原目的地址</td></tr>
+    <tr><td>你怎么测延迟代价</td><td>同一环境同一流量模型，注入前后对比分位数；不引用别人的结论</td></tr>
+    <tr><td>灰度怎么做</td><td>DR 切 subset，VS 配权重，权重之和为 100，subset 名两边要对得上</td></tr>
+    <tr><td>出过什么事故</td><td>用「现象 → 误判 → 真实原因 → 验证方法 → 固化动作」五段讲，别只讲结论</td></tr>
+  </table>
+  <p>最后一段（事故经历）的讲法值得展开，因为它是唯一无法背的部分。结构是：<b>现象要具体</b>（不是「有一次出问题」，而是「把 mTLS 切成 STRICT 之后，订单服务的定时任务连续三天在凌晨失败，成功率掉到 0」）；<b>说明当时的误判</b>（「一开始以为是证书过期」）；<b>给出真实原因</b>（「Job 没有注入 sidecar，STRICT 下被拒绝」）；<b>说清怎么验证的</b>（「用 istioctl x describe 看 Pod 的 mTLS 状态，再把 Job 的日志和 Envoy 的访问日志对上时间」）；<b>最后是固化动作</b>（「之后加了准入检查：命名空间开启注入后，CI 会扫描 Job/CronJob 是否显式关闭了注入，并且 PERMISSIVE 期间会输出一份明文流量清单」）。<b>有固化动作，才是「做过」而不是「遇到过」。</b></p>
+  <div class="callout ok">
+    <b>一套能直接用的自检清单：</b>① 注入开关是否只对新建 Pod 生效，你的滚动重启做了吗；② <span class="k">istioctl analyze</span> 进 CI 了吗；③ sidecar 的 requests/limits 单独申明了吗；④ mTLS 现在是什么模式，明文流量清单在哪看；⑤ 有没有 Job/CronJob/探针被 STRICT 打掉的风险；⑥ 服务数上百时 xDS 推送延迟测过吗；⑦ 网格 CRD 的回滚路径演练过吗；⑧ 有没有一份「Envoy 的问题 / 业务的问题」的分层排障清单。八条都能答，说明这套东西在你手上是可用的。
+  </div>
+  <p><b>面试怎么答：</b>「我讲网格一般讲三件事，不讲功能清单：一是我们原来的痛点（多语言导致治理行为不一致、证书靠人轮换）；二是为什么选网格而不是继续用 SDK（边际成本结构不同，且有身份化和审计的需求）；三是我们为代价做了什么（压测对比延迟、单独算 sidecar 资源、限缩 xDS、渐进切 mTLS、CRD 进 Git）。如果追问经历，我会讲一次具体的事故，重点在验证方法和之后固化的动作。」</p>
+</section>
+
+<section id="s9">
+  <div class="shead"><span class="mins">模块 9</span><h2>10 个坑：大部分是「配置没生效但也不报错」</h2></div>
+  <p class="lead">这一节的坑有个明显的共性：<b>它们几乎都不会报错</b>。Istio 的配置失效方式通常是「静默落到默认行为」，而不是拒绝。所以排查的抓手不是日志，是 <span class="k">istioctl</span> 的三个命令。</p>
+  <div class="pit"><div class="num">1</div><div class="pb"><div class="pt">开了注入标签，但没重建 Pod</div><div class="pd">自动注入是 admission webhook，只作用于新建的 Pod。给已有命名空间补标签后必须滚动重启，否则你以为在网格里，实际一个 sidecar 都没有。</div></div></div>
+  <div class="pit"><div class="num">2</div><div class="pb"><div class="pt">mTLS 直接切 STRICT</div><div class="pd">所有没有网格身份的调用方会被拒绝：Job、CronJob、外部系统、以及 kubelet 的探针。正确顺序是 PERMISSIVE 先跑，确认没有明文残留，再切 STRICT。</div></div></div>
+  <div class="pit"><div class="num">3</div><div class="pb"><div class="pt">VirtualService 引用了不存在的 subset</div><div class="pd">规则被判为无效，流量落回默认路由的 100%，你配的 10% 灰度等于没配。subset 必须在 DestinationRule 里定义，且名字完全一致，用 istioctl analyze 能查出来。</div></div></div>
+  <div class="pit"><div class="num">4</div><div class="pb"><div class="pt">Gateway 配了但没和 VirtualService 绑定</div><div class="pd">边缘流量 404。Gateway 只定义 listener，路由要靠 VS 的 gateways 字段引用它，两边的 hosts 也要对得上。</div></div></div>
+  <div class="pit"><div class="num">5</div><div class="pb"><div class="pt">重试次数乘单次超时大于总超时</div><div class="pd">最后一次重试必然超时，白占连接还给下游加压力。perTryTimeout 乘 attempts 必须小于 timeout，而且只重试连接类错误和 503，写操作要幂等。</div></div></div>
+  <div class="pit"><div class="num">6</div><div class="pb"><div class="pt">每一层都各设各的超时</div><div class="pd">超时是串联的，三层各 800 毫秒，最坏链路 2.4 秒。要做预算传递，入口定总 deadline，每层减掉自身开销后传给下游。</div></div></div>
+  <div class="pit"><div class="num">7</div><div class="pb"><div class="pt">用 EnvoyFilter 改原生 xDS</div><div class="pd">它绕过 Istio 的抽象，绑定 Envoy 的内部结构，Istio 或 Envoy 升级就可能失效甚至不兼容。能用 VirtualService / DestinationRule 表达的，绝不要写 EnvoyFilter。</div></div></div>
+  <div class="pit"><div class="num">8</div><div class="pb"><div class="pt">以为「上了网格就有了可观测性」</div><div class="pd">网格给的是一致的 L7 网络层指标和访问日志，业务语义埋点、应用内部 span、以及指标口径还要你自己做。而且采样率和访问日志格式会直接影响 sidecar 的开销。</div></div></div>
+  <div class="pit"><div class="num">9</div><div class="pb"><div class="pt">异常点驱逐不设上限</div><div class="pd">没有 maxEjectionPercent，极端情况下大部分实例被摘掉，剩下的少数实例被全部流量打爆。保护机制本身也需要被保护。</div></div></div>
+  <div class="pit"><div class="num">10</div><div class="pb"><div class="pt">把网格配置当随手改的 YAML</div><div class="pd">改一条 VirtualService 等于改全集群路由，破坏力和发版一样。CRD 必须进 Git、走评审、能回滚，CI 里跑 istioctl analyze。</div></div></div>
+  <p><b>面试怎么答：</b>挑一个带验证过程的讲。比如「我们把 mTLS 切到 STRICT 之后，凌晨的定时任务开始全量失败，一开始查证书，查了半天没结果。后来用 istioctl x describe 看那个 Pod 的 mTLS 状态，再对 Envoy 访问日志的时间点，才发现 Job 没注入 sidecar，STRICT 下被直接拒绝。之后的动作是：CI 里加一条扫描，凡是显式关掉注入的 Job/CronJob 都要登记原因；并且 PERMISSIVE 期间固定输出一份明文流量清单，作为切 STRICT 的准入材料。」有现象、有误判、有工具、有固化动作，这四样齐了就够了。</p>
+</section>
+
+<section id="s10">
+  <div class="shead"><span class="mins">自测</span><h2>六道题</h2></div>
+  <div class="quiz">
+    <div class="q" data-a="2">
+      <div class="qt">1. 关于 istiod 与 Envoy sidecar 的分工，正确的是？</div>
+      <button class="opt">istiod 是所有服务间流量的必经转发节点，它挂了流量立刻中断</button>
+      <button class="opt">Envoy 负责计算路由策略，istiod 只负责存储配置</button>
+      <button class="opt">istiod 负责把配置和证书通过 xDS 下发给 Envoy，Envoy 负责实际转发；istiod 不可用不影响存量转发，但配置更新和证书签发会停</button>
+      <button class="opt">两者都在数据路径上，请求要先后经过它们</button>
+      <div class="ans">正确答案：<b>控制面只发配置，数据面才碰包</b>。istiod 把 Service/Endpoint 和 Istio CRD 翻译成 xDS（LDS/RDS/CDS/EDS/SDS）推给 Envoy，同时作为 CA 签发证书、通过 webhook 做注入和校验。转发完全由 Envoy 本地已有配置决定，所以 istiod 挂了存量流量照走，但新配置推不下去、新 Pod 拿不到证书。说「istiod 挂了全站不可用」是把控制面和数据面搞混了。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">2. Sidecar 是怎么「截获」业务容器的流量的？</div>
+      <button class="opt">业务容器被改造成主动连 Envoy，靠环境变量指定代理地址</button>
+      <button class="opt">init 容器在 Pod 的网络命名空间里写 iptables NAT 规则，出站重定向到 15001、入站重定向到 15006，Envoy 再用 SO_ORIGINAL_DST 取回原目的地址</button>
+      <button class="opt">靠修改集群 DNS，把服务域名解析到 Envoy 的 IP</button>
+      <button class="opt">靠 CNI 插件把流量镜像一份给 Envoy，原流量照常走</button>
+      <div class="ans">正确答案：<b>iptables 重定向</b>。istio-init 这个 init 容器在 Pod 的 netns 里建 ISTIO_OUTPUT / ISTIO_INBOUND 链，把流量 REDIRECT 到 Envoy 的虚拟监听端口。因为 REDIRECT 改写了目的地址，Envoy 必须用 SO_ORIGINAL_DST 拿回「原本要去哪」才能路由。规则里会排除 uid 1337（Envoy 自己），否则形成环路。init 容器需要 NET_ADMIN，与某些 CNI 冲突时可改用 istio-cni。</div>
+    </div>
+    <div class="q" data-a="3">
+      <div class="qt">3. VirtualService 和 DestinationRule 的分工，正确的是？</div>
+      <button class="opt">VirtualService 定义 subset，DestinationRule 定义权重</button>
+      <button class="opt">两者功能相同，只是 API 版本不同</button>
+      <button class="opt">DestinationRule 负责对外暴露服务，VirtualService 负责集群内部调用</button>
+      <button class="opt">VirtualService 管路由（匹配、权重、超时、重试、故障注入），DestinationRule 管目标策略（subset、负载均衡、连接池上限、异常点驱逐）</button>
+      <div class="ans">正确答案：<b>VS 管怎么走，DR 管到了怎么打</b>。金丝雀正是这个分工的典型用法：DR 用标签把实例切成 v1/v2 两个 subset，VS 按 weight 分配流量。常见失效原因是 VS 引用的 subset 在 DR 里不存在，规则静默无效、流量落回默认路由 100%，istioctl analyze 可以查出来。</div>
+    </div>
+    <div class="q" data-a="0">
+      <div class="qt">4. 落地 mTLS 的正确顺序与原因？</div>
+      <button class="opt">先 PERMISSIVE 并确认没有明文残留，再切 STRICT，最后写 AuthorizationPolicy；因为授权依赖身份，而身份依赖 mTLS</button>
+      <button class="opt">直接切 STRICT，出问题再回滚，这样最快</button>
+      <button class="opt">先写 AuthorizationPolicy，再开 mTLS，先保证权限对</button>
+      <button class="opt">先 DISABLE 跑一个月，再直接 STRICT</button>
+      <div class="ans">正确答案：<b>PERMISSIVE → 观察 → STRICT → 授权</b>。STRICT 要求对端也有网格身份，没注入 sidecar 的调用方（Job、CronJob、外部系统、kubelet 探针）会被直接拒绝，这是「一开 STRICT 就大面积 503」的根因。PERMISSIVE 同时接受明文和 mTLS，这段时间用来把明文调用方逐个找出来。身份来自 ServiceAccount（SPIFFE ID），不是 IP，授权策略写的 principals 就是它。</div>
+    </div>
+    <div class="q" data-a="2">
+      <div class="qt">5. 在 VirtualService 里配置故障注入（延迟/中止），应该用哪个字段？它对应什么能力？</div>
+      <button class="opt">DestinationRule 的 outlierDetection</button>
+      <button class="opt">Gateway 的 tls 配置</button>
+      <button class="opt">VirtualService 的 fault.delay / fault.abort，可以按百分比和请求头匹配，是混沌实验里最便宜的注入点</button>
+      <button class="opt">PeerAuthentication 的 mtls.mode</button>
+      <div class="ans">正确答案：<b>VirtualService 的 fault</b>。delay 注入延迟、abort 注入错误码，都能配 percentage，配合 http.match 还能只打给带特定 header 的请求——这意味着可以把爆炸半径压到「单个测试流量」，非常适合做故障演练。outlierDetection 是异常点驱逐，属于熔断范畴，不是注入手段。</div>
+    </div>
+    <div class="q" data-a="1">
+      <div class="qt">6. 下面哪个场景<b>不适合</b>上服务网格？</div>
+      <button class="opt">多语言栈、上百个服务、有全链路加密的合规要求</button>
+      <button class="opt">只有 5 个服务且全是同一种语言，团队也没有专人维护控制面，P99 已经贴着 SLO</button>
+      <button class="opt">需要跨服务统一灰度能力和集中审计的策略管理</button>
+      <button class="opt">需要把超时、重试、熔断策略从应用代码里解耦出来</button>
+      <div class="ans">正确答案：<b>服务少、语言单一、没人维护控制面、且延迟预算已经很紧的情况不适合</b>。SDK 在单语言下开销最小、排障最短，是最优解；网格的固定成本（控制面、每 Pod 一份 sidecar、学习成本、额外延迟）在这种规模下收不回来。而且 P99 已经贴着 SLO 时，多两跳代理的增量可能直接顶出预算，具体增量必须自己压测，不能引用通用数字。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s11">
+  <div class="shead"><span class="mins">收口</span><h2>术语表与下一步</h2></div>
+  <table>
+    <tr><th style="width:210px">术语</th><th>一句话解释</th></tr>
+    <tr><td><b>控制面 / 数据面</b></td><td>istiod 算配置发证书（不碰包），Envoy sidecar 转发流量；之间是 xDS 通道</td></tr>
+    <tr><td><b>xDS</b></td><td>一组发现服务的统称：LDS/RDS/CDS/EDS/SDS，Envoy 热加载，不中断已有连接</td></tr>
+    <tr><td><b>sidecar 注入</b></td><td>mutating webhook 改写 Pod spec，加入 istio-init + istio-proxy；只对新 Pod 生效</td></tr>
+    <tr><td><b>istio-init</b></td><td>写 iptables NAT 规则的 init 容器，需要 NET_ADMIN；冲突时可用 istio-cni 替代</td></tr>
+    <tr><td><b>15001 / 15006</b></td><td>Envoy 的出站 / 入站虚拟监听端口（具体以你版本为准），流量被 REDIRECT 到这里</td></tr>
+    <tr><td><b>SO_ORIGINAL_DST</b></td><td>REDIRECT 后 Envoy 用它取回原目的地址，否则不知道该转发到哪</td></tr>
+    <tr><td><b>uid 1337</b></td><td>Envoy 进程运行的 uid，iptables 规则里排除它以避免流量环路</td></tr>
+    <tr><td><b>VirtualService</b></td><td>路由表：匹配规则、权重、超时、重试、故障注入</td></tr>
+    <tr><td><b>DestinationRule</b></td><td>目标策略：subset、负载均衡、连接池上限、异常点驱逐</td></tr>
+    <tr><td><b>subset</b></td><td>按标签切出的实例分组（如 v1/v2），是灰度权重的作用对象</td></tr>
+    <tr><td><b>outlierDetection</b></td><td>被动健康检查，连续错误达阈值就临时摘除实例，需配 maxEjectionPercent 上限</td></tr>
+    <tr><td><b>SPIFFE ID</b></td><td>工作负载身份，形如 spiffe://信任域/ns/命名空间/sa/服务账号，来自 ServiceAccount 而非 IP</td></tr>
+    <tr><td><b>PERMISSIVE / STRICT</b></td><td>mTLS 的两档：前者明文与 mTLS 都接受（迁移期），后者只接受 mTLS</td></tr>
+    <tr><td><b>AuthorizationPolicy</b></td><td>L7 授权：谁可以调谁的什么方法，DENY 优先于 ALLOW</td></tr>
+    <tr><td><b>Sidecar 资源</b></td><td>限缩 sidecar 接收哪些服务的配置，用来控制 xDS 推送体积</td></tr>
+    <tr><td><b>ambient 模式</b></td><td>较新版本提供的无 sidecar 数据面（ztunnel + waypoint），生产落地情况以版本为准</td></tr>
+  </table>
+
+  <div class="callout ok">
+    <b>下一步怎么练：</b>① 起两个版本的 Deployment（v1/v2 各带不同 version 标签），用 DR 切 subset、VS 配 90/10 权重，然后故意把 subset 名字写错一次，观察流量如何静默落回 100%，再用 <span class="k">istioctl analyze</span> 抓出来——这个对比会让你记住「配置失效不报错」。② 在一个测试 Pod 上进 netns 打印 iptables 的 nat 表，数一数有几条 ISTIO_ 开头的链，再把 <span class="k">istio-proxy</span> 容器的 uid 改成非 1337 试试会发生什么（不要在生产做）。③ 用 VirtualService 的 fault 给带特定 header 的请求注入 2 秒延迟，同时用循环 curl 观察 P99，体会「注入点有多便宜」。<br><br>
+    <b>之后值得单独学：</b>第 44 期讲混沌工程，网格的故障注入只是注入手段之一，那一篇会把实验设计四要素讲全；第 32 期讲限流熔断降级，网格里的连接池和异常点驱逐只是把同样的思想搬到了 sidecar，阈值怎么定还得回那一篇；第 12 期讲 K8s 网络与 Service/Endpoints，能解释「iptables 劫持」到底改的是哪一层。
+  </div>
+</section>
+
+</main>
+
+<footer>求职冲刺专栏 · 第 43 期 · 网格卖的不是灰度、mTLS 和指标，是「把这些能力从应用代码里搬出来」这件事</footer>
+
+<script>
+var total=1200,left=total,timer=null,running=false;
+var clock=document.getElementById('clock'),startBtn=document.getElementById('start'),hint=document.getElementById('hint');
+function fmt(s){var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x;}
+function tick(){
+  left--;clock.textContent=fmt(Math.max(left,0));
+  if(left<=180&&left>0){clock.classList.add('done');}
+  if(left<=0){
+    clearInterval(timer);running=false;clock.textContent='00:00';clock.classList.add('done');
+    startBtn.textContent='再来一轮';
+    hint.textContent='时间到。模块 3（PromQL）和模块 5（告警）是重点，值得再读一遍。';
+  }
+}
+startBtn.onclick=function(){
+  if(running){clearInterval(timer);running=false;startBtn.textContent='继续';return;}
+  if(left<=0){left=total;clock.classList.remove('done');clock.textContent=fmt(left);}
+  running=true;startBtn.textContent='暂停';
+  hint.textContent='计时中 —— 边看边在 Graph 页面里敲 PromQL。';
+  timer=setInterval(tick,1000);
+};
+document.getElementById('reset').onclick=function(){
+  clearInterval(timer);running=false;left=total;
+  clock.textContent=fmt(total);clock.classList.remove('done');
+  startBtn.textContent='开始计时';
+  hint.textContent='建议边看边敲：起一个 Prometheus，用 node_exporter 当抓取目标';
+};
+window.addEventListener('scroll',function(){
+  var h=document.documentElement.scrollHeight-window.innerHeight;
+  document.getElementById('bar').style.width=(h>0?(window.scrollY/h*100):0)+'%';
+});
+document.querySelectorAll('.copy').forEach(function(b){
+  b.onclick=function(){
+    var t=b.parentNode.querySelector('code').textContent;
+    var done=function(){b.textContent='已复制';b.classList.add('ok');setTimeout(function(){b.textContent='复制';b.classList.remove('ok');},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,function(){fb(t);done();});}
+    else{fb(t);done();}
+  };
+});
+function fb(t){
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';
+  document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+}
+document.querySelectorAll('.q').forEach(function(q){
+  var idx=parseInt(q.dataset.a,10),opts=q.querySelectorAll('.opt');
+  opts.forEach(function(o,i){
+    o.onclick=function(){
+      if(q.dataset.done)return;
+      q.dataset.done='1';
+      opts.forEach(function(x,j){x.classList.add(j===idx?'right':'wrong');});
+      q.querySelector('.ans').classList.add('show');
+    };
+  });
+});
+</script>
+<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+</body>
+</html>
