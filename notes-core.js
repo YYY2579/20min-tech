@@ -1299,12 +1299,27 @@
 
   var homeIds = [];
 
+  // 把首页里的相对链接解析成与 docId() 同口径的文档 ID，
+  // 否则子站（10-interview/index.html）的徽章与已读进度会全部对不上。
+  function hrefDocId(href) {
+    try {
+      var a = document.createElement('a');
+      a.href = href;
+      var root = siteRootPath().replace(/\/+$/, '');
+      var p = a.pathname || '';
+      if (root && p.indexOf(root + '/') === 0) p = p.slice(root.length + 1);
+      else if (p.charAt(0) === '/') p = p.slice(1);
+      return (p.replace(/\/+$/, '')) || 'index.html';
+    } catch (e) { return href; }
+  }
+
   function homeDocIds() {
     if (homeIds.length) return homeIds;
     $$('a.row[href], a.fcard[href]').forEach(function (a) {
       var href = a.getAttribute('href') || '';
+      var id = hrefDocId(href);
       if (/\.html?$/.test(href) && href.indexOf('://') < 0 && href.indexOf('#') < 0 &&
-          homeIds.indexOf(href) < 0) homeIds.push(href);
+          homeIds.indexOf(id) < 0) homeIds.push(id);
     });
     return homeIds;
   }
@@ -1313,9 +1328,10 @@
     homeDocIds();
     $$('a.row[href], a.fcard[href]').forEach(function (a) {
       var href = a.getAttribute('href') || '';
-      if (homeIds.indexOf(href) < 0) return;
+      var id = hrefDocId(href);
+      if (homeIds.indexOf(id) < 0) return;
       var badge = el('span', 'n20-rb', '✓ 已读');
-      badge.dataset.fn = href;
+      badge.dataset.fn = id;
       badge.hidden = true;
       var arr = a.querySelector('.rarr');
       if (arr) a.insertBefore(badge, arr); else a.appendChild(badge);
@@ -1346,8 +1362,9 @@
     $$('.n20-rb').forEach(function (b) { b.hidden = !readApi.is(b.dataset.fn); });
     $$('a.row[href], a.fcard[href]').forEach(function (a) {
       var href = a.getAttribute('href') || '';
-      if (homeIds.indexOf(href) < 0) return;
-      a.classList.toggle('n20-read', readApi.is(href));
+      var id = hrefDocId(href);
+      if (homeIds.indexOf(id) < 0) return;
+      a.classList.toggle('n20-read', readApi.is(id));
     });
     var n = $('#n20-hstat-n');
     if (n) n.textContent = readApi.count(homeIds) + '/' + homeIds.length;

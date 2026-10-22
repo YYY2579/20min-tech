@@ -24,7 +24,7 @@ import re
 import sys
 
 ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.abspath(__file__))
-VERSION = '4'  # ← 每次改 notes-core.js 必须 +1（v4：一章多笔记 + creating 修复 + chips 刷新 + 迁移修复）
+VERSION = '5'  # ← 每次改 notes-core.js 必须 +1（v4：一章多笔记 + creating 修复 + chips 刷新 + 迁移修复）
 SKIP = {'404.html'}
 
 TAG_RE = re.compile(

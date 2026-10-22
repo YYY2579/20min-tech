@@ -37,6 +37,8 @@ GROUPS = [
       '40-jvm-troubleshooting', '48-aiops', '36-written-test']),
 ]
 
+GCOLORS = ['#2E5BFF','#0F766E','#6A4FD0','#B45309','#BE123C','#7C3AED','#0E7A5F','#C2410C']
+
 FEATURED = [
     ('01-battle-map.html', '从这篇开始', '三层能力模型、高频题分布、30 天冲刺表。看完就知道剩下 47 篇读哪几篇。'),
     ('21-incident.html', '面试必问', '「讲一次你处理的事故」的前 5 分钟动作、复盘模板和三分钟逐字稿。'),
@@ -93,8 +95,6 @@ for i, (name, desc, items) in enumerate(GROUPS):
     for slug in items:
         idx += 1
         t, s = meta(slug)
-        if len(s) > 66:
-            s = s[:66] + '…'
         rows.append(f'''      <a class="row" href="{slug}.html" data-g="g{i}" data-title="{esc(t.lower())} {esc(s.lower())}">
         <span class="rnum">{idx:02d}</span>
         <span class="rbody"><span class="rt">{esc(t)}</span><span class="rd">{esc(s)}</span></span>
@@ -103,6 +103,7 @@ for i, (name, desc, items) in enumerate(GROUPS):
       </a>''')
     groups_html.append(f'''    <section class="group" data-group="g{i}">
       <div class="ghead">
+        <span class="gbar" style="background:{GCOLORS[i]}"></span>
         <span class="gname">{name}</span>
         <span class="gdesc">{esc(desc)}</span>
         <span class="gcount">{len(items)} 篇</span>
@@ -121,6 +122,7 @@ HTML = f'''<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232E5BFF'/%3E%3Ctext x='16' y='22' font-size='15' font-family='system-ui' font-weight='700' fill='%23fff' text-anchor='middle'%3E20%3C/text%3E%3C/svg%3E">
 <title>求职冲刺 · {total} 篇面试手册 · 20分钟速学</title>
 <meta name="description" content="面向运维 / SRE / 云原生的求职冲刺专栏：{total} 篇每篇 20 分钟读完的中文面试手册，覆盖 Linux、网络、Docker、Kubernetes、可观测性、MySQL/Redis、系统设计、事故复盘、行为面、谈薪与简历。纯静态 HTML，离线可用。">
 <style>
@@ -192,21 +194,23 @@ h1 .grad{{background:linear-gradient(120deg,var(--accent) 10%,#7B5CFF 90%);-webk
 
 main{{max-width:1080px;margin:0 auto;padding:8px 24px 10px}}
 .group{{margin-top:22px}}
-.ghead{{display:flex;align-items:baseline;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line);position:sticky;top:102px;background:rgba(246,247,249,.94);backdrop-filter:blur(8px);z-index:30}}
-.gname{{font-size:15.5px;font-weight:700;letter-spacing:-.2px;white-space:nowrap}}
+.ghead{{display:flex;align-items:baseline;gap:9px;padding:9px 12px 8px 14px;position:relative;border-bottom:1px solid var(--line);position:sticky;top:56px;background:#F6F7F9;z-index:30}}
+.gbar{{position:absolute;left:0;top:10px;bottom:8px;width:3px;border-radius:3px}}
+.gname{{font-size:14px;font-weight:700;letter-spacing:-.2px;white-space:nowrap}}
 .gdesc{{font-size:12.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}}
 .gcount{{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}}
-.rows{{display:flex;flex-direction:column}}
-.row{{display:flex;align-items:center;gap:14px;padding:9px 12px;border-radius:10px;text-decoration:none;transition:background .12s,box-shadow .12s;border-bottom:1px solid var(--line2)}}
+.rows{{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-top:8px;overflow:hidden}}
+.row{{display:flex;align-items:center;gap:14px;padding:9px 14px;text-decoration:none;transition:background .12s;border-bottom:1px solid var(--line2)}}
 .rows .row:last-child{{border-bottom:0}}
-.row:hover{{background:var(--card);box-shadow:var(--shadow)}}
+.row:hover{{background:#FAFBFC}}
 .rnum{{flex:none;width:26px;font-size:11.5px;font-weight:700;color:var(--faint);font-variant-numeric:tabular-nums;text-align:right}}
-.rbody{{flex:1;min-width:0;display:flex;flex-direction:column}}
+.rbody{{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}}
 .rt{{font-size:14.5px;font-weight:600;letter-spacing:-.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
-.rd{{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}}
+.rd{{font-size:12.2px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 .rmin{{flex:none;font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}}
 .rarr{{flex:none;width:16px;color:var(--accent);opacity:0;transform:translateX(-4px);transition:.15s;font-weight:700}}
 .row:hover .rarr{{opacity:1;transform:none}}
+.n20-rb[hidden]{{display:none!important}}
 .empty{{display:none;text-align:center;padding:64px 0 80px;color:var(--faint)}}
 .empty .big{{font-size:38px;margin-bottom:10px}}
 .empty .t{{font-size:14.5px;color:var(--muted)}}

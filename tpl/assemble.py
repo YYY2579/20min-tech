@@ -24,6 +24,7 @@ DOC = '''<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{title}</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232E5BFF'/%3E%3Ctext x='16' y='22' font-size='15' font-family='system-ui' font-weight='700' fill='%23fff' text-anchor='middle'%3E20%3C/text%3E%3C/svg%3E">
 <style>{css}</style>
 </head>
 <body>
@@ -37,7 +38,7 @@ DOC = '''<!DOCTYPE html>
 {body}
 
 {js}
-<script src="../notes-core.js?v=4" id="n20-core" defer></script>
+<script src="../notes-core.js?v=5" id="n20-core" defer></script>
 </body>
 </html>
 '''

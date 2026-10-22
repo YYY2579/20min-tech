@@ -88,7 +88,8 @@
 
 ```
 .
-├── index.html                    首页（搜索 + 分类导航 + 已读进度）
+├── index.html                    首页（左侧分类导航 + 搜索 + 已读进度 + 学习路径）
+├── catalog.html                  完整目录页（build-index.py 一并生成）
 ├── 404.html
 ├── .nojekyll                     跳过 Jekyll 处理
 ├── notes-core.js                 笔记/已读核心模块（唯一被 246 篇共享的文件）
@@ -116,8 +117,8 @@
 ## 维护工作流
 
 ```bash
-# 1. 改完任何文档后，重新生成首页（自动提取标题/简介/标签）
-python build-index.py
+# 1. 改完任何文档后，重新生成首页与目录页（自动提取标题/简介）
+python build-index.py          # index.html + catalog.html
 
 # 2. 改了 notes-core.js？先把 inject-notes.py 里的 VERSION +1（缓存穿透，必须！），
 #    再把笔记模块注入所有页面（幂等；版本号不变则跳过，变了则自动替换旧版本）
